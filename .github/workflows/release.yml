@@ -39,7 +39,7 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
+      # Ubuntu 运行器已预装 Android SDK（ANDROID_HOME 已设置），无需再安装
 
       - name: 准备安卓工程（页面 + 版本号 + 可选正式签名）
         run: |
