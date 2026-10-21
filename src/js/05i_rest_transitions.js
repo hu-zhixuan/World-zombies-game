@@ -61,7 +61,6 @@ function resetInputAndInteractionState(){
   // 4. Close all floating modals & popovers
   if(typeof isBackpackOpen === 'function' && isBackpackOpen()) closeBackpack();
   if(typeof isDuffWorkshopOpen === 'function' && isDuffWorkshopOpen()) closeDuffWorkshop();
-  if(typeof isTacticalFeastOpen === 'function' && isTacticalFeastOpen()) closeTacticalFeastModal();
   if(typeof isExpeditionOpen === 'function' && isExpeditionOpen()) closeExpeditionModal();
   if(typeof closeShop === 'function' && typeof shopOpen !== 'undefined' && shopOpen) closeShop();
   if(typeof closeCabinUpgradeUI === 'function' && typeof cabinUIOpen !== 'undefined' && cabinUIOpen) closeCabinUpgradeUI();
@@ -592,7 +591,7 @@ function getDamage(base){
     if(dMod > 0) dmg *= (1 + dMod * 0.15);
   }
   // ── 战前特餐：龙息炙烤盛宴 全伤害+35% ──
-  if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'dragon'){
+  if(activeSignature && activeSignature.id === 'dragon'){
     dmg *= 1.35;
   }
   // ── v51模块四：武器改装台——当前武器每改装+10%（与军火库全局加成叠乘）──

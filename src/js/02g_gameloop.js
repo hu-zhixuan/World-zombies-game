@@ -20,7 +20,7 @@ function gameLoop(){
   try{
   frameT++;
   checkStuckWatchdog();  // 防卡死检测
-  if(shopOpen||cabinUIOpen||gamePaused||cinActive||gameState==='restaurant'||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen())||(typeof isTacticalFeastOpen==='function'&&isTacticalFeastOpen())){
+  if(shopOpen||cabinUIOpen||gamePaused||cinActive||gameState==='restaurant'||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen())){
     updateNextWaveBtn();
     return;  // finally块会继续调度下一帧
   }
@@ -37,13 +37,13 @@ function gameLoop(){
   }
   if(window._globalDmgNumCd>0)window._globalDmgNumCd--;  // 伤害数字全局限频衰减
   // ── 战前特餐：十全大补汤持续回血 (每90帧=1.5秒回2血) ──
-  if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'stew' && frameT % 90 === 0 && health < maxHp && gameState === 'world'){
+  if(activeSignature && activeSignature.id === 'stew' && frameT % 90 === 0 && health < maxHp && gameState === 'world'){
     health = Math.min(maxHp, health + 2);
     updateHpUI();
     spawnFloatText('❤+2 🍲', player.x + CHAR_W/2, player.y - 25, '#88ffaa');
   }
   // ── 战前特餐：麻辣爆烤翻滚留火海 (仅在战斗世界生效) ──
-  if(gameState === 'world' && typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'spicy' && dodgeT > 0 && frameT % 4 === 0){
+  if(gameState === 'world' && activeSignature && activeSignature.id === 'spicy' && dodgeT > 0 && frameT % 4 === 0){
     if(!window._groundFires) window._groundFires = [];
     window._groundFires.push({ x: player.x + CHAR_W/2, y: Z_TOP+50, life: 240, dmg: 35, tickT: 45 });
   }

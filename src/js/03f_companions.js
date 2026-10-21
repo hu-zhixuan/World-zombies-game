@@ -95,7 +95,7 @@ function updateCompanions() {
       // 狙击手AI：远程精准射击（射程800，高伤害，低射速）
       // v50模块二：哨笛狂暴——hornRage 期间射速×2伤害+50%
       const rageMul = c.hornRage > 0 ? 1.5 : 1;
-      const fireRate = Math.floor((c.fireRate || 240) / (c.hornRage > 0 ? 2 : 1));
+      const fireRate = Math.floor((c.fireRate || 240) / ((c.hornRage > 0 ? 2 : 1) * (c.mealBoost || 1)));
       if (c.timer >= fireRate) {
         const range = c.isStoryNpc ? 800 : 700;
         const near = findNearestEnemy(c.x + CHAR_W/2, c.y + 30, range);
@@ -131,7 +131,7 @@ function updateCompanions() {
       }
       if (gameState === 'building') c.x = Math.max(35, Math.min(GW - 50, c.x));
       // 医疗兵AI：定期治疗玩家+偶尔治疗附近友军
-      const healRate = c.healRate || 360;
+      const healRate = (c.healRate || 360) / (c.mealBoost || 1);
       if (c.timer >= healRate) {
         if (health < maxHp * 0.95) {
           c.timer = 0;
@@ -174,7 +174,7 @@ function updateCompanions() {
       }
       if (gameState === 'building') c.x = Math.max(35, Math.min(GW - 50, c.x));
       // 机枪手AI：3连发扫射（射程500，主循环帧驱动，零原生定时器泄漏）；v50模块二：哨笛狂暴——射速×2伤害+50%
-      const fireRate = Math.floor((c.fireRate || 100) / (c.hornRage > 0 ? 2 : 1));
+      const fireRate = Math.floor((c.fireRate || 100) / ((c.hornRage > 0 ? 2 : 1) * (c.mealBoost || 1)));
       if (c.timer >= fireRate && (!c.burstShots || c.burstShots <= 0)) {
         const near = findNearestEnemy(c.x + CHAR_W/2, c.y + 30, 500);
         if (near) {

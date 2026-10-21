@@ -43,8 +43,8 @@
     <button id="expedition-btn" class="hdr-btn" onclick="openExpeditionModal()" title="旧城区远征探险看板 [E]" style="background:rgba(42,24,12,0.85);border:1.5px solid #ff922b;color:#ffd8a8;box-shadow:0 0 10px rgba(255,146,43,0.25);">🗺️远征</button>
     <button id="workshop-btn" class="hdr-btn" onclick="openDuffWorkshop()" title="小胡军备改造台 [M]" style="background:rgba(18,32,54,0.85);border:1.5px solid #00d4ff;color:#a5f3fc;box-shadow:0 0 12px rgba(0,212,255,0.3);">🛠️改造(M)</button>
     <button id="manage-btn" class="hdr-btn" onclick="openManageUI()" title="据点建设与经营管理" style="background:rgba(28,40,32,0.85);border:1.5px solid #2ecc71;color:#a3e635;box-shadow:0 0 10px rgba(46,204,113,0.3);">🏗️建设</button>
-    <div id="tactical-meal-hud" style="display:none;align-items:center;gap:5px;background:rgba(60,20,15,0.85);border:1.5px solid #ff6b6b;border-radius:14px;padding:2px 10px;font-family:var(--font-display);font-size:0.75rem;color:#ffe0e0;box-shadow:0 0 10px rgba(255,107,107,0.4);">
-      <span id="tm-hud-icon">🍲</span> <span id="tm-hud-text">特餐生效</span>
+    <div id="meal-hud" style="display:none;align-items:center;gap:5px;background:rgba(60,34,15,0.88);border:1.5px solid #f0b060;border-radius:14px;padding:2px 10px;font-family:var(--font-display);font-size:0.75rem;color:#ffe9c4;box-shadow:0 0 10px rgba(240,176,96,0.4);max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+      <span id="meal-hud-icon">🍽️</span> <span id="meal-hud-text">昨晚吃了…</span>
     </div>
     <button id="next-wave-btn" class="hdr-btn" onclick="skipToNextWave()" style="display: none;background:linear-gradient(180deg,#27ae60,#1e8449);border:1.5px solid #2ecc71;color:#fff;box-shadow:0 0 12px rgba(46,204,113,0.4);">▶ 下一波</button>
     <button id="pause-btn" class="hdr-btn" onclick="togglePause()" style="background:rgba(22,26,38,0.85);border:1.5px solid rgba(148,163,184,0.4);color:#cbd5e1;box-shadow:0 0 8px rgba(0,0,0,0.4);">⏸ 暂停</button>
@@ -134,7 +134,6 @@
       <div class="cabin-tab" onclick="switchCabinTab('shop')">📦 战地补给军备</div>
       <div class="cabin-tab" onclick="switchCabinTab('kitchen')">📋 战饭菜单整备</div>
       <div class="cabin-tab" onclick="switchCabinTab('workshop')">🛠️ 小胡军备改造台</div>
-      <div class="cabin-tab" onclick="switchCabinTab('feast')">🍲 战前战备特餐</div>
     </div>
     <div id="cabin-resources">
       <span id="cabin-res-wood">木材: 0</span>
@@ -162,10 +161,6 @@
     <!-- 小胡战备改造工坊内嵌面板 -->
     <div id="cabin-workshop-panel" style="display:none;width:100%;flex-direction:column;align-items:center;padding:8px 12px;overflow-y:auto;max-height:360px;">
       <div id="cabin-ws-content" style="width:100%;max-width:760px;"></div>
-    </div>
-    <!-- 战前特餐内嵌面板 -->
-    <div id="cabin-feast-panel" style="display:none;width:100%;flex-direction:column;align-items:center;padding:8px 12px;overflow-y:auto;max-height:360px;">
-      <div id="cabin-tf-content" style="width:100%;max-width:760px;"></div>
     </div>
     <button id="cabin-close" onclick="closeCabinUpgradeUI()">继续 →</button>
   </div>
@@ -205,7 +200,6 @@
         <div id="rest-end-stats" style="font-family:var(--font-body);color:#cbd5e1;font-size:.9rem;line-height:1.8;width:100%;text-align:center;"></div>
         <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;justify-content:center;width:100%;">
           <button class="big-btn" onclick="finishRestaurantToWorkshop()" style="border-color:#00d4ff;color:#e0f7ff;background:linear-gradient(180deg,rgba(0,212,255,0.25),rgba(0,140,210,0.35));box-shadow:0 0 14px rgba(0,212,255,0.3);font-size:0.88rem;padding:8px 16px;border-radius:8px;">🛠️ 小胡军备改造台 [M]</button>
-          <button class="big-btn" onclick="finishRestaurantToFeast()" style="border-color:#ff6b6b;color:#ffe4e4;background:linear-gradient(180deg,rgba(255,107,107,0.25),rgba(200,60,60,0.35));box-shadow:0 0 14px rgba(255,107,107,0.3);font-size:0.88rem;padding:8px 16px;border-radius:8px;">🍲 小胡战备特餐灶台</button>
           <button class="big-btn" onclick="closeRestaurant()" style="border-color:#2ecc71;color:#e8fdf0;background:linear-gradient(180deg,rgba(46,204,113,0.25),rgba(39,174,96,0.35));box-shadow:0 0 14px rgba(46,204,113,0.3);font-size:0.88rem;padding:8px 16px;border-radius:8px;">迎接黎明出击 →</button>
         </div>
       </div>
@@ -399,35 +393,6 @@
     </div>
   </div>
 
-  <!-- TACTICAL FEAST MODAL (战前战备特餐 - 小胡军用秘制灶台) -->
-  <div id="tactical-feast-modal" style="display:none;">
-    <div style="position:absolute;inset:0;background:rgba(12,6,8,0.92);" onclick="closeTacticalFeastModal()"></div>
-    <div class="tf-window">
-      <div class="tf-header">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <span style="font-size:2rem;line-height:1;filter:drop-shadow(0 0 10px rgba(255,107,107,0.6));">🍲</span>
-          <div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <div style="font-family:var(--font-display);font-size:1.3rem;color:#ff7878;font-weight:900;letter-spacing:1px;text-shadow:0 0 16px rgba(255,107,107,0.6);">
-                战前战备特餐 · 小胡深夜特调秘制灶台
-              </div>
-              <span style="font-size:0.58rem;padding:2px 8px;border-radius:4px;background:rgba(255,107,107,0.18);border:1px solid #ff7878;color:#ff9999;font-weight:700;letter-spacing:1px;">战前能量补给</span>
-            </div>
-            <div style="font-size:0.68rem;color:#d0a0a0;margin-top:2px;">出击防线前特供 · 消耗僵尸食材享用强力大餐 · 赋予防线肉眼可见的战斗机制</div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;font-size:0.75rem;">
-          <div id="tf-meat-summary" style="display:flex;gap:6px;color:#ffd8a8;"></div>
-          <button style="background:rgba(180,40,40,0.25);border:1px solid #ff5555;color:#ff9999;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:700;transition:all .15s;" onmouseover="this.style.background='rgba(220,50,50,0.4)'" onmouseout="this.style.background='rgba(180,40,40,0.25)'" onclick="closeTacticalFeastModal()">✕ 关闭 (Esc)</button>
-        </div>
-      </div>
-      <div style="padding:10px 18px;background:rgba(0,0,0,0.3);border-bottom:1px solid rgba(255,107,107,0.2);font-size:0.72rem;color:#e8c4b8;display:flex;justify-content:space-between;align-items:center;">
-        <span id="tf-active-status">当前生效特餐: <b>暂无 (出击前可享用一份)</b></span>
-        <span style="color:#ffd875;">🍽️ 享用后持续整整一波战斗，下次回据点可再次烹调</span>
-      </div>
-      <div class="feast-grid" id="tf-grid"></div>
-    </div>
-  </div>
 
   <!-- CINEMATIC FULL-SCREEN DIALOGUE v2.0（视觉小说式剧情演出） -->
   <div id="cinematic-scr" class="">
@@ -534,7 +499,7 @@
         ✨ 小胡的潜意识梦境 · 深层冥想
       </h2>
       <p style="font-size:0.85rem;color:#94a3b8;margin-bottom:18px;text-align:center;max-width:620px;line-height:1.5;">
-        末世无眠之夜，小胡在微光中闭上双眼。沉睡潜意识在星辉与余烬中浮沉，领悟破晓时分的求生奥秘...请选择今夜的潜意识梦境启示：
+        末世无眠之夜，小胡在微光中闭上双眼。梦里的收获带不上战场，却会留在这间小屋里……选一个今夜的梦（每天一次）：
       </p>
       <div id="dream-cards-container" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;width:100%;margin-bottom:18px;">
       </div>

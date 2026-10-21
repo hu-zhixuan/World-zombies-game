@@ -6,7 +6,8 @@ let score=0,best=0,health=100,maxHp=100,coins=100;
 let moraleBuff=0;  // 士气加成：餐厅经营越好，下一波战斗伤害/移速越高（0=无加成）
 // ── 经营→战斗联动：菜品增益队列（餐厅上菜品质good+时按菜谱buffId入队，下一波生效）──
 let queuedBattleBuffs=[];  // [{id:'dmg_small'|'hp_regen'|'armor'|'dmg_med'|'berserk'|'all_buff', stacks:1-2}]
-let activeBattleBuffs=[];   // 本波生效中的增益 [{id,stacks,timeLeft}]
+let activeBattleBuffs=[];   // 本波生效中的增益 [{id,stacks,timeLeft,dishName}]
+let activeSignature=null;   // 本波生效中的「留饭」招牌特效（DISH_SIGNATURES 之一，见 05j）
 // 增益定义表（HUD显示+效果说明）
 const BATTLE_BUFF_DEFS={
   dmg_small:{icon:'🍖',name:'增益小餐',desc:'伤害+10%'},

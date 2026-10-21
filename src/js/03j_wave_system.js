@@ -13,30 +13,8 @@ function nextWave(){
   wavePhase='waiting'; // 防止章节卡/对话期间误判清场
   safehouseRestUsed = false;
   safehouseCraftUsed = false;
-  // ── 经营→战斗联动：应用菜品增益（上一夜餐厅上菜品质good+入队的增益）──
-  if(queuedBattleBuffs.length > 0){
-    // v52两界互锁：完美品质增益——效果×1.5（层数向上取整）、持续+50%
-    activeBattleBuffs = queuedBattleBuffs.map(b => {
-      const boostMul = b.boosted ? 1.5 : 1;
-      const dur = Math.round(60*60 * (b.boosted ? 1.5 : 1));
-      return {...b, stacks: Math.max(1, Math.ceil(b.stacks*boostMul)), timeLeft: dur};
-    });
-    const names = activeBattleBuffs.map(b => {
-      const def=BATTLE_BUFF_DEFS[b.id];
-      const qTag = b.boosted ? '✨' : '';
-      return def ? def.icon+def.name+qTag : b.id;
-    }).join(' ');
-    addBanner('🍲 美味增益生效：' + names + (activeBattleBuffs.some(b=>b.boosted) ? '（含完美强化）' : ''));
-    // v52肉鸽·餐厅线：余味悠长——增益本波结束后保留一半层数进队列（不再单波清零）
-    if(playerPerks.buffextend){
-      queuedBattleBuffs = queuedBattleBuffs.map(b => ({id:b.id, stacks:Math.max(1, Math.ceil(b.stacks/2))}));
-      addBanner('⏳ 余味悠长：增益层数减半延续至下一波');
-    }else{
-      queuedBattleBuffs = [];  // 消耗队列（每夜菜品只强化下一波）
-    }
-  }else{
-    activeBattleBuffs = [];  // 无新增益则清空（不无限续）
-  }
+  // ── 经营→战斗联动：夜里做的饭（卖出的菜的增益 + 留饭的招牌特效）在这里生效 ──
+  applyOvernightMeals();
   // ── VIP 兑现：狂牙的看门兽（传说品质时 _freeTowerPending+1，这里兑现为免费机枪塔）──
   if(window._freeTowerPending > 0){
     let placed = 0;
@@ -281,11 +259,7 @@ function onWaveCleared(){
 
   // 正常波清场
   addBanner(`✅ 第 ${wave} 波大捷！击杀 ${waveKilledThisWave} 只`);
-  if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal){
-    addBanner(`🍲 战备特餐「${activeTacticalMeal.name}」效力已耗尽。回据点可重新烹制！`);
-    activeTacticalMeal = null;
-    if(typeof updateTacticalMealHUD === 'function') updateTacticalMealHUD();
-  }
+  endOvernightMeals();
   
   // ── 【做减法：战后强磁吸】全场肉块与金币瞬间吸入背包 ──
   vacuumAllLoot();

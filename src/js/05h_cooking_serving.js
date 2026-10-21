@@ -171,14 +171,31 @@ function renderCookingStation(){
         closeRestModal();
         startCookingQTE(recipe);
       };
+      // 留一份：不卖，带上战场（招牌特效 + 更强增益，队友同享）。一晚一份。
+      const sig = recipeSignature(recipe);
+      const keepBtn = document.createElement('button');
+      const keepOk = canPackFamilyMeal();
+      keepBtn.textContent = keepOk ? '🍱 留一份' : '🍱 已留';
+      keepBtn.disabled = !keepOk;
+      keepBtn.title = (sig ? sig.icon + sig.name + '（' + sig.badge + '）：' + sig.effectDesc + '\n' : '') + '不卖给客人，明天出击前和队友一起吃。一晚只能留一份。';
+      keepBtn.style.cssText = 'margin-left:8px;padding:3px 8px;border-radius:6px;border:1px solid #ffd868;background:rgba(255,216,104,.15);color:#ffe9a8;font-size:.68rem;cursor:' + (keepOk ? 'pointer' : 'not-allowed') + ';opacity:' + (keepOk ? 1 : .5) + ';';
+      keepBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        closeRestModal();
+        startCookingQTE(recipe, { forFamily: true });
+      };
+      div.appendChild(keepBtn);
     }
     list.appendChild(div);
   });
 }
 
-function startCookingQTE(dish){
+function startCookingQTE(dish, opts){
   // 菜单制：dish 是 REST_RECIPES 菜谱对象——先扣肉，QTE 只定品质
+  // opts.forFamily：这一份不上出餐口，做成「留饭」带上战场（见 05j packFamilyMeal）
   const recipe = dish;
+  const forFamily = !!(opts && opts.forFamily);
+  if(forFamily && !canPackFamilyMeal()){ addBanner('🍱 已经留了一份饭了，一晚只留一份'); return; }
   const canCook = Object.keys(recipe.cost).every(m => meatInventory[m] >= recipe.cost[m]);
   if(!canCook){ addBanner('⚠ 肉不够了！'); return; }
   Object.keys(recipe.cost).forEach(m => { meatInventory[m] -= recipe.cost[m]; });
@@ -205,6 +222,7 @@ function startCookingQTE(dish){
     stove.sizzleT = 0;
     stove._quality = quality;
     stove._cookedBy = null;
+    stove._forFamily = forFamily;
     sndCookSizzle();
     RestAudio.init();
     RestAudio.playSizzle();
@@ -680,7 +698,12 @@ function restLoop(now){
             finalQuality=qOrder[qi+1];
           }
         }
-        restReadyDishes.push({ recipeId: stove.recipe.id || 'dynamic', recipe: stove.recipe, quality: finalQuality });
+        if(stove._forFamily){
+          packFamilyMeal(stove.recipe, finalQuality);  // 留给自己和队友，不卖
+          stove._forFamily = false;
+        }else{
+          restReadyDishes.push({ recipeId: stove.recipe.id || 'dynamic', recipe: stove.recipe, quality: finalQuality });
+        }
         // 记录厨师贡献
         if(stove._cookedBy){stove._cookedBy.dishesCooked = (stove._cookedBy.dishesCooked||0)+1;}
         stove.recipe = null;
@@ -993,16 +1016,10 @@ function serveCustomer(c){
   restRep = Math.min(60, Math.max(-50, restRep + Math.floor(repGain * (repGain > 0 ? c.satisfaction : 1))));
   // ── 经营→战斗联动（激活 buffId）：品质 good+ 的菜按菜谱增益入队，下一波生效 ──
   // v52两界互锁：perfect+品质带 boosted 标记——下一波该增益效果×1.5、时长+50%
-  if(quality === 'good' || quality === 'perfect' || quality === 'legendary'){
+  {
     const buffRecipe = c.order ? REST_RECIPES.find(r => r.id === c.order) : null;
-    const buffId = (buffRecipe && buffRecipe.buffId) || null;
-    if(buffId){
-      const boosted = (quality === 'perfect' || quality === 'legendary');
-      queuedBattleBuffs = queuedBattleBuffs.filter(b => b.id !== buffId);  // 同名增益刷新时长
-      queuedBattleBuffs.push({ id: buffId, stacks: quality === 'legendary' ? 2 : 1, boosted });
-      if(boosted){
-        addRestFloatText('⚔ 完美品质！下波增益强化', c.walkX, c.seat.y - 105, '#ffd840');
-      }
+    if(queueDishBuff(buffRecipe, quality)){
+      addRestFloatText('⚔ 完美品质！下波增益强化', c.walkX, c.seat.y - 105, '#ffd840');
     }
   }
   // ── 美术E：上菜金色闪光（品质越高闪越强；粒子版闪光+放大金币飘字）──
@@ -1387,6 +1404,12 @@ function drawRestaurant(){
         ctx2.textAlign = 'left';
         const qName = {legendary:'传说',perfect:'完美',good:'良好',poor:'普通',burned:'焦'}[stove._quality]||'';
         ctx2.fillText(qName, sx + 24, sy - 12);
+      }
+      if(stove._forFamily){
+        ctx2.fillStyle = '#ffd868';
+        ctx2.font = 'bold 8px Microsoft YaHei UI,sans-serif';
+        ctx2.textAlign = 'center';
+        ctx2.fillText('🍱留饭', sx, sy - 20);
       }
       // 完成标记
       if(pct >= 1){
@@ -2331,6 +2354,7 @@ function endRestaurantNight(){
       ${moraleHtml}
       ${wastegramHtml}
       ${vipHtml}
+      ${restState.familyMeal ? `<div style="color:#ffd868;margin-top:6px;">🍱 留饭「${restState.familyMeal.name}」→ 明天出击前和队友一起吃${(DISH_SIGNATURES.find(g => g.id === restState.familyMeal.signatureId) || {}).badge ? '：' + DISH_SIGNATURES.find(g => g.id === restState.familyMeal.signatureId).badge : ''}</div>` : (tonightMenu.some(id => (REST_RECIPES.find(r => r.id === id) || {}).signatureId) ? '<div style="color:#b0a284;margin-top:6px;">🍱 今晚没留饭——明天出击没有招牌特效</div>' : '')}
       ${influencerBoost > 0 ? `<div style="color:#ff66cc;margin-top:6px;">📱 网红好评 ×${influencerBoost} → 下一夜客流+${influencerBoost * 30}%</div>` : ''}
       ${currentTrend ? `<div style="color:#ff8844;margin-top:4px;font-size:.72rem;">📱 今日热搜：${currentTrend.text}</div>` : ''}
       <div style="margin-top:6px;color:#dd88ff;font-size:.72rem;">${getSocialMediaRank().icon} 社媒等级：${getSocialMediaRank().name} (粉丝${wastegramFans})${getNextSocialMediaRank() ? ' → 下一级:'+getNextSocialMediaRank().name+'(需'+getNextSocialMediaRank().minFans+'粉)' : ' (满级)'}</div>

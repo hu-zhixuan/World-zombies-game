@@ -37,6 +37,7 @@
   "05g_restaurant_engine.js",
   "05h_cooking_serving.js",
   "05i_rest_transitions.js",
+  "05j_family_meal.js",
   "06a_ui_hud.js",
   "06b_save_boot.js"
 ]

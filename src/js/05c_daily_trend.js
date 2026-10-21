@@ -171,15 +171,29 @@ function trendMatchableNow(tr){
   }catch(e){ return true; }
 }
 
-// 热搜每天在白天第一波开始时刷新（nextWave→startWaveContent），晚上开张直接沿用，
-// 这样玩家打僵尸时就知道今晚什么菜好卖。只在"当前能做出匹配菜"的热搜里抽，且尽量不连续重复。
-function rollDailyTrend(){
+let nextTrendPreview = null;  // 梦境「预知之梦」提前抽好的明日热搜
+
+// 在"当前能做出匹配菜"的热搜里抽一条，尽量不和 exclude 重复
+function pickTrend(exclude){
   let pool = DAILY_TRENDS.filter(trendMatchableNow);
   if(pool.length === 0) pool = DAILY_TRENDS;
-  if(currentTrend && pool.length > 1) pool = pool.filter(t => t.id !== currentTrend.id);
-  currentTrend = pool[Math.floor(Math.random() * pool.length)];
+  if(exclude && pool.length > 1) pool = pool.filter(t => t.id !== exclude.id);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// 热搜每天在白天第一波开始时刷新（nextWave→startWaveContent），晚上开张直接沿用，
+// 这样玩家打僵尸时就知道今晚什么菜好卖。若梦里已预知明日热搜，则直接兑现那一条。
+function rollDailyTrend(){
+  currentTrend = nextTrendPreview || pickTrend(currentTrend);
+  nextTrendPreview = null;
   trendMeatToday = 0;
   return currentTrend;
+}
+
+// 梦境用：提前抽好明天的热搜并返回
+function previewTomorrowTrend(){
+  nextTrendPreview = pickTrend(currentTrend);
+  return nextTrendPreview;
 }
 
 // 热搜标签 → 哪种肉带这个标签 → 哪些僵尸掉这种肉

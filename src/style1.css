@@ -733,61 +733,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);
   50%{box-shadow:0 0 32px rgba(255,215,0,0.55),inset 0 0 20px rgba(255,215,0,0.2);border-color:#ffd700;}
 }
 
-/* ── TACTICAL FEAST MODAL (战前战备特餐 - 小胡军用秘制灶台) ── */
-#tactical-feast-modal{
-  position:fixed;inset:0;z-index:160;display:none;
-  align-items:center;justify-content:center;backdrop-filter:blur(8px);
-  background:rgba(12,6,8,0.92);
-}
-#tactical-feast-modal.open{display:flex;}
-.tf-window{
-  position:relative;width:95%;max-width:960px;max-height:92vh;
-  background:linear-gradient(180deg,#241210 0%,#120606 100%);
-  border:2px solid rgba(255,107,107,0.65);border-radius:16px;
-  box-shadow:0 0 50px rgba(0,0,0,0.95),0 0 30px rgba(255,107,107,0.25),inset 0 1px 0 rgba(255,255,255,0.1);
-  display:flex;flex-direction:column;overflow:hidden;
-  animation:modalSlideIn .25s cubic-bezier(0.16,1,0.3,1);
-}
-.tf-header{
-  display:flex;justify-content:space-between;align-items:center;padding:12px 20px;
-  background:linear-gradient(90deg,rgba(40,16,14,0.95) 0%,rgba(20,8,7,0.95) 100%);
-  border-bottom:2px solid rgba(255,107,107,0.35);
-}
-.feast-grid{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;
-  padding:16px;overflow-y:auto;
-  scrollbar-color:rgba(255,107,107,0.5) rgba(20,10,10,0.6);
-}
-.feast-grid::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#ff6b6b,#cc2222);box-shadow:0 0 6px rgba(255,107,107,0.5);}
-.feast-card{
-  background:linear-gradient(180deg,rgba(42,18,16,0.88) 0%,rgba(22,9,7,0.96) 100%);
-  border:1.5px solid #6a3225;border-radius:12px;padding:14px;
-  display:flex;flex-direction:column;gap:10px;transition:all .18s cubic-bezier(.2,.8,.2,1);position:relative;
-  box-shadow:0 4px 14px rgba(0,0,0,0.4);
-}
-.feast-card:hover{
-  transform:translateY(-3px);border-color:#ff8866;
-  box-shadow:0 8px 24px rgba(255,107,107,0.35);
-}
-.feast-card.active-feast{
-  border-color:#ffd700;box-shadow:0 0 24px rgba(255,215,0,0.45),inset 0 0 12px rgba(255,215,0,0.15);
-  background:linear-gradient(180deg,rgba(60,35,15,0.92),rgba(30,16,6,0.97));
-}
-.btn-feast-cook{
-  font-family:var(--font-display);font-size:0.78rem;padding:8px;border-radius:6px;
-  background:linear-gradient(180deg,#e67e22,#d35400);border:1px solid #f39c12;color:#fff;
-  cursor:pointer;font-weight:800;letter-spacing:1px;transition:all .18s;margin-top:auto;
-  box-shadow:0 4px 12px rgba(230,126,34,0.4);text-shadow:0 1px 2px rgba(0,0,0,0.5);
-}
-.btn-feast-cook:hover:not(:disabled){
-  background:linear-gradient(180deg,#f39c12,#e67e22);box-shadow:0 6px 18px rgba(243,156,18,0.6);
-  transform:translateY(-1px) scale(1.02);
-}
-.btn-feast-cook:disabled{
-  opacity:0.38;cursor:not-allowed;background:#2e1c18;border-color:#4a2b25;
-  box-shadow:none;transform:none;
-}
-
 /* 下一波按钮 */
 #next-wave-btn{font-family:var(--font-display);font-size:.75rem;letter-spacing:1px;
   padding:3px 10px;border-radius:3px;cursor:pointer;

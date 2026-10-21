@@ -1056,12 +1056,10 @@ function switchCabinTab(tab){
   const kitPanel = document.getElementById('cabin-kitchen-panel');
   const shopPanel = document.getElementById('cabin-shop-panel');
   const workPanel = document.getElementById('cabin-workshop-panel');
-  const feastPanel = document.getElementById('cabin-feast-panel');
   if(upgPanel) upgPanel.style.display = 'none';
   if(kitPanel) kitPanel.classList.remove('active');
   if(shopPanel) shopPanel.style.display = 'none';
   if(workPanel) workPanel.style.display = 'none';
-  if(feastPanel) feastPanel.style.display = 'none';
 
   if(tab === 'upgrade'){
     if(upgPanel) upgPanel.style.display = 'block';
@@ -1072,9 +1070,6 @@ function switchCabinTab(tab){
   } else if(tab === 'workshop'){
     if(workPanel) workPanel.style.display = 'flex';
     renderCabinWorkshopUI();
-  } else if(tab === 'feast'){
-    if(feastPanel) feastPanel.style.display = 'flex';
-    renderCabinFeastUI();
   } else {
     if(kitPanel) kitPanel.classList.add('active');
     buildKitchenUI();

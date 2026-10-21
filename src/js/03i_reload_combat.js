@@ -78,7 +78,7 @@ function reloadWeapon(){
     vfxReloadComplete(pivX,pivY);
   },s5To));
   reloadTimer=setInterval(()=>{
-    if(shopOpen||cabinUIOpen||gamePaused||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen())||(typeof isTacticalFeastOpen==='function'&&isTacticalFeastOpen()))return;
+    if(shopOpen||cabinUIOpen||gamePaused||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen()))return;
     prog+=inc;rldF.style.width=Math.min(prog,100)+'%';
     reloadAnimT=Math.max(0,100-prog);
     if(prog>=100){
@@ -320,7 +320,7 @@ function hitZombie(z,bx,by,dmg,fromX,fromY,knockbackMult,dmgType){
       spawnFloatText('⚡狂暴震击!', bx, by - 30, '#ffd700');
     }
     // ── 战前特餐：爆裂雷光拼盘（暴击/爆头天谴落雷与超导连锁跳跃）──
-    if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'thunder' && (crit || bodyPart === 'head')){
+    if(activeSignature && activeSignature.id === 'thunder' && (crit || bodyPart === 'head')){
       vfxRail(bx, 0, bx, by, '#dd66ff', '#8800ff');
       addShake(2.5);
       hitZombie(z, bx, by, 35, bx, 0, 1, 'energy');
@@ -1317,7 +1317,7 @@ function takeDamage(dmg){
   const realDmg=Math.ceil(dmg*(1-upgrades.armor*.2-upgrades.clinicArmor*.1-barricadeRed-ironRed-castleRed-mingRed-foodRed-hammerShield-skillRed));
   health=Math.max(0,health-realDmg);updateHpUI();
   // ── 战前特餐：十全大补汤（受创爆发环形震荡冲击波，震飞周围僵尸并眩晕2秒）──
-  if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'stew' && (!window._lastShockT || frameT - window._lastShockT > 60)){
+  if(activeSignature && activeSignature.id === 'stew' && (!window._lastShockT || frameT - window._lastShockT > 60)){
     window._lastShockT = frameT;
     spawnFloatText('💥 护体冲击波!', player.x + CHAR_W/2, player.y - 30, '#ffd700');
     addShake(7);

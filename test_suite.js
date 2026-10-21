@@ -361,6 +361,74 @@ try { run(`meatInventory.normal = 5; gameState = 'hub'; _doStartRestaurant();`);
 assert(!openErr, '_doStartRestaurant 在测试环境下可执行', openErr && openErr.stack);
 assert(run(`currentTrend.id`) === trendBefore, '晚上开张不重掷热搜', `before=${trendBefore} after=${run('currentTrend.id')}`);
 
+
+// -------------------------------------------------------------
+// Test Set 5: 食堂成为唯一的备战饭（P1-3）
+// -------------------------------------------------------------
+console.log('\n--- Running Test Set 5: Restaurant Is The Only Pre-Battle Meal ---');
+assert(run(`typeof openTacticalFeastModal`) === 'undefined' && run(`typeof TACTICAL_FEASTS`) === 'undefined', '据点战备特餐已移除(弹窗函数与 TACTICAL_FEASTS 不再存在)');
+assert(run(`REST_RECIPES.filter(r => r.signatureId).every(r => DISH_SIGNATURES.some(g => g.id === r.signatureId))`), '每个菜谱的 signatureId 都指向存在的招牌特效');
+assert(run(`DISH_SIGNATURES.every(g => REST_RECIPES.some(r => r.signatureId === g.id))`), '五个战斗特效都挂在了某道菜上(没有孤儿特效)');
+
+const rec = id => `REST_RECIPES.find(r => r.id === '${id}')`;
+run(`queuedBattleBuffs = [];`);
+assert(run(`queueDishBuff(${rec('grilled_meat')}, 'poor')`) === false && run(`queuedBattleBuffs.length`) === 0, 'poor 品质的菜不产生增益');
+run(`queueDishBuff(${rec('grilled_meat')}, 'good')`);
+assert(run(`queuedBattleBuffs.length`) === 1 && run(`queuedBattleBuffs[0].boosted`) === false, 'good 品质入队,不带强化');
+assert(run(`queueDishBuff(${rec('grilled_meat')}, 'perfect')`) === true && run(`queuedBattleBuffs.length`) === 1 && run(`queuedBattleBuffs[0].boosted`), 'perfect 刷新同名增益并带强化');
+run(`queueDishBuff(${rec('grilled_meat')}, 'good')`);
+assert(run(`queuedBattleBuffs[0].boosted`) === true, '后来的低品质菜不会覆盖已有的高品质增益');
+
+// 留饭:卖出和留饭的取舍
+run(`queuedBattleBuffs = []; queuedFamilyMeal = null; lastMealLog = []; activeSignature = null; activeBattleBuffs = [];
+     hiredCompanions = [{name:'张', type:'sniper', hp:5, maxHp:100, downed:true}];
+     restState = restState || {};`);
+assert(run(`canPackFamilyMeal()`) === true, '一开始可以留饭');
+run(`packFamilyMeal(${rec('grilled_meat')}, 'perfect');`);
+assert(run(`queuedFamilyMeal && queuedFamilyMeal.signatureId`) === 'spicy', '烤肉串留饭 → 麻辣爆烤(翻滚烈焰)');
+assert(run(`canPackFamilyMeal()`) === false, '一晚只能留一份');
+assert(run(`queuedBattleBuffs.some(b => b.family && b.boosted)`), '留饭同时排进更强的数值增益');
+run(`packFamilyMeal(${rec('steak')}, 'burned');`);
+assert(run(`queuedFamilyMeal.recipeId`) === 'grilled_meat', '烤焦的留饭作废,不会覆盖已留的');
+
+run(`wave = 1; applyOvernightMeals();`);
+assert(run(`activeSignature && activeSignature.id`) === 'spicy', '下一波开战前吃下留饭 → 招牌特效生效');
+assert(run(`queuedFamilyMeal`) === null, '留饭吃完即清空');
+assert(run(`hiredCompanions[0].downed === false && hiredCompanions[0].hp === 100 && hiredCompanions[0].mealBoost === 1.25`), '队友同享:满血站起来且射速提升');
+assert(run(`lastMealLog.some(m => m.family && m.name === '烤肉串')`), '战斗 HUD 记录了昨晚吃了什么');
+assert(run(`activeBattleBuffs.length === 1 && activeBattleBuffs[0].dishName === '烤肉串'`), '数值增益带着菜名,HUD 能说清来自哪道菜');
+run(`endOvernightMeals();`);
+assert(run(`activeSignature === null && hiredCompanions[0].mealBoost === 1 && lastMealLog.length === 0`), '一波结束,饭吃完了:特效、队友加成、HUD 记录都清掉');
+
+// 存档往返:完美强化标记与菜名不再丢
+run(`queuedBattleBuffs = []; queueDishBuff(${rec('meat_soup')}, 'legendary'); queuedFamilyMeal = {recipeId:'steak', name:'铁板厚肉', quality:'good', signatureId:'frost'};`);
+const saved = JSON.parse(JSON.stringify(run(`buildSaveState()`)));
+assert(saved.queuedBattleBuffs[0].boosted === true && saved.queuedBattleBuffs[0].dishName === '僵尸浓汤', '存档保留增益的强化标记和菜名');
+assert(saved.queuedFamilyMeal && saved.queuedFamilyMeal.signatureId === 'frost', '存档保留还没吃的留饭');
+let restoreErr = null;
+try { run(`queuedBattleBuffs = []; queuedFamilyMeal = null;`); sandbox.__saved = saved; run(`restoreSaveState(__saved);`); } catch (e) { restoreErr = e; }
+assert(!restoreErr, 'restoreSaveState 可执行', restoreErr && restoreErr.stack);
+assert(run(`queuedBattleBuffs[0].boosted === true && queuedFamilyMeal.name === '铁板厚肉'`), '读档后强化标记和留饭恢复');
+// 旧存档只有 activeTacticalMealId 时,特效 id 仍被识别
+const legacy = JSON.parse(JSON.stringify(saved)); delete legacy.activeSignatureId; legacy.activeTacticalMealId = 'dragon';
+sandbox.__legacy = legacy; run(`restoreSaveState(__legacy);`);
+assert(run(`activeSignature && activeSignature.id`) === 'dragon', '旧存档的 activeTacticalMealId 仍能恢复特效');
+
+// 梦境:非战斗奖励,每天一次
+run(`wave = 3; dreamPickedWave = 0; meatInventory = {normal:0,fast:0,tank:0,elite:0}; woodPlanks = 0; scrapMetal = 0; wastegramFans = 0; restRep = 0; coins = 0; nextTrendPreview = null; currentTrend = null;`);
+assert(run(`DREAM_INSIGHTS.length`) === 6, '梦境有 6 个选项');
+let dreamErr = null;
+try { run(`DREAM_INSIGHTS.forEach(d => d.apply());`); } catch (e) { dreamErr = e; }
+assert(!dreamErr, '六个梦全部可执行', dreamErr && dreamErr.stack);
+assert(run(`meatInventory.normal === 3 && woodPlanks === 4 && scrapMetal === 4 && wastegramFans === 40`), '梦的奖励真实落到资源上');
+assert(run(`nextTrendPreview !== null`), '预知之梦抽好了明日热搜');
+run(`const want = nextTrendPreview.id; window.__want = want; rollDailyTrend();`);
+assert(run(`currentTrend.id === window.__want && nextTrendPreview === null`), '第二天的热搜就是梦里预知的那一条');
+run(`dreamPickedWave = 0; selectDreamInsight(DREAM_INSIGHTS[2]);`);
+assert(run(`dreamPickedWave`) === 3, '做梦会记下是哪一天');
+run(`meatInventory.normal = 0; health = 10; openDreamModal();`);
+assert(run(`meatInventory.normal === 0 && health === maxHp`), '同一天不能再做梦,只是睡一觉回血');
+
 console.log(`\n========================================`);
 console.log(`FINAL RESULT: Passed: ${testsPassed}, Failed: ${testsFailed}`);
 console.log(`========================================`);

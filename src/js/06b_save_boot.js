@@ -31,8 +31,10 @@ function buildSaveState() {
     tonightMenu: [...tonightMenu],
     currentTrendId: currentTrend ? currentTrend.id : null,
     trendMeatToday,
-    queuedBattleBuffs: queuedBattleBuffs.map(b => ({ id: b.id, stacks: b.stacks })),
-    activeBattleBuffs: activeBattleBuffs.map(b => ({ id: b.id, stacks: b.stacks, timeLeft: b.timeLeft })),
+    queuedBattleBuffs: queuedBattleBuffs.map(b => ({ ...b })),
+    activeBattleBuffs: activeBattleBuffs.map(b => ({ ...b })),
+    queuedFamilyMeal: queuedFamilyMeal ? { ...queuedFamilyMeal } : null,
+    lastMealLog: lastMealLog.map(m => ({ ...m })),
     wastegramFans,
     wastegramRank,
     vipCompendium: JSON.parse(JSON.stringify(vipCompendium || {})),
@@ -49,7 +51,7 @@ function buildSaveState() {
     playerClassPerks: playerClass ? { ...playerClass.perks } : null,
     backpackInventory: (typeof backpackInventory !== 'undefined') ? { ...backpackInventory } : null,
     duffWeaponMods: JSON.parse(JSON.stringify(duffWeaponMods || {})),
-    activeTacticalMealId: (typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal) ? activeTacticalMeal.id : null,
+    activeSignatureId: (activeSignature) ? activeSignature.id : null,
     meleeComboSaveFlag: true,
     saveTime: Date.now(),
   };
@@ -416,12 +418,12 @@ function restoreSaveState(state) {
   } else {
     duffWeaponMods = {};
   }
-  if (state.activeTacticalMealId && typeof TACTICAL_FEASTS !== 'undefined') {
-    activeTacticalMeal = TACTICAL_FEASTS.find(f => f.id === state.activeTacticalMealId) || null;
-  } else {
-    activeTacticalMeal = null;
-  }
-  if (typeof updateTacticalMealHUD === 'function') updateTacticalMealHUD();
+  // 兼容旧存档：activeTacticalMealId 是旧版据点特餐，特效 id 沿用，直接当作当前生效的招牌特效
+  const sigId = state.activeSignatureId || state.activeTacticalMealId || null;
+  activeSignature = sigId ? (DISH_SIGNATURES.find(f => f.id === sigId) || null) : null;
+  queuedFamilyMeal = state.queuedFamilyMeal ? { ...state.queuedFamilyMeal } : null;
+  lastMealLog = Array.isArray(state.lastMealLog) ? state.lastMealLog.map(m => ({ ...m })) : [];
+  updateMealHUD();
   updateXpBar();  // v52：恢复等级后同步经验条UI
 
   zombies.forEach(z => { if (z.burnTimer) clearInterval(z.burnTimer); });
@@ -484,13 +486,16 @@ function startGame(){
   if(typeof stopMenuBgAnimation === 'function') stopMenuBgAnimation();
   try{ sndBtnClick(); }catch(e){}
   if(typeof closeDuffWorkshop === 'function') closeDuffWorkshop();
-  if(typeof closeTacticalFeastModal === 'function') closeTacticalFeastModal();
   if(typeof resetWeaponDefs === 'function') resetWeaponDefs();
   weaponLevels = {};
   duffWeaponMods = {};
-  activeTacticalMeal = null;
+  activeSignature = null;
+  queuedFamilyMeal = null;
+  lastMealLog = [];
+  dreamPickedWave = 0;
+  nextTrendPreview = null;
   wsActiveSlot = 0;
-  if(typeof updateTacticalMealHUD === 'function') updateTacticalMealHUD();
+  updateMealHUD();
   // 隐藏主菜单和其他界面
   document.getElementById('main-menu-scr').style.display='none';
   document.getElementById('start-scr').style.display='none';
@@ -598,7 +603,7 @@ function startGame(){
   sprite.exists=false;sprite.level=1;sprite.attackTimer=180;sprite.healTimer=480;sprite.shieldReady=true;
   // Bug修复：#weapon-bar/#hud/#m-status 也是 game-wrap 的直接div子节点但从未进豁免名单——
   // 第二局起会被此清理删掉，随后 buildWeaponBar 对 null 写 innerHTML 崩溃。加入豁免。
-  document.querySelectorAll('#game-wrap > div:not(.overlay):not(canvas):not(#emergency-retreat-hud):not(#tactical-door-wipe):not(#shop-scr):not(#cabin-scr):not(#boss-hpbar):not(#vehicle-prompt):not(#dialogue-box):not(#combo-hud):not(#combo-vignette):not(#chapter-scr):not(#world-progress):not(#home-hp-hud):not(#touch-overlay):not(#tower-popover):not(#cinematic-scr):not(#restaurant-scr):not(#transition-overlay):not(#rest-end-scr):not(#dave-transition):not(#tutorial-scr):not(#codex-scr):not(#vip-compendium-scr):not(#main-menu-scr):not(#settings-scr):not(#wastegram-hud):not(#wastegram-notify):not(#weapon-bar):not(#hud):not(#m-status):not(#wave-dlg-bar):not(#backpack-modal):not(#expedition-modal):not(#duff-workshop-modal):not(#tactical-feast-modal)').forEach(e=>e.remove());
+  document.querySelectorAll('#game-wrap > div:not(.overlay):not(canvas):not(#emergency-retreat-hud):not(#tactical-door-wipe):not(#shop-scr):not(#cabin-scr):not(#boss-hpbar):not(#vehicle-prompt):not(#dialogue-box):not(#combo-hud):not(#combo-vignette):not(#chapter-scr):not(#world-progress):not(#home-hp-hud):not(#touch-overlay):not(#tower-popover):not(#cinematic-scr):not(#restaurant-scr):not(#transition-overlay):not(#rest-end-scr):not(#dave-transition):not(#tutorial-scr):not(#codex-scr):not(#vip-compendium-scr):not(#main-menu-scr):not(#settings-scr):not(#wastegram-hud):not(#wastegram-notify):not(#weapon-bar):not(#hud):not(#m-status):not(#wave-dlg-bar):not(#backpack-modal):not(#expedition-modal):not(#duff-workshop-modal)').forEach(e=>e.remove());
   scEl.textContent='0';killsEl.textContent='0';updateHpUI();updateCoinUI();
   buildWeaponBar();refreshWBar();updateAmmoUI();
   waveTxt.textContent='第 1 波';bossHpBar.style.display='none';setInteractPrompt(null);

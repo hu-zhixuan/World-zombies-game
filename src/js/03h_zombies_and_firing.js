@@ -499,7 +499,7 @@ function fireWeapon(toX,toY){
       spawnFloatText('🛰️ 天基轨道死光!', toX, GROUND_Y - 50, '#aaffaa');
     }
     // ── 战前特餐【极光霜冻排】：发射冰霜剑气与极寒冲击波 ──
-    if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'frost'){
+    if(activeSignature && activeSignature.id === 'frost'){
       const pFacing = player.facingRight ? 1 : -1;
       bullets.push({
         id: bId++,
@@ -519,7 +519,7 @@ function fireWeapon(toX,toY){
       });
     }
     // ── 战前特餐【龙息炙烤盛宴】：25%概率触发扇形地狱龙息焦土 ──
-    if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'dragon' && Math.random() < 0.25){
+    if(activeSignature && activeSignature.id === 'dragon' && Math.random() < 0.25){
       const pFacing = player.facingRight ? 1 : -1;
       const dfX = player.x + CHAR_W/2;
       const dfY = player.y + CHAR_H/2;

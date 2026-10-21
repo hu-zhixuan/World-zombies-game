@@ -1,19 +1,33 @@
 // ═══════════════════════════════════════════════════════════════════
 //  【梦境系统】小胡的潜意识梦境 · 深层冥想 (Dreamland Meditation)
 // ═══════════════════════════════════════════════════════════════════
+// 梦里的收获不带上战场（战斗增益只来自食堂的饭），而是落在小屋里：情报、修缮、食材、人气、材料。
+// 每个梦立即生效；每天（每个 wave）只能做一次梦。
 const DREAM_INSIGHTS = [
-  { id:'crit_focus', icon:'🔮', name:'预知之梦', desc:'专注感知敌人破绽，次日暴击率 +18%，暴伤 ×2.2', apply:(s)=>{ s.critBonus = 0.18; s.critMul = 2.2; } },
-  { id:'celerity',   icon:'⚡', name:'迅影之梦', desc:'身体反射极限激活，次日移动速度 +25%，翻滚冷却 -35%', apply:(s)=>{ s.speedBonus = 0.25; s.dodgeCdDiscount = 0.35; } },
-  { id:'ironwill',   icon:'🛡️', name:'钢铁之梦', desc:'筑牢潜意识心防，次日受击减免 +25%，围墙耐久 +350', apply:(s)=>{ s.dmgReduction = 0.25; const mHp = (typeof WALL_HP_PER_LEVEL !== "undefined" && WALL_HP_PER_LEVEL[wallLevel]) || 600; wallHp = Math.min(mHp, wallHp + 350); updateHpUI(); } },
-  { id:'arsenal',    icon:'💥', name:'狂澜之梦', desc:'军火武器领悟顿悟，次日所有枪械攻击力 +30%', apply:(s)=>{ s.weaponDmgBoost = 0.30; } },
-  { id:'bountiful',  icon:'🍲', name:'丰饶之梦', desc:'厨神潜能觉醒，次日击杀僵尸肉块掉率翻倍，金币收益 +45%', apply:(s)=>{ s.meatDropMul = 2.0; s.coinMul = 1.45; } },
-  { id:'psionic',    icon:'🌙', name:'灵能之梦', desc:'精神力同调共振，全枪械射速 +20%，换弹提速 +35%', apply:(s)=>{ s.fireRateBoost = 0.20; s.reloadSpeedBoost = 0.35; } },
+  { id:'foresight', icon:'🔮', name:'预知之梦', desc:'梦见明天的热搜——提前知道明天什么菜好卖，白天该打什么',
+    apply:()=>{ const t = previewTomorrowTrend(); addBanner('🔮 梦见明天的热搜：' + t.text); } },
+  { id:'ironwill',  icon:'🛡️', name:'钢铁之梦', desc:'梦里把城墙一砖一瓦重砌了一遍，围墙耐久 +350',
+    apply:()=>{ const mHp = (typeof WALL_HP_PER_LEVEL !== "undefined" && WALL_HP_PER_LEVEL[wallLevel]) || 600; wallHp = Math.min(mHp, wallHp + 350); updateHpUI(); } },
+  { id:'bountiful', icon:'🍲', name:'丰饶之梦', desc:'梦见满满一仓的肉，醒来真的摸到了——普通肉 +3、瘦肉 +1',
+    apply:()=>{ meatInventory.normal += 3; meatInventory.fast += 1; } },
+  { id:'regulars',  icon:'👥', name:'老顾客之梦', desc:'梦见老顾客们排着队夸你的菜——粉丝 +40、声望 +2',
+    apply:()=>{ wastegramFans += 40; restRep = Math.min(60, restRep + 2); if(typeof updateWastegramRank === 'function') updateWastegramRank(); } },
+  { id:'scrap',     icon:'🔧', name:'旧物之梦', desc:'梦见翻出一堆旧木料和废铁——木材 +4、废铁 +4',
+    apply:()=>{ woodPlanks += 4; scrapMetal += 4; } },
+  { id:'recipe',    icon:'📖', name:'妈妈的菜谱之梦', desc:'梦里妈妈在灶台前教你火候——声望 +3、金币 +30',
+    apply:()=>{ restRep = Math.min(60, restRep + 3); coins += 30; updateCoinUI(); } },
 ];
-let activeDreamBuff = null;
+let dreamPickedWave = 0;  // 最近一次做梦是第几天（同一天不能再做梦）
 
 function openDreamModal(){
   const modal = document.getElementById('dream-modal');
   if(!modal) return;
+  if(dreamPickedWave === wave){
+    health = maxHp;
+    updateHpUI();
+    addBanner('🛏️ 今天已经做过梦了，这回只是睡了一觉——生命值已完全恢复');
+    return;
+  }
 
   const shuffled = [...DREAM_INSIGHTS].sort(() => 0.5 - Math.random());
   const picks = shuffled.slice(0, 3);
@@ -53,16 +67,15 @@ function openDreamModal(){
 }
 
 function selectDreamInsight(insight){
-  activeDreamBuff = { ...insight, activeDay: wave };
-  if(insight.apply) insight.apply(activeDreamBuff);
+  dreamPickedWave = wave;
+  if(insight.apply) insight.apply();
 
   health = maxHp;
   updateHpUI();
 
-  spawnFloatText('✨ 梦境潜能觉醒: ' + insight.name, player.x + CHAR_W/2, player.y - 30, '#00f0ff');
-  addBanner('🌙 小胡于沉睡中领悟【' + insight.name + '】！' + insight.desc);
+  spawnFloatText('✨ ' + insight.name, player.x + CHAR_W/2, player.y - 30, '#00f0ff');
+  addBanner('🌙 小胡于沉睡中做了【' + insight.name + '】！' + insight.desc);
 
-  updateDreamBuffHUD();
   closeDreamModal(true);
 }
 
@@ -77,27 +90,6 @@ function closeDreamModal(hadPick){
     spawnFloatText('HP 满', player.x + CHAR_W/2, player.y - 30, '#2ecc71');
   }
 }
-
-function updateDreamBuffHUD(){
-  let badge = document.getElementById('dream-buff-badge');
-  if(!badge){
-    badge = document.createElement('div');
-    badge.id = 'dream-buff-badge';
-    badge.style.cssText = 'display:none;align-items:center;gap:4px;background:rgba(0,40,70,0.85);border:1.5px solid #00f0ff;border-radius:12px;padding:2px 10px;font-family:var(--font-display);font-size:0.75rem;color:#a5f3fc;box-shadow:0 0 10px rgba(0,240,255,0.4);margin-right:4px;';
-    const coinEl = document.getElementById('coin-display');
-    if(coinEl && coinEl.parentNode){
-      coinEl.parentNode.insertBefore(badge, coinEl);
-    }
-  }
-  if(activeDreamBuff){
-    badge.innerHTML = `<span>${activeDreamBuff.icon}</span> <span>${activeDreamBuff.name}</span>`;
-    badge.style.display = 'inline-flex';
-    badge.title = activeDreamBuff.desc;
-  } else {
-    badge.style.display = 'none';
-  }
-}
-
 
 // ── 阶段里程碑：第 3 波狂暴尸潮撤退进小屋后，触发【小胡专属神兵战备交付】──
 let _signatureDeliveredThisRun = false;
@@ -297,11 +289,6 @@ document.addEventListener('keydown',e=>{
       closeDuffWorkshop();
       return;
     }
-    if(typeof isTacticalFeastOpen === 'function' && isTacticalFeastOpen()){
-      e.preventDefault();
-      closeTacticalFeastModal();
-      return;
-    }
   }
   // M 键：全局快速开关小胡军备改造台（仅在游戏运行且非剧情/主菜单/结算时响应）
   if(e.code==='KeyM'||e.key==='m'||e.key==='M'){
@@ -366,7 +353,6 @@ document.addEventListener('keydown',e=>{
     case'KeyP':case'Escape':
       e.preventDefault();
       if(typeof isDuffWorkshopOpen === 'function' && isDuffWorkshopOpen()){closeDuffWorkshop();break;}
-      if(typeof isTacticalFeastOpen === 'function' && isTacticalFeastOpen()){closeTacticalFeastModal();break;}
       if(typeof isExpeditionOpen === 'function' && isExpeditionOpen()){closeExpeditionModal();break;}
       if(isBackpackOpen()){closeBackpack();break;}
       if(typeof unboxActive !== 'undefined' && unboxActive){ closeUnboxCard(false); break; }
@@ -515,7 +501,7 @@ document.addEventListener('keyup',e=>{
 });
 canvas.addEventListener('mousemove',e=>{const r=canvas.getBoundingClientRect(),sx=GW/r.width,sy=GH/r.height;lastMX=(e.clientX-r.left)*sx+cameraX;lastMY=(e.clientY-r.top)*sy;});
 canvas.addEventListener('mousedown',e=>{
-  if(!gameRunning||shopOpen||cabinUIOpen||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen())||(typeof isTacticalFeastOpen==='function'&&isTacticalFeastOpen())||(typeof isBackpackOpen==='function'&&isBackpackOpen())||(typeof isExpeditionOpen==='function'&&isExpeditionOpen()))return;
+  if(!gameRunning||shopOpen||cabinUIOpen||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen())||(typeof isBackpackOpen==='function'&&isBackpackOpen())||(typeof isExpeditionOpen==='function'&&isExpeditionOpen()))return;
   // 放置模式：左键确认放置，不射击
   if(placementMode){
     if(e.button===0){

@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════
 // 闪避翻滚（任务3）：Shift/Ctrl键，无敌帧20帧，冷却40帧，向移动方向翻滚
 function tryDodge(){
-  if(!gameRunning||shopOpen||cabinUIOpen||gamePaused||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen())||(typeof isTacticalFeastOpen==='function'&&isTacticalFeastOpen()))return;
+  if(!gameRunning||shopOpen||cabinUIOpen||gamePaused||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen()))return;
   if(gameState !== 'world' && gameState !== 'hub' && gameState !== 'building') return;
   if(typeof cinActive !== 'undefined' && cinActive) return;
   if(typeof scoutView !== 'undefined' && scoutView) return;
@@ -19,7 +19,7 @@ function tryDodge(){
   const py = (gameState === 'hub') ? (HUB_GROUND_Y - CHAR_H/2) : (player.y + CHAR_H/2);
   const gy = (gameState === 'hub') ? HUB_GROUND_Y : (gameState === 'building' ? GROUND_Y : (typeof groundYAt === 'function' ? groundYAt(player.x + CHAR_W/2) : GROUND_Y));
   // ── 战前特餐：麻辣爆烤（翻滚烈焰火墙，仅战斗世界）──
-  if(gameState === 'world' && typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'spicy'){
+  if(gameState === 'world' && activeSignature && activeSignature.id === 'spicy'){
     if(!window._groundFires) window._groundFires = [];
     window._groundFires.push({ x: player.x + CHAR_W/2, y: Z_TOP+50, life: 280, dmg: 35, tickT: 45 });
     for(let i=0; i<8; i++){

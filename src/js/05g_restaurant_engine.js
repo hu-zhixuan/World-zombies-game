@@ -570,19 +570,19 @@ function recipeBuffDesc(buffId){
 }
 const REST_RECIPES = [
   { id:'grilled_meat',  name:'烤肉串',     unlockRep:0,  unlockWave:1, cost:{normal:2}, price:8, cookTime:2,
-    icon:'烤', color:'#c87862', desc:'入门菜，快速出餐', tasteScore:50, buffId:'dmg_small' },
+    icon:'烤', color:'#c87862', desc:'入门菜，快速出餐', tasteScore:50, buffId:'dmg_small', signatureId:'spicy' },
   { id:'meat_soup',     name:'僵尸浓汤',   unlockRep:5,  unlockWave:2, cost:{normal:3, fast:1}, price:15, cookTime:3,
-    icon:'汤', color:'#d89878', desc:'暖身汤品', tasteScore:60, buffId:'hp_regen' },
+    icon:'汤', color:'#d89878', desc:'暖身汤品', tasteScore:60, buffId:'hp_regen', signatureId:'stew' },
   { id:'steak',         name:'铁板厚肉',   unlockRep:10, unlockWave:3, cost:{tank:2}, price:22, cookTime:4,
-    icon:'铁', color:'#a85838', desc:'厚肉铁板烧', tasteScore:70, buffId:'armor' },
+    icon:'铁', color:'#a85838', desc:'厚肉铁板烧', tasteScore:70, buffId:'armor', signatureId:'frost' },
   { id:'mixed_grill',   name:'混合烤拼盘', unlockRep:15, unlockWave:4, cost:{normal:2, fast:2, tank:1}, price:32, cookTime:5,
-    icon:'拼', color:'#aa8855', desc:'三种肉混烤', tasteScore:75, buffId:'dmg_med' },
+    icon:'拼', color:'#aa8855', desc:'三种肉混烤', tasteScore:75, buffId:'dmg_med', signatureId:'thunder' },
   { id:'elite_hotpot',  name:'异变火锅',   unlockRep:25, unlockWave:5, cost:{elite:1, normal:3}, price:50, cookTime:6,
     icon:'锅', color:'#aa44cc', desc:'异变肉火锅——只有击杀精英僵尸才掉异变肉！', tasteScore:85, buffId:'berserk' },
   { id:'feast',         name:'末日大餐',   unlockRep:35, unlockWave:7, cost:{normal:4, fast:3, tank:2, elite:1}, price:90, cookTime:8,
-    icon:'宴', color:'#ffee44', desc:'终极盛宴——需要异变肉的顶级Buff菜', tasteScore:100, buffId:'all_buff' },
+    icon:'宴', color:'#ffee44', desc:'终极盛宴——需要异变肉的顶级Buff菜', tasteScore:100, buffId:'all_buff', signatureId:'dragon' },
   { id:'king_feast',    name:'霸王末日能量煲', unlockRep:0,  unlockWave:1, isSecret:true, cost:{normal:3, fast:2, tank:2, elite:1}, price:180, cookTime:8,
-    icon:'👑', color:'#ffa033', desc:'绝密古卷秘传大菜！全属性极限增益与超高客单价', tasteScore:130, buffId:'all_buff' },
+    icon:'👑', color:'#ffa033', desc:'绝密古卷秘传大菜！全属性极限增益与超高客单价', tasteScore:130, buffId:'all_buff', signatureId:'dragon' },
 ];
 
 // ── 可雇佣员工 ──
@@ -863,11 +863,6 @@ function finishRestaurantNight(){
 function finishRestaurantToWorkshop(){
   closeRestaurant();
   setTimeout(() => { if(typeof openDuffWorkshop === 'function') openDuffWorkshop(); }, 250);
-}
-
-function finishRestaurantToFeast(){
-  closeRestaurant();
-  setTimeout(() => { if(typeof openTacticalFeastModal === 'function') openTacticalFeastModal(); }, 250);
 }
 
 // 每日任务面板折叠/展开（布局修复：避免常驻面板遮挡酒柜点击区）

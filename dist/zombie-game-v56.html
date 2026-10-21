@@ -741,61 +741,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);
   50%{box-shadow:0 0 32px rgba(255,215,0,0.55),inset 0 0 20px rgba(255,215,0,0.2);border-color:#ffd700;}
 }
 
-/* ── TACTICAL FEAST MODAL (战前战备特餐 - 小胡军用秘制灶台) ── */
-#tactical-feast-modal{
-  position:fixed;inset:0;z-index:160;display:none;
-  align-items:center;justify-content:center;backdrop-filter:blur(8px);
-  background:rgba(12,6,8,0.92);
-}
-#tactical-feast-modal.open{display:flex;}
-.tf-window{
-  position:relative;width:95%;max-width:960px;max-height:92vh;
-  background:linear-gradient(180deg,#241210 0%,#120606 100%);
-  border:2px solid rgba(255,107,107,0.65);border-radius:16px;
-  box-shadow:0 0 50px rgba(0,0,0,0.95),0 0 30px rgba(255,107,107,0.25),inset 0 1px 0 rgba(255,255,255,0.1);
-  display:flex;flex-direction:column;overflow:hidden;
-  animation:modalSlideIn .25s cubic-bezier(0.16,1,0.3,1);
-}
-.tf-header{
-  display:flex;justify-content:space-between;align-items:center;padding:12px 20px;
-  background:linear-gradient(90deg,rgba(40,16,14,0.95) 0%,rgba(20,8,7,0.95) 100%);
-  border-bottom:2px solid rgba(255,107,107,0.35);
-}
-.feast-grid{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;
-  padding:16px;overflow-y:auto;
-  scrollbar-color:rgba(255,107,107,0.5) rgba(20,10,10,0.6);
-}
-.feast-grid::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#ff6b6b,#cc2222);box-shadow:0 0 6px rgba(255,107,107,0.5);}
-.feast-card{
-  background:linear-gradient(180deg,rgba(42,18,16,0.88) 0%,rgba(22,9,7,0.96) 100%);
-  border:1.5px solid #6a3225;border-radius:12px;padding:14px;
-  display:flex;flex-direction:column;gap:10px;transition:all .18s cubic-bezier(.2,.8,.2,1);position:relative;
-  box-shadow:0 4px 14px rgba(0,0,0,0.4);
-}
-.feast-card:hover{
-  transform:translateY(-3px);border-color:#ff8866;
-  box-shadow:0 8px 24px rgba(255,107,107,0.35);
-}
-.feast-card.active-feast{
-  border-color:#ffd700;box-shadow:0 0 24px rgba(255,215,0,0.45),inset 0 0 12px rgba(255,215,0,0.15);
-  background:linear-gradient(180deg,rgba(60,35,15,0.92),rgba(30,16,6,0.97));
-}
-.btn-feast-cook{
-  font-family:var(--font-display);font-size:0.78rem;padding:8px;border-radius:6px;
-  background:linear-gradient(180deg,#e67e22,#d35400);border:1px solid #f39c12;color:#fff;
-  cursor:pointer;font-weight:800;letter-spacing:1px;transition:all .18s;margin-top:auto;
-  box-shadow:0 4px 12px rgba(230,126,34,0.4);text-shadow:0 1px 2px rgba(0,0,0,0.5);
-}
-.btn-feast-cook:hover:not(:disabled){
-  background:linear-gradient(180deg,#f39c12,#e67e22);box-shadow:0 6px 18px rgba(243,156,18,0.6);
-  transform:translateY(-1px) scale(1.02);
-}
-.btn-feast-cook:disabled{
-  opacity:0.38;cursor:not-allowed;background:#2e1c18;border-color:#4a2b25;
-  box-shadow:none;transform:none;
-}
-
 /* 下一波按钮 */
 #next-wave-btn{font-family:var(--font-display);font-size:.75rem;letter-spacing:1px;
   padding:3px 10px;border-radius:3px;cursor:pointer;
@@ -1878,8 +1823,8 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
     <button id="expedition-btn" class="hdr-btn" onclick="openExpeditionModal()" title="旧城区远征探险看板 [E]" style="background:rgba(42,24,12,0.85);border:1.5px solid #ff922b;color:#ffd8a8;box-shadow:0 0 10px rgba(255,146,43,0.25);">🗺️远征</button>
     <button id="workshop-btn" class="hdr-btn" onclick="openDuffWorkshop()" title="小胡军备改造台 [M]" style="background:rgba(18,32,54,0.85);border:1.5px solid #00d4ff;color:#a5f3fc;box-shadow:0 0 12px rgba(0,212,255,0.3);">🛠️改造(M)</button>
     <button id="manage-btn" class="hdr-btn" onclick="openManageUI()" title="据点建设与经营管理" style="background:rgba(28,40,32,0.85);border:1.5px solid #2ecc71;color:#a3e635;box-shadow:0 0 10px rgba(46,204,113,0.3);">🏗️建设</button>
-    <div id="tactical-meal-hud" style="display:none;align-items:center;gap:5px;background:rgba(60,20,15,0.85);border:1.5px solid #ff6b6b;border-radius:14px;padding:2px 10px;font-family:var(--font-display);font-size:0.75rem;color:#ffe0e0;box-shadow:0 0 10px rgba(255,107,107,0.4);">
-      <span id="tm-hud-icon">🍲</span> <span id="tm-hud-text">特餐生效</span>
+    <div id="meal-hud" style="display:none;align-items:center;gap:5px;background:rgba(60,34,15,0.88);border:1.5px solid #f0b060;border-radius:14px;padding:2px 10px;font-family:var(--font-display);font-size:0.75rem;color:#ffe9c4;box-shadow:0 0 10px rgba(240,176,96,0.4);max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+      <span id="meal-hud-icon">🍽️</span> <span id="meal-hud-text">昨晚吃了…</span>
     </div>
     <button id="next-wave-btn" class="hdr-btn" onclick="skipToNextWave()" style="display: none;background:linear-gradient(180deg,#27ae60,#1e8449);border:1.5px solid #2ecc71;color:#fff;box-shadow:0 0 12px rgba(46,204,113,0.4);">▶ 下一波</button>
     <button id="pause-btn" class="hdr-btn" onclick="togglePause()" style="background:rgba(22,26,38,0.85);border:1.5px solid rgba(148,163,184,0.4);color:#cbd5e1;box-shadow:0 0 8px rgba(0,0,0,0.4);">⏸ 暂停</button>
@@ -1969,7 +1914,6 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
       <div class="cabin-tab" onclick="switchCabinTab('shop')">📦 战地补给军备</div>
       <div class="cabin-tab" onclick="switchCabinTab('kitchen')">📋 战饭菜单整备</div>
       <div class="cabin-tab" onclick="switchCabinTab('workshop')">🛠️ 小胡军备改造台</div>
-      <div class="cabin-tab" onclick="switchCabinTab('feast')">🍲 战前战备特餐</div>
     </div>
     <div id="cabin-resources">
       <span id="cabin-res-wood">木材: 0</span>
@@ -1997,10 +1941,6 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
     <!-- 小胡战备改造工坊内嵌面板 -->
     <div id="cabin-workshop-panel" style="display:none;width:100%;flex-direction:column;align-items:center;padding:8px 12px;overflow-y:auto;max-height:360px;">
       <div id="cabin-ws-content" style="width:100%;max-width:760px;"></div>
-    </div>
-    <!-- 战前特餐内嵌面板 -->
-    <div id="cabin-feast-panel" style="display:none;width:100%;flex-direction:column;align-items:center;padding:8px 12px;overflow-y:auto;max-height:360px;">
-      <div id="cabin-tf-content" style="width:100%;max-width:760px;"></div>
     </div>
     <button id="cabin-close" onclick="closeCabinUpgradeUI()">继续 →</button>
   </div>
@@ -2040,7 +1980,6 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
         <div id="rest-end-stats" style="font-family:var(--font-body);color:#cbd5e1;font-size:.9rem;line-height:1.8;width:100%;text-align:center;"></div>
         <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;justify-content:center;width:100%;">
           <button class="big-btn" onclick="finishRestaurantToWorkshop()" style="border-color:#00d4ff;color:#e0f7ff;background:linear-gradient(180deg,rgba(0,212,255,0.25),rgba(0,140,210,0.35));box-shadow:0 0 14px rgba(0,212,255,0.3);font-size:0.88rem;padding:8px 16px;border-radius:8px;">🛠️ 小胡军备改造台 [M]</button>
-          <button class="big-btn" onclick="finishRestaurantToFeast()" style="border-color:#ff6b6b;color:#ffe4e4;background:linear-gradient(180deg,rgba(255,107,107,0.25),rgba(200,60,60,0.35));box-shadow:0 0 14px rgba(255,107,107,0.3);font-size:0.88rem;padding:8px 16px;border-radius:8px;">🍲 小胡战备特餐灶台</button>
           <button class="big-btn" onclick="closeRestaurant()" style="border-color:#2ecc71;color:#e8fdf0;background:linear-gradient(180deg,rgba(46,204,113,0.25),rgba(39,174,96,0.35));box-shadow:0 0 14px rgba(46,204,113,0.3);font-size:0.88rem;padding:8px 16px;border-radius:8px;">迎接黎明出击 →</button>
         </div>
       </div>
@@ -2234,35 +2173,6 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
     </div>
   </div>
 
-  <!-- TACTICAL FEAST MODAL (战前战备特餐 - 小胡军用秘制灶台) -->
-  <div id="tactical-feast-modal" style="display:none;">
-    <div style="position:absolute;inset:0;background:rgba(12,6,8,0.92);" onclick="closeTacticalFeastModal()"></div>
-    <div class="tf-window">
-      <div class="tf-header">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <span style="font-size:2rem;line-height:1;filter:drop-shadow(0 0 10px rgba(255,107,107,0.6));">🍲</span>
-          <div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <div style="font-family:var(--font-display);font-size:1.3rem;color:#ff7878;font-weight:900;letter-spacing:1px;text-shadow:0 0 16px rgba(255,107,107,0.6);">
-                战前战备特餐 · 小胡深夜特调秘制灶台
-              </div>
-              <span style="font-size:0.58rem;padding:2px 8px;border-radius:4px;background:rgba(255,107,107,0.18);border:1px solid #ff7878;color:#ff9999;font-weight:700;letter-spacing:1px;">战前能量补给</span>
-            </div>
-            <div style="font-size:0.68rem;color:#d0a0a0;margin-top:2px;">出击防线前特供 · 消耗僵尸食材享用强力大餐 · 赋予防线肉眼可见的战斗机制</div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px;font-size:0.75rem;">
-          <div id="tf-meat-summary" style="display:flex;gap:6px;color:#ffd8a8;"></div>
-          <button style="background:rgba(180,40,40,0.25);border:1px solid #ff5555;color:#ff9999;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:700;transition:all .15s;" onmouseover="this.style.background='rgba(220,50,50,0.4)'" onmouseout="this.style.background='rgba(180,40,40,0.25)'" onclick="closeTacticalFeastModal()">✕ 关闭 (Esc)</button>
-        </div>
-      </div>
-      <div style="padding:10px 18px;background:rgba(0,0,0,0.3);border-bottom:1px solid rgba(255,107,107,0.2);font-size:0.72rem;color:#e8c4b8;display:flex;justify-content:space-between;align-items:center;">
-        <span id="tf-active-status">当前生效特餐: <b>暂无 (出击前可享用一份)</b></span>
-        <span style="color:#ffd875;">🍽️ 享用后持续整整一波战斗，下次回据点可再次烹调</span>
-      </div>
-      <div class="feast-grid" id="tf-grid"></div>
-    </div>
-  </div>
 
   <!-- CINEMATIC FULL-SCREEN DIALOGUE v2.0（视觉小说式剧情演出） -->
   <div id="cinematic-scr" class="">
@@ -2369,7 +2279,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
         ✨ 小胡的潜意识梦境 · 深层冥想
       </h2>
       <p style="font-size:0.85rem;color:#94a3b8;margin-bottom:18px;text-align:center;max-width:620px;line-height:1.5;">
-        末世无眠之夜，小胡在微光中闭上双眼。沉睡潜意识在星辉与余烬中浮沉，领悟破晓时分的求生奥秘...请选择今夜的潜意识梦境启示：
+        末世无眠之夜，小胡在微光中闭上双眼。梦里的收获带不上战场，却会留在这间小屋里……选一个今夜的梦（每天一次）：
       </p>
       <div id="dream-cards-container" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;width:100%;margin-bottom:18px;">
       </div>
@@ -2852,7 +2762,8 @@ let score=0,best=0,health=100,maxHp=100,coins=100;
 let moraleBuff=0;  // 士气加成：餐厅经营越好，下一波战斗伤害/移速越高（0=无加成）
 // ── 经营→战斗联动：菜品增益队列（餐厅上菜品质good+时按菜谱buffId入队，下一波生效）──
 let queuedBattleBuffs=[];  // [{id:'dmg_small'|'hp_regen'|'armor'|'dmg_med'|'berserk'|'all_buff', stacks:1-2}]
-let activeBattleBuffs=[];   // 本波生效中的增益 [{id,stacks,timeLeft}]
+let activeBattleBuffs=[];   // 本波生效中的增益 [{id,stacks,timeLeft,dishName}]
+let activeSignature=null;   // 本波生效中的「留饭」招牌特效（DISH_SIGNATURES 之一，见 05j）
 // 增益定义表（HUD显示+效果说明）
 const BATTLE_BUFF_DEFS={
   dmg_small:{icon:'🍖',name:'增益小餐',desc:'伤害+10%'},
@@ -5140,19 +5051,33 @@ function playTacticalDoorTransition(onComplete){
 // ═══════════════════════════════════════════════════════════════════
 //  【梦境系统】小胡的潜意识梦境 · 深层冥想 (Dreamland Meditation)
 // ═══════════════════════════════════════════════════════════════════
+// 梦里的收获不带上战场（战斗增益只来自食堂的饭），而是落在小屋里：情报、修缮、食材、人气、材料。
+// 每个梦立即生效；每天（每个 wave）只能做一次梦。
 const DREAM_INSIGHTS = [
-  { id:'crit_focus', icon:'🔮', name:'预知之梦', desc:'专注感知敌人破绽，次日暴击率 +18%，暴伤 ×2.2', apply:(s)=>{ s.critBonus = 0.18; s.critMul = 2.2; } },
-  { id:'celerity',   icon:'⚡', name:'迅影之梦', desc:'身体反射极限激活，次日移动速度 +25%，翻滚冷却 -35%', apply:(s)=>{ s.speedBonus = 0.25; s.dodgeCdDiscount = 0.35; } },
-  { id:'ironwill',   icon:'🛡️', name:'钢铁之梦', desc:'筑牢潜意识心防，次日受击减免 +25%，围墙耐久 +350', apply:(s)=>{ s.dmgReduction = 0.25; const mHp = (typeof WALL_HP_PER_LEVEL !== "undefined" && WALL_HP_PER_LEVEL[wallLevel]) || 600; wallHp = Math.min(mHp, wallHp + 350); updateHpUI(); } },
-  { id:'arsenal',    icon:'💥', name:'狂澜之梦', desc:'军火武器领悟顿悟，次日所有枪械攻击力 +30%', apply:(s)=>{ s.weaponDmgBoost = 0.30; } },
-  { id:'bountiful',  icon:'🍲', name:'丰饶之梦', desc:'厨神潜能觉醒，次日击杀僵尸肉块掉率翻倍，金币收益 +45%', apply:(s)=>{ s.meatDropMul = 2.0; s.coinMul = 1.45; } },
-  { id:'psionic',    icon:'🌙', name:'灵能之梦', desc:'精神力同调共振，全枪械射速 +20%，换弹提速 +35%', apply:(s)=>{ s.fireRateBoost = 0.20; s.reloadSpeedBoost = 0.35; } },
+  { id:'foresight', icon:'🔮', name:'预知之梦', desc:'梦见明天的热搜——提前知道明天什么菜好卖，白天该打什么',
+    apply:()=>{ const t = previewTomorrowTrend(); addBanner('🔮 梦见明天的热搜：' + t.text); } },
+  { id:'ironwill',  icon:'🛡️', name:'钢铁之梦', desc:'梦里把城墙一砖一瓦重砌了一遍，围墙耐久 +350',
+    apply:()=>{ const mHp = (typeof WALL_HP_PER_LEVEL !== "undefined" && WALL_HP_PER_LEVEL[wallLevel]) || 600; wallHp = Math.min(mHp, wallHp + 350); updateHpUI(); } },
+  { id:'bountiful', icon:'🍲', name:'丰饶之梦', desc:'梦见满满一仓的肉，醒来真的摸到了——普通肉 +3、瘦肉 +1',
+    apply:()=>{ meatInventory.normal += 3; meatInventory.fast += 1; } },
+  { id:'regulars',  icon:'👥', name:'老顾客之梦', desc:'梦见老顾客们排着队夸你的菜——粉丝 +40、声望 +2',
+    apply:()=>{ wastegramFans += 40; restRep = Math.min(60, restRep + 2); if(typeof updateWastegramRank === 'function') updateWastegramRank(); } },
+  { id:'scrap',     icon:'🔧', name:'旧物之梦', desc:'梦见翻出一堆旧木料和废铁——木材 +4、废铁 +4',
+    apply:()=>{ woodPlanks += 4; scrapMetal += 4; } },
+  { id:'recipe',    icon:'📖', name:'妈妈的菜谱之梦', desc:'梦里妈妈在灶台前教你火候——声望 +3、金币 +30',
+    apply:()=>{ restRep = Math.min(60, restRep + 3); coins += 30; updateCoinUI(); } },
 ];
-let activeDreamBuff = null;
+let dreamPickedWave = 0;  // 最近一次做梦是第几天（同一天不能再做梦）
 
 function openDreamModal(){
   const modal = document.getElementById('dream-modal');
   if(!modal) return;
+  if(dreamPickedWave === wave){
+    health = maxHp;
+    updateHpUI();
+    addBanner('🛏️ 今天已经做过梦了，这回只是睡了一觉——生命值已完全恢复');
+    return;
+  }
 
   const shuffled = [...DREAM_INSIGHTS].sort(() => 0.5 - Math.random());
   const picks = shuffled.slice(0, 3);
@@ -5192,16 +5117,15 @@ function openDreamModal(){
 }
 
 function selectDreamInsight(insight){
-  activeDreamBuff = { ...insight, activeDay: wave };
-  if(insight.apply) insight.apply(activeDreamBuff);
+  dreamPickedWave = wave;
+  if(insight.apply) insight.apply();
 
   health = maxHp;
   updateHpUI();
 
-  spawnFloatText('✨ 梦境潜能觉醒: ' + insight.name, player.x + CHAR_W/2, player.y - 30, '#00f0ff');
-  addBanner('🌙 小胡于沉睡中领悟【' + insight.name + '】！' + insight.desc);
+  spawnFloatText('✨ ' + insight.name, player.x + CHAR_W/2, player.y - 30, '#00f0ff');
+  addBanner('🌙 小胡于沉睡中做了【' + insight.name + '】！' + insight.desc);
 
-  updateDreamBuffHUD();
   closeDreamModal(true);
 }
 
@@ -5216,27 +5140,6 @@ function closeDreamModal(hadPick){
     spawnFloatText('HP 满', player.x + CHAR_W/2, player.y - 30, '#2ecc71');
   }
 }
-
-function updateDreamBuffHUD(){
-  let badge = document.getElementById('dream-buff-badge');
-  if(!badge){
-    badge = document.createElement('div');
-    badge.id = 'dream-buff-badge';
-    badge.style.cssText = 'display:none;align-items:center;gap:4px;background:rgba(0,40,70,0.85);border:1.5px solid #00f0ff;border-radius:12px;padding:2px 10px;font-family:var(--font-display);font-size:0.75rem;color:#a5f3fc;box-shadow:0 0 10px rgba(0,240,255,0.4);margin-right:4px;';
-    const coinEl = document.getElementById('coin-display');
-    if(coinEl && coinEl.parentNode){
-      coinEl.parentNode.insertBefore(badge, coinEl);
-    }
-  }
-  if(activeDreamBuff){
-    badge.innerHTML = `<span>${activeDreamBuff.icon}</span> <span>${activeDreamBuff.name}</span>`;
-    badge.style.display = 'inline-flex';
-    badge.title = activeDreamBuff.desc;
-  } else {
-    badge.style.display = 'none';
-  }
-}
-
 
 // ── 阶段里程碑：第 3 波狂暴尸潮撤退进小屋后，触发【小胡专属神兵战备交付】──
 let _signatureDeliveredThisRun = false;
@@ -5436,11 +5339,6 @@ document.addEventListener('keydown',e=>{
       closeDuffWorkshop();
       return;
     }
-    if(typeof isTacticalFeastOpen === 'function' && isTacticalFeastOpen()){
-      e.preventDefault();
-      closeTacticalFeastModal();
-      return;
-    }
   }
   // M 键：全局快速开关小胡军备改造台（仅在游戏运行且非剧情/主菜单/结算时响应）
   if(e.code==='KeyM'||e.key==='m'||e.key==='M'){
@@ -5505,7 +5403,6 @@ document.addEventListener('keydown',e=>{
     case'KeyP':case'Escape':
       e.preventDefault();
       if(typeof isDuffWorkshopOpen === 'function' && isDuffWorkshopOpen()){closeDuffWorkshop();break;}
-      if(typeof isTacticalFeastOpen === 'function' && isTacticalFeastOpen()){closeTacticalFeastModal();break;}
       if(typeof isExpeditionOpen === 'function' && isExpeditionOpen()){closeExpeditionModal();break;}
       if(isBackpackOpen()){closeBackpack();break;}
       if(typeof unboxActive !== 'undefined' && unboxActive){ closeUnboxCard(false); break; }
@@ -5654,7 +5551,7 @@ document.addEventListener('keyup',e=>{
 });
 canvas.addEventListener('mousemove',e=>{const r=canvas.getBoundingClientRect(),sx=GW/r.width,sy=GH/r.height;lastMX=(e.clientX-r.left)*sx+cameraX;lastMY=(e.clientY-r.top)*sy;});
 canvas.addEventListener('mousedown',e=>{
-  if(!gameRunning||shopOpen||cabinUIOpen||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen())||(typeof isTacticalFeastOpen==='function'&&isTacticalFeastOpen())||(typeof isBackpackOpen==='function'&&isBackpackOpen())||(typeof isExpeditionOpen==='function'&&isExpeditionOpen()))return;
+  if(!gameRunning||shopOpen||cabinUIOpen||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen())||(typeof isBackpackOpen==='function'&&isBackpackOpen())||(typeof isExpeditionOpen==='function'&&isExpeditionOpen()))return;
   // 放置模式：左键确认放置，不射击
   if(placementMode){
     if(e.button===0){
@@ -6142,7 +6039,7 @@ function gameLoop(){
   try{
   frameT++;
   checkStuckWatchdog();  // 防卡死检测
-  if(shopOpen||cabinUIOpen||gamePaused||cinActive||gameState==='restaurant'||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen())||(typeof isTacticalFeastOpen==='function'&&isTacticalFeastOpen())){
+  if(shopOpen||cabinUIOpen||gamePaused||cinActive||gameState==='restaurant'||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen())){
     updateNextWaveBtn();
     return;  // finally块会继续调度下一帧
   }
@@ -6159,13 +6056,13 @@ function gameLoop(){
   }
   if(window._globalDmgNumCd>0)window._globalDmgNumCd--;  // 伤害数字全局限频衰减
   // ── 战前特餐：十全大补汤持续回血 (每90帧=1.5秒回2血) ──
-  if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'stew' && frameT % 90 === 0 && health < maxHp && gameState === 'world'){
+  if(activeSignature && activeSignature.id === 'stew' && frameT % 90 === 0 && health < maxHp && gameState === 'world'){
     health = Math.min(maxHp, health + 2);
     updateHpUI();
     spawnFloatText('❤+2 🍲', player.x + CHAR_W/2, player.y - 25, '#88ffaa');
   }
   // ── 战前特餐：麻辣爆烤翻滚留火海 (仅在战斗世界生效) ──
-  if(gameState === 'world' && typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'spicy' && dodgeT > 0 && frameT % 4 === 0){
+  if(gameState === 'world' && activeSignature && activeSignature.id === 'spicy' && dodgeT > 0 && frameT % 4 === 0){
     if(!window._groundFires) window._groundFires = [];
     window._groundFires.push({ x: player.x + CHAR_W/2, y: Z_TOP+50, life: 240, dmg: 35, tickT: 45 });
   }
@@ -14787,7 +14684,7 @@ function updateCompanions() {
       // 狙击手AI：远程精准射击（射程800，高伤害，低射速）
       // v50模块二：哨笛狂暴——hornRage 期间射速×2伤害+50%
       const rageMul = c.hornRage > 0 ? 1.5 : 1;
-      const fireRate = Math.floor((c.fireRate || 240) / (c.hornRage > 0 ? 2 : 1));
+      const fireRate = Math.floor((c.fireRate || 240) / ((c.hornRage > 0 ? 2 : 1) * (c.mealBoost || 1)));
       if (c.timer >= fireRate) {
         const range = c.isStoryNpc ? 800 : 700;
         const near = findNearestEnemy(c.x + CHAR_W/2, c.y + 30, range);
@@ -14823,7 +14720,7 @@ function updateCompanions() {
       }
       if (gameState === 'building') c.x = Math.max(35, Math.min(GW - 50, c.x));
       // 医疗兵AI：定期治疗玩家+偶尔治疗附近友军
-      const healRate = c.healRate || 360;
+      const healRate = (c.healRate || 360) / (c.mealBoost || 1);
       if (c.timer >= healRate) {
         if (health < maxHp * 0.95) {
           c.timer = 0;
@@ -14866,7 +14763,7 @@ function updateCompanions() {
       }
       if (gameState === 'building') c.x = Math.max(35, Math.min(GW - 50, c.x));
       // 机枪手AI：3连发扫射（射程500，主循环帧驱动，零原生定时器泄漏）；v50模块二：哨笛狂暴——射速×2伤害+50%
-      const fireRate = Math.floor((c.fireRate || 100) / (c.hornRage > 0 ? 2 : 1));
+      const fireRate = Math.floor((c.fireRate || 100) / ((c.hornRage > 0 ? 2 : 1) * (c.mealBoost || 1)));
       if (c.timer >= fireRate && (!c.burstShots || c.burstShots <= 0)) {
         const near = findNearestEnemy(c.x + CHAR_W/2, c.y + 30, 500);
         if (near) {
@@ -15461,7 +15358,7 @@ function hitBoss(dmg,bx,by,fromX,fromY,dmgType){
 // ═══════════════════════════════════════════
 // 闪避翻滚（任务3）：Shift/Ctrl键，无敌帧20帧，冷却40帧，向移动方向翻滚
 function tryDodge(){
-  if(!gameRunning||shopOpen||cabinUIOpen||gamePaused||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen())||(typeof isTacticalFeastOpen==='function'&&isTacticalFeastOpen()))return;
+  if(!gameRunning||shopOpen||cabinUIOpen||gamePaused||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen()))return;
   if(gameState !== 'world' && gameState !== 'hub' && gameState !== 'building') return;
   if(typeof cinActive !== 'undefined' && cinActive) return;
   if(typeof scoutView !== 'undefined' && scoutView) return;
@@ -15479,7 +15376,7 @@ function tryDodge(){
   const py = (gameState === 'hub') ? (HUB_GROUND_Y - CHAR_H/2) : (player.y + CHAR_H/2);
   const gy = (gameState === 'hub') ? HUB_GROUND_Y : (gameState === 'building' ? GROUND_Y : (typeof groundYAt === 'function' ? groundYAt(player.x + CHAR_W/2) : GROUND_Y));
   // ── 战前特餐：麻辣爆烤（翻滚烈焰火墙，仅战斗世界）──
-  if(gameState === 'world' && typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'spicy'){
+  if(gameState === 'world' && activeSignature && activeSignature.id === 'spicy'){
     if(!window._groundFires) window._groundFires = [];
     window._groundFires.push({ x: player.x + CHAR_W/2, y: Z_TOP+50, life: 280, dmg: 35, tickT: 45 });
     for(let i=0; i<8; i++){
@@ -16362,7 +16259,7 @@ function fireWeapon(toX,toY){
       spawnFloatText('🛰️ 天基轨道死光!', toX, GROUND_Y - 50, '#aaffaa');
     }
     // ── 战前特餐【极光霜冻排】：发射冰霜剑气与极寒冲击波 ──
-    if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'frost'){
+    if(activeSignature && activeSignature.id === 'frost'){
       const pFacing = player.facingRight ? 1 : -1;
       bullets.push({
         id: bId++,
@@ -16382,7 +16279,7 @@ function fireWeapon(toX,toY){
       });
     }
     // ── 战前特餐【龙息炙烤盛宴】：25%概率触发扇形地狱龙息焦土 ──
-    if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'dragon' && Math.random() < 0.25){
+    if(activeSignature && activeSignature.id === 'dragon' && Math.random() < 0.25){
       const pFacing = player.facingRight ? 1 : -1;
       const dfX = player.x + CHAR_W/2;
       const dfY = player.y + CHAR_H/2;
@@ -16631,7 +16528,7 @@ function reloadWeapon(){
     vfxReloadComplete(pivX,pivY);
   },s5To));
   reloadTimer=setInterval(()=>{
-    if(shopOpen||cabinUIOpen||gamePaused||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen())||(typeof isTacticalFeastOpen==='function'&&isTacticalFeastOpen()))return;
+    if(shopOpen||cabinUIOpen||gamePaused||(typeof isDuffWorkshopOpen==='function'&&isDuffWorkshopOpen()))return;
     prog+=inc;rldF.style.width=Math.min(prog,100)+'%';
     reloadAnimT=Math.max(0,100-prog);
     if(prog>=100){
@@ -16873,7 +16770,7 @@ function hitZombie(z,bx,by,dmg,fromX,fromY,knockbackMult,dmgType){
       spawnFloatText('⚡狂暴震击!', bx, by - 30, '#ffd700');
     }
     // ── 战前特餐：爆裂雷光拼盘（暴击/爆头天谴落雷与超导连锁跳跃）──
-    if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'thunder' && (crit || bodyPart === 'head')){
+    if(activeSignature && activeSignature.id === 'thunder' && (crit || bodyPart === 'head')){
       vfxRail(bx, 0, bx, by, '#dd66ff', '#8800ff');
       addShake(2.5);
       hitZombie(z, bx, by, 35, bx, 0, 1, 'energy');
@@ -17870,7 +17767,7 @@ function takeDamage(dmg){
   const realDmg=Math.ceil(dmg*(1-upgrades.armor*.2-upgrades.clinicArmor*.1-barricadeRed-ironRed-castleRed-mingRed-foodRed-hammerShield-skillRed));
   health=Math.max(0,health-realDmg);updateHpUI();
   // ── 战前特餐：十全大补汤（受创爆发环形震荡冲击波，震飞周围僵尸并眩晕2秒）──
-  if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'stew' && (!window._lastShockT || frameT - window._lastShockT > 60)){
+  if(activeSignature && activeSignature.id === 'stew' && (!window._lastShockT || frameT - window._lastShockT > 60)){
     window._lastShockT = frameT;
     spawnFloatText('💥 护体冲击波!', player.x + CHAR_W/2, player.y - 30, '#ffd700');
     addShake(7);
@@ -17968,30 +17865,8 @@ function nextWave(){
   wavePhase='waiting'; // 防止章节卡/对话期间误判清场
   safehouseRestUsed = false;
   safehouseCraftUsed = false;
-  // ── 经营→战斗联动：应用菜品增益（上一夜餐厅上菜品质good+入队的增益）──
-  if(queuedBattleBuffs.length > 0){
-    // v52两界互锁：完美品质增益——效果×1.5（层数向上取整）、持续+50%
-    activeBattleBuffs = queuedBattleBuffs.map(b => {
-      const boostMul = b.boosted ? 1.5 : 1;
-      const dur = Math.round(60*60 * (b.boosted ? 1.5 : 1));
-      return {...b, stacks: Math.max(1, Math.ceil(b.stacks*boostMul)), timeLeft: dur};
-    });
-    const names = activeBattleBuffs.map(b => {
-      const def=BATTLE_BUFF_DEFS[b.id];
-      const qTag = b.boosted ? '✨' : '';
-      return def ? def.icon+def.name+qTag : b.id;
-    }).join(' ');
-    addBanner('🍲 美味增益生效：' + names + (activeBattleBuffs.some(b=>b.boosted) ? '（含完美强化）' : ''));
-    // v52肉鸽·餐厅线：余味悠长——增益本波结束后保留一半层数进队列（不再单波清零）
-    if(playerPerks.buffextend){
-      queuedBattleBuffs = queuedBattleBuffs.map(b => ({id:b.id, stacks:Math.max(1, Math.ceil(b.stacks/2))}));
-      addBanner('⏳ 余味悠长：增益层数减半延续至下一波');
-    }else{
-      queuedBattleBuffs = [];  // 消耗队列（每夜菜品只强化下一波）
-    }
-  }else{
-    activeBattleBuffs = [];  // 无新增益则清空（不无限续）
-  }
+  // ── 经营→战斗联动：夜里做的饭（卖出的菜的增益 + 留饭的招牌特效）在这里生效 ──
+  applyOvernightMeals();
   // ── VIP 兑现：狂牙的看门兽（传说品质时 _freeTowerPending+1，这里兑现为免费机枪塔）──
   if(window._freeTowerPending > 0){
     let placed = 0;
@@ -18236,11 +18111,7 @@ function onWaveCleared(){
 
   // 正常波清场
   addBanner(`✅ 第 ${wave} 波大捷！击杀 ${waveKilledThisWave} 只`);
-  if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal){
-    addBanner(`🍲 战备特餐「${activeTacticalMeal.name}」效力已耗尽。回据点可重新烹制！`);
-    activeTacticalMeal = null;
-    if(typeof updateTacticalMealHUD === 'function') updateTacticalMealHUD();
-  }
+  endOvernightMeals();
   
   // ── 【做减法：战后强磁吸】全场肉块与金币瞬间吸入背包 ──
   vacuumAllLoot();
@@ -19621,7 +19492,7 @@ function renderDuffWorkshopUI(){
   let awakenSectionHtml = '';
   if(evoData){
     const isAwakened = !!rec.isSuperEvolved;
-    const isReady = isAwakened || (rec.lv >= 5) || (getWeaponMod(curW.id,'damage')>=3 && getWeaponMod(curW.id,'mag')>=3 && getWeaponMod(curW.id,'reload')>=3 && getWeaponMod(curW.id,'tactical')>=3) || (activeTacticalMeal && activeTacticalMeal.id === 'dragon');
+    const isReady = isAwakened || (rec.lv >= 5) || (getWeaponMod(curW.id,'damage')>=3 && getWeaponMod(curW.id,'mag')>=3 && getWeaponMod(curW.id,'reload')>=3 && getWeaponMod(curW.id,'tactical')>=3) || (activeSignature && activeSignature.id === 'dragon');
 
     awakenSectionHtml = `
       <div class="ws-awaken-box">
@@ -19737,225 +19608,6 @@ window.openHuWorkshop = openDuffWorkshop;
 window.closeHuWorkshop = closeDuffWorkshop;
 window.toggleHuWorkshop = toggleDuffWorkshop;
 window.isHuWorkshopOpen = isDuffWorkshopOpen;
-
-// ── 2. 战前战备特餐机制 (Tactical Cat Meal / Feast) ──
-const TACTICAL_FEASTS = [
-  {
-    id: 'spicy',
-    name: '麻辣爆烤',
-    icon: '🌶️🍖',
-    cost: { normal: 2, fast: 1, tank: 0, elite: 0 },
-    badge: '翻滚烈焰',
-    color: '#ff4422',
-    desc: '食用后全身血液沸腾。闪避翻滚时在身后留下一道灼热烈焰火海，踏入的僵尸每秒受到140点持续灼烧。',
-    effectDesc: '空格翻滚留火海(4秒持续·每秒140点伤害) + 移速+15%',
-  },
-  {
-    id: 'frost',
-    name: '极光霜冻排',
-    icon: '❄️🥩',
-    cost: { normal: 0, fast: 1, tank: 2, elite: 0 },
-    badge: '极寒剑气',
-    color: '#55ccff',
-    desc: '深层极寒凝结的变异排骨。挥砍与射击发射穿透冰霜剑气，命中敌人强效减速70%并引发碎冰连环震荡爆破。',
-    effectDesc: '挥砍/射击释放冰霜剑气 + 命中减速70% + 碎冰范围AoE爆破',
-  },
-  {
-    id: 'stew',
-    name: '十全大补汤',
-    icon: '🍲✨',
-    cost: { normal: 3, fast: 0, tank: 1, elite: 0 },
-    badge: '护体冲击波',
-    color: '#ffd700',
-    desc: '耗费大量高蛋白慢火熬制的军用秘汤。持续自动回复生命，受创时爆发强力环形冲击波震飞周围所有僵尸。',
-    effectDesc: '每1.5秒自动回2血 + 受创爆发150px冲击波震飞眩晕2秒',
-  },
-  {
-    id: 'thunder',
-    name: '爆裂雷光拼盘',
-    icon: '⚡🍢',
-    cost: { normal: 0, fast: 2, tank: 0, elite: 1 },
-    badge: '天谴连锁雷',
-    color: '#dd66ff',
-    desc: '带电异变核心与瘦肉爆炒的激流料理。射击暴击或爆头时引动天降落雷，在多只僵尸间跳跃超导电离。',
-    effectDesc: '暴击/爆头引动天降落雷(80点雷伤)并在周围4目标超导跳跃',
-  },
-  {
-    id: 'dragon',
-    name: '龙息炙烤盛宴',
-    icon: '🐉🔥',
-    cost: { normal: 2, fast: 0, tank: 2, elite: 1 },
-    badge: '地狱龙息',
-    color: '#ff8800',
-    desc: '汇聚所有肉类的终极战争大餐。开火时25%概率触发大范围扇形龙息焦土，伤害+35%并直接激活超武觉醒！',
-    effectDesc: '开火25%概率喷射龙息焦土 + 全伤害+35% + 立即激活超武觉醒',
-  },
-];
-
-let activeTacticalMeal = null; // 当前生效的战前特餐
-
-function isTacticalFeastOpen(){
-  const m = document.getElementById('tactical-feast-modal');
-  return !!(m && (m.classList.contains('open') || m.style.display === 'flex'));
-}
-
-function openTacticalFeastModal(){
-  const m = document.getElementById('tactical-feast-modal');
-  if(!m) return;
-  if(typeof clearWaveDlg === 'function') clearWaveDlg();
-  if(typeof closeDlg === 'function') closeDlg();
-  m.classList.add('open');
-  m.style.display = 'flex';
-  renderTacticalFeastUI();
-  try{ sndShopOpen(); }catch(e){}
-}
-
-function closeTacticalFeastModal(){
-  const m = document.getElementById('tactical-feast-modal');
-  if(!m) return;
-  m.classList.remove('open');
-  m.style.display = 'none';
-  try{ sndShopClose(); }catch(e){}
-}
-
-function toggleTacticalFeastModal(){
-  if(isTacticalFeastOpen()) closeTacticalFeastModal();
-  else openTacticalFeastModal();
-}
-
-function cookTacticalFeast(feastId){
-  const feast = TACTICAL_FEASTS.find(f => f.id === feastId);
-  if(!feast) return;
-
-  // Verify cost
-  for(const k of ['normal', 'fast', 'tank', 'elite']){
-    const need = feast.cost[k] || 0;
-    if((meatInventory[k] || 0) < need){
-      addBanner(`❌ 食材不足！需要 ${MEAT_TYPES[k].name}×${need} (当前只有 ${meatInventory[k]||0})`);
-      return;
-    }
-  }
-
-  // Deduct meats
-  for(const k of ['normal', 'fast', 'tank', 'elite']){
-    const need = feast.cost[k] || 0;
-    meatInventory[k] -= need;
-  }
-
-  activeTacticalMeal = feast;
-  addBanner(`🍲 战备特餐「${feast.name}」烹饪享用完成！获得【${feast.badge}】战备加持！`);
-  spawnFloatText(`享用 ${feast.name}! 🍲`, player.x + CHAR_W/2, player.y - 30, feast.color);
-  sndLevelUp();
-  try{ sndCookSizzle(); }catch(e){}
-
-  updateTacticalMealHUD();
-  renderTacticalFeastUI();
-  renderCabinFeastUI();
-  if(typeof renderDuffWorkshopUI === 'function') renderDuffWorkshopUI();
-}
-
-function updateTacticalMealHUD(){
-  const hud = document.getElementById('tactical-meal-hud');
-  const icon = document.getElementById('tm-hud-icon');
-  const text = document.getElementById('tm-hud-text');
-  if(!hud) return;
-
-  if(activeTacticalMeal){
-    hud.style.display = 'flex';
-    hud.style.borderColor = activeTacticalMeal.color || '#ff6b6b';
-    if(icon) icon.textContent = activeTacticalMeal.icon;
-    if(text) text.textContent = `${activeTacticalMeal.name} (${activeTacticalMeal.badge})`;
-  } else {
-    hud.style.display = 'none';
-  }
-}
-
-function renderTacticalFeastUI(){
-  const meatSummary = document.getElementById('tf-meat-summary');
-  if(meatSummary){
-    meatSummary.innerHTML = `
-      <span style="background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:4px;">🥩普通×${meatInventory.normal||0}</span>
-      <span style="background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:4px;">🍗瘦肉×${meatInventory.fast||0}</span>
-      <span style="background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:4px;">🍖厚肉×${meatInventory.tank||0}</span>
-      <span style="background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:4px;color:#dd88ff;">🧪异变×${meatInventory.elite||0}</span>
-    `;
-  }
-
-  const statusEl = document.getElementById('tf-active-status');
-  if(statusEl){
-    if(activeTacticalMeal){
-      statusEl.innerHTML = `当前生效特餐: <b style="color:${activeTacticalMeal.color};">${activeTacticalMeal.name} (${activeTacticalMeal.badge})</b>`;
-    } else {
-      statusEl.innerHTML = '当前生效特餐: <b style="color:#aaa;">暂无 (出击前烹调享用一份)</b>';
-    }
-  }
-
-  const grid = document.getElementById('tf-grid');
-  if(!grid) return;
-
-  grid.innerHTML = TACTICAL_FEASTS.map(f => {
-    const isActive = (activeTacticalMeal && activeTacticalMeal.id === f.id);
-    let canAfford = true;
-    const costBadges = ['normal', 'fast', 'tank', 'elite'].map(k => {
-      const need = f.cost[k] || 0;
-      if(need === 0) return '';
-      const has = meatInventory[k] || 0;
-      if(has < need) canAfford = false;
-      const col = has >= need ? '#88ffaa' : '#ff7777';
-      const name = { normal:'普通', fast:'瘦肉', tank:'厚肉', elite:'异变' }[k];
-      return `<span style="background:rgba(0,0,0,0.45);border:1px solid ${col};color:${col};padding:1px 6px;border-radius:4px;font-size:0.65rem;">${name}${has}/${need}</span>`;
-    }).filter(x => x).join(' ');
-
-    return `
-      <div class="feast-card ${isActive ? 'active-feast' : ''}">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:1.8rem;line-height:1;">${f.icon}</span>
-            <div>
-              <div style="font-family:var(--font-display);font-size:0.95rem;font-weight:800;color:#f5deb3;">${f.name}</div>
-              <span style="font-size:0.6rem;padding:1px 6px;border-radius:8px;background:${f.color}33;border:1px solid ${f.color};color:#fff;">${f.badge}</span>
-            </div>
-          </div>
-          ${isActive ? '<span style="color:#ffd700;font-size:0.65rem;font-weight:700;">★ 生效中</span>' : ''}
-        </div>
-        <div style="font-size:0.66rem;color:#d8c0b8;line-height:1.45;background:rgba(0,0,0,0.3);padding:6px 8px;border-radius:6px;">
-          ${f.desc}
-        </div>
-        <div style="font-size:0.62rem;color:#ffd875;font-weight:700;">
-          机制: ${f.effectDesc}
-        </div>
-        <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-top:2px;">
-          <span style="font-size:0.62rem;color:#a89088;">消耗:</span>
-          ${costBadges}
-        </div>
-        <button class="btn-feast-cook" ${(!canAfford || isActive) ? 'disabled' : ''} onclick="cookTacticalFeast('${f.id}')">
-          ${isActive ? '当前已享用' : canAfford ? '烹调享用 🍲' : '食材不足 🔒'}
-        </button>
-      </div>
-    `;
-  }).join('');
-}
-
-function renderCabinFeastUI(){
-  const container = document.getElementById('cabin-tf-content');
-  if(!container) return;
-  container.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <div style="font-family:var(--font-display);font-size:0.95rem;color:#ff6b6b;font-weight:700;">
-        🍲 战前战备特餐 (战术猫饭)
-      </div>
-      <div style="font-size:0.7rem;color:#ffd875;">
-        当前: ${activeTacticalMeal ? activeTacticalMeal.name : '未享用'}
-      </div>
-    </div>
-    <div style="font-size:0.68rem;color:#d8c0b8;margin-bottom:8px;">
-      小胡军用秘制灶台已点火！消耗肉块烹调大餐，赋予防线强力战斗机制。
-    </div>
-    <button class="btn-feast-cook" style="width:100%;padding:10px;font-size:0.85rem;" onclick="openTacticalFeastModal()">
-      🍲 打开战前特餐料理面板
-    </button>
-  `;
-}
 
 // ── 3. 超级武器觉醒系统 (Super Weapon Evolution) ──
 const SUPER_WEAPON_EVOLUTIONS = {
@@ -21904,15 +21556,29 @@ function trendMatchableNow(tr){
   }catch(e){ return true; }
 }
 
-// 热搜每天在白天第一波开始时刷新（nextWave→startWaveContent），晚上开张直接沿用，
-// 这样玩家打僵尸时就知道今晚什么菜好卖。只在"当前能做出匹配菜"的热搜里抽，且尽量不连续重复。
-function rollDailyTrend(){
+let nextTrendPreview = null;  // 梦境「预知之梦」提前抽好的明日热搜
+
+// 在"当前能做出匹配菜"的热搜里抽一条，尽量不和 exclude 重复
+function pickTrend(exclude){
   let pool = DAILY_TRENDS.filter(trendMatchableNow);
   if(pool.length === 0) pool = DAILY_TRENDS;
-  if(currentTrend && pool.length > 1) pool = pool.filter(t => t.id !== currentTrend.id);
-  currentTrend = pool[Math.floor(Math.random() * pool.length)];
+  if(exclude && pool.length > 1) pool = pool.filter(t => t.id !== exclude.id);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// 热搜每天在白天第一波开始时刷新（nextWave→startWaveContent），晚上开张直接沿用，
+// 这样玩家打僵尸时就知道今晚什么菜好卖。若梦里已预知明日热搜，则直接兑现那一条。
+function rollDailyTrend(){
+  currentTrend = nextTrendPreview || pickTrend(currentTrend);
+  nextTrendPreview = null;
   trendMeatToday = 0;
   return currentTrend;
+}
+
+// 梦境用：提前抽好明天的热搜并返回
+function previewTomorrowTrend(){
+  nextTrendPreview = pickTrend(currentTrend);
+  return nextTrendPreview;
 }
 
 // 热搜标签 → 哪种肉带这个标签 → 哪些僵尸掉这种肉
@@ -24346,19 +24012,19 @@ function recipeBuffDesc(buffId){
 }
 const REST_RECIPES = [
   { id:'grilled_meat',  name:'烤肉串',     unlockRep:0,  unlockWave:1, cost:{normal:2}, price:8, cookTime:2,
-    icon:'烤', color:'#c87862', desc:'入门菜，快速出餐', tasteScore:50, buffId:'dmg_small' },
+    icon:'烤', color:'#c87862', desc:'入门菜，快速出餐', tasteScore:50, buffId:'dmg_small', signatureId:'spicy' },
   { id:'meat_soup',     name:'僵尸浓汤',   unlockRep:5,  unlockWave:2, cost:{normal:3, fast:1}, price:15, cookTime:3,
-    icon:'汤', color:'#d89878', desc:'暖身汤品', tasteScore:60, buffId:'hp_regen' },
+    icon:'汤', color:'#d89878', desc:'暖身汤品', tasteScore:60, buffId:'hp_regen', signatureId:'stew' },
   { id:'steak',         name:'铁板厚肉',   unlockRep:10, unlockWave:3, cost:{tank:2}, price:22, cookTime:4,
-    icon:'铁', color:'#a85838', desc:'厚肉铁板烧', tasteScore:70, buffId:'armor' },
+    icon:'铁', color:'#a85838', desc:'厚肉铁板烧', tasteScore:70, buffId:'armor', signatureId:'frost' },
   { id:'mixed_grill',   name:'混合烤拼盘', unlockRep:15, unlockWave:4, cost:{normal:2, fast:2, tank:1}, price:32, cookTime:5,
-    icon:'拼', color:'#aa8855', desc:'三种肉混烤', tasteScore:75, buffId:'dmg_med' },
+    icon:'拼', color:'#aa8855', desc:'三种肉混烤', tasteScore:75, buffId:'dmg_med', signatureId:'thunder' },
   { id:'elite_hotpot',  name:'异变火锅',   unlockRep:25, unlockWave:5, cost:{elite:1, normal:3}, price:50, cookTime:6,
     icon:'锅', color:'#aa44cc', desc:'异变肉火锅——只有击杀精英僵尸才掉异变肉！', tasteScore:85, buffId:'berserk' },
   { id:'feast',         name:'末日大餐',   unlockRep:35, unlockWave:7, cost:{normal:4, fast:3, tank:2, elite:1}, price:90, cookTime:8,
-    icon:'宴', color:'#ffee44', desc:'终极盛宴——需要异变肉的顶级Buff菜', tasteScore:100, buffId:'all_buff' },
+    icon:'宴', color:'#ffee44', desc:'终极盛宴——需要异变肉的顶级Buff菜', tasteScore:100, buffId:'all_buff', signatureId:'dragon' },
   { id:'king_feast',    name:'霸王末日能量煲', unlockRep:0,  unlockWave:1, isSecret:true, cost:{normal:3, fast:2, tank:2, elite:1}, price:180, cookTime:8,
-    icon:'👑', color:'#ffa033', desc:'绝密古卷秘传大菜！全属性极限增益与超高客单价', tasteScore:130, buffId:'all_buff' },
+    icon:'👑', color:'#ffa033', desc:'绝密古卷秘传大菜！全属性极限增益与超高客单价', tasteScore:130, buffId:'all_buff', signatureId:'dragon' },
 ];
 
 // ── 可雇佣员工 ──
@@ -24639,11 +24305,6 @@ function finishRestaurantNight(){
 function finishRestaurantToWorkshop(){
   closeRestaurant();
   setTimeout(() => { if(typeof openDuffWorkshop === 'function') openDuffWorkshop(); }, 250);
-}
-
-function finishRestaurantToFeast(){
-  closeRestaurant();
-  setTimeout(() => { if(typeof openTacticalFeastModal === 'function') openTacticalFeastModal(); }, 250);
 }
 
 // 每日任务面板折叠/展开（布局修复：避免常驻面板遮挡酒柜点击区）
@@ -25112,14 +24773,31 @@ function renderCookingStation(){
         closeRestModal();
         startCookingQTE(recipe);
       };
+      // 留一份：不卖，带上战场（招牌特效 + 更强增益，队友同享）。一晚一份。
+      const sig = recipeSignature(recipe);
+      const keepBtn = document.createElement('button');
+      const keepOk = canPackFamilyMeal();
+      keepBtn.textContent = keepOk ? '🍱 留一份' : '🍱 已留';
+      keepBtn.disabled = !keepOk;
+      keepBtn.title = (sig ? sig.icon + sig.name + '（' + sig.badge + '）：' + sig.effectDesc + '\n' : '') + '不卖给客人，明天出击前和队友一起吃。一晚只能留一份。';
+      keepBtn.style.cssText = 'margin-left:8px;padding:3px 8px;border-radius:6px;border:1px solid #ffd868;background:rgba(255,216,104,.15);color:#ffe9a8;font-size:.68rem;cursor:' + (keepOk ? 'pointer' : 'not-allowed') + ';opacity:' + (keepOk ? 1 : .5) + ';';
+      keepBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        closeRestModal();
+        startCookingQTE(recipe, { forFamily: true });
+      };
+      div.appendChild(keepBtn);
     }
     list.appendChild(div);
   });
 }
 
-function startCookingQTE(dish){
+function startCookingQTE(dish, opts){
   // 菜单制：dish 是 REST_RECIPES 菜谱对象——先扣肉，QTE 只定品质
+  // opts.forFamily：这一份不上出餐口，做成「留饭」带上战场（见 05j packFamilyMeal）
   const recipe = dish;
+  const forFamily = !!(opts && opts.forFamily);
+  if(forFamily && !canPackFamilyMeal()){ addBanner('🍱 已经留了一份饭了，一晚只留一份'); return; }
   const canCook = Object.keys(recipe.cost).every(m => meatInventory[m] >= recipe.cost[m]);
   if(!canCook){ addBanner('⚠ 肉不够了！'); return; }
   Object.keys(recipe.cost).forEach(m => { meatInventory[m] -= recipe.cost[m]; });
@@ -25146,6 +24824,7 @@ function startCookingQTE(dish){
     stove.sizzleT = 0;
     stove._quality = quality;
     stove._cookedBy = null;
+    stove._forFamily = forFamily;
     sndCookSizzle();
     RestAudio.init();
     RestAudio.playSizzle();
@@ -25621,7 +25300,12 @@ function restLoop(now){
             finalQuality=qOrder[qi+1];
           }
         }
-        restReadyDishes.push({ recipeId: stove.recipe.id || 'dynamic', recipe: stove.recipe, quality: finalQuality });
+        if(stove._forFamily){
+          packFamilyMeal(stove.recipe, finalQuality);  // 留给自己和队友，不卖
+          stove._forFamily = false;
+        }else{
+          restReadyDishes.push({ recipeId: stove.recipe.id || 'dynamic', recipe: stove.recipe, quality: finalQuality });
+        }
         // 记录厨师贡献
         if(stove._cookedBy){stove._cookedBy.dishesCooked = (stove._cookedBy.dishesCooked||0)+1;}
         stove.recipe = null;
@@ -25934,16 +25618,10 @@ function serveCustomer(c){
   restRep = Math.min(60, Math.max(-50, restRep + Math.floor(repGain * (repGain > 0 ? c.satisfaction : 1))));
   // ── 经营→战斗联动（激活 buffId）：品质 good+ 的菜按菜谱增益入队，下一波生效 ──
   // v52两界互锁：perfect+品质带 boosted 标记——下一波该增益效果×1.5、时长+50%
-  if(quality === 'good' || quality === 'perfect' || quality === 'legendary'){
+  {
     const buffRecipe = c.order ? REST_RECIPES.find(r => r.id === c.order) : null;
-    const buffId = (buffRecipe && buffRecipe.buffId) || null;
-    if(buffId){
-      const boosted = (quality === 'perfect' || quality === 'legendary');
-      queuedBattleBuffs = queuedBattleBuffs.filter(b => b.id !== buffId);  // 同名增益刷新时长
-      queuedBattleBuffs.push({ id: buffId, stacks: quality === 'legendary' ? 2 : 1, boosted });
-      if(boosted){
-        addRestFloatText('⚔ 完美品质！下波增益强化', c.walkX, c.seat.y - 105, '#ffd840');
-      }
+    if(queueDishBuff(buffRecipe, quality)){
+      addRestFloatText('⚔ 完美品质！下波增益强化', c.walkX, c.seat.y - 105, '#ffd840');
     }
   }
   // ── 美术E：上菜金色闪光（品质越高闪越强；粒子版闪光+放大金币飘字）──
@@ -26328,6 +26006,12 @@ function drawRestaurant(){
         ctx2.textAlign = 'left';
         const qName = {legendary:'传说',perfect:'完美',good:'良好',poor:'普通',burned:'焦'}[stove._quality]||'';
         ctx2.fillText(qName, sx + 24, sy - 12);
+      }
+      if(stove._forFamily){
+        ctx2.fillStyle = '#ffd868';
+        ctx2.font = 'bold 8px Microsoft YaHei UI,sans-serif';
+        ctx2.textAlign = 'center';
+        ctx2.fillText('🍱留饭', sx, sy - 20);
       }
       // 完成标记
       if(pct >= 1){
@@ -27272,6 +26956,7 @@ function endRestaurantNight(){
       ${moraleHtml}
       ${wastegramHtml}
       ${vipHtml}
+      ${restState.familyMeal ? `<div style="color:#ffd868;margin-top:6px;">🍱 留饭「${restState.familyMeal.name}」→ 明天出击前和队友一起吃${(DISH_SIGNATURES.find(g => g.id === restState.familyMeal.signatureId) || {}).badge ? '：' + DISH_SIGNATURES.find(g => g.id === restState.familyMeal.signatureId).badge : ''}</div>` : (tonightMenu.some(id => (REST_RECIPES.find(r => r.id === id) || {}).signatureId) ? '<div style="color:#b0a284;margin-top:6px;">🍱 今晚没留饭——明天出击没有招牌特效</div>' : '')}
       ${influencerBoost > 0 ? `<div style="color:#ff66cc;margin-top:6px;">📱 网红好评 ×${influencerBoost} → 下一夜客流+${influencerBoost * 30}%</div>` : ''}
       ${currentTrend ? `<div style="color:#ff8844;margin-top:4px;font-size:.72rem;">📱 今日热搜：${currentTrend.text}</div>` : ''}
       <div style="margin-top:6px;color:#dd88ff;font-size:.72rem;">${getSocialMediaRank().icon} 社媒等级：${getSocialMediaRank().name} (粉丝${wastegramFans})${getNextSocialMediaRank() ? ' → 下一级:'+getNextSocialMediaRank().name+'(需'+getNextSocialMediaRank().minFans+'粉)' : ' (满级)'}</div>
@@ -27349,7 +27034,6 @@ function resetInputAndInteractionState(){
   // 4. Close all floating modals & popovers
   if(typeof isBackpackOpen === 'function' && isBackpackOpen()) closeBackpack();
   if(typeof isDuffWorkshopOpen === 'function' && isDuffWorkshopOpen()) closeDuffWorkshop();
-  if(typeof isTacticalFeastOpen === 'function' && isTacticalFeastOpen()) closeTacticalFeastModal();
   if(typeof isExpeditionOpen === 'function' && isExpeditionOpen()) closeExpeditionModal();
   if(typeof closeShop === 'function' && typeof shopOpen !== 'undefined' && shopOpen) closeShop();
   if(typeof closeCabinUpgradeUI === 'function' && typeof cabinUIOpen !== 'undefined' && cabinUIOpen) closeCabinUpgradeUI();
@@ -27880,7 +27564,7 @@ function getDamage(base){
     if(dMod > 0) dmg *= (1 + dMod * 0.15);
   }
   // ── 战前特餐：龙息炙烤盛宴 全伤害+35% ──
-  if(typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal && activeTacticalMeal.id === 'dragon'){
+  if(activeSignature && activeSignature.id === 'dragon'){
     dmg *= 1.35;
   }
   // ── v51模块四：武器改装台——当前武器每改装+10%（与军火库全局加成叠乘）──
@@ -28027,6 +27711,187 @@ function updateXpBar(){
   const lvEl=document.getElementById('lv-display');if(lvEl)lvEl.textContent='Lv.'+playerLevel;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  【昨晚的饭】食堂是唯一的"备战饭"来源
+//  - 卖给客人：赚钱+声望，品质 good+ 的菜顺带给下一波一个数值增益（queuedBattleBuffs）
+//  - 留一份：不卖，带上战场——该菜的「招牌特效」(DISH_SIGNATURES) + 更强的数值增益，队友同享
+//  原先据点里单独的"战备特餐灶台"已并入这里，不再和食堂抢肉。
+// ════════════════════════════════════════════════════════════════════════════
+
+// 招牌特效：挂在食堂菜谱上（REST_RECIPES[].signatureId），战斗里的效果代码读 activeSignature.id
+const DISH_SIGNATURES = [
+  {
+    id: 'spicy', name: '麻辣爆烤', icon: '🌶️🍖', badge: '翻滚烈焰', color: '#ff4422',
+    desc: '吃下去全身血液沸腾。闪避翻滚时在身后留下一道灼热烈焰火海，踏入的僵尸每秒受到持续灼烧。',
+    effectDesc: '空格翻滚留火海(4秒持续·每秒140点伤害) + 移速+15%',
+  },
+  {
+    id: 'frost', name: '极光霜冻排', icon: '❄️🥩', badge: '极寒剑气', color: '#55ccff',
+    desc: '深层极寒凝结的变异排骨。挥砍与射击发射穿透冰霜剑气，命中敌人强效减速并引发碎冰连环震荡爆破。',
+    effectDesc: '挥砍/射击释放冰霜剑气 + 命中减速70% + 碎冰范围AoE爆破',
+  },
+  {
+    id: 'stew', name: '十全大补汤', icon: '🍲✨', badge: '护体冲击波', color: '#ffd700',
+    desc: '慢火熬制的秘汤。持续自动回复生命，受创时爆发环形冲击波震飞周围所有僵尸。',
+    effectDesc: '每1.5秒自动回2血 + 受创爆发150px冲击波震飞眩晕2秒',
+  },
+  {
+    id: 'thunder', name: '爆裂雷光拼盘', icon: '⚡🍢', badge: '天谴连锁雷', color: '#dd66ff',
+    desc: '带电异变核心与瘦肉爆炒的激流料理。射击暴击或爆头时引动天降落雷，在多只僵尸间跳跃超导电离。',
+    effectDesc: '暴击/爆头引动天降落雷(80点雷伤)并在周围4目标超导跳跃',
+  },
+  {
+    id: 'dragon', name: '龙息炙烤盛宴', icon: '🐉🔥', badge: '地狱龙息', color: '#ff8800',
+    desc: '汇聚所有肉类的终极战争大餐。开火时25%概率触发大范围扇形龙息焦土，伤害+35%并直接激活超武觉醒！',
+    effectDesc: '开火25%概率喷射龙息焦土 + 全伤害+35% + 立即激活超武觉醒',
+  },
+];
+
+// 昨晚吃了什么（战斗 HUD 显示用）：[{name, family}]
+let lastMealLog = [];
+// 食堂做好的"留饭"，下一波开战前吃：{recipeId, name, quality, signatureId}
+let queuedFamilyMeal = null;
+
+// 增益品质等级：good=0，perfect=1，legendary=2 stacks 视为 +1
+function _buffRank(b){ return (b.boosted ? 1 : 0) + (b.stacks >= 2 ? 1 : 0); }
+
+// 把一道菜的数值增益排进下一波。卖出的菜和留饭共用这一个入口。
+// 返回 true 表示这份增益带"完美强化"(×1.5)。同名增益刷新，但低品质不会覆盖高品质。
+function queueDishBuff(recipe, quality, opts){
+  if(!recipe || !recipe.buffId) return false;
+  if(quality !== 'good' && quality !== 'perfect' && quality !== 'legendary') return false;
+  const entry = {
+    id: recipe.buffId,
+    stacks: quality === 'legendary' ? 2 : 1,
+    boosted: quality === 'perfect' || quality === 'legendary',
+    dishName: recipe.name,
+    family: !!(opts && opts.family),
+  };
+  const old = queuedBattleBuffs.find(b => b.id === entry.id);
+  if(old){
+    if(_buffRank(entry) < _buffRank(old)) return false;
+    queuedBattleBuffs = queuedBattleBuffs.filter(b => b !== old);
+  }
+  queuedBattleBuffs.push(entry);
+  return entry.boosted;
+}
+
+// 这道菜有没有招牌特效可留
+function recipeSignature(recipe){
+  return recipe && recipe.signatureId ? DISH_SIGNATURES.find(s => s.id === recipe.signatureId) : null;
+}
+
+// 今晚还能不能留饭（每晚一份，且上一份还没吃掉）
+function canPackFamilyMeal(){
+  return !queuedFamilyMeal;
+}
+
+// 留饭做好了（灶台出菜时调用，取代"上出餐口"）
+function packFamilyMeal(recipe, quality){
+  const sig = recipeSignature(recipe);
+  if(quality === 'burned'){
+    addBanner('🔥 「' + recipe.name + '」烤焦了，留饭作废……');
+    return false;
+  }
+  queuedFamilyMeal = { recipeId: recipe.id, name: recipe.name, quality, signatureId: sig ? sig.id : null };
+  queueDishBuff(recipe, quality, { family: true });
+  if(restState) restState.familyMeal = queuedFamilyMeal;
+  const boosted = (quality === 'perfect' || quality === 'legendary');
+  addBanner('🍱 留好了一份「' + recipe.name + '」' + (sig ? '——明天出击前和队友一起吃：' + sig.badge : '') + (boosted ? '（完美强化）' : ''));
+  if(typeof addRestFloatText === 'function') addRestFloatText('🍱 留饭：' + recipe.name, REST_CANVAS_W * 0.5, REST_CANVAS_H * 0.2, '#ffd840');
+  return true;
+}
+
+// 下一波开战前（nextWave 调用）：把夜里的饭变成战场上的效果
+//  1) 排队的数值增益 → 本波生效（含完美强化）
+//  2) 留饭 → 招牌特效 + 队友同享（满血、射速提升）
+//  3) 记下"昨晚吃了什么"给 HUD
+function applyOvernightMeals(){
+  lastMealLog = [];
+  if(queuedBattleBuffs.length > 0){
+    // v52两界互锁：完美品质增益——效果×1.5（层数向上取整）、持续+50%
+    activeBattleBuffs = queuedBattleBuffs.map(b => {
+      const boostMul = b.boosted ? 1.5 : 1;
+      const dur = Math.round(60*60 * (b.boosted ? 1.5 : 1));
+      return {...b, stacks: Math.max(1, Math.ceil(b.stacks*boostMul)), timeLeft: dur};
+    });
+    activeBattleBuffs.forEach(b => {
+      if(b.dishName && !lastMealLog.some(m => m.name === b.dishName)) lastMealLog.push({ name: b.dishName, family: !!b.family });
+    });
+    const names = activeBattleBuffs.map(b => {
+      const def = BATTLE_BUFF_DEFS[b.id];
+      const qTag = b.boosted ? '✨' : '';
+      return def ? def.icon + def.name + qTag : b.id;
+    }).join(' ');
+    addBanner('🍲 美味增益生效：' + names + (activeBattleBuffs.some(b => b.boosted) ? '（含完美强化）' : ''));
+    // v52肉鸽·餐厅线：余味悠长——增益本波结束后保留一半层数进队列（不再单波清零）
+    if(playerPerks.buffextend){
+      queuedBattleBuffs = queuedBattleBuffs.map(b => ({id:b.id, stacks:Math.max(1, Math.ceil(b.stacks/2)), dishName:b.dishName}));
+      addBanner('⏳ 余味悠长：增益层数减半延续至下一波');
+    }else{
+      queuedBattleBuffs = [];  // 消耗队列（每夜菜品只强化下一波）
+    }
+  }else{
+    activeBattleBuffs = [];  // 无新增益则清空（不无限续）
+  }
+
+  activeSignature = null;
+  if(queuedFamilyMeal){
+    const sig = DISH_SIGNATURES.find(s => s.id === queuedFamilyMeal.signatureId) || null;
+    activeSignature = sig;
+    if(!lastMealLog.some(m => m.name === queuedFamilyMeal.name)) lastMealLog.push({ name: queuedFamilyMeal.name, family: true });
+    // 队友同享：满血站起来，射速/治疗频率+25%
+    hiredCompanions.forEach(c => {
+      if(!c) return;
+      c.mealBoost = 1.25;
+      c.downed = false;
+      c.hp = c.maxHp;
+    });
+    if(sig) addBanner('🍱 留饭「' + queuedFamilyMeal.name + '」：' + sig.icon + sig.badge + '！队友同享（满血·射速+25%）');
+    else addBanner('🍱 留饭「' + queuedFamilyMeal.name + '」：队友同享（满血·射速+25%）');
+    queuedFamilyMeal = null;
+  }
+  updateMealHUD();
+}
+
+// 一波结束（onWaveCleared 调用）：饭吃完了
+function endOvernightMeals(){
+  if(activeSignature){
+    addBanner('🍱 留饭的劲儿用完了。今晚再留一份吧！');
+    activeSignature = null;
+  }
+  hiredCompanions.forEach(c => { if(c) c.mealBoost = 1; });
+  lastMealLog = [];
+  updateMealHUD();
+}
+
+// 战斗 HUD 顶栏：昨晚吃了什么
+function updateMealHUD(){
+  const hud = document.getElementById('meal-hud');
+  if(!hud) return;
+  const text = document.getElementById('meal-hud-text');
+  const icon = document.getElementById('meal-hud-icon');
+  if(lastMealLog.length === 0 && !activeSignature){
+    hud.style.display = 'none';
+    return;
+  }
+  const dishes = lastMealLog.map(m => m.name + (m.family ? '(留饭)' : '')).join('·');
+  let label = '昨晚吃了：' + (dishes || '—');
+  const tips = [];
+  activeBattleBuffs.forEach(b => {
+    const def = BATTLE_BUFF_DEFS[b.id];
+    if(def) tips.push(def.icon + def.name + (b.dishName ? '（' + b.dishName + '）' : '') + '：' + def.desc);
+  });
+  if(activeSignature){
+    label += ' ｜ ' + activeSignature.badge;
+    tips.push(activeSignature.icon + activeSignature.name + '：' + activeSignature.effectDesc);
+  }
+  hud.style.display = 'flex';
+  hud.style.borderColor = (activeSignature && activeSignature.color) || '#f0b060';
+  if(icon) icon.textContent = activeSignature ? '🍱' : '🍽️';
+  if(text) text.textContent = label;
+  hud.title = tips.join('\n');
+}
 // ═══════════════════════════════════════════
 
 
@@ -29085,12 +28950,10 @@ function switchCabinTab(tab){
   const kitPanel = document.getElementById('cabin-kitchen-panel');
   const shopPanel = document.getElementById('cabin-shop-panel');
   const workPanel = document.getElementById('cabin-workshop-panel');
-  const feastPanel = document.getElementById('cabin-feast-panel');
   if(upgPanel) upgPanel.style.display = 'none';
   if(kitPanel) kitPanel.classList.remove('active');
   if(shopPanel) shopPanel.style.display = 'none';
   if(workPanel) workPanel.style.display = 'none';
-  if(feastPanel) feastPanel.style.display = 'none';
 
   if(tab === 'upgrade'){
     if(upgPanel) upgPanel.style.display = 'block';
@@ -29101,9 +28964,6 @@ function switchCabinTab(tab){
   } else if(tab === 'workshop'){
     if(workPanel) workPanel.style.display = 'flex';
     renderCabinWorkshopUI();
-  } else if(tab === 'feast'){
-    if(feastPanel) feastPanel.style.display = 'flex';
-    renderCabinFeastUI();
   } else {
     if(kitPanel) kitPanel.classList.add('active');
     buildKitchenUI();
@@ -29605,8 +29465,10 @@ function buildSaveState() {
     tonightMenu: [...tonightMenu],
     currentTrendId: currentTrend ? currentTrend.id : null,
     trendMeatToday,
-    queuedBattleBuffs: queuedBattleBuffs.map(b => ({ id: b.id, stacks: b.stacks })),
-    activeBattleBuffs: activeBattleBuffs.map(b => ({ id: b.id, stacks: b.stacks, timeLeft: b.timeLeft })),
+    queuedBattleBuffs: queuedBattleBuffs.map(b => ({ ...b })),
+    activeBattleBuffs: activeBattleBuffs.map(b => ({ ...b })),
+    queuedFamilyMeal: queuedFamilyMeal ? { ...queuedFamilyMeal } : null,
+    lastMealLog: lastMealLog.map(m => ({ ...m })),
     wastegramFans,
     wastegramRank,
     vipCompendium: JSON.parse(JSON.stringify(vipCompendium || {})),
@@ -29623,7 +29485,7 @@ function buildSaveState() {
     playerClassPerks: playerClass ? { ...playerClass.perks } : null,
     backpackInventory: (typeof backpackInventory !== 'undefined') ? { ...backpackInventory } : null,
     duffWeaponMods: JSON.parse(JSON.stringify(duffWeaponMods || {})),
-    activeTacticalMealId: (typeof activeTacticalMeal !== 'undefined' && activeTacticalMeal) ? activeTacticalMeal.id : null,
+    activeSignatureId: (activeSignature) ? activeSignature.id : null,
     meleeComboSaveFlag: true,
     saveTime: Date.now(),
   };
@@ -29990,12 +29852,12 @@ function restoreSaveState(state) {
   } else {
     duffWeaponMods = {};
   }
-  if (state.activeTacticalMealId && typeof TACTICAL_FEASTS !== 'undefined') {
-    activeTacticalMeal = TACTICAL_FEASTS.find(f => f.id === state.activeTacticalMealId) || null;
-  } else {
-    activeTacticalMeal = null;
-  }
-  if (typeof updateTacticalMealHUD === 'function') updateTacticalMealHUD();
+  // 兼容旧存档：activeTacticalMealId 是旧版据点特餐，特效 id 沿用，直接当作当前生效的招牌特效
+  const sigId = state.activeSignatureId || state.activeTacticalMealId || null;
+  activeSignature = sigId ? (DISH_SIGNATURES.find(f => f.id === sigId) || null) : null;
+  queuedFamilyMeal = state.queuedFamilyMeal ? { ...state.queuedFamilyMeal } : null;
+  lastMealLog = Array.isArray(state.lastMealLog) ? state.lastMealLog.map(m => ({ ...m })) : [];
+  updateMealHUD();
   updateXpBar();  // v52：恢复等级后同步经验条UI
 
   zombies.forEach(z => { if (z.burnTimer) clearInterval(z.burnTimer); });
@@ -30058,13 +29920,16 @@ function startGame(){
   if(typeof stopMenuBgAnimation === 'function') stopMenuBgAnimation();
   try{ sndBtnClick(); }catch(e){}
   if(typeof closeDuffWorkshop === 'function') closeDuffWorkshop();
-  if(typeof closeTacticalFeastModal === 'function') closeTacticalFeastModal();
   if(typeof resetWeaponDefs === 'function') resetWeaponDefs();
   weaponLevels = {};
   duffWeaponMods = {};
-  activeTacticalMeal = null;
+  activeSignature = null;
+  queuedFamilyMeal = null;
+  lastMealLog = [];
+  dreamPickedWave = 0;
+  nextTrendPreview = null;
   wsActiveSlot = 0;
-  if(typeof updateTacticalMealHUD === 'function') updateTacticalMealHUD();
+  updateMealHUD();
   // 隐藏主菜单和其他界面
   document.getElementById('main-menu-scr').style.display='none';
   document.getElementById('start-scr').style.display='none';
@@ -30172,7 +30037,7 @@ function startGame(){
   sprite.exists=false;sprite.level=1;sprite.attackTimer=180;sprite.healTimer=480;sprite.shieldReady=true;
   // Bug修复：#weapon-bar/#hud/#m-status 也是 game-wrap 的直接div子节点但从未进豁免名单——
   // 第二局起会被此清理删掉，随后 buildWeaponBar 对 null 写 innerHTML 崩溃。加入豁免。
-  document.querySelectorAll('#game-wrap > div:not(.overlay):not(canvas):not(#emergency-retreat-hud):not(#tactical-door-wipe):not(#shop-scr):not(#cabin-scr):not(#boss-hpbar):not(#vehicle-prompt):not(#dialogue-box):not(#combo-hud):not(#combo-vignette):not(#chapter-scr):not(#world-progress):not(#home-hp-hud):not(#touch-overlay):not(#tower-popover):not(#cinematic-scr):not(#restaurant-scr):not(#transition-overlay):not(#rest-end-scr):not(#dave-transition):not(#tutorial-scr):not(#codex-scr):not(#vip-compendium-scr):not(#main-menu-scr):not(#settings-scr):not(#wastegram-hud):not(#wastegram-notify):not(#weapon-bar):not(#hud):not(#m-status):not(#wave-dlg-bar):not(#backpack-modal):not(#expedition-modal):not(#duff-workshop-modal):not(#tactical-feast-modal)').forEach(e=>e.remove());
+  document.querySelectorAll('#game-wrap > div:not(.overlay):not(canvas):not(#emergency-retreat-hud):not(#tactical-door-wipe):not(#shop-scr):not(#cabin-scr):not(#boss-hpbar):not(#vehicle-prompt):not(#dialogue-box):not(#combo-hud):not(#combo-vignette):not(#chapter-scr):not(#world-progress):not(#home-hp-hud):not(#touch-overlay):not(#tower-popover):not(#cinematic-scr):not(#restaurant-scr):not(#transition-overlay):not(#rest-end-scr):not(#dave-transition):not(#tutorial-scr):not(#codex-scr):not(#vip-compendium-scr):not(#main-menu-scr):not(#settings-scr):not(#wastegram-hud):not(#wastegram-notify):not(#weapon-bar):not(#hud):not(#m-status):not(#wave-dlg-bar):not(#backpack-modal):not(#expedition-modal):not(#duff-workshop-modal)').forEach(e=>e.remove());
   scEl.textContent='0';killsEl.textContent='0';updateHpUI();updateCoinUI();
   buildWeaponBar();refreshWBar();updateAmmoUI();
   waveTxt.textContent='第 1 波';bossHpBar.style.display='none';setInteractPrompt(null);
