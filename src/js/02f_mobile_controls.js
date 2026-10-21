@@ -1,7 +1,25 @@
 // ═══════════════════════════════════════════
 //  MOBILE TOUCH CONTROLS
 // ═══════════════════════════════════════════
-const isMobile = ()=> window.innerWidth <= 840 || ('ontouchstart' in window);
+// 与 CSS 里的手机媒体查询保持同一个条件：窄屏，或「粗指针(触屏)且宽度不超过 1100」
+const MOBILE_MQ = '(max-width: 840px), (pointer: coarse) and (max-width: 1100px)';
+const isMobile = ()=> window.innerWidth <= 840 || (window.matchMedia && window.matchMedia(MOBILE_MQ).matches) || ('ontouchstart' in window);
+
+// 手机：画布按 #game-wrap 剩余空间等比缩放（不用 object-fit，避免触点换算偏移）
+function layoutMobile(){
+  const cv = document.getElementById('gc'), wrap = document.getElementById('game-wrap');
+  if(!cv || !wrap) return;
+  if(!window.matchMedia(MOBILE_MQ).matches){ cv.style.width = ''; cv.style.height = ''; return; }
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  if(!w || !h) return;
+  const k = Math.min(w / 1100, h / 500);
+  cv.style.width = Math.floor(1100 * k) + 'px';
+  cv.style.height = Math.floor(500 * k) + 'px';
+}
+window.addEventListener('resize', layoutMobile);
+window.addEventListener('orientationchange', () => setTimeout(layoutMobile, 150));
+window.addEventListener('load', layoutMobile);
+setTimeout(layoutMobile, 0);
 
 // ── Joystick ──────────────────────────────
 const joyZone  = document.getElementById('joy-zone');

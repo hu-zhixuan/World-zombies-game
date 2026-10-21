@@ -1191,20 +1191,40 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
 /* ══════════════════════════════════════════
    MOBILE LAYOUT & TOUCH CONTROLS
 ══════════════════════════════════════════ */
-@media (max-width: 840px) {
+@media (max-width: 840px), (pointer: coarse) and (max-width: 1100px) {
+  /* 手机/平板：一行紧凑顶栏 + 画布占满剩余高度，操作靠触屏按钮 */
   body { overflow: hidden; height: 100dvh; height: 100vh; justify-content: flex-start; }
-  #header { padding: 5px 10px; gap: 3px; }
-  #title { font-size: 1.2rem; letter-spacing:1px; }
-  #stats { gap: 8px; }
-  .sv { font-size: .85rem; }
-  .sl { font-size: .5rem; }
-  #hpbw { width: 60px; }
-  #coin-display { font-size: .85rem; padding: 1px 6px; }
-  #game-wrap { flex: 1; display: flex; flex-direction: column; }
-  #gc { flex: 1; height: auto; object-fit: contain; touch-action: none; }
+  #header { flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 12px; padding: 4px 12px; position: relative; }
+  .hdr-main, .hdr-sub { width: auto; gap: 12px; }
+  .hdr-sub { margin-left: auto; }
+  #title, .stat:not(:first-child), #cabin-resources-hud { display: none; }
+  #hpbw { width: 64px; }
+  .hdr-info { gap: 12px; }
+  #world-progress { display: none; }
+  #header #hdr-menu-btn { display: inline-flex; }
+  .hdr-actions { display: none; position: absolute; top: 100%; right: 8px; z-index: 200; flex-direction: column; align-items: stretch;
+    gap: 4px; padding: 8px; background: var(--s1); border: 1px solid var(--line-hi); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.6); }
+  #header.menu-open .hdr-actions { display: flex; }
+  .hdr-actions .hdr-btn { justify-content: space-between; min-width: 120px; padding: 9px 14px; font-size: .9rem; }
+  #game-wrap { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: center; background: #000; max-width: none; }
+  #gc { flex: none; touch-action: none; }   /* 尺寸由 layoutMobile() 按剩余空间等比设置，保证触点换算准确 */
   /* Hide desktop weapon bar + HUD on mobile — replaced by touch controls */
   #weapon-bar { display: none !important; }
   #hud { display: none !important; }
+  /* 弹层在小屏上允许滚动 */
+  #perk-choice-scr, #shop-scr, #cabin-scr, #tutorial-scr, #rest-end-scr { overflow-y: auto; }
+  /* flex 居中的内容比屏幕高时顶部会被切掉且滚不上去：改成上对齐 + 首尾 auto 边距（够高时仍居中） */
+  #perk-choice-scr, #tutorial-scr, #rest-end-scr { justify-content: flex-start; }
+  #perk-choice-scr > :first-child, #tutorial-scr > :first-child, #rest-end-scr > :first-child { margin-top: auto; }
+  #perk-choice-scr > :last-child, #tutorial-scr > :last-child, #rest-end-scr > :last-child { margin-bottom: auto; }
+  .perk-card { font-size: .9em; }
+}
+#hdr-menu-btn { display: none; }
+#rotate-hint { display: none; }
+@media (orientation: portrait) and (max-width: 840px) {
+  #rotate-hint { display: flex; position: fixed; inset: 0; z-index: 9999; background: var(--s0); color: var(--text-1);
+    flex-direction: column; align-items: center; justify-content: center; gap: 10px; font-size: 1.1rem; text-align: center; padding: 24px; }
+  #rotate-hint small { color: var(--text-2); font-size: .8rem; }
 }
 
 /* ── Touch overlay (sits over canvas, pointer-events only on control areas) ── */
@@ -1213,7 +1233,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
   position: absolute; inset: 0; z-index: 60;
   pointer-events: none;
 }
-@media (max-width: 840px) {
+@media (max-width: 840px), (pointer: coarse) and (max-width: 1100px) {
   #touch-overlay { display: block; }
 }
 
@@ -1361,7 +1381,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
   gap: 4px; z-index: 62; pointer-events: all;
   padding: 0 4px;
 }
-@media (max-width: 840px) { #wpn-strip { display: flex; } }
+@media (max-width: 840px), (pointer: coarse) and (max-width: 1100px) { #wpn-strip { display: flex; } }
 .wpn-btn {
   flex: 1; max-width: 52px; padding: 3px 2px;
   border: 1px solid #2a1a20; background: rgba(14,11,15,.82);
@@ -1382,7 +1402,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
   justify-content: space-between; align-items: center;
   font-size: .65rem; color: var(--dim);
 }
-@media (max-width: 840px) { #m-status { display: flex; } }
+@media (max-width: 840px), (pointer: coarse) and (max-width: 1100px) { #m-status { display: flex; } }
 #m-ammo { color: var(--yellow); font-family: var(--font-num); font-size: .8rem; }
 #m-wave { color: var(--dim); letter-spacing: 1px; }
 #m-coins { color: #f0c060; }
@@ -1392,7 +1412,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
 /* 流派技能按钮：样式见 .hdr-btn 共用规则 */
 /* 移动端技能按钮（放装填按钮左侧） */
 #btn-skill{
-  position:absolute;right:122px;bottom:106px;
+  position:absolute;right:122px;bottom:162px;
   width:48px;height:48px;border-radius:8px;
   background:rgba(40,16,60,.8);
   border:1px solid rgba(221,136,255,.6);
@@ -1667,7 +1687,8 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
       </span>
       <div id="coin-display">150</div>
     </div>
-    <div class="hdr-actions">
+    <button id="hdr-menu-btn" class="hdr-btn" onclick="document.getElementById('header').classList.toggle('menu-open')">菜单</button>
+    <div class="hdr-actions" onclick="document.getElementById('header').classList.remove('menu-open')">
       <button id="codex-btn" class="hdr-btn" onclick="openCodex()" title="变异体机密图鉴">图鉴</button>
       <button id="backpack-btn" class="hdr-btn" onclick="toggleBackpack()" title="避难所战术行囊">行囊<span class="key">B</span></button>
       <button id="expedition-btn" class="hdr-btn" onclick="openExpeditionModal()" title="旧城区远征探险看板">远征</button>
@@ -1678,6 +1699,8 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
     </div>
   </div>
 </div>
+
+<div id="rotate-hint"><div>请把手机横过来玩</div><small>十五波围城需要横屏</small></div>
 
 <div id="world-progress">
   <span class="wp-end">据点</span>
@@ -5459,7 +5482,25 @@ function stopAuto(){if(autoInterval){clearInterval(autoInterval);autoInterval=nu
 // ═══════════════════════════════════════════
 //  MOBILE TOUCH CONTROLS
 // ═══════════════════════════════════════════
-const isMobile = ()=> window.innerWidth <= 840 || ('ontouchstart' in window);
+// 与 CSS 里的手机媒体查询保持同一个条件：窄屏，或「粗指针(触屏)且宽度不超过 1100」
+const MOBILE_MQ = '(max-width: 840px), (pointer: coarse) and (max-width: 1100px)';
+const isMobile = ()=> window.innerWidth <= 840 || (window.matchMedia && window.matchMedia(MOBILE_MQ).matches) || ('ontouchstart' in window);
+
+// 手机：画布按 #game-wrap 剩余空间等比缩放（不用 object-fit，避免触点换算偏移）
+function layoutMobile(){
+  const cv = document.getElementById('gc'), wrap = document.getElementById('game-wrap');
+  if(!cv || !wrap) return;
+  if(!window.matchMedia(MOBILE_MQ).matches){ cv.style.width = ''; cv.style.height = ''; return; }
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  if(!w || !h) return;
+  const k = Math.min(w / 1100, h / 500);
+  cv.style.width = Math.floor(1100 * k) + 'px';
+  cv.style.height = Math.floor(500 * k) + 'px';
+}
+window.addEventListener('resize', layoutMobile);
+window.addEventListener('orientationchange', () => setTimeout(layoutMobile, 150));
+window.addEventListener('load', layoutMobile);
+setTimeout(layoutMobile, 0);
 
 // ── Joystick ──────────────────────────────
 const joyZone  = document.getElementById('joy-zone');
@@ -28145,6 +28186,8 @@ function drawFoodStatusStack(x, y, w){
   }
 }
 
+// 手机上画布被缩小（约 0.65×），HUD 面板放大补偿，保证字号可读
+function hudScale(){ return (typeof isMobile === 'function' && isMobile()) ? 1.35 : 1; }
 function drawWaveHUD(){
   ctx.save();
   // ── 连杀狂热：角标 ──
@@ -28159,6 +28202,8 @@ function drawWaveHUD(){
   const total = waveTotalThisWave || 1;
 
   // ── 右上：波次面板（标题 / 进度条 / 一行提示）──
+  const hk = hudScale();
+  ctx.save(); ctx.translate(GW, 0); ctx.scale(hk, hk); ctx.translate(-GW, 0);
   const pw = 200, px = GW - pw - 10, py = 10, pad = 12, iw = pw - pad * 2;
   let title, titleColor = HUD.t1, right = '', ratio = null, barColor = HUD.accent, sub = '';
   if(isHub){
@@ -28188,9 +28233,11 @@ function drawWaveHUD(){
   if(ratio !== null){ hudBar(px + pad, cy, iw, 4, ratio, barColor); cy += 12; }
   if(sub){ ctx.font = hudFont(11, 400); ctx.fillStyle = HUD.t2; ctx.fillText(sub, px + pad, cy + 12); }
   drawFoodStatusStack(px, py + ph + 8, pw);
+  ctx.restore();
 
   // ── 左上：防御面板（围墙 + 家园 + 塔防，全游戏只在这里显示一份）──
   if(gameState === 'world' && !isHub){
+    ctx.save(); ctx.scale(hk, hk);
     const dpX = 10, dpY = 10, dpW = 172, dpH = 82, ip = 12, iw2 = dpW - ip * 2;
     hudPanel(dpX, dpY, dpW, dpH);
     const wallNames = ['无围墙','木墙','石墙','铁墙'];
@@ -28202,6 +28249,7 @@ function drawWaveHUD(){
     hudRow(dpX + ip, dpY + 48, iw2, '家园', Math.round(homeHp) + ' / ' + HOME_HP_MAX, HUD.t2, HUD.t1);
     hudBar(dpX + ip, dpY + 54, iw2, 4, homeRatio, homeRatio > .5 ? HUD.ok : homeRatio > .25 ? HUD.accent : HUD.danger);
     hudRow(dpX + ip, dpY + 74, iw2, '防御塔', towers.length + ' / ' + getTowerMaxCount(), HUD.t2, HUD.t1);
+    ctx.restore();
   }
   ctx.restore();
 }

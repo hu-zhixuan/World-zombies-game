@@ -251,6 +251,8 @@ function drawFoodStatusStack(x, y, w){
   }
 }
 
+// 手机上画布被缩小（约 0.65×），HUD 面板放大补偿，保证字号可读
+function hudScale(){ return (typeof isMobile === 'function' && isMobile()) ? 1.35 : 1; }
 function drawWaveHUD(){
   ctx.save();
   // ── 连杀狂热：角标 ──
@@ -265,6 +267,8 @@ function drawWaveHUD(){
   const total = waveTotalThisWave || 1;
 
   // ── 右上：波次面板（标题 / 进度条 / 一行提示）──
+  const hk = hudScale();
+  ctx.save(); ctx.translate(GW, 0); ctx.scale(hk, hk); ctx.translate(-GW, 0);
   const pw = 200, px = GW - pw - 10, py = 10, pad = 12, iw = pw - pad * 2;
   let title, titleColor = HUD.t1, right = '', ratio = null, barColor = HUD.accent, sub = '';
   if(isHub){
@@ -294,9 +298,11 @@ function drawWaveHUD(){
   if(ratio !== null){ hudBar(px + pad, cy, iw, 4, ratio, barColor); cy += 12; }
   if(sub){ ctx.font = hudFont(11, 400); ctx.fillStyle = HUD.t2; ctx.fillText(sub, px + pad, cy + 12); }
   drawFoodStatusStack(px, py + ph + 8, pw);
+  ctx.restore();
 
   // ── 左上：防御面板（围墙 + 家园 + 塔防，全游戏只在这里显示一份）──
   if(gameState === 'world' && !isHub){
+    ctx.save(); ctx.scale(hk, hk);
     const dpX = 10, dpY = 10, dpW = 172, dpH = 82, ip = 12, iw2 = dpW - ip * 2;
     hudPanel(dpX, dpY, dpW, dpH);
     const wallNames = ['无围墙','木墙','石墙','铁墙'];
@@ -308,6 +314,7 @@ function drawWaveHUD(){
     hudRow(dpX + ip, dpY + 48, iw2, '家园', Math.round(homeHp) + ' / ' + HOME_HP_MAX, HUD.t2, HUD.t1);
     hudBar(dpX + ip, dpY + 54, iw2, 4, homeRatio, homeRatio > .5 ? HUD.ok : homeRatio > .25 ? HUD.accent : HUD.danger);
     hudRow(dpX + ip, dpY + 74, iw2, '防御塔', towers.length + ' / ' + getTowerMaxCount(), HUD.t2, HUD.t1);
+    ctx.restore();
   }
   ctx.restore();
 }

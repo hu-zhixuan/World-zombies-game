@@ -39,7 +39,8 @@
       </span>
       <div id="coin-display">150</div>
     </div>
-    <div class="hdr-actions">
+    <button id="hdr-menu-btn" class="hdr-btn" onclick="document.getElementById('header').classList.toggle('menu-open')">菜单</button>
+    <div class="hdr-actions" onclick="document.getElementById('header').classList.remove('menu-open')">
       <button id="codex-btn" class="hdr-btn" onclick="openCodex()" title="变异体机密图鉴">图鉴</button>
       <button id="backpack-btn" class="hdr-btn" onclick="toggleBackpack()" title="避难所战术行囊">行囊<span class="key">B</span></button>
       <button id="expedition-btn" class="hdr-btn" onclick="openExpeditionModal()" title="旧城区远征探险看板">远征</button>
@@ -50,6 +51,8 @@
     </div>
   </div>
 </div>
+
+<div id="rotate-hint"><div>请把手机横过来玩</div><small>十五波围城需要横屏</small></div>
 
 <div id="world-progress">
   <span class="wp-end">据点</span>
