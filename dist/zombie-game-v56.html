@@ -5890,7 +5890,9 @@ let stuckWatchdog = 0;
 let lastGameState = '';
 function checkStuckWatchdog(){
   if(!gameRunning)return;
-  const currentState = gameState + '|' + wavePhase + '|' + (cinActive?'cin':'') + '|' + (shopOpen?'shop':'') + '|' + (cabinUIOpen?'cabin':'');
+  // 选流派/天赋三选一/梦境（gamePaused）或教程开着 = 玩家在看面板，不是卡死；开关面板和换波都重新计时
+  const panelOpen = gamePaused || isTutorialOpen();
+  const currentState = gameState + '|' + wave + '|' + wavePhase + '|' + (cinActive?'cin':'') + '|' + (shopOpen?'shop':'') + '|' + (cabinUIOpen?'cabin':'') + '|' + (panelOpen?'panel':'');
   if(currentState === lastGameState){
     stuckWatchdog++;
   } else {
@@ -5900,7 +5902,8 @@ function checkStuckWatchdog(){
 
   // ── 核心守护1：战斗世界等待中（waiting）超时保底 ──
   // 若处于 world + waiting 超过 240 帧 (4秒) 且无全屏剧情和对话进行，自动解除等待开启波次
-  if(gameState === 'world' && wavePhase === 'waiting' && !cinActive && !dlgActive && stuckWatchdog > 240){
+  // 第 0 波归守护2管：在这里 startWaveContent 会把 0%5===0 当成 Boss 波
+  if(gameState === 'world' && wave > 0 && wavePhase === 'waiting' && !cinActive && !dlgActive && !panelOpen && stuckWatchdog > 240){
     console.warn('[WATCHDOG] wavePhase=waiting timeout in world, forcing wave content start');
     stuckWatchdog = 0;
     const cs = document.getElementById('chapter-scr');
@@ -5914,7 +5917,7 @@ function checkStuckWatchdog(){
 
   // ── 核心守护2：第0波滞留保底 ──
   // 若处于 world + wave===0 超过 180 帧 (3秒) 且无剧情无教程，自动进入第1波
-  if(gameState === 'world' && wave === 0 && !cinActive && !isTutorialOpen() && stuckWatchdog > 180){
+  if(gameState === 'world' && wave === 0 && !cinActive && !panelOpen && stuckWatchdog > 180){
     console.warn('[WATCHDOG] Stuck at wave 0 in world, forcing nextWave');
     stuckWatchdog = 0;
     nextWave();
