@@ -261,9 +261,10 @@ function updateClassSkillBtn(){
   const btn=document.getElementById('btn-skill');
   if(btn){
     if(!sk){btn.style.display='none';return;}
-    btn.style.display='block';
-    if(dt>0){btn.classList.add('cd');btn.classList.remove('ready');btn.textContent='⏳'+dt;}
-    else{btn.classList.remove('cd');btn.classList.add('ready');btn.textContent=sk.icon+'\n'+sk.name;}
+    btn.style.display='grid';
+    btn.title=sk.name;
+    if(dt>0){btn.classList.add('cd');btn.classList.remove('ready');btn.dataset.cd=dt;}
+    else{btn.classList.remove('cd');btn.classList.add('ready');btn.dataset.cd='';}
   }
   const hudBtn=document.getElementById('skill-hud-btn');
   if(hudBtn){

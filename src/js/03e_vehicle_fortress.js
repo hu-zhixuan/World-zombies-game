@@ -813,31 +813,37 @@ function drawCabinTurret() {
   ctx.restore();
 }
 
+// 手机上交互键下面的文字：去掉 emoji / 括号 / 说明，只留一个动词（最多 4 个字）
+function actLabelFrom(text){
+  let t = String(text).replace(/\[[^\]]*\]/g, '').replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '').trim();
+  t = t.split(/[（(—：:·]/)[0].trim().split(/\s+/)[0];
+  return t ? t.slice(0, 4) : '交互';
+}
+
 function setInteractPrompt(text) {
+  const btn = document.getElementById('btn-vehicle');
+  const label = document.getElementById('act-label');
   if (text) {
     vehiclePrompt.style.display = 'block';
-    vehiclePrompt.textContent = text;
-    if (isMobile()) {
-      const btn = document.getElementById('btn-vehicle');
-      if (btn) {
-        btn.style.display = 'block';
-        if((isHordeThreatActive() || wavePhase === 'cleared') && gameState === 'world'){
-          if(wavePhase === 'cleared'){
-            btn.innerHTML = isPlayerNearCabin() ? '🏠<br>[进小屋]' : '🏃<br>[回小屋]';
-          } else {
-            btn.innerHTML = isPlayerNearCabin() ? '🏠<br>[按住闭锁]' : '🏃<br>[回小屋]';
-          }
-        } else {
-          btn.innerHTML = '🚗<br>[ E ]';
-        }
+    // 手机上没有键盘，提示里的 [E] 之类的按键说明没意义
+    vehiclePrompt.textContent = isPhoneUI() ? String(text).replace(/\[[^\]]*\]/g, '').trim() : text;
+    // 只有真正能按 E 做点什么的提示才点亮交互键；"门锁着""向左撤回"之类只是信息，不亮
+    const actionable = /\[\s*(长按\s*)?E\s*\]/.test(text) || /正在闭锁/.test(text);
+    if (isMobile() && btn) {
+      if (actionable) {
+        btn.style.display = 'flex';
+        let lbl;
+        if (/正在闭锁/.test(text)) lbl = '闭锁中';
+        else if ((isHordeThreatActive() || wavePhase === 'cleared') && gameState === 'world' && /小屋/.test(text)) lbl = wavePhase === 'cleared' ? '进小屋' : '长按闭锁';
+        else lbl = actLabelFrom(text);
+        if (label) label.textContent = lbl;
+      } else {
+        btn.style.display = 'none';
       }
     }
   } else {
     vehiclePrompt.style.display = 'none';
-    if (isMobile()) {
-      const btn = document.getElementById('btn-vehicle');
-      if (btn) btn.style.display = 'none';
-    }
+    if (isMobile() && btn) btn.style.display = 'none';
   }
 }
 
@@ -944,6 +950,11 @@ function updateInteractionPrompt() {
   if (vehicle.entered) {
     setInteractPrompt(null);
     return;
+  }
+  // 战场求救者就在身边：显示「救人」，手机上会点亮 E 按钮
+  if (gameState === 'world') {
+    const nearSurv = fieldSurvivors.find(sv => sv.state === 'waiting' && sv.near);
+    if (nearSurv) { setInteractPrompt('[ E ] 救人：' + nearSurv.persona.name); return; }
   }
   // 优先：附近有武器宝箱 → 显示拾取提示（任何阶段都显示）
   const nearCrate = findNearbyWeaponCrate();

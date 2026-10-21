@@ -936,16 +936,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);
   text-align:center;padding:20px;}
 #tutorial-scr.show{display:flex;animation:tutFade .25s ease-out;}
 @keyframes tutFade{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
-.tutorial-box{max-width:560px;width:92%;background:var(--s1);
-  border:1px solid var(--line-hi);border-radius:14px;padding:28px 32px;
+.tutorial-box{max-width:560px;width:92%;max-height:calc(100% - 16px);display:flex;flex-direction:column;background:var(--s1);
+  border:1px solid var(--line-hi);border-radius:14px;padding:24px 28px;
   box-shadow:0 16px 48px rgba(0,0,0,.6);}
+#tutorial-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#tutorial-footer{flex:none;display:flex;gap:10px;justify-content:flex-end;align-items:center;margin-top:14px;}
+#tutorial-footer:empty{display:none;}
 #tutorial-title{font-family:var(--font-display);font-weight:600;font-size:1.25rem;
   color:var(--text-1);letter-spacing:.02em;margin-bottom:18px;text-align:left;}
 .tutorial-line{font-family:var(--font-body);font-weight:400;font-size:.88rem;color:var(--text-1);
   line-height:1.7;margin-bottom:10px;text-align:left;padding-left:0;border-left:none;}
-#tutorial-ok-btn{margin-top:20px;background:var(--accent);border:1px solid var(--accent);color:#1a1205;
+#tutorial-ok-btn{margin-top:14px;background:var(--accent);border:1px solid var(--accent);color:#1a1205;
   font-family:var(--font-display);font-weight:600;font-size:.9rem;padding:8px 28px;
-  cursor:pointer;transition:background .12s;border-radius:8px;float:right;}
+  cursor:pointer;transition:background .12s;border-radius:8px;flex:none;align-self:flex-end;}
 #tutorial-ok-btn:hover{background:#f6b472;}
 #chapter-label{font-family:var(--font-display);font-size:1rem;color:#777d88;
   letter-spacing:1px;margin-bottom:6px;opacity:.9;text-shadow:none;}
@@ -1180,243 +1183,8 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
 #rldw{display:none;width:70px;height:3px;background:var(--s3);border-radius:2px;overflow:hidden;}
 #rldf{height:100%;background:var(--accent);width:0%;}
 
-/* ══════════════════════════════════════════
-   MOBILE LAYOUT & TOUCH CONTROLS
-══════════════════════════════════════════ */
-@media (max-width: 840px), (pointer: coarse) and (max-width: 1100px) {
-  /* 手机/平板：一行紧凑顶栏 + 画布占满剩余高度，操作靠触屏按钮 */
-  body { overflow: hidden; height: 100dvh; height: 100vh; justify-content: flex-start; }
-  #header { flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 12px; padding: 4px 12px; position: relative; }
-  .hdr-main, .hdr-sub { width: auto; gap: 12px; }
-  .hdr-sub { margin-left: auto; }
-  #title, .stat:not(:first-child), #cabin-resources-hud { display: none; }
-  #hpbw { width: 64px; }
-  .hdr-info { gap: 12px; }
-  #world-progress { display: none; }
-  #header #hdr-menu-btn { display: inline-flex; }
-  .hdr-actions { display: none; position: absolute; top: 100%; right: 8px; z-index: 200; flex-direction: column; align-items: stretch;
-    gap: 4px; padding: 8px; background: var(--s1); border: 1px solid var(--line-hi); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.6); }
-  #header.menu-open .hdr-actions { display: flex; }
-  .hdr-actions .hdr-btn { justify-content: space-between; min-width: 120px; padding: 9px 14px; font-size: .9rem; }
-  #game-wrap { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: center; background: #000; max-width: none; }
-  #gc { flex: none; touch-action: none; }   /* 尺寸由 layoutMobile() 按剩余空间等比设置，保证触点换算准确 */
-  /* Hide desktop weapon bar + HUD on mobile — replaced by touch controls */
-  #weapon-bar { display: none !important; }
-  #hud { display: none !important; }
-  /* 弹层在小屏上允许滚动 */
-  #perk-choice-scr, #shop-scr, #cabin-scr, #tutorial-scr, #rest-end-scr { overflow-y: auto; }
-  /* flex 居中的内容比屏幕高时顶部会被切掉且滚不上去：改成上对齐 + 首尾 auto 边距（够高时仍居中） */
-  #perk-choice-scr, #tutorial-scr, #rest-end-scr { justify-content: flex-start; }
-  #perk-choice-scr > :first-child, #tutorial-scr > :first-child, #rest-end-scr > :first-child { margin-top: auto; }
-  #perk-choice-scr > :last-child, #tutorial-scr > :last-child, #rest-end-scr > :last-child { margin-bottom: auto; }
-  .perk-card { font-size: .9em; }
-}
-#hdr-menu-btn { display: none; }
-#rotate-hint { display: none; }
-@media (orientation: portrait) and (max-width: 840px) {
-  #rotate-hint { display: flex; position: fixed; inset: 0; z-index: 9999; background: var(--s0); color: var(--text-1);
-    flex-direction: column; align-items: center; justify-content: center; gap: 10px; font-size: 1.1rem; text-align: center; padding: 24px; }
-  #rotate-hint small { color: var(--text-2); font-size: .8rem; }
-}
-
-/* ── Touch overlay (sits over canvas, pointer-events only on control areas) ── */
-#touch-overlay {
-  display: none;
-  position: absolute; inset: 0; z-index: 60;
-  pointer-events: none;
-}
-@media (max-width: 840px), (pointer: coarse) and (max-width: 1100px) {
-  #touch-overlay { display: block; }
-}
-
-/* Joystick zone — bottom left */
-#joy-zone {
-  position: absolute; left: 10px; bottom: 10px;
-  width: 110px; height: 110px;
-  pointer-events: all;
-}
-#joy-base {
-  position: absolute; inset: 0;
-  border-radius: 50%;
-  background: rgba(255,255,255,.06);
-  border: 2px solid rgba(255,255,255,.15);
-}
-#joy-knob {
-  position: absolute;
-  width: 42px; height: 42px;
-  background: rgba(255,255,255,.35);
-  border-radius: 50%;
-  border: 2px solid rgba(255,255,255,.3);
-  left: 50%; top: 50%;
-  transform: translate(-50%,-50%);
-  transition: none;
-  pointer-events: none;
-}
-
-/* Fire button — bottom right */
-#btn-fire {
-  position: absolute; right: 14px; bottom: 24px;
-  width: 72px; height: 72px; border-radius: 50%;
-  background: rgba(192,57,43,.7);
-  border: 2px solid rgba(192,57,43,.8);
-  color: #ffffff; font-size: 1.5rem; line-height: 72px; text-align: center;
-  pointer-events: all; touch-action: none;
-  box-shadow: none;
-  transition: transform .07s, background .07s;
-  user-select: none;
-}
-#btn-fire.pressed {
-  transform: scale(.92);
-  background: rgba(220,80,60,.85);
-}
-
-/* Jump button */
-#btn-jump {
-  position: absolute; right: 98px; bottom: 24px;
-  width: 54px; height: 54px; border-radius: 50%;
-  background: rgba(39,174,96,.6);
-  border: 2px solid rgba(39,174,96,.7);
-  color: #ffffff; font-size: 1.3rem; line-height: 54px; text-align: center;
-  pointer-events: all; touch-action: none;
-  box-shadow: none;
-  transition: transform .07s;
-  user-select: none;
-}
-#btn-jump.pressed { transform: scale(.9); }
-
-/* Dodge button (mobile) */
-#btn-dodge {
-  position: absolute; right: 160px; bottom: 24px;
-  width: 54px; height: 54px; border-radius: 50%;
-  background: rgba(242,166,90,.6);
-  border: 2px solid rgba(242,166,90,.7);
-  color: #ffffff; font-size: .7rem; text-align: center; line-height: 1.1;
-  padding-top: 12px;
-  pointer-events: all; touch-action: none;
-  box-shadow: none;
-  transition: transform .07s;
-  user-select: none;
-}
-#btn-dodge.pressed { transform: scale(.9); }
-
-/* Reload button */
-#btn-reload {
-  position: absolute; right: 14px; bottom: 106px;
-  width: 48px; height: 48px; border-radius: 8px;
-  background: rgba(40,20,10,.8);
-  border: 1px solid rgba(243,156,18,.6);
-  color: #f39c12; font-size: .65rem; text-align: center; line-height: 1.1;
-  padding-top: 10px;
-  pointer-events: all; touch-action: none;
-  user-select: none;
-}
-
-/* Backpack button mobile */
-#btn-backpack {
-  position: absolute; right: 122px; bottom: 106px;
-  width: 48px; height: 48px; border-radius: 8px;
-  background: rgba(36,22,12,.85);
-  border: 1px solid rgba(240,192,96,.5);
-  color: #ffd875; font-size: .62rem; text-align: center; line-height: 1.1;
-  padding-top: 10px;
-  pointer-events: all; touch-action: none;
-  user-select: none;
-}
-/* Shop button mobile */
-#btn-shop-m {
-  position: absolute; right: 68px; bottom: 106px;
-  width: 48px; height: 48px; border-radius: 8px;
-  background: rgba(26,16,0,.8);
-  border: 1px solid rgba(240,192,60,.5);
-  color: #f0c060; font-size: .62rem; text-align: center; line-height: 1.1;
-  padding-top: 10px;
-  pointer-events: all; touch-action: none;
-  user-select: none;
-}
-
-/* Vehicle enter button */
-#btn-vehicle {
-  position: absolute; right: 14px; bottom: 162px;
-  width: 48px; height: 48px; border-radius: 8px;
-  background: rgba(40,50,30,.8);
-  border: 1px solid rgba(100,160,70,.6);
-  color: #88cc44; font-size: .62rem; text-align: center; line-height: 1.1;
-  padding-top: 10px;
-  pointer-events: all; touch-action: none;
-  display: none;
-  user-select: none;
-}
-
-/* Scout view button (peek at battlefield) */
-#btn-scout {
-  position: absolute; right: 68px; bottom: 162px;
-  width: 48px; height: 48px; border-radius: 8px;
-  background: rgba(33,34,37,.8);
-  border: 1px solid rgba(242,166,90,.6);
-  color: #f2a65a; font-size: .62rem; text-align: center; line-height: 1.1;
-  padding-top: 10px;
-  pointer-events: all; touch-action: none;
-  user-select: none;
-}
-#btn-scout.active {
-  background: rgba(242,166,90,.4);
-  border-color: #f2a65a;
-  color: #ffffff;
-  box-shadow: none;
-}
-
-/* Mobile weapon selector strip at top of game area */
-#wpn-strip {
-  position: absolute; top: 4px; left: 0; right: 0;
-  display: none;
-  flex-direction: row; justify-content: center;
-  gap: 4px; z-index: 62; pointer-events: all;
-  padding: 0 4px;
-}
-@media (max-width: 840px), (pointer: coarse) and (max-width: 1100px) { #wpn-strip { display: flex; } }
-.wpn-btn {
-  flex: 1; max-width: 52px; padding: 3px 2px;
-  border: 1px solid #2a1a20; background: rgba(14,11,15,.82);
-  border-radius: 4px; text-align: center; cursor: pointer;
-  touch-action: none; user-select: none;
-  transition: all .1s;
-}
-.wpn-btn.active-w { border-color: var(--yellow); background: rgba(26,20,0,.9); }
-.wpn-btn.locked-w { opacity: .3; pointer-events: none; }
-.wpn-btn .wi2 { font-size: 1rem; display: block; line-height: 1; }
-.wpn-btn .wa2 { font-size: .5rem; color: #f39c12; display: block; }
-
-/* Mobile status bar under canvas */
-#m-status {
-  display: none;
-  background: #09080a; border-top: 1px solid #1a1015;
-  padding: 3px 10px; flex-direction: row;
-  justify-content: space-between; align-items: center;
-  font-size: .65rem; color: var(--dim);
-}
-@media (max-width: 840px), (pointer: coarse) and (max-width: 1100px) { #m-status { display: flex; } }
-#m-ammo { color: var(--yellow); font-family: var(--font-num); font-size: .8rem; }
-#m-wave { color: var(--dim); letter-spacing: 1px; }
-#m-coins { color: #f0c060; }
-#m-rld-wrap { width: 50px; height: 3px; background: #1a1015; border-radius: 2px; overflow: hidden; }
-#m-rld-bar { height: 100%; background: var(--green); width: 0%; transition: width .05s; }
-
-/* 流派技能按钮：样式见 .hdr-btn 共用规则 */
-/* 移动端技能按钮（放装填按钮左侧） */
-#btn-skill{
-  position:absolute;right:122px;bottom:162px;
-  width:48px;height:48px;border-radius:8px;
-  background:rgba(40,16,60,.8);
-  border:1px solid rgba(221,136,255,.6);
-  color:#dd88ff;font-size:.62rem;text-align:center;line-height:1.1;
-  padding-top:10px;
-  pointer-events:all;touch-action:none;
-  user-select:none;
-  display:none;
-}
-#btn-skill.ready{box-shadow:none;animation:skillPulse 1.6s ease-in-out infinite;}
-#btn-skill.cd{filter:grayscale(.4);opacity:.75;}
-@keyframes skillPulse{0%,100%{box-shadow:none}50%{box-shadow:none}}
+/* 手机界面的全部样式在 style_phone.css（body.phone） */
+#mhud,#touch-overlay,#rotate-hint,#hdr-menu-btn{display:none;}
 
 /* Building options UI styling */
 .bld-opt-btn {
@@ -1489,8 +1257,8 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
   opacity:0;
 }
 .cin-portrait.shown{opacity:1;}
-.cin-portrait.speaking{filter:brightness(1.2) drop-shadow(0 0 16px currentColor); transform:translateY(-6px);}
-.cin-portrait.dimmed{filter:brightness(0.5) saturate(0.6);}
+.cin-portrait.speaking{transform:translateY(-6px);}
+.cin-portrait.dimmed{filter:brightness(.55) saturate(.7);}
 .cin-portrait.left-side{left:8%;}
 .cin-portrait.right-side{right:8%;}
 .cin-portrait.center-side{left:50%; transform:translateX(-50%);}
@@ -1537,8 +1305,8 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
   position:relative; z-index:5; width:94%; max-width:780px;
   margin-bottom:3%; padding:0;
   background:rgba(9,10,11,.96);
-  border:1px solid rgba(120,60,160,.6); border-radius:6px;
-  box-shadow:0 8px 32px rgba(0,0,0,.7);
+  border:1px solid var(--line-hi); border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
   overflow:hidden;
   animation:cinBoxSlide .4s ease-out;
 }
@@ -1546,8 +1314,8 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
 /* 对话框顶部说话人条 */
 #cin-speaker-bar{
   display:flex; align-items:center; gap:10px;
-  padding:8px 20px; background:rgba(120,40,180,.25);
-  border-bottom:1px solid rgba(120,40,180,.3);
+  padding:8px 20px; background:var(--s2);
+  border-bottom:1px solid var(--line);
 }
 #cin-speaker-icon{
   width:28px; height:28px; border-radius:50%; flex-shrink:0;
@@ -1564,7 +1332,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
   padding:16px 24px 20px; min-height:80px; position:relative;
 }
 #cin-text{
-  font-size:.92rem; color:#e8e0c8; line-height:1.9;
+  font-size:.92rem; color:var(--text-1); line-height:1.9;
   min-height:56px; white-space:pre-wrap;
   font-family:var(--font-body);
 }
@@ -1577,7 +1345,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
 /* 对话框底部控制条 */
 #cin-control-bar{
   display:flex; justify-content:space-between; align-items:center;
-  padding:4px 20px 8px; font-size:.65rem; color:#6a5a4a;
+  padding:4px 20px 8px; font-size:.65rem; color:var(--text-3);
 }
 #cin-tap{
   letter-spacing:1px; animation:tapBlink .9s ease-in-out infinite;
@@ -1587,12 +1355,12 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
 #cin-skip{
   position:absolute; top:16px; right:16px; z-index:6;
   font-family:var(--font-body); font-size:.7rem;
-  padding:5px 14px; background:rgba(0,0,0,.6);
-  border:1px solid #5a4a30; color:#9a8f6a;
-  border-radius:3px; cursor:pointer; letter-spacing:1px;
+  padding:5px 14px; background:rgba(12,13,15,.7);
+  border:1px solid var(--line-hi); color:var(--text-2);
+  border-radius:8px; cursor:pointer; letter-spacing:1px;
   transition:all .15s;
 }
-#cin-skip:hover{border-color:var(--yellow); color:var(--yellow);}
+#cin-skip:hover{border-color:var(--accent); color:var(--accent);}
 
 
 /* ═══ 紧急撤退提示（定位 + 脉冲动画）═══ */

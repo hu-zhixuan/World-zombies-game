@@ -967,6 +967,8 @@ function buildRestControls(){
   mkMgmt('📖', '顾客图鉴', '相遇 ' + metCount + '/' + (VIP_CUSTOMERS ? VIP_CUSTOMERS.length : 15), () => openVIPCompendium());
   // 状态文字：粉丝 / 员工 / 设施，一行淡色文字，不做成按钮样子
   const info = document.createElement('div');
+  info.className = 'rest-info';
+  info.className = 'rest-info';
   info.style.cssText = 'align-self:center;margin-left:8px;font-size:.74rem;color:var(--text-2);line-height:1.7;';
   info.innerHTML = '粉丝 ' + wastegramFans + '（' + wastegramRank + '）<br>员工 ' + restHiredStaff.length + '/' + STAFF_POOL.length + ' · 灶 ' + restUpgradeLevel.stoves + ' · 桌 ' + restUpgradeLevel.tables + ' · 装修 ' + restUpgradeLevel.decor;
   mgmtRow.appendChild(info);

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh"><head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>十五波围城：最后据点 v56 (旧城区远征与双持生态版)</title>
@@ -10,7 +10,28 @@
 </head>
 <body>
 
-<div id="header">
+<!-- 图标集：24×24 描边图标，界面里统一用 <use href="#i-xxx"> -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.5s-8-4.7-8-10.3C4 7 6.2 5 8.7 5c1.4 0 2.6.7 3.3 1.8C12.7 5.7 13.9 5 15.3 5 17.8 5 20 7 20 10.2c0 5.6-8 10.3-8 10.3z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7.5 2.8v5.6c0 4.4-3 8-7.5 9.6-4.5-1.6-7.5-5.2-7.5-9.6V5.8z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7"/><path d="M6 10v9.5h12V10"/><path d="M10 19.5v-5h4v5"/></symbol>
+  <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="4.6" fill="none" stroke="#0d0e10" stroke-width="1.7" opacity=".4"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.2A8.2 8.2 0 019.8 4a8.2 8.2 0 1010.2 10.2z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M3 4h2.4l2 10.2h10.2L19.6 7H6.2"/><circle cx="9" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/></symbol>
+  <symbol id="i-bag" viewBox="0 0 24 24"><path d="M9 6.5V6a3 3 0 016 0v.5"/><rect x="5" y="6.5" width="14" height="14" rx="3.5"/><path d="M9 13h6M10 16.5h4"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+  <symbol id="i-aim" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="i-jump" viewBox="0 0 24 24"><path d="M6 12.5l6-6 6 6"/><path d="M6 18.5l6-6 6 6"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><path d="M3 8h6M3 12h4M3 16h6"/><path d="M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-reload" viewBox="0 0 24 24"><path d="M20 11a8 8 0 00-14.3-4.6L4 8.5"/><path d="M4 4v4.5h4.5"/><path d="M4 13a8 8 0 0014.3 4.6L20 15.5"/><path d="M20 20v-4.5h-4.5"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.5 2.5L5 13.5h6l-1 8 8.5-11h-6z" fill="currentColor"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M9 11V5.5a1.5 1.5 0 013 0V10"/><path d="M12 10V4.5a1.5 1.5 0 013 0V11"/><path d="M15 11V7a1.5 1.5 0 013 0v7.5a6.5 6.5 0 01-6.5 6.5h-1A6 6 0 016 17.4L4.2 14a1.5 1.5 0 012.5-1.6L9 15.2V11"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M5 9h13l-3-3"/><path d="M19 15H6l3 3"/></symbol>
+</defs></svg>
+
+<div id="header" onclick="if(event.target===this&&Date.now()-(window._menuOpenedAt||0)>350)this.classList.remove('menu-open')">
   <div class="hdr-main">
     <div id="title">十五波围城<span class="ver">v56</span></div>
     <div id="stats">
@@ -78,25 +99,57 @@
   
   <canvas id="gc" width="1100" height="500"></canvas>
 
-  <!-- ── TOUCH CONTROLS OVERLAY ── -->
-  <div id="touch-overlay">
-    <!-- Mobile weapon strip -->
-    <div id="wpn-strip"><div class="wpn-btn active-w" id="mwb0" style="border-color: rgb(255,224,102);"><span class="wi2">🔫</span><span class="wa2">12</span></div><div class="wpn-btn" id="mwb1" style="border-color: rgb(154,154,154);"><span class="wi2">💥</span><span class="wa2">6</span></div></div>
-    <!-- Joystick -->
-    <div id="joy-zone">
-      <div id="joy-base"></div>
-      <div id="joy-knob"></div>
+  <!-- ── 手机 HUD（HTML 叠层，随屏幕自适应；桌面版不显示）── -->
+  <div id="mhud">
+    <div class="mh-tl">
+      <div class="mh-chip mh-hp">
+        <svg class="ic"><use href="#i-heart"/></svg>
+        <div class="mh-bar"><i id="mh-hp-fill"></i></div>
+        <b id="mh-hp-val">100</b>
+      </div>
+      <div class="mh-lv"><span id="mh-lv-val">Lv.1</span><div class="mh-bar xs"><i id="mh-xp-fill"></i></div></div>
+      <div class="mh-chip mh-def" id="mh-def">
+        <span class="mh-mini"><svg class="ic"><use href="#i-shield"/></svg><div class="mh-bar"><i id="mh-wall-fill"></i></div></span>
+        <span class="mh-mini"><svg class="ic"><use href="#i-home"/></svg><div class="mh-bar"><i id="mh-home-fill"></i></div></span>
+      </div>
     </div>
-    <!-- Action buttons -->
-    <div id="btn-fire">🔫</div>
-    <div id="btn-jump">↑</div>
-    <div id="btn-dodge">🤸<br>翻滚</div>
-    <div id="btn-reload">🔄<br>装填</div>
-    <div id="btn-skill">✨<br>技能</div>
-    <div id="btn-shop-m">🛒<br>商店</div>
-    <div id="btn-backpack" onclick="toggleBackpack()">🎒<br>行囊</div>
-    <div id="btn-vehicle">✋<br>[ E ]</div>
-    <div id="btn-scout">🔍<br>侦察</div>
+    <div class="mh-tc">
+      <div class="mh-chip mh-wave">
+        <svg class="ic" id="mh-tod"><use href="#i-sun"/></svg>
+        <b id="mh-wave-title">第 1 波</b>
+        <span id="mh-wave-right"></span>
+        <div class="mh-prog"><i id="mh-wave-fill"></i></div>
+      </div>
+      <div class="mh-sub" id="mh-sub"></div>
+      <div class="mh-tags" id="mh-tags"></div>
+    </div>
+    <div class="mh-tr">
+      <div class="mh-chip mh-coin"><svg class="ic"><use href="#i-coin"/></svg><b id="mh-coin-val">0</b></div>
+      <div id="btn-shop-m" class="mh-ibtn"><svg><use href="#i-cart"/></svg></div>
+      <div id="btn-backpack" class="mh-ibtn"><svg><use href="#i-bag"/></svg></div>
+      <div id="btn-scout" class="mh-ibtn"><svg><use href="#i-eye"/></svg></div>
+      <div id="mh-menu" class="mh-ibtn"><svg><use href="#i-menu"/></svg></div>
+    </div>
+  </div>
+
+  <!-- ── 触控操作层 ── -->
+  <div id="touch-overlay">
+    <!-- 摇杆：左下；手指按在左下区域任何位置都会以按下点为中心（浮动式） -->
+    <div id="joy-zone">
+      <div id="joy-base"><i class="jc jl"></i><i class="jc jr"></i><div id="joy-knob"></div></div>
+    </div>
+    <!-- 右下：一个大攻击键，其余围成弧形 -->
+    <div id="btn-fire" class="tb">
+      <svg class="fire-ring" viewBox="0 0 100 100"><circle id="fire-ring-c" cx="50" cy="50" r="47"/></svg>
+      <svg class="ico"><use href="#i-aim"/></svg>
+      <span id="fire-ammo">--</span>
+    </div>
+    <div id="btn-jump" class="tb"><svg><use href="#i-jump"/></svg></div>
+    <div id="btn-dodge" class="tb"><svg><use href="#i-dash"/></svg></div>
+    <div id="btn-swap" class="tb"><span id="swap-icon">🔫</span><svg class="badge"><use href="#i-swap"/></svg></div>
+    <div id="btn-reload" class="tb"><svg><use href="#i-reload"/></svg></div>
+    <div id="btn-skill" class="tb"><svg><use href="#i-bolt"/></svg></div>
+    <div id="btn-vehicle" class="tb"><svg><use href="#i-hand"/></svg><span id="act-label">交互</span></div>
   </div>
 
   <div id="boss-hpbar" style="display: none;">
@@ -403,7 +456,7 @@
 （我在心里给自己道了个歉。然后又咬了一口。）</div>
       </div>
       <div id="cin-control-bar">
-        <span id="cin-tap">点击 / 空格 继续 ▶</span>
+        <span id="cin-tap">点击继续 ▶</span>
         <span id="cin-progress">3 / 6</span>
       </div>
     </div>
@@ -660,6 +713,7 @@
     <div class="tutorial-box">
       <div id="tutorial-title">🎮 新手教程 · 第1步：基础操作</div>
       <div id="tutorial-body"></div>
+      <div id="tutorial-footer"></div>
       <button id="tutorial-ok-btn" onclick="dismissTutorial()">明白了 ▶</button>
     </div>
   </div>
@@ -714,14 +768,6 @@
     <button id="shop-btn" onclick="openShop()">商店<span class="key">Tab</span></button>
     <button id="rld-btn" onclick="reloadWeapon()">装填<span class="key">R</span></button>
   </div>
-</div>
-
-<!-- Mobile status bar -->
-<div id="m-status">
-  <div id="m-ammo">-- / --</div>
-  <div id="m-rld-wrap"><div id="m-rld-bar"></div></div>
-  <div id="m-wave">第 1 波</div>
-  <div id="m-coins">💰 0</div>
 </div>
 
 <style>

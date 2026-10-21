@@ -9,7 +9,8 @@ build.js               构建脚本：src/ -> dist/zombie-game-v56.html
 test_suite.js          回归测试（node 里用 vm + mock DOM 跑，无需浏览器）
 src/
   index.template.html  页面骨架，含 /*@@STYLE1@@*/ /*@@STYLE2@@*/ /*@@SCRIPT@@*/ 三个占位符
-  style1.css style2.css
+  style1.css style2.css  桌面版样式
+  style_phone.css      手机界面（body.phone）：HUD、操控键、菜单面板、各弹层的小屏排版；与 style2 一起拼进第二个 <style>
   js/                  所有 JS，同一个全局作用域，拼接顺序见 _order.json
     01*  配置与注册表（武器、剧情、僵尸、菜谱配方）
     02*  引擎（音频、输入、尸潮、转场、梦境、主循环）

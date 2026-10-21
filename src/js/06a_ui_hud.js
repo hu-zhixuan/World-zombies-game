@@ -18,8 +18,24 @@
 // 注：spawnFloatText 与 drawFloatTexts 已由 Canvas 对象池驱动，实现零 DOM 节点创建与零 GC 抖动。
 
 let bannerTimer=null, lastBannerText='', lastBannerTime=0;
+// 手机上没有键盘：把提示里的「按 E / 按 [N]」之类改成触屏说法
+const PHONE_TEXT_FIXES = [
+  [/按住\s*\[\s*E\s*\]\s*键/g, '按住右下角按钮'],
+  [/长按\s*\[?\s*E\s*\]?/g, '长按右下角按钮'],
+  [/(?:再)?按\s*\[?\s*E\s*\]?\s*键?\s*或\s*(?:按\s*)?\[?\s*[NB]\s*\]?/g, '点右下角按钮'],
+  [/或按\s*\[\s*N\s*\]/g, ''],
+  [/(?:再)?按\s*\[?\s*E\s*\]?\s*键?/g, '点右下角按钮'],
+  [/\[\s*N\s*\]/g, ''],
+];
+function phoneText(t){
+  if(!isPhoneUI()) return t;
+  let r = String(t);
+  PHONE_TEXT_FIXES.forEach(f => { r = r.replace(f[0], f[1]); });
+  return r;
+}
 function addBanner(txt){
   if(!txt) return;
+  txt = phoneText(txt);
   const now = Date.now();
   if(txt === lastBannerText && now - lastBannerTime < 1200) return; // 抑制重复刷屏
   lastBannerText = txt; lastBannerTime = now;
@@ -253,7 +269,59 @@ function drawFoodStatusStack(x, y, w){
 
 // 手机上画布被缩小（约 0.65×），HUD 面板放大补偿，保证字号可读
 function hudScale(){ return (typeof isMobile === 'function' && isMobile()) ? 1.35 : 1; }
+// 波次面板要显示什么（画布 HUD 和手机 HTML HUD 共用这一份）
+// 返回 {title, tone:''|'ok'|'danger', right, ratio:0~1|null, barTone:'accent'|'danger', sub}
+function getWaveHudInfo(){
+  const isBuffer = window.__waveSpecial === 'buffer';
+  const isHub = gameState === 'hub';
+  const isBufferWaiting = wavePhase === 'buffer' && !isBuffer;
+  const remaining = waveSpawnQueue + zombies.length;
+  const total = waveTotalThisWave || 1;
+  const phone = isPhoneUI();
+  const o = { title: '', tone: '', right: '', ratio: null, barTone: 'accent', sub: '' };
+  if(isHub){
+    o.title = '据点整备'; o.tone = 'ok'; o.right = '第 ' + (wave + 1) + ' 波前';
+    o.sub = phone ? '走近建筑，点右下角按钮进入' : '进食堂 N · 出击 B';
+  }else if(isBufferWaiting){
+    o.title = '夜晚尸潮将至'; o.tone = 'danger';
+    o.sub = phone ? '回小屋避难（长按右下角按钮）' : '进小屋避难（长按 E）';
+  }else if(isBuffer){
+    o.title = '夜晚尸潮 ×' + ([2,3,5,10][bufferWaveLevel] || 2); o.tone = 'danger';
+    o.right = '剩 ' + remaining; o.ratio = 1 - remaining/total; o.barTone = 'danger';
+    o.sub = phone ? '进小屋点右下角按钮避难' : '进小屋按 E 或 N 避难';
+  }else if(wavePhase === 'boss'){
+    o.title = 'BOSS 战'; o.tone = 'danger'; o.right = '第 ' + wave + ' 波';
+    o.sub = '击败 Boss 进入下一阶段';
+  }else if(wavePhase === 'spawning'){
+    o.title = '第 ' + wave + ' 波'; o.right = '剩 ' + remaining + ' / ' + total; o.ratio = 1 - remaining/total;
+  }else{
+    const PHASE_LABEL = { waiting:'准备中', cleared:'已清场', rest:'休整', shop:'整备', buffer:'夜晚将至' };
+    o.title = wave > 0 ? '第 ' + wave + ' 波' : '准备出击'; o.right = PHASE_LABEL[wavePhase] || '';
+  }
+  return o;
+}
+
+// 手机 HUD 里波次下面的小标签：热搜目标 / 昨晚的饭 / 士气 / 连杀
+function getHudTags(){
+  const tags = [];
+  if(gameState !== 'world') return tags;
+  if(currentTrend){
+    const info = getTrendHuntInfo();
+    const kind = info && info.kinds.length ? info.kinds.map(k => MEAT_TYPES[k].name).join('/') : '';
+    tags.push({ text: '#' + currentTrend.tag + '#  ' + kind + ' ×' + trendMeatToday, hot: trendMeatToday > 0 });
+  }
+  const buffs = activeBattleBuffs.filter(b => BATTLE_BUFF_DEFS[b.id]);
+  if(buffs.length > 0 || activeSignature){
+    const dish = lastMealLog.length ? lastMealLog[0].name : '';
+    tags.push({ text: (activeSignature ? '留饭·' + activeSignature.badge : '饱餐' + (dish ? '·' + dish : '')) + (buffs.length > 1 ? ' +' + (buffs.length - 1) : ''), hot: true });
+  }
+  if(moraleBuff > 0) tags.push({ text: '士气 +' + (moraleBuff * 5) + '%', hot: true });
+  if(frenzyT > 0) tags.push({ text: '狂热 ' + Math.ceil(frenzyT/60) + 's', hot: true });
+  return tags;
+}
+
 function drawWaveHUD(){
+  if(isPhoneUI()) return;   // 手机用 HTML HUD（见 updatePhoneHud）
   ctx.save();
   // ── 连杀狂热：角标 ──
   if(frenzyT>0 && gameState==='world'){
@@ -270,25 +338,10 @@ function drawWaveHUD(){
   const hk = hudScale();
   ctx.save(); ctx.translate(GW, 0); ctx.scale(hk, hk); ctx.translate(-GW, 0);
   const pw = 200, px = GW - pw - 10, py = 10, pad = 12, iw = pw - pad * 2;
-  let title, titleColor = HUD.t1, right = '', ratio = null, barColor = HUD.accent, sub = '';
-  if(isHub){
-    title = '据点整备'; titleColor = HUD.ok; right = '第 ' + (wave + 1) + ' 波前';
-    sub = '进食堂 N · 出击 B';
-  }else if(isBufferWaiting){
-    title = '夜晚尸潮将至'; titleColor = HUD.danger;
-    sub = '进小屋避难（长按 E）';
-  }else if(isBuffer){
-    title = '夜晚尸潮 ×' + ([2,3,5,10][bufferWaveLevel] || 2); titleColor = HUD.danger;
-    right = '剩 ' + remaining; ratio = 1 - remaining/total; barColor = HUD.danger;
-    sub = '进小屋按 E 或 N 避难';
-  }else if(wavePhase === 'boss'){
-    title = 'BOSS 战'; titleColor = HUD.danger; right = '第 ' + wave + ' 波';
-    sub = '击败 Boss 进入下一阶段';
-  }else if(wavePhase === 'spawning'){
-    title = '第 ' + wave + ' 波'; right = '剩 ' + remaining + ' / ' + total; ratio = 1 - remaining/total;
-  }else{
-    title = '第 ' + wave + ' 波'; right = wavePhase || '';
-  }
+  const info = getWaveHudInfo();
+  const title = info.title, right = info.right, ratio = info.ratio, sub = info.sub;
+  const titleColor = info.tone === 'danger' ? HUD.danger : info.tone === 'ok' ? HUD.ok : HUD.t1;
+  const barColor = info.barTone === 'danger' ? HUD.danger : HUD.accent;
   const ph = 14 + 20 + (ratio !== null ? 12 : 0) + (sub ? 20 : 0) + 8;
   hudPanel(px, py, pw, ph);
   ctx.font = hudFont(14, 600); ctx.textAlign = 'left'; ctx.fillStyle = titleColor;
@@ -321,7 +374,6 @@ function drawWaveHUD(){
 
 function updateCoinUI(){
   coinDisp.textContent=coins;
-  if(isMobile()){const m=document.getElementById('m-coins');if(m)m.textContent='💰 '+coins;}
   const wEl = document.getElementById('hud-wood');
   const sEl = document.getElementById('hud-scrap');
   if (wEl) wEl.textContent = '木材 ' + woodPlanks;
@@ -1177,6 +1229,9 @@ function showTutorial(key, title, lines){
   document.getElementById('tutorial-title').textContent = title;
   const bodyEl = document.getElementById('tutorial-body');
   bodyEl.innerHTML = lines.map(l => `<div class="tutorial-line">${l}</div>`).join('');
+  bodyEl.scrollTop = 0;
+  const _ft = document.getElementById('tutorial-footer'); if(_ft) _ft.innerHTML = '';
+  const _ok = document.getElementById('tutorial-ok-btn'); if(_ok) _ok.style.display = '';
   tutScr.style.display = 'flex';
   tutScr.classList.add('show');
   gameWrap.querySelectorAll('.banner-msg').forEach(el => { el.style.top = '10px'; });  // 已显示的横幅挪到卡片上方，别盖住标题

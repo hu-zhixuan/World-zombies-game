@@ -217,8 +217,8 @@ function playNextWaveDlg(){
         <div class="wd-text">${waveDlgCurrent.text}</div>
       </div>
       <div class="wd-actions">
-        <div class="wd-btn-next" onclick="event.stopPropagation();advWaveDlg()">[点击/T] 推进 ▶</div>
-        <div class="wd-btn-close" onclick="event.stopPropagation();clearWaveDlg()">[Esc/✕] 跳过</div>
+        <div class="wd-btn-next" onclick="event.stopPropagation();advWaveDlg()">点击继续 ▶</div>
+        <div class="wd-btn-close" onclick="event.stopPropagation();clearWaveDlg()">跳过</div>
       </div>
     </div>
     <div class="wd-timer-track">

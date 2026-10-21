@@ -16,7 +16,7 @@ function build(outFile) {
   const js = order.map(f => fs.readFileSync(path.join(SRC, 'js', f), 'utf8')).join('');
   let html = fs.readFileSync(path.join(SRC, 'index.template.html'), 'utf8');
   html = fill(html, '/*@@STYLE1@@*/', fs.readFileSync(path.join(SRC, 'style1.css'), 'utf8'));
-  html = fill(html, '/*@@STYLE2@@*/', fs.readFileSync(path.join(SRC, 'style2.css'), 'utf8'));
+  html = fill(html, '/*@@STYLE2@@*/', fs.readFileSync(path.join(SRC, 'style2.css'), 'utf8') + '\n' + fs.readFileSync(path.join(SRC, 'style_phone.css'), 'utf8'));
   html = fill(html, '/*@@SCRIPT@@*/', js);
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, html);

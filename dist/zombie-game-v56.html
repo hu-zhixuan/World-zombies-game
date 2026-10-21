@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh"><head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>十五波围城：最后据点 v56 (旧城区远征与双持生态版)</title>
@@ -944,16 +944,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);
   text-align:center;padding:20px;}
 #tutorial-scr.show{display:flex;animation:tutFade .25s ease-out;}
 @keyframes tutFade{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
-.tutorial-box{max-width:560px;width:92%;background:var(--s1);
-  border:1px solid var(--line-hi);border-radius:14px;padding:28px 32px;
+.tutorial-box{max-width:560px;width:92%;max-height:calc(100% - 16px);display:flex;flex-direction:column;background:var(--s1);
+  border:1px solid var(--line-hi);border-radius:14px;padding:24px 28px;
   box-shadow:0 16px 48px rgba(0,0,0,.6);}
+#tutorial-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#tutorial-footer{flex:none;display:flex;gap:10px;justify-content:flex-end;align-items:center;margin-top:14px;}
+#tutorial-footer:empty{display:none;}
 #tutorial-title{font-family:var(--font-display);font-weight:600;font-size:1.25rem;
   color:var(--text-1);letter-spacing:.02em;margin-bottom:18px;text-align:left;}
 .tutorial-line{font-family:var(--font-body);font-weight:400;font-size:.88rem;color:var(--text-1);
   line-height:1.7;margin-bottom:10px;text-align:left;padding-left:0;border-left:none;}
-#tutorial-ok-btn{margin-top:20px;background:var(--accent);border:1px solid var(--accent);color:#1a1205;
+#tutorial-ok-btn{margin-top:14px;background:var(--accent);border:1px solid var(--accent);color:#1a1205;
   font-family:var(--font-display);font-weight:600;font-size:.9rem;padding:8px 28px;
-  cursor:pointer;transition:background .12s;border-radius:8px;float:right;}
+  cursor:pointer;transition:background .12s;border-radius:8px;flex:none;align-self:flex-end;}
 #tutorial-ok-btn:hover{background:#f6b472;}
 #chapter-label{font-family:var(--font-display);font-size:1rem;color:#777d88;
   letter-spacing:1px;margin-bottom:6px;opacity:.9;text-shadow:none;}
@@ -1188,243 +1191,8 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
 #rldw{display:none;width:70px;height:3px;background:var(--s3);border-radius:2px;overflow:hidden;}
 #rldf{height:100%;background:var(--accent);width:0%;}
 
-/* ══════════════════════════════════════════
-   MOBILE LAYOUT & TOUCH CONTROLS
-══════════════════════════════════════════ */
-@media (max-width: 840px), (pointer: coarse) and (max-width: 1100px) {
-  /* 手机/平板：一行紧凑顶栏 + 画布占满剩余高度，操作靠触屏按钮 */
-  body { overflow: hidden; height: 100dvh; height: 100vh; justify-content: flex-start; }
-  #header { flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 12px; padding: 4px 12px; position: relative; }
-  .hdr-main, .hdr-sub { width: auto; gap: 12px; }
-  .hdr-sub { margin-left: auto; }
-  #title, .stat:not(:first-child), #cabin-resources-hud { display: none; }
-  #hpbw { width: 64px; }
-  .hdr-info { gap: 12px; }
-  #world-progress { display: none; }
-  #header #hdr-menu-btn { display: inline-flex; }
-  .hdr-actions { display: none; position: absolute; top: 100%; right: 8px; z-index: 200; flex-direction: column; align-items: stretch;
-    gap: 4px; padding: 8px; background: var(--s1); border: 1px solid var(--line-hi); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.6); }
-  #header.menu-open .hdr-actions { display: flex; }
-  .hdr-actions .hdr-btn { justify-content: space-between; min-width: 120px; padding: 9px 14px; font-size: .9rem; }
-  #game-wrap { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: center; background: #000; max-width: none; }
-  #gc { flex: none; touch-action: none; }   /* 尺寸由 layoutMobile() 按剩余空间等比设置，保证触点换算准确 */
-  /* Hide desktop weapon bar + HUD on mobile — replaced by touch controls */
-  #weapon-bar { display: none !important; }
-  #hud { display: none !important; }
-  /* 弹层在小屏上允许滚动 */
-  #perk-choice-scr, #shop-scr, #cabin-scr, #tutorial-scr, #rest-end-scr { overflow-y: auto; }
-  /* flex 居中的内容比屏幕高时顶部会被切掉且滚不上去：改成上对齐 + 首尾 auto 边距（够高时仍居中） */
-  #perk-choice-scr, #tutorial-scr, #rest-end-scr { justify-content: flex-start; }
-  #perk-choice-scr > :first-child, #tutorial-scr > :first-child, #rest-end-scr > :first-child { margin-top: auto; }
-  #perk-choice-scr > :last-child, #tutorial-scr > :last-child, #rest-end-scr > :last-child { margin-bottom: auto; }
-  .perk-card { font-size: .9em; }
-}
-#hdr-menu-btn { display: none; }
-#rotate-hint { display: none; }
-@media (orientation: portrait) and (max-width: 840px) {
-  #rotate-hint { display: flex; position: fixed; inset: 0; z-index: 9999; background: var(--s0); color: var(--text-1);
-    flex-direction: column; align-items: center; justify-content: center; gap: 10px; font-size: 1.1rem; text-align: center; padding: 24px; }
-  #rotate-hint small { color: var(--text-2); font-size: .8rem; }
-}
-
-/* ── Touch overlay (sits over canvas, pointer-events only on control areas) ── */
-#touch-overlay {
-  display: none;
-  position: absolute; inset: 0; z-index: 60;
-  pointer-events: none;
-}
-@media (max-width: 840px), (pointer: coarse) and (max-width: 1100px) {
-  #touch-overlay { display: block; }
-}
-
-/* Joystick zone — bottom left */
-#joy-zone {
-  position: absolute; left: 10px; bottom: 10px;
-  width: 110px; height: 110px;
-  pointer-events: all;
-}
-#joy-base {
-  position: absolute; inset: 0;
-  border-radius: 50%;
-  background: rgba(255,255,255,.06);
-  border: 2px solid rgba(255,255,255,.15);
-}
-#joy-knob {
-  position: absolute;
-  width: 42px; height: 42px;
-  background: rgba(255,255,255,.35);
-  border-radius: 50%;
-  border: 2px solid rgba(255,255,255,.3);
-  left: 50%; top: 50%;
-  transform: translate(-50%,-50%);
-  transition: none;
-  pointer-events: none;
-}
-
-/* Fire button — bottom right */
-#btn-fire {
-  position: absolute; right: 14px; bottom: 24px;
-  width: 72px; height: 72px; border-radius: 50%;
-  background: rgba(192,57,43,.7);
-  border: 2px solid rgba(192,57,43,.8);
-  color: #ffffff; font-size: 1.5rem; line-height: 72px; text-align: center;
-  pointer-events: all; touch-action: none;
-  box-shadow: none;
-  transition: transform .07s, background .07s;
-  user-select: none;
-}
-#btn-fire.pressed {
-  transform: scale(.92);
-  background: rgba(220,80,60,.85);
-}
-
-/* Jump button */
-#btn-jump {
-  position: absolute; right: 98px; bottom: 24px;
-  width: 54px; height: 54px; border-radius: 50%;
-  background: rgba(39,174,96,.6);
-  border: 2px solid rgba(39,174,96,.7);
-  color: #ffffff; font-size: 1.3rem; line-height: 54px; text-align: center;
-  pointer-events: all; touch-action: none;
-  box-shadow: none;
-  transition: transform .07s;
-  user-select: none;
-}
-#btn-jump.pressed { transform: scale(.9); }
-
-/* Dodge button (mobile) */
-#btn-dodge {
-  position: absolute; right: 160px; bottom: 24px;
-  width: 54px; height: 54px; border-radius: 50%;
-  background: rgba(242,166,90,.6);
-  border: 2px solid rgba(242,166,90,.7);
-  color: #ffffff; font-size: .7rem; text-align: center; line-height: 1.1;
-  padding-top: 12px;
-  pointer-events: all; touch-action: none;
-  box-shadow: none;
-  transition: transform .07s;
-  user-select: none;
-}
-#btn-dodge.pressed { transform: scale(.9); }
-
-/* Reload button */
-#btn-reload {
-  position: absolute; right: 14px; bottom: 106px;
-  width: 48px; height: 48px; border-radius: 8px;
-  background: rgba(40,20,10,.8);
-  border: 1px solid rgba(243,156,18,.6);
-  color: #f39c12; font-size: .65rem; text-align: center; line-height: 1.1;
-  padding-top: 10px;
-  pointer-events: all; touch-action: none;
-  user-select: none;
-}
-
-/* Backpack button mobile */
-#btn-backpack {
-  position: absolute; right: 122px; bottom: 106px;
-  width: 48px; height: 48px; border-radius: 8px;
-  background: rgba(36,22,12,.85);
-  border: 1px solid rgba(240,192,96,.5);
-  color: #ffd875; font-size: .62rem; text-align: center; line-height: 1.1;
-  padding-top: 10px;
-  pointer-events: all; touch-action: none;
-  user-select: none;
-}
-/* Shop button mobile */
-#btn-shop-m {
-  position: absolute; right: 68px; bottom: 106px;
-  width: 48px; height: 48px; border-radius: 8px;
-  background: rgba(26,16,0,.8);
-  border: 1px solid rgba(240,192,60,.5);
-  color: #f0c060; font-size: .62rem; text-align: center; line-height: 1.1;
-  padding-top: 10px;
-  pointer-events: all; touch-action: none;
-  user-select: none;
-}
-
-/* Vehicle enter button */
-#btn-vehicle {
-  position: absolute; right: 14px; bottom: 162px;
-  width: 48px; height: 48px; border-radius: 8px;
-  background: rgba(40,50,30,.8);
-  border: 1px solid rgba(100,160,70,.6);
-  color: #88cc44; font-size: .62rem; text-align: center; line-height: 1.1;
-  padding-top: 10px;
-  pointer-events: all; touch-action: none;
-  display: none;
-  user-select: none;
-}
-
-/* Scout view button (peek at battlefield) */
-#btn-scout {
-  position: absolute; right: 68px; bottom: 162px;
-  width: 48px; height: 48px; border-radius: 8px;
-  background: rgba(33,34,37,.8);
-  border: 1px solid rgba(242,166,90,.6);
-  color: #f2a65a; font-size: .62rem; text-align: center; line-height: 1.1;
-  padding-top: 10px;
-  pointer-events: all; touch-action: none;
-  user-select: none;
-}
-#btn-scout.active {
-  background: rgba(242,166,90,.4);
-  border-color: #f2a65a;
-  color: #ffffff;
-  box-shadow: none;
-}
-
-/* Mobile weapon selector strip at top of game area */
-#wpn-strip {
-  position: absolute; top: 4px; left: 0; right: 0;
-  display: none;
-  flex-direction: row; justify-content: center;
-  gap: 4px; z-index: 62; pointer-events: all;
-  padding: 0 4px;
-}
-@media (max-width: 840px), (pointer: coarse) and (max-width: 1100px) { #wpn-strip { display: flex; } }
-.wpn-btn {
-  flex: 1; max-width: 52px; padding: 3px 2px;
-  border: 1px solid #2a1a20; background: rgba(14,11,15,.82);
-  border-radius: 4px; text-align: center; cursor: pointer;
-  touch-action: none; user-select: none;
-  transition: all .1s;
-}
-.wpn-btn.active-w { border-color: var(--yellow); background: rgba(26,20,0,.9); }
-.wpn-btn.locked-w { opacity: .3; pointer-events: none; }
-.wpn-btn .wi2 { font-size: 1rem; display: block; line-height: 1; }
-.wpn-btn .wa2 { font-size: .5rem; color: #f39c12; display: block; }
-
-/* Mobile status bar under canvas */
-#m-status {
-  display: none;
-  background: #09080a; border-top: 1px solid #1a1015;
-  padding: 3px 10px; flex-direction: row;
-  justify-content: space-between; align-items: center;
-  font-size: .65rem; color: var(--dim);
-}
-@media (max-width: 840px), (pointer: coarse) and (max-width: 1100px) { #m-status { display: flex; } }
-#m-ammo { color: var(--yellow); font-family: var(--font-num); font-size: .8rem; }
-#m-wave { color: var(--dim); letter-spacing: 1px; }
-#m-coins { color: #f0c060; }
-#m-rld-wrap { width: 50px; height: 3px; background: #1a1015; border-radius: 2px; overflow: hidden; }
-#m-rld-bar { height: 100%; background: var(--green); width: 0%; transition: width .05s; }
-
-/* 流派技能按钮：样式见 .hdr-btn 共用规则 */
-/* 移动端技能按钮（放装填按钮左侧） */
-#btn-skill{
-  position:absolute;right:122px;bottom:162px;
-  width:48px;height:48px;border-radius:8px;
-  background:rgba(40,16,60,.8);
-  border:1px solid rgba(221,136,255,.6);
-  color:#dd88ff;font-size:.62rem;text-align:center;line-height:1.1;
-  padding-top:10px;
-  pointer-events:all;touch-action:none;
-  user-select:none;
-  display:none;
-}
-#btn-skill.ready{box-shadow:none;animation:skillPulse 1.6s ease-in-out infinite;}
-#btn-skill.cd{filter:grayscale(.4);opacity:.75;}
-@keyframes skillPulse{0%,100%{box-shadow:none}50%{box-shadow:none}}
+/* 手机界面的全部样式在 style_phone.css（body.phone） */
+#mhud,#touch-overlay,#rotate-hint,#hdr-menu-btn{display:none;}
 
 /* Building options UI styling */
 .bld-opt-btn {
@@ -1497,8 +1265,8 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
   opacity:0;
 }
 .cin-portrait.shown{opacity:1;}
-.cin-portrait.speaking{filter:brightness(1.2) drop-shadow(0 0 16px currentColor); transform:translateY(-6px);}
-.cin-portrait.dimmed{filter:brightness(0.5) saturate(0.6);}
+.cin-portrait.speaking{transform:translateY(-6px);}
+.cin-portrait.dimmed{filter:brightness(.55) saturate(.7);}
 .cin-portrait.left-side{left:8%;}
 .cin-portrait.right-side{right:8%;}
 .cin-portrait.center-side{left:50%; transform:translateX(-50%);}
@@ -1545,8 +1313,8 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
   position:relative; z-index:5; width:94%; max-width:780px;
   margin-bottom:3%; padding:0;
   background:rgba(9,10,11,.96);
-  border:1px solid rgba(120,60,160,.6); border-radius:6px;
-  box-shadow:0 8px 32px rgba(0,0,0,.7);
+  border:1px solid var(--line-hi); border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
   overflow:hidden;
   animation:cinBoxSlide .4s ease-out;
 }
@@ -1554,8 +1322,8 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
 /* 对话框顶部说话人条 */
 #cin-speaker-bar{
   display:flex; align-items:center; gap:10px;
-  padding:8px 20px; background:rgba(120,40,180,.25);
-  border-bottom:1px solid rgba(120,40,180,.3);
+  padding:8px 20px; background:var(--s2);
+  border-bottom:1px solid var(--line);
 }
 #cin-speaker-icon{
   width:28px; height:28px; border-radius:50%; flex-shrink:0;
@@ -1572,7 +1340,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
   padding:16px 24px 20px; min-height:80px; position:relative;
 }
 #cin-text{
-  font-size:.92rem; color:#e8e0c8; line-height:1.9;
+  font-size:.92rem; color:var(--text-1); line-height:1.9;
   min-height:56px; white-space:pre-wrap;
   font-family:var(--font-body);
 }
@@ -1585,7 +1353,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
 /* 对话框底部控制条 */
 #cin-control-bar{
   display:flex; justify-content:space-between; align-items:center;
-  padding:4px 20px 8px; font-size:.65rem; color:#6a5a4a;
+  padding:4px 20px 8px; font-size:.65rem; color:var(--text-3);
 }
 #cin-tap{
   letter-spacing:1px; animation:tapBlink .9s ease-in-out infinite;
@@ -1595,12 +1363,12 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
 #cin-skip{
   position:absolute; top:16px; right:16px; z-index:6;
   font-family:var(--font-body); font-size:.7rem;
-  padding:5px 14px; background:rgba(0,0,0,.6);
-  border:1px solid #5a4a30; color:#9a8f6a;
-  border-radius:3px; cursor:pointer; letter-spacing:1px;
+  padding:5px 14px; background:rgba(12,13,15,.7);
+  border:1px solid var(--line-hi); color:var(--text-2);
+  border-radius:8px; cursor:pointer; letter-spacing:1px;
   transition:all .15s;
 }
-#cin-skip:hover{border-color:var(--yellow); color:var(--yellow);}
+#cin-skip:hover{border-color:var(--accent); color:var(--accent);}
 
 
 /* ═══ 紧急撤退提示（定位 + 脉冲动画）═══ */
@@ -1658,7 +1426,28 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
 </head>
 <body>
 
-<div id="header">
+<!-- 图标集：24×24 描边图标，界面里统一用 <use href="#i-xxx"> -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.5s-8-4.7-8-10.3C4 7 6.2 5 8.7 5c1.4 0 2.6.7 3.3 1.8C12.7 5.7 13.9 5 15.3 5 17.8 5 20 7 20 10.2c0 5.6-8 10.3-8 10.3z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7.5 2.8v5.6c0 4.4-3 8-7.5 9.6-4.5-1.6-7.5-5.2-7.5-9.6V5.8z"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7"/><path d="M6 10v9.5h12V10"/><path d="M10 19.5v-5h4v5"/></symbol>
+  <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="4.6" fill="none" stroke="#0d0e10" stroke-width="1.7" opacity=".4"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.2A8.2 8.2 0 019.8 4a8.2 8.2 0 1010.2 10.2z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M3 4h2.4l2 10.2h10.2L19.6 7H6.2"/><circle cx="9" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/></symbol>
+  <symbol id="i-bag" viewBox="0 0 24 24"><path d="M9 6.5V6a3 3 0 016 0v.5"/><rect x="5" y="6.5" width="14" height="14" rx="3.5"/><path d="M9 13h6M10 16.5h4"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+  <symbol id="i-aim" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></symbol>
+  <symbol id="i-jump" viewBox="0 0 24 24"><path d="M6 12.5l6-6 6 6"/><path d="M6 18.5l6-6 6 6"/></symbol>
+  <symbol id="i-dash" viewBox="0 0 24 24"><path d="M3 8h6M3 12h4M3 16h6"/><path d="M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-reload" viewBox="0 0 24 24"><path d="M20 11a8 8 0 00-14.3-4.6L4 8.5"/><path d="M4 4v4.5h4.5"/><path d="M4 13a8 8 0 0014.3 4.6L20 15.5"/><path d="M20 20v-4.5h-4.5"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.5 2.5L5 13.5h6l-1 8 8.5-11h-6z" fill="currentColor"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M9 11V5.5a1.5 1.5 0 013 0V10"/><path d="M12 10V4.5a1.5 1.5 0 013 0V11"/><path d="M15 11V7a1.5 1.5 0 013 0v7.5a6.5 6.5 0 01-6.5 6.5h-1A6 6 0 016 17.4L4.2 14a1.5 1.5 0 012.5-1.6L9 15.2V11"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M5 9h13l-3-3"/><path d="M19 15H6l3 3"/></symbol>
+</defs></svg>
+
+<div id="header" onclick="if(event.target===this&&Date.now()-(window._menuOpenedAt||0)>350)this.classList.remove('menu-open')">
   <div class="hdr-main">
     <div id="title">十五波围城<span class="ver">v56</span></div>
     <div id="stats">
@@ -1726,25 +1515,57 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
   
   <canvas id="gc" width="1100" height="500"></canvas>
 
-  <!-- ── TOUCH CONTROLS OVERLAY ── -->
-  <div id="touch-overlay">
-    <!-- Mobile weapon strip -->
-    <div id="wpn-strip"><div class="wpn-btn active-w" id="mwb0" style="border-color: rgb(255,224,102);"><span class="wi2">🔫</span><span class="wa2">12</span></div><div class="wpn-btn" id="mwb1" style="border-color: rgb(154,154,154);"><span class="wi2">💥</span><span class="wa2">6</span></div></div>
-    <!-- Joystick -->
-    <div id="joy-zone">
-      <div id="joy-base"></div>
-      <div id="joy-knob"></div>
+  <!-- ── 手机 HUD（HTML 叠层，随屏幕自适应；桌面版不显示）── -->
+  <div id="mhud">
+    <div class="mh-tl">
+      <div class="mh-chip mh-hp">
+        <svg class="ic"><use href="#i-heart"/></svg>
+        <div class="mh-bar"><i id="mh-hp-fill"></i></div>
+        <b id="mh-hp-val">100</b>
+      </div>
+      <div class="mh-lv"><span id="mh-lv-val">Lv.1</span><div class="mh-bar xs"><i id="mh-xp-fill"></i></div></div>
+      <div class="mh-chip mh-def" id="mh-def">
+        <span class="mh-mini"><svg class="ic"><use href="#i-shield"/></svg><div class="mh-bar"><i id="mh-wall-fill"></i></div></span>
+        <span class="mh-mini"><svg class="ic"><use href="#i-home"/></svg><div class="mh-bar"><i id="mh-home-fill"></i></div></span>
+      </div>
     </div>
-    <!-- Action buttons -->
-    <div id="btn-fire">🔫</div>
-    <div id="btn-jump">↑</div>
-    <div id="btn-dodge">🤸<br>翻滚</div>
-    <div id="btn-reload">🔄<br>装填</div>
-    <div id="btn-skill">✨<br>技能</div>
-    <div id="btn-shop-m">🛒<br>商店</div>
-    <div id="btn-backpack" onclick="toggleBackpack()">🎒<br>行囊</div>
-    <div id="btn-vehicle">✋<br>[ E ]</div>
-    <div id="btn-scout">🔍<br>侦察</div>
+    <div class="mh-tc">
+      <div class="mh-chip mh-wave">
+        <svg class="ic" id="mh-tod"><use href="#i-sun"/></svg>
+        <b id="mh-wave-title">第 1 波</b>
+        <span id="mh-wave-right"></span>
+        <div class="mh-prog"><i id="mh-wave-fill"></i></div>
+      </div>
+      <div class="mh-sub" id="mh-sub"></div>
+      <div class="mh-tags" id="mh-tags"></div>
+    </div>
+    <div class="mh-tr">
+      <div class="mh-chip mh-coin"><svg class="ic"><use href="#i-coin"/></svg><b id="mh-coin-val">0</b></div>
+      <div id="btn-shop-m" class="mh-ibtn"><svg><use href="#i-cart"/></svg></div>
+      <div id="btn-backpack" class="mh-ibtn"><svg><use href="#i-bag"/></svg></div>
+      <div id="btn-scout" class="mh-ibtn"><svg><use href="#i-eye"/></svg></div>
+      <div id="mh-menu" class="mh-ibtn"><svg><use href="#i-menu"/></svg></div>
+    </div>
+  </div>
+
+  <!-- ── 触控操作层 ── -->
+  <div id="touch-overlay">
+    <!-- 摇杆：左下；手指按在左下区域任何位置都会以按下点为中心（浮动式） -->
+    <div id="joy-zone">
+      <div id="joy-base"><i class="jc jl"></i><i class="jc jr"></i><div id="joy-knob"></div></div>
+    </div>
+    <!-- 右下：一个大攻击键，其余围成弧形 -->
+    <div id="btn-fire" class="tb">
+      <svg class="fire-ring" viewBox="0 0 100 100"><circle id="fire-ring-c" cx="50" cy="50" r="47"/></svg>
+      <svg class="ico"><use href="#i-aim"/></svg>
+      <span id="fire-ammo">--</span>
+    </div>
+    <div id="btn-jump" class="tb"><svg><use href="#i-jump"/></svg></div>
+    <div id="btn-dodge" class="tb"><svg><use href="#i-dash"/></svg></div>
+    <div id="btn-swap" class="tb"><span id="swap-icon">🔫</span><svg class="badge"><use href="#i-swap"/></svg></div>
+    <div id="btn-reload" class="tb"><svg><use href="#i-reload"/></svg></div>
+    <div id="btn-skill" class="tb"><svg><use href="#i-bolt"/></svg></div>
+    <div id="btn-vehicle" class="tb"><svg><use href="#i-hand"/></svg><span id="act-label">交互</span></div>
   </div>
 
   <div id="boss-hpbar" style="display: none;">
@@ -2051,7 +1872,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
 （我在心里给自己道了个歉。然后又咬了一口。）</div>
       </div>
       <div id="cin-control-bar">
-        <span id="cin-tap">点击 / 空格 继续 ▶</span>
+        <span id="cin-tap">点击继续 ▶</span>
         <span id="cin-progress">3 / 6</span>
       </div>
     </div>
@@ -2308,6 +2129,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
     <div class="tutorial-box">
       <div id="tutorial-title">🎮 新手教程 · 第1步：基础操作</div>
       <div id="tutorial-body"></div>
+      <div id="tutorial-footer"></div>
       <button id="tutorial-ok-btn" onclick="dismissTutorial()">明白了 ▶</button>
     </div>
   </div>
@@ -2364,17 +2186,287 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
   </div>
 </div>
 
-<!-- Mobile status bar -->
-<div id="m-status">
-  <div id="m-ammo">-- / --</div>
-  <div id="m-rld-wrap"><div id="m-rld-bar"></div></div>
-  <div id="m-wave">第 1 波</div>
-  <div id="m-coins">💰 0</div>
-</div>
-
 <style>
 @keyframes scoreFloat{0%{transform:scale(0.95) translateY(0);opacity:0.95}35%{transform:scale(1.05) translateY(-8px);opacity:1}100%{transform:scale(0.85) translateY(-22px);opacity:0}}
 @keyframes alertPulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   手机界面（body.phone，由 layoutMobile() 按媒体查询打开）
+
+   原则
+   · 画布铺满整屏，HUD 只占四个角，中间留给战场
+   · 操作区只在左右两个拇指够得到的角：左下摇杆，右下一个大攻击键 + 弧形副键
+   · 一个强调色（暖橙）；其余全是半透明深灰玻璃 + 白色线性图标，不用渐变、不用发光
+   · 尺寸以屏幕高度为基准：1u = 1% 屏高（至少 3.4px），不同手机按比例缩放
+═══════════════════════════════════════════════════════════════════════ */
+body.phone {
+  --u: clamp(3.4px, 1vh, 5px);
+  --ins-l: env(safe-area-inset-left, 0px);
+  --ins-r: env(safe-area-inset-right, 0px);
+  --glass: rgba(14, 16, 20, .62);
+  --ink: rgba(255, 255, 255, .92);
+  display: block; height: 100vh; overflow: hidden; background: #000;
+}
+@supports (height: 1dvh) { body.phone { --u: clamp(3.4px, 1dvh, 5px); height: 100dvh; } }
+
+body.phone #world-progress, body.phone #weapon-bar, body.phone #hud { display: none !important; }
+body.phone #game-wrap { position: fixed; inset: 0; width: auto; max-width: none; display: flex; align-items: center; justify-content: center; background: #000; }
+body.phone #gc { flex: none; touch-action: none; cursor: default; }
+body.phone .kbd-only { display: none !important; }
+
+/* ── 菜单面板：右上角菜单键打开，点遮罩关闭 ── */
+body.phone #header { position: fixed; inset: 0; z-index: 400; display: none; padding: 0; gap: 0; max-width: none; border: 0; background: rgba(0, 0, 0, .6); }
+body.phone #header.menu-open { display: flex; align-items: center; justify-content: center; }
+body.phone .hdr-main, body.phone .hdr-info, body.phone #hdr-menu-btn { display: none !important; }
+body.phone .hdr-sub { display: contents; }
+body.phone .hdr-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: min(560px, 88%); padding: 14px; background: var(--s1); border: 1px solid var(--line-hi); border-radius: 16px; }
+body.phone .hdr-actions .hdr-btn { justify-content: center; padding: 14px 6px; font-size: 14px; border-radius: 10px; background: var(--s2); border-color: var(--line); }
+body.phone .hdr-actions .hdr-btn:active { background: var(--s3); }
+body.phone .hdr-actions .key { display: none; }
+
+/* 竖屏提示 */
+@media (orientation: portrait) and (max-width: 840px) {
+  #rotate-hint { display: flex; position: fixed; inset: 0; z-index: 9999; background: var(--s0); color: var(--text-1);
+    flex-direction: column; align-items: center; justify-content: center; gap: 10px; font-size: 1.1rem; text-align: center; padding: 24px; }
+  #rotate-hint small { color: var(--text-2); font-size: .8rem; }
+}
+
+/* ══════════ HUD ══════════ */
+body.phone #mhud, body.phone #touch-overlay { display: block; }
+body.phone.rest-mode #mhud, body.phone.rest-mode #touch-overlay { display: none; }
+#mhud { position: absolute; inset: 0; z-index: 55; pointer-events: none; color: var(--ink); font-family: var(--font-body); font-size: 13px; font-variant-numeric: tabular-nums; }
+.mh-tl, .mh-tc, .mh-tr { position: absolute; top: calc(2.2 * var(--u)); display: flex; }
+.mh-tl { left: calc(var(--ins-l) + 2.6 * var(--u)); flex-direction: column; align-items: flex-start; gap: calc(1.1 * var(--u)); }
+.mh-tc { left: 50%; transform: translateX(-50%); flex-direction: column; align-items: center; gap: calc(1.1 * var(--u)); max-width: 36%; }
+.mh-tr { right: calc(var(--ins-r) + 2.6 * var(--u)); align-items: center; gap: calc(1.4 * var(--u)); }
+
+.mh-chip { display: flex; align-items: center; gap: 7px; height: max(26px, calc(6.8 * var(--u))); padding: 0 11px; border-radius: 999px; background: var(--glass); border: 1px solid rgba(255, 255, 255, .1); white-space: nowrap; }
+.mh-chip .ic { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mh-chip b { font-weight: 700; font-size: 13px; }
+.mh-bar { position: relative; width: calc(20 * var(--u)); height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .16); overflow: hidden; flex: none; }
+.mh-bar > i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 3px; background: #e5594f; transition: width .15s; }
+.mh-bar.xs { width: calc(14 * var(--u)); height: 3px; }
+
+/* 左上：血量 / 等级 / 围墙 + 家园 */
+.mh-hp .ic { color: #e5594f; }
+#mh-hp-fill.low { animation: hpLow .7s ease-in-out infinite alternate; }
+@keyframes hpLow { to { opacity: .45; } }
+.mh-lv { display: flex; align-items: center; gap: 6px; padding-left: 5px; font-size: 11px; color: rgba(255, 255, 255, .72); text-shadow: 0 1px 2px rgba(0, 0, 0, .7); }
+#mh-xp-fill { background: var(--accent); width: 0; }
+.mh-def { height: max(22px, calc(5.6 * var(--u))); gap: 12px; padding: 0 10px; }
+.mh-mini { display: flex; align-items: center; gap: 5px; color: rgba(255, 255, 255, .8); }
+.mh-mini .ic { width: 13px; height: 13px; }
+.mh-def .mh-bar { width: calc(11 * var(--u)); }
+#mh-wall-fill { background: #cfd4dc; }
+#mh-home-fill { background: #6fbf8b; }
+#mh-home-fill.mid { background: var(--accent); }
+#mh-wall-fill.low, #mh-home-fill.low { background: #e5594f; }
+#mhud.no-def .mh-def { display: none; }
+
+/* 顶部居中：波次 */
+.mh-wave { position: relative; overflow: hidden; gap: 8px; height: max(28px, calc(7.2 * var(--u))); padding: 0 14px; }
+.mh-wave .ic { color: var(--accent); width: 16px; height: 16px; }
+.mh-wave .ic.night { color: #aab4c8; }
+#mh-wave-title { font-size: 14px; }
+#mh-wave-title.danger { color: #ff7b70; }
+#mh-wave-title.ok { color: #8fd4a6; }
+#mh-wave-right { font-size: 12px; color: rgba(255, 255, 255, .66); }
+#mh-wave-right:empty { display: none; }
+.mh-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255, 255, 255, .1); }
+.mh-prog > i { display: block; width: 0; height: 100%; background: var(--accent); transition: width .2s; }
+.mh-prog > i.danger { background: #e5594f; }
+#mhud.no-prog .mh-prog { display: none; }
+.mh-sub { font-size: 11.5px; padding: 3px 10px; border-radius: 10px; background: var(--glass); color: rgba(255, 255, 255, .78); text-align: center; }
+.mh-sub:empty { display: none; }
+.mh-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; }
+.mh-tags:empty { display: none; }
+.mh-tag { font-size: 11px; padding: 2px 9px; border-radius: 9px; background: var(--glass); color: rgba(255, 255, 255, .7); }
+.mh-tag.hot { color: var(--accent); }
+
+/* 右上：金币 + 商店 / 行囊 / 侦察 / 菜单 */
+.mh-coin .ic { color: var(--accent); width: 16px; height: 16px; }
+.mh-ibtn { pointer-events: auto; touch-action: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  width: max(34px, calc(8.8 * var(--u))); height: max(34px, calc(8.8 * var(--u))); border-radius: 11px; display: grid; place-items: center;
+  background: var(--glass); border: 1px solid rgba(255, 255, 255, .12); color: var(--ink); }
+.mh-ibtn svg { width: 54%; height: 54%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mh-ibtn.pressed { background: rgba(255, 255, 255, .24); }
+
+/* ══════════ 操控层 ══════════ */
+#touch-overlay { position: absolute; inset: 0; z-index: 60; pointer-events: none; }
+.tb { position: absolute; display: grid; place-items: center; border-radius: 50%; background: var(--glass); border: 1.5px solid rgba(255, 255, 255, .22);
+  color: var(--ink); pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  transition: transform .06s, background .06s; }
+.tb svg { width: 48%; height: 48%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.tb.pressed { transform: scale(.92); background: rgba(255, 255, 255, .26); }
+
+/* 摇杆：浮动式，手指落在左下区域任何位置都行 */
+#joy-zone { position: absolute; left: var(--ins-l); bottom: 0; width: calc(60 * var(--u)); height: calc(60 * var(--u)); pointer-events: auto; touch-action: none; }
+#joy-base { position: absolute; left: 36.7%; top: 63.3%; width: calc(30 * var(--u)); height: calc(30 * var(--u)); transform: translate(-50%, -50%);
+  border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .05); pointer-events: none; }
+#joy-zone.on #joy-base { border-color: rgba(255, 255, 255, .45); background: rgba(255, 255, 255, .1); }
+.jc { position: absolute; top: 50%; width: 0; height: 0; border: calc(1.7 * var(--u)) solid transparent; transform: translateY(-50%); }
+.jl { left: calc(1.2 * var(--u)); border-left: 0; border-right-color: rgba(255, 255, 255, .34); }
+.jr { right: calc(1.2 * var(--u)); border-right: 0; border-left-color: rgba(255, 255, 255, .34); }
+#joy-knob { position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; border-radius: 50%;
+  background: rgba(255, 255, 255, .28); border: 1.5px solid rgba(255, 255, 255, .5); transform: translate(-50%, -50%); pointer-events: none; }
+#joy-zone.on #joy-knob { background: rgba(255, 255, 255, .42); }
+
+/* 攻击键：全屏最显眼的东西，也是唯一的实心强调色 */
+#btn-fire { width: calc(24 * var(--u)); height: calc(24 * var(--u)); right: calc(var(--ins-r) + 3 * var(--u)); bottom: calc(4 * var(--u));
+  background: var(--accent); border-color: rgba(255, 255, 255, .45); color: #1b1208;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(.5 * var(--u)); }
+#btn-fire.pressed { background: #f6b472; }
+#btn-fire .ico { width: calc(9 * var(--u)); height: calc(9 * var(--u)); stroke-width: 2.2; }
+#fire-ammo { font: 800 calc(3.9 * var(--u)) / 1 var(--font-num); letter-spacing: .02em; }
+#btn-fire.low #fire-ammo { color: #9d2218; }
+#btn-fire .fire-ring { position: absolute; inset: auto; left: -6px; top: -6px; width: calc(100% + 12px); height: calc(100% + 12px); transform: rotate(-90deg); }
+#btn-fire .fire-ring circle { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 295.3; stroke-dashoffset: 295.3; }
+
+#btn-jump   { width: calc(15 * var(--u)); height: calc(15 * var(--u)); right: calc(var(--ins-r) + 7.5 * var(--u));  bottom: calc(36.5 * var(--u)); }
+#btn-dodge  { width: calc(15 * var(--u)); height: calc(15 * var(--u)); right: calc(var(--ins-r) + 30.5 * var(--u)); bottom: calc(22.5 * var(--u)); }
+#btn-swap   { width: calc(12 * var(--u)); height: calc(12 * var(--u)); right: calc(var(--ins-r) + 30 * var(--u));   bottom: calc(46 * var(--u)); }
+#btn-reload { width: calc(12 * var(--u)); height: calc(12 * var(--u)); right: calc(var(--ins-r) + 34 * var(--u));   bottom: calc(5 * var(--u)); }
+#btn-skill  { width: calc(13 * var(--u)); height: calc(13 * var(--u)); right: calc(var(--ins-r) + 8.5 * var(--u));  bottom: calc(57.5 * var(--u)); display: none; }
+#swap-icon { font-size: calc(5.4 * var(--u)); line-height: 1; }
+#btn-swap .badge { position: absolute; right: -2px; bottom: -2px; width: calc(4.8 * var(--u)); height: calc(4.8 * var(--u)); padding: 2px; border-radius: 50%;
+  background: #2a2d33; border: 1px solid rgba(255, 255, 255, .3); stroke-width: 2.6; }
+#btn-swap.solo { display: none; }
+#btn-skill.ready { border-color: var(--accent); color: var(--accent); }
+#btn-skill.cd { opacity: .65; }
+#btn-skill.cd svg { opacity: .2; }
+#btn-skill[data-cd]:not([data-cd=""])::after { content: attr(data-cd); position: absolute; font: 700 calc(4.2 * var(--u)) var(--font-num); color: #fff; }
+
+/* 交互键：只有附近有可交互的东西才出现（救人 / 进小屋 / 拾取 / 建造…） */
+#btn-vehicle { width: calc(16 * var(--u)); height: calc(16 * var(--u)); right: calc(var(--ins-r) + 49 * var(--u)); bottom: calc(10 * var(--u));
+  display: none; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  background: rgba(242, 166, 90, .22); border: 2px solid var(--accent); color: var(--accent); animation: actPulse 1.3s ease-in-out infinite; }
+#btn-vehicle svg { width: 38%; height: 38%; }
+#act-label { font: 700 calc(3.2 * var(--u)) / 1.1 var(--font-body); }
+@keyframes actPulse { 50% { transform: scale(1.07); } }
+
+/* 据点里不需要战斗键 */
+body.phone.hub-mode #btn-fire, body.phone.hub-mode #btn-reload, body.phone.hub-mode #btn-swap, body.phone.hub-mode #btn-skill, body.phone.hub-mode #btn-dodge { display: none !important; }
+
+/* ══════════ 提示 / 对话 / Boss ══════════ */
+body.phone .banner-msg { top: calc(21 * var(--u)) !important; max-width: 46%; padding: 5px 14px !important; font-size: 12.5px !important; line-height: 1.35;
+  white-space: normal !important; text-align: center; background: var(--glass) !important; border: 1px solid rgba(255, 255, 255, .12) !important; border-radius: 12px !important; box-shadow: none !important; }
+body.phone:has(#wave-dlg-bar.open) .banner-msg { top: calc(42 * var(--u)) !important; }
+body.phone #vehicle-prompt { bottom: calc(1.6 * var(--u)); max-width: 34%; padding: 4px 12px; font-size: 12px; white-space: normal; text-align: center; background: var(--glass); border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; }
+body.phone #wave-dlg-bar { top: calc(21 * var(--u)); width: 46%; max-width: 440px; }
+body.phone .wd-top-bar { display: none; }
+body.phone .wd-main { padding: 8px 10px; gap: 8px; }
+body.phone .wd-avatar { width: 28px; height: 28px; font-size: .8rem; }
+body.phone .wd-text { font-size: .8rem; line-height: 1.45; }
+body.phone .wd-actions { flex-direction: row; align-items: center; margin-left: 0; }
+body.phone #boss-hpbar { top: calc(21 * var(--u)); width: 34%; }
+body.phone #emergency-retreat-hud { top: calc(21 * var(--u)) !important; }
+body.phone #combo-hud { top: calc(24 * var(--u)); left: calc(var(--ins-l) + 2.6 * var(--u)); transform: none; animation: none; }
+
+/* ══════════ 弹层：小屏上可滚动、不被切掉 ══════════ */
+body.phone #perk-choice-scr, body.phone #shop-scr, body.phone #cabin-scr, body.phone #tutorial-scr, body.phone #rest-end-scr { overflow-y: auto; }
+body.phone #perk-choice-scr, body.phone #tutorial-scr, body.phone #rest-end-scr { justify-content: flex-start; }
+body.phone #perk-choice-scr > :first-child, body.phone #tutorial-scr > :first-child, body.phone #rest-end-scr > :first-child { margin-top: auto; }
+body.phone #perk-choice-scr > :last-child, body.phone #tutorial-scr > :last-child, body.phone #rest-end-scr > :last-child { margin-bottom: auto; }
+body.phone .perk-card { font-size: .9em; }
+body.phone .tutorial-box { width: 96%; padding: 12px 16px; border-radius: 12px; }
+body.phone #tutorial-title { font-size: 1rem; margin-bottom: 8px; }
+body.phone .tutorial-line, body.phone #tutorial-body { font-size: .82rem; line-height: 1.5; }
+body.phone #tutorial-footer { margin-top: 10px; }
+body.phone #tutorial-footer .big-btn { margin-top: 0; padding: 9px 22px; }
+
+/* 商店 / 指挥所：标题压小，关闭按钮钉在底部，随时点得到 */
+body.phone #shop-scr, body.phone #cabin-scr { padding: 6px 12px 0; }
+body.phone #shop-title { font-size: 1.05rem; margin: 0; }
+body.phone #shop-coins { font-size: .8rem; margin: 2px 0 4px; padding: 1px 12px; }
+body.phone #shop-timer-bar { margin-bottom: 4px; width: 160px; }
+body.phone #shop-grid { gap: 6px; margin-bottom: 8px; }
+body.phone #shop-close, body.phone #cabin-close { position: sticky; bottom: 0; margin-top: auto; padding: 8px 32px; z-index: 5; box-shadow: 0 -8px 16px rgba(0, 0, 0, .5); }
+
+/* ══════════ 食堂：工具栏压成各一行，把高度还给营业画面 ══════════ */
+body.phone #rest-hud { padding: 4px 10px; gap: 6px; flex-wrap: nowrap; overflow-x: auto; font-size: .72rem; }
+body.phone #rest-hud > * { flex: none; white-space: nowrap; font-size: .72rem; }
+body.phone #rest-timer { font-size: .95rem; }
+body.phone #rest-fans-display, body.phone #rest-vip-btn, body.phone #rest-music-btn, body.phone #rest-mute-btn, body.phone #rep-tier-display { display: none; }
+body.phone .rest-chip, body.phone #cooksta-toggle-btn { padding: 3px 8px; font-size: .7rem; }
+body.phone #trending-display { padding: 3px 8px; max-width: 220px; }
+body.phone #trending-text { font-size: .7rem; }
+body.phone #rest-controls { padding: 4px 8px; gap: 3px; flex-direction: column; flex-wrap: nowrap; max-height: none; overflow: visible; }
+body.phone #rest-controls > div { flex-wrap: nowrap !important; overflow-x: auto; justify-content: flex-start !important; width: 100%; margin-bottom: 0 !important; padding-bottom: 2px; }
+body.phone .rest-stock-row { font-size: .66rem !important; gap: 8px !important; }
+body.phone .dish-btn { min-width: 58px !important; padding: 3px 8px; flex: none; }
+body.phone .dish-btn-icon { font-size: 1rem !important; }
+body.phone .dish-btn-name { font-size: .66rem; }
+body.phone .dish-btn-cost { font-size: .58rem; }
+body.phone .rest-info { display: none; }
+body.phone #daily-tasks-panel { top: 4px; right: 4px; width: 150px; padding: 4px 8px; }
+
+/* ══════════ 第二轮微调：对话条 / 商店 / 天赋 ══════════ */
+body.phone #wave-dlg-bar { width: 54%; max-width: 480px; }
+body.phone:has(#wave-dlg-bar.open) .banner-msg { top: calc(56 * var(--u)) !important; }
+body.phone .wd-text { font-size: 12.5px; line-height: 1.45; }
+body.phone .wd-speaker-row { margin-bottom: 0; }
+
+/* 商店：四列紧凑卡片，一屏看得下 */
+body.phone #shop-grid { grid-template-columns: repeat(4, 1fr); max-width: none; gap: 6px; }
+body.phone .si { padding: 6px 6px 8px; gap: 2px; border-radius: 10px; }
+body.phone .si-icon { font-size: 1.35rem; filter: none; }
+body.phone .si-name { font-size: .74rem; letter-spacing: 0; }
+body.phone .si-desc { font-size: .62rem; line-height: 1.3; }
+body.phone .si-cost { font-size: .72rem; margin-top: 2px; padding: 1px 8px; }
+body.phone #shop-title { font-size: 1rem; }
+
+/* 天赋三选一：卡片压矮，标题变小 */
+body.phone #perk-choice-scr h2, body.phone #perk-choice-scr > div:first-child { font-size: 1.15rem; }
+body.phone .perk-card { width: 170px; min-height: 0; padding: 12px 12px 10px; }
+body.phone .perk-icon { font-size: 2rem; margin-top: 2px; }
+body.phone .perk-name { font-size: 1.05rem; }
+body.phone .perk-desc { font-size: .72rem; line-height: 1.45; }
+
+/* ══════════ 主菜单：手机上收成一屏——标题 + 四个按钮 ══════════ */
+body.phone #menu-content-wrap { justify-content: center; max-height: 100%; padding: 8px 16px; }
+body.phone #menu-header { margin-bottom: 10px; }
+body.phone #menu-header > div:first-child { display: none; }
+body.phone #menu-header h1 { font-size: 2rem !important; margin-bottom: 2px !important; }
+body.phone #menu-header .menu-neon-canteen-sign { font-size: .95rem !important; margin-bottom: 4px !important; }
+body.phone #menu-header > div:last-child { font-size: .66rem !important; padding: 1px 10px !important; }
+body.phone #menu-cards-row { flex-wrap: nowrap; }
+body.phone #save-intel-card, body.phone #menu-content-wrap > div:last-child { display: none !important; }
+body.phone #menu-cards-row > .glass-tactical-card:first-child { max-width: 560px !important; min-width: 0 !important; padding: 12px !important; }
+body.phone #menu-cards-row > .glass-tactical-card:first-child > div:first-child { display: none !important; }
+body.phone #menu-btns { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; }
+body.phone #menu-btns .btn-new { grid-column: 1 / -1; }
+body.phone #menu-btns .btn-download { display: none; }
+body.phone #menu-btns .tactical-menu-btn { padding: 10px 12px; }
+
+/* ══════════ 第三轮：流派选择 / 指挥所 / 提示层级 ══════════ */
+/* 提示横幅压在 HUD 之上、全屏弹层之下，不再盖在商店/章节卡上 */
+body.phone .banner-msg { z-index: 70 !important; }
+
+/* 流派选择：六张卡排成一行 */
+body.phone #perk-choice-scr { padding: 6px 10px; }
+body.phone #perk-choice-level { font-size: 1.05rem !important; margin-bottom: 8px !important; }
+body.phone #perk-choice-list { gap: 8px !important; flex-wrap: nowrap !important; }
+body.phone #perk-choice-list .perk-card[data-class] { width: calc((100% - 40px) / 6) !important; min-width: 0; min-height: 0 !important; padding: 8px !important; gap: 4px !important; }
+body.phone #perk-choice-list .perk-card[data-class] .perk-icon { font-size: 1.6rem !important; }
+body.phone #perk-choice-list .perk-card[data-class] .perk-name { font-size: .78rem !important; }
+body.phone #perk-choice-list .perk-card[data-class] .perk-desc { font-size: .6rem !important; line-height: 1.35 !important; }
+body.phone #perk-choice-list .perk-card[data-class] > div:last-child { display: none; }
+
+/* 指挥所：标题和说明压缩，标签页一行 */
+body.phone #cabin-title { font-size: 1.1rem; margin: 0; }
+body.phone #cabin-scr > div:nth-child(2) { display: none; }
+body.phone #cabin-tabs { margin-bottom: 6px; gap: 4px; }
+body.phone .cabin-tab { padding: 6px 4px; font-size: .72rem; text-align: center; }
+body.phone #cabin-resources { margin-bottom: 6px; gap: 12px; font-size: .8rem; padding: 3px 14px; }
+
+/* ══════════ 剧情演出：压成一屏 ══════════ */
+body.phone #cinematic-stage { top: 8%; bottom: 40%; }
+body.phone .portrait-body { transform: scale(.8); transform-origin: bottom center; }
+body.phone #cinematic-box { margin-bottom: 2%; }
+body.phone #cin-text-area { padding: 10px 18px 6px; min-height: 0; }
+body.phone #cin-text { font-size: .88rem; line-height: 1.6; min-height: 0; }
+body.phone #cin-speaker-bar { padding: 5px 16px; }
+body.phone #cin-skip { top: 8px; right: 10px; }
 </style>
 
 <script>
@@ -2906,8 +2998,8 @@ function playNextWaveDlg(){
         <div class="wd-text">${waveDlgCurrent.text}</div>
       </div>
       <div class="wd-actions">
-        <div class="wd-btn-next" onclick="event.stopPropagation();advWaveDlg()">[点击/T] 推进 ▶</div>
-        <div class="wd-btn-close" onclick="event.stopPropagation();clearWaveDlg()">[Esc/✕] 跳过</div>
+        <div class="wd-btn-next" onclick="event.stopPropagation();advWaveDlg()">点击继续 ▶</div>
+        <div class="wd-btn-close" onclick="event.stopPropagation();clearWaveDlg()">跳过</div>
       </div>
     </div>
     <div class="wd-timer-track">
@@ -5480,17 +5572,27 @@ canvas.addEventListener('mouseleave',()=>{mouseHeld=false;stopAuto();if(isChargi
 function stopAuto(){if(autoInterval){clearInterval(autoInterval);autoInterval=null;}}
 
 // ═══════════════════════════════════════════
-//  MOBILE TOUCH CONTROLS
+//  MOBILE TOUCH CONTROLS（手机操控层）
+//  布局：左下浮动摇杆；右下一个大攻击键 + 弧形副键；商店/行囊/侦察/菜单在右上角。
+//  所有按键统一走 Pointer 事件：触屏、窄窗口里的鼠标都能点，也不会一次点击触发两次。
 // ═══════════════════════════════════════════
 // 与 CSS 里的手机媒体查询保持同一个条件：窄屏，或「粗指针(触屏)且宽度不超过 1100」
 const MOBILE_MQ = '(max-width: 840px), (pointer: coarse) and (max-width: 1100px)';
 const isMobile = ()=> window.innerWidth <= 840 || (window.matchMedia && window.matchMedia(MOBILE_MQ).matches) || ('ontouchstart' in window);
 
-// 手机：画布按 #game-wrap 剩余空间等比缩放（不用 object-fit，避免触点换算偏移）
+// body.phone：整套手机界面（HUD / 操控键 / 菜单面板）的总开关，样式见 style_phone.css
+function syncPhoneClass(){
+  const on = !!(window.matchMedia && window.matchMedia(MOBILE_MQ).matches);
+  try{ if(document.body && document.body.classList) document.body.classList.toggle('phone', on); }catch(e){}
+  return on;
+}
+const isPhoneUI = ()=>{ try{ return !!(document.body && document.body.classList && document.body.classList.contains('phone')); }catch(e){ return false; } };
+
+// 手机：画布在整块屏幕里等比放大（不用 object-fit，避免触点换算偏移）
 function layoutMobile(){
   const cv = document.getElementById('gc'), wrap = document.getElementById('game-wrap');
   if(!cv || !wrap) return;
-  if(!window.matchMedia || !window.matchMedia(MOBILE_MQ).matches){ cv.style.width = ''; cv.style.height = ''; return; }
+  if(!syncPhoneClass()){ cv.style.width = ''; cv.style.height = ''; return; }
   const w = wrap.clientWidth, h = wrap.clientHeight;
   if(!w || !h) return;
   const k = Math.min(w / 1100, h / 500);
@@ -5500,69 +5602,92 @@ function layoutMobile(){
 window.addEventListener('resize', layoutMobile);
 window.addEventListener('orientationchange', () => setTimeout(layoutMobile, 150));
 window.addEventListener('load', layoutMobile);
+layoutMobile();
 setTimeout(layoutMobile, 0);
 
-// ── Joystick ──────────────────────────────
-const joyZone  = document.getElementById('joy-zone');
-const joyKnob  = document.getElementById('joy-knob');
-const JOY_R    = 34; // max knob travel radius
-let joyActive  = false;
-let joyId      = -1;
-let joyOx=0, joyOy=0; // origin of this touch
-
-function joyStart(e){
-  e.preventDefault();
-  const t = e.changedTouches[0];
-  joyId = t.identifier;
-  const r = joyZone.getBoundingClientRect();
-  joyOx = r.left + r.width/2;
-  joyOy = r.top  + r.height/2;
-  joyActive = true;
-  joyMove(e);
+// 按住类按键：pointerdown → down()，pointerup/cancel → up()。多指同时按各自独立。
+function bindPress(el, down, up){
+  if(!el) return;
+  const ids = new Set();
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
+    ids.add(e.pointerId);
+    if(el.classList) el.classList.add('pressed');
+    down(e);
+  });
+  const end = e => {
+    if(!ids.delete(e.pointerId)) return;
+    if(ids.size === 0 && el.classList) el.classList.remove('pressed');
+    if(up) up(e);
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  el.addEventListener('lostpointercapture', end);
 }
-function joyMove(e){
-  e.preventDefault();
-  if(!joyActive) return;
-  let t = null;
-  for(let i=0;i<e.touches.length;i++) if(e.touches[i].identifier===joyId){t=e.touches[i];break;}
-  if(!t) return;
-  const dx = t.clientX - joyOx;
-  const dy = t.clientY - joyOy;
-  const dist = Math.sqrt(dx*dx+dy*dy);
-  const clamp = Math.min(dist, JOY_R);
-  const nx = dist>0 ? dx/dist : 0;
-  const ny = dist>0 ? dy/dist : 0;
-  // Move knob visually
+
+// ── 摇杆（浮动式）──────────────────────────
+// 手指落在左下摇杆区的任何位置，底盘就以落点为中心；松手后回到原位。
+const joyZone = document.getElementById('joy-zone');
+const joyBase = document.getElementById('joy-base');
+const joyKnob = document.getElementById('joy-knob');
+let joyActive = false;
+let joyId = -1;
+let joyOx = 0, joyOy = 0, joyR = 36;   // 本次触摸的中心点 / 旋钮最大位移
+
+function joyPlace(e){
+  const dx = e.clientX - joyOx, dy = e.clientY - joyOy;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const clamp = Math.min(dist, joyR);
+  const nx = dist > 0 ? dx / dist : 0;
+  const ny = dist > 0 ? dy / dist : 0;
   joyKnob.style.transform = `translate(calc(-50% + ${nx*clamp}px), calc(-50% + ${ny*clamp}px))`;
-  // Map to keys — horizontal only (vertical would be jump, handled by btn)
-  keys.l = nx < -0.35 && clamp > 8;
-  keys.r = nx >  0.35 && clamp > 8;
-  // Vertical: swipe up = jump
-  if(ny < -0.5 && clamp > 20 && player.onGround) keys.j = true;
+  // 只用水平方向（竖直方向向上滑 = 跳）
+  keys.l = nx < -0.35 && clamp > joyR * 0.22;
+  keys.r = nx >  0.35 && clamp > joyR * 0.22;
+  if(ny < -0.5 && clamp > joyR * 0.6 && player.onGround) keys.j = true;
   else if(ny >= -0.3) keys.j = false;
 }
-function joyEnd(e){
-  e.preventDefault();
-  let found = false;
-  for(let i=0;i<e.touches.length;i++) if(e.touches[i].identifier===joyId) found=true;
-  if(!found){
-    joyActive=false; joyId=-1;
-    keys.l=false; keys.r=false; keys.j=false;
-    joyKnob.style.transform='translate(-50%,-50%)';
-  }
+if(joyZone){
+  joyZone.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if(joyActive) return;
+    try{ joyZone.setPointerCapture(e.pointerId); }catch(_){}
+    joyId = e.pointerId;
+    const z = joyZone.getBoundingClientRect(), half = (joyBase.offsetWidth || 120) / 2;
+    // 底盘整个留在摇杆区内
+    joyOx = Math.min(z.right - half, Math.max(z.left + half, e.clientX));
+    joyOy = Math.min(z.bottom - half, Math.max(z.top + half, e.clientY));
+    joyBase.style.left = (joyOx - z.left) + 'px';
+    joyBase.style.top  = (joyOy - z.top) + 'px';
+    joyR = (joyBase.offsetWidth || 120) * 0.3;
+    joyActive = true;
+    joyZone.classList.add('on');
+    joyPlace(e);
+  });
+  joyZone.addEventListener('pointermove', e => { if(joyActive && e.pointerId === joyId){ e.preventDefault(); joyPlace(e); } });
+  const joyEnd = e => {
+    if(!joyActive || e.pointerId !== joyId) return;
+    joyActive = false; joyId = -1;
+    keys.l = false; keys.r = false; keys.j = false;
+    joyKnob.style.transform = 'translate(-50%,-50%)';
+    joyBase.style.left = ''; joyBase.style.top = '';
+    joyZone.classList.remove('on');
+  };
+  joyZone.addEventListener('pointerup', joyEnd);
+  joyZone.addEventListener('pointercancel', joyEnd);
+  joyZone.addEventListener('lostpointercapture', joyEnd);
 }
-joyZone.addEventListener('touchstart', joyStart, {passive:false});
-joyZone.addEventListener('touchmove',  joyMove,  {passive:false});
-joyZone.addEventListener('touchend',   joyEnd,   {passive:false});
-joyZone.addEventListener('touchcancel',joyEnd,   {passive:false});
 
-// ── Fire button ───────────────────────────
+// ── 攻击键 ────────────────────────────────
 const btnFire = document.getElementById('btn-fire');
-let fireTouch = -1;
 let fireTouchInterval = null;
 
-function touchFire(toX, toY) {
+function touchFire() {
   if (!gameRunning || shopOpen || cabinUIOpen) return;
+  const w0 = cw();
+  // 弹匣空了自动装填：手机上没有"按 R"的习惯，别让玩家对着空枪干按
+  if (!isReloading && w0.id !== 'minigun' && !w0.noRefill && !w0.meleeWeapon && wAmmo[curWpnIdx] <= 0) { reloadWeapon(); return; }
   mouseHeld = true;
   const near = findNearestEnemy(player.x + CHAR_W / 2, player.y + CHAR_H / 2, 9999);
   if (near) {
@@ -5571,138 +5696,70 @@ function touchFire(toX, toY) {
   }
   fireWeapon(lastMX, lastMY);
 }
-
-btnFire.addEventListener('touchstart', e => {
-  e.preventDefault();
-  btnFire.classList.add('pressed');
-  const t = e.changedTouches[0];
-  fireTouch = t.identifier;
-  touchFire(lastMX, lastMY);
-  // v52修：清旧间隔防堆叠；近战自动武器不建循环（同黑屏根因）
-  if (fireTouchInterval) { clearInterval(fireTouchInterval); fireTouchInterval = null; }
-  if ((cw().autofire || cw().id === 'minigun') && !cw().meleeWeapon) {
-    fireTouchInterval = setInterval(() => { if (gameRunning && !shopOpen && !cabinUIOpen) touchFire(lastMX, lastMY); }, getFireInterval());
-  }
-}, { passive: false });
-btnFire.addEventListener('touchend', e => {
-  e.preventDefault();
-  btnFire.classList.remove('pressed');
+function stopFireLoop(){
   mouseHeld = false;
   if (fireTouchInterval) { clearInterval(fireTouchInterval); fireTouchInterval = null; }
-  fireTouch = -1;
   stopAuto();
-}, { passive: false });
-
-// ── Jump button ───────────────────────────
-const btnJump = document.getElementById('btn-jump');
-btnJump.addEventListener('touchstart', e => {
-  e.preventDefault();
-  btnJump.classList.add('pressed');
-  keys.j = true;
-}, { passive: false });
-btnJump.addEventListener('touchend', e => {
-  e.preventDefault();
-  btnJump.classList.remove('pressed');
-  keys.j = false;
-}, { passive: false });
-
-// ── Dodge button (mobile) ─────────────────
-const btnDodge = document.getElementById('btn-dodge');
-if(btnDodge){
-  btnDodge.addEventListener('touchstart', e => {
-    e.preventDefault();
-    btnDodge.classList.add('pressed');
-    tryDodge();
-  }, { passive: false });
-  btnDodge.addEventListener('touchend', e => {
-    e.preventDefault();
-    btnDodge.classList.remove('pressed');
-  }, { passive: false });
 }
+bindPress(btnFire, () => {
+  touchFire();
+  // v52修：清旧间隔防堆叠；近战自动武器不建循环（同黑屏根因）
+  if (fireTouchInterval) { clearInterval(fireTouchInterval); fireTouchInterval = null; }
+  // 近战不建循环（连击会把角色推出世界边界，见桌面版同处注释）；
+  // 自动武器按射速连发；点射武器按住时按"手速"连发（间隔不低于 280ms）——手机上不用狂点
+  const w = cw();
+  if (!w.meleeWeapon) {
+    const iv = (w.autofire || w.id === 'minigun') ? getFireInterval() : Math.max(getFireInterval(), 280);
+    fireTouchInterval = setInterval(() => { if (gameRunning && !shopOpen && !cabinUIOpen) touchFire(); }, iv);
+  }
+}, stopFireLoop);
 
-// ── Reload button ─────────────────────────
-document.getElementById('btn-reload').addEventListener('touchstart', e => {
-  e.preventDefault(); reloadWeapon();
-}, { passive: false });
+// ── 跳 / 翻滚 / 装填 / 流派技能 / 换枪 ─────────
+bindPress(document.getElementById('btn-jump'), () => { keys.j = true; }, () => { keys.j = false; });
+bindPress(document.getElementById('btn-dodge'), () => { tryDodge(); });
+bindPress(document.getElementById('btn-reload'), () => { reloadWeapon(); });
+bindPress(document.getElementById('btn-skill'), () => { tryClassSkill(); });
+bindPress(document.getElementById('btn-swap'), () => {
+  if (!ownedWeapons || ownedWeapons.length < 2) return;
+  const i = ownedWeapons.indexOf(curWpnIdx);
+  switchWeapon(ownedWeapons[(i + 1) % ownedWeapons.length]);
+});
 
-// ── v53 Class skill button (mobile) ───────
-const btnSkill = document.getElementById('btn-skill');
-if(btnSkill){
-  btnSkill.addEventListener('touchstart', e => {
-    e.preventDefault();
-    btnSkill.classList.add('pressed');
-    tryClassSkill();
-  }, { passive: false });
-  btnSkill.addEventListener('touchend', e => {
-    e.preventDefault();
-    btnSkill.classList.remove('pressed');
-  }, { passive: false });
-}
+// ── 右上角：商店 / 行囊 / 侦察 ───────────────
+bindPress(document.getElementById('btn-shop-m'), () => { if (shopOpen) closeShop(); else openShop(); });
+bindPress(document.getElementById('btn-backpack'), () => { toggleBackpack(); });
+// 菜单：弹出面板；点黑色遮罩关闭（刚打开的 350ms 内忽略遮罩点击，避免同一次点按立刻把它关掉）
+bindPress(document.getElementById('mh-menu'), () => {
+  const h = document.getElementById('header');
+  window._menuOpenedAt = Date.now();
+  if(h) h.classList.toggle('menu-open');
+});
+bindPress(document.getElementById('btn-scout'), () => { scoutView = true; }, () => { scoutView = false; });
 
-// ── Shop button mobile ────────────────────
-document.getElementById('btn-shop-m').addEventListener('touchstart', e => {
-  e.preventDefault(); if (shopOpen) closeShop(); else openShop();
-}, { passive: false });
-const bBp = document.getElementById('btn-backpack');
-if (bBp) {
-  bBp.addEventListener('touchstart', e => {
-    e.preventDefault();
-    toggleBackpack();
-  }, { passive: false });
-}
-
-// ── Vehicle / Interact button (Mobile) ────
-const btnVehicle = document.getElementById('btn-vehicle');
-if(btnVehicle){
-  const onMobileInteractStart = (e) => {
-    e.preventDefault();
-    keys.holdInteract = true;
-    if((isHordeThreatActive() || wavePhase === 'cleared') && gameState === 'world'){
-      if(typeof unboxActive !== 'undefined' && unboxActive){ closeUnboxCard(true); return; }
-      if(typeof rescueNearestCompanion === 'function' && rescueNearestCompanion()) return;
-      if(tryPickupWeaponCrate()) return;
-      if(isPlayerNearCabin()){
-        if(wavePhase === 'cleared'){
-          enterCabinShelter();
-        } else {
-          startCabinHold();
-        }
+// ── 交互键（救人 / 进屋 / 拾取 / 建造…）────────
+bindPress(document.getElementById('btn-vehicle'), () => {
+  keys.holdInteract = true;
+  if((isHordeThreatActive() || wavePhase === 'cleared') && gameState === 'world'){
+    if(typeof unboxActive !== 'undefined' && unboxActive){ closeUnboxCard(true); return; }
+    if(typeof rescueNearestCompanion === 'function' && rescueNearestCompanion()) return;
+    if(rescueNearestSurvivor()) return;
+    if(tryPickupWeaponCrate()) return;
+    if(isPlayerNearCabin()){
+      if(wavePhase === 'cleared'){
+        enterCabinShelter();
       } else {
-        addBanner('🏃 距离小屋太远！快向左撤回据点小屋门前！');
+        startCabinHold();
       }
-      return;
+    } else {
+      addBanner('🏃 距离小屋太远！快向左撤回据点小屋门前！');
     }
-    handleInteractAction();
-  };
-  const onMobileInteractEnd = (e) => {
-    e.preventDefault();
-    keys.holdInteract = false;
-    if(cabinHoldTimer > 0 || cabinHoldActive) cancelCabinHold();
-  };
-  btnVehicle.addEventListener('touchstart', onMobileInteractStart, { passive: false });
-  btnVehicle.addEventListener('touchend', onMobileInteractEnd, { passive: false });
-  btnVehicle.addEventListener('touchcancel', onMobileInteractEnd, { passive: false });
-  btnVehicle.addEventListener('pointerdown', onMobileInteractStart);
-  btnVehicle.addEventListener('pointerup', onMobileInteractEnd);
-  btnVehicle.addEventListener('pointercancel', onMobileInteractEnd);
-}
-
-// ── Scout view button (mobile) ────────────
-const btnScout = document.getElementById('btn-scout');
-btnScout.addEventListener('touchstart', e => {
-  e.preventDefault();
-  scoutView = true;
-  btnScout.classList.add('active');
-}, { passive: false });
-btnScout.addEventListener('touchend', e => {
-  e.preventDefault();
-  scoutView = false;
-  btnScout.classList.remove('active');
-}, { passive: false });
-btnScout.addEventListener('touchcancel', e => {
-  scoutView = false;
-  btnScout.classList.remove('active');
-}, { passive: false });
+    return;
+  }
+  handleInteractAction();
+}, () => {
+  keys.holdInteract = false;
+  if(cabinHoldTimer > 0 || cabinHoldActive) cancelCabinHold();
+});
 
 // ── Canvas touch = aim ────────────────────
 // 放置模式：触摸点击地图放置塔/陷阱
@@ -5739,56 +5796,89 @@ canvas.addEventListener('touchmove', e => {
   lastMY = (t.clientY - r.top) * sy;
 }, { passive: false });
 
-// ── Mobile weapon strip ───────────────────
-function buildMobileWpnStrip() {
-  const strip = document.getElementById('wpn-strip');
-  if(!strip)return;  // 防御：wpn-strip 不存在时跳过
-  strip.innerHTML = '';
-  ownedWeapons.forEach((wi, slot) => {
-    const w = WEAPONS[wi];
-    const rar = WEAPON_RARITY[w.rarity]||WEAPON_RARITY.common;
-    const btn = document.createElement('div');
-    btn.className = 'wpn-btn' + (wi === curWpnIdx ? ' active-w' : '');
-    btn.id = 'mwb' + wi;
-    btn.style.borderColor = wi === curWpnIdx ? '#ffe066' : rar.color;
-    const mNoAmmo = w.classWeapon && (w.id==='warhorn'||w.id==='quakehammer'||w.id==='bloodblades');
-    btn.innerHTML = `<span class="wi2">${w.icon}</span><span class="wa2">${(mNoAmmo || w.id==='minigun') ? '∞' : wAmmo[wi]}</span>`;
-    btn.addEventListener('touchstart', e => { e.preventDefault(); switchWeapon(wi); }, { passive: false });
-    strip.appendChild(btn);
-  });
+// ── 手机 HUD：把游戏状态写进 #mhud（只在值变了才碰 DOM）──────
+const _phCache = {}, _phEl = {};
+function phEl(id){ return _phEl[id] || (_phEl[id] = document.getElementById(id)); }
+function phText(id, v){ const k = 't' + id; if(_phCache[k] === v) return; _phCache[k] = v; const el = phEl(id); if(el) el.textContent = v; }
+function phPct(id, ratio){
+  const r = Math.max(0, Math.min(1, ratio)), v = (r * 100).toFixed(1) + '%', k = 'w' + id;
+  if(_phCache[k] === v) return; _phCache[k] = v;
+  const el = phEl(id); if(el) el.style.width = v;
 }
-function refreshMobileStrip() {
-  ownedWeapons.forEach((wi) => {
-    const w = WEAPONS[wi];
-    const rar = WEAPON_RARITY[w.rarity]||WEAPON_RARITY.common;
-    const btn = document.getElementById('mwb' + wi);
-    if (!btn) return;
-    btn.className = 'wpn-btn' + (wi === curWpnIdx ? ' active-w' : '');
-    btn.style.borderColor = wi === curWpnIdx ? '#ffe066' : rar.color;
-    const ammoEl = btn.querySelector('.wa2');
-    if (ammoEl) ammoEl.textContent = w.id === 'minigun' ? '∞' : wAmmo[wi];
-  });
-}
+function phClass(id, cls, on){ const k = 'c' + id + cls; if(_phCache[k] === !!on) return; _phCache[k] = !!on; const el = phEl(id); if(el) el.classList.toggle(cls, !!on); }
+function phHref(id, href){ const k = 'h' + id; if(_phCache[k] === href) return; _phCache[k] = href; const el = phEl(id); const u = el && el.querySelector('use'); if(u) u.setAttribute('href', href); }
 
-// ── Mobile status bar update ──────────────
-function updateMobileStatus() {
+function updatePhoneHud(){
+  if(!isPhoneUI()) return;
+  // 左上：血量 / 等级 / 围墙 + 家园
+  phText('mh-hp-val', Math.max(0, Math.ceil(health)));
+  phPct('mh-hp-fill', health / maxHp);
+  phClass('mh-hp-fill', 'low', health / maxHp < 0.3);
+  phText('mh-lv-val', 'Lv.' + playerLevel);
+  phPct('mh-xp-fill', playerXp / Math.max(1, playerXpNeed));
+  const showDef = gameState === 'world';
+  phClass('mhud', 'no-def', !showDef);
+  if(showDef){
+    const wallMax = WALL_HP_PER_LEVEL[wallLevel] || 1, wr = wallHp / wallMax, hr = homeHp / HOME_HP_MAX;
+    phPct('mh-wall-fill', wallLevel > 0 ? wr : 0);
+    phClass('mh-wall-fill', 'low', wallLevel > 0 && wr < 0.3);
+    phPct('mh-home-fill', hr);
+    phClass('mh-home-fill', 'low', hr < 0.25);
+    phClass('mh-home-fill', 'mid', hr >= 0.25 && hr <= 0.5);
+  }
+  // 顶部居中：波次
+  const info = getWaveHudInfo();
+  phText('mh-wave-title', info.title);
+  phText('mh-wave-right', info.right);
+  phClass('mh-wave-title', 'danger', info.tone === 'danger');
+  phClass('mh-wave-title', 'ok', info.tone === 'ok');
+  phClass('mhud', 'no-prog', info.ratio === null);
+  if(info.ratio !== null) phPct('mh-wave-fill', info.ratio);
+  phClass('mh-wave-fill', 'danger', info.barTone === 'danger');
+  phText('mh-sub', info.sub);
+  phHref('mh-tod', timeOfDay === 'night' ? '#i-moon' : '#i-sun');
+  phClass('mh-tod', 'night', timeOfDay === 'night');
+  // 标签行：热搜 / 昨晚的饭 / 士气 / 连杀
+  const tags = getHudTags();
+  const tk = tags.map(t => t.text).join('|');
+  if(_phCache.tags !== tk){
+    _phCache.tags = tk;
+    const box = phEl('mh-tags');
+    if(box){
+      box.textContent = '';
+      tags.forEach(t => { const d = document.createElement('span'); d.className = 'mh-tag' + (t.hot ? ' hot' : ''); d.textContent = t.text; box.appendChild(d); });
+    }
+  }
+  // 右上：金币
+  phText('mh-coin-val', coins);
+  // 右下：弹药 / 装填环 / 换枪
   const w = cw();
-  document.getElementById('m-ammo').textContent = w.id === 'minigun' ? '∞' : (`${wAmmo[curWpnIdx]}/${weaponMagSize(w)}`);
-  document.getElementById('m-wave').textContent = '第 ' + wave + ' 波';
-  document.getElementById('m-coins').textContent = '💰 ' + coins;
-  document.getElementById('m-rld-bar').style.width = rldF.style.width || '0%';
+  const noAmmo = w.id === 'minigun' || w.meleeWeapon || (w.classWeapon && (w.id === 'warhorn' || w.id === 'quakehammer' || w.id === 'bloodblades'));
+  const cur = wAmmo[curWpnIdx];
+  phText('fire-ammo', (noAmmo || cur === 9999) ? '∞' : cur);
+  phClass('btn-fire', 'low', !noAmmo && cur !== 9999 && cur <= Math.max(1, Math.floor(weaponMagSize(w) * 0.25)));
+  phText('swap-icon', w.icon);
+  phClass('btn-swap', 'solo', !ownedWeapons || ownedWeapons.length < 2);
+  const ring = phEl('fire-ring-c');
+  if(ring){
+    const p = isReloading ? Math.min(1, Math.max(0, parseFloat(rldF.style.width) / 100 || 0)) : 0;
+    const v = isReloading ? (295.3 * (1 - p)).toFixed(1) : '295.3';
+    if(_phCache.ring !== v){ _phCache.ring = v; ring.style.strokeDashoffset = v; }
+    phClass('btn-fire', 'reloading', isReloading);
+  }
 }
 
-// ── Mobile status tick ────────────────────
+// 弹药/武器变化时刷新（旧的武器条已并入攻击键和换枪键，函数名沿用以免改动调用方）
+function buildMobileWpnStrip(){ updatePhoneHud(); }
+function refreshMobileStrip(){ updatePhoneHud(); }
+function updateMobileStatus(){ updatePhoneHud(); }
+
+// ── 每帧调用，约每 4 帧刷新一次 HUD ──
 let mStatusTimer = 0;
 function mobileStatusTick() {
-  if (!isMobile()) return;
+  if (!isPhoneUI()) return;
   mStatusTimer++;
-  if (mStatusTimer % 20 === 0) {
-    updateMobileStatus();
-    document.getElementById('m-wave').textContent = waveTxt.textContent;
-    document.getElementById('m-rld-bar').style.width = rldF.style.width || '0%';
-  }
+  if (mStatusTimer % 4 === 0) updatePhoneHud();
 }
 
 // ═══════════════════════════════════════════
@@ -7388,113 +7478,178 @@ function drawWorldScenery(t){
 
 //  PLAYER SPRITE
 // ═══════════════════════════════════════════
+// 主角配色：橄榄绿夹克 + 暖橙围巾（和界面强调色同一个橙），夜景里剪影也认得出
+const HERO = {
+  line:'#0e1116',
+  jacket:'#6e7f4c', jacketShade:'#566339', jacketLight:'#8a9b63',
+  pants:'#4b5563', pantsShade:'#39414c',
+  boot:'#2d2622', sole:'#15110f',
+  scarf:'#e8743b', scarfShade:'#c45a28',
+  skin:'#f3cba5', skinShade:'#dba982',
+  hair:'#2b1f1a', hairLight:'#4a382c',
+  glove:'#3b3329', pack:'#8a6a45', packShade:'#6d522f',
+};
+// 路径：圆角矩形（不依赖 ctx.roundRect）
+function heroRR(x,y,w,h,r){
+  r=Math.min(r,w/2,h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+// 一块带描边的色块
+function heroPart(fill,x,y,w,h,r){ heroRR(x,y,w,h,r); ctx.fillStyle=fill; ctx.fill(); ctx.stroke(); }
+function heroDisc(fill,x,y,r){ ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();ctx.stroke(); }
+
 function drawPlayer(px,py,facingR,walkT,aimA,jumping,hurtFlash,t,dodge){
   ctx.save();
   ctx.translate(px+CHAR_W/2,py+CHAR_H);
   if(!facingR)ctx.scale(-1,1);
   if(hurtFlash&&Math.floor(t/80)%2===0)ctx.globalAlpha=.25;
-  
-  // ── 翻滚动画：身手敏捷利落翻滚 ──
+
+  // 脚下阴影（先画，翻滚时留在地面上）
+  const shadowS=jumping?Math.max(.2,1-(CHAR_GY-py)/150):1;
+  ctx.save();ctx.globalAlpha*=.3*shadowS;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(0,0,14*shadowS,3.6*shadowS,0,0,Math.PI*2);ctx.fill();ctx.restore();
+
+  // 翻滚：绕身体中心滚一圈并压扁
   if(dodge>0){
     const dp=dodge/20;
+    ctx.translate(0,-CHAR_H/2);
     ctx.rotate((1-dp)*Math.PI*2*(facingR?1:-1));
     ctx.scale(1,0.65+dp*0.35);
+    ctx.translate(0,CHAR_H/2);
     if(t%2===0){
-      mkP({x:px+CHAR_W/2,y:py+CHAR_H/2,vx:(facingR?-1:1)*(Math.random()*1.5),vy:-Math.random()*1.5,r:2+Math.random()*1.5,rDecay:.05,decay:.05,color:'rgba(80,160,240,.45)',type:'circle',grav:.05,alpha:.5,blur:true});
+      mkP({x:px+CHAR_W/2,y:py+CHAR_H/2,vx:(facingR?-1:1)*(Math.random()*1.5),vy:-Math.random()*1.5,r:2+Math.random()*1.5,rDecay:.05,decay:.05,color:'rgba(240,240,240,.4)',type:'circle',grav:.05,alpha:.5,blur:true});
     }
   }
-  
-  // 角色脚下小巧阴影
-  const shadowS=jumping?Math.max(.2,1-(CHAR_GY-py)/150):1;
-  ctx.save();ctx.globalAlpha=.3*shadowS;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(0,0,13*shadowS,3.5*shadowS,0,0,Math.PI*2);ctx.fill();ctx.restore();
   ctx.translate(0,-CHAR_H);
 
-  // 跑动前倾
-  if(!jumping && dodge<=0){
-    const runLean = 0.08 + Math.sin(walkT*Math.PI*2)*0.02;
+  // 跑动：整体前倾 + 随步伐上下起伏
+  const sw=jumping?0:Math.sin(walkT*Math.PI*2);
+  const running=!jumping&&dodge<=0;
+  if(running){
     ctx.save();
-    ctx.translate(0, CHAR_H);
-    ctx.rotate(runLean);
-    ctx.translate(0, -CHAR_H);
+    ctx.translate(0,CHAR_H);ctx.rotate(0.07+sw*0.015);ctx.translate(0,-CHAR_H);
+    ctx.translate(0,Math.abs(sw)*1.3);
   }
+  // 后坐力：身体微微后仰
+  if(shootRecoil*0.4>0.3&&dodge<=0) ctx.translate(-shootRecoil*0.14,0);
 
-  // 后坐力躯干微退
-  const shoulderRecoil = shootRecoil*0.4;
-  if(shoulderRecoil>0.3 && dodge<=0){
-    ctx.translate(-shoulderRecoil*0.35, 0);
-  }
+  ctx.strokeStyle=HERO.line;ctx.lineWidth=1.4;ctx.lineJoin='round';ctx.lineCap='round';
 
-  // ── 双腿与高帮战术马丁靴 ──
-  const legA=jumping?0:Math.sin(walkT*Math.PI*2)*20;
-  const bootA=jumping?0:Math.sin(walkT*Math.PI*2+.5)*12;
-  function drawBoot(ox,la,ba){
-    ctx.save();ctx.translate(ox,52);ctx.rotate(la*Math.PI/180);ctx.translate(0,11);ctx.rotate(ba*Math.PI/180);
-    // 高帮战靴皮面
-    ctx.fillStyle='#14171d';ctx.fillRect(-4,2,11,5);
-    ctx.fillStyle='#232832';ctx.fillRect(-3,-1,7,4);
-    // 鞋底防滑齿
-    ctx.fillStyle='#0d0f12';ctx.fillRect(-4,6,11,1.5);
-    // 战术鞋带金属扣
-    ctx.fillStyle='#5a6578';ctx.fillRect(-1,1,2,1);ctx.fillRect(-1,3,2,1);
-    ctx.restore();
-  }
-  drawBoot(-5,-legA,-bootA);drawBoot(5,legA,bootA);
+  // ── 背包（躯干身后）──
+  heroPart(HERO.packShade,-14,25,9,16,3);
+  ctx.fillStyle=HERO.pack;ctx.fillRect(-13,26,3,10);
 
-  function drawLeg(ox,la){
-    ctx.save();ctx.translate(ox,50);ctx.rotate(la*Math.PI/180);
-    // 修身战术束脚工装裤
-    const legGrad=ctx.createLinearGradient(-4,0,4,0);
-    legGrad.addColorStop(0,'#1e2530');legGrad.addColorStop(0.5,'#2b3545');legGrad.addColorStop(1,'#1b212b');
-    ctx.fillStyle=legGrad;ctx.fillRect(-4,0,8,13);
-    // 膝盖耐磨补强块
-    ctx.fillStyle='#161b24';ctx.fillRect(-3,4,6,5);
-    ctx.restore();
-  }
-  drawLeg(-5,-legA);drawLeg(5,legA);
-
-  // 战术腰带与合金快拆扣
-  ctx.fillStyle='#14171c';ctx.fillRect(-9,46,18,5);
-  ctx.fillStyle='#4b5563';ctx.fillRect(-2,46.5,4,4); // 银灰合金带扣
-  ctx.fillStyle='#1f2937';ctx.fillRect(5,47,3,4); // 侧挂战术小包
-
-  // ── 帅气修身暗夜战术立领夹克 (Torso & Jacket) ──
-  const jacketGrad=ctx.createLinearGradient(-9,18,9,46);
-  jacketGrad.addColorStop(0,'#1c232d');
-  jacketGrad.addColorStop(0.5,'#252f3d');
-  jacketGrad.addColorStop(1,'#181e26');
-  ctx.fillStyle=jacketGrad;
-  ctx.beginPath();
-  // 挺拔倒梯形上身剪裁
-  ctx.moveTo(-9,20);
-  ctx.lineTo(9,20);
-  ctx.lineTo(8,46);
-  ctx.lineTo(-8,46);
-  ctx.closePath();
-  ctx.fill();
-
-  // 战术立领
-  ctx.fillStyle='#13171f';
-  ctx.fillRect(-6,17,12,4);
-  // 领口内搭暗黑纯色T恤
-  ctx.fillStyle='#0f1115';
-  ctx.beginPath();
-  ctx.moveTo(-3,20);ctx.lineTo(3,20);ctx.lineTo(0,24);ctx.closePath();
-  ctx.fill();
-
-  // 帅气拉链与战术胸线
-  ctx.strokeStyle='#475569';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(0,22);ctx.lineTo(0,46);ctx.stroke();
-  // 胸前战术织带扣
-  ctx.fillStyle='#11151a';ctx.fillRect(-7,25,5,5);ctx.fillRect(2,25,5,5);
-  ctx.fillStyle='#388bfd';ctx.fillRect(4,26,1.5,1.5); // 科技微光芯片指示灯
-
-  // 左手/副手自然摆动
-  const freeA=jumping?-15:-Math.sin(walkT*Math.PI*2)*18;
-  ctx.save();ctx.translate(-9,24);ctx.rotate(freeA*Math.PI/180);
-  ctx.fillStyle='#252f3d';ctx.fillRect(-3,0,6,15); // 袖子
-  ctx.fillStyle='#14171d';ctx.fillRect(-2.5,12,5,3); // 战术手套腕带
-  ctx.fillStyle='#f2c299';ctx.fillRect(-2,15,4,4); // 少年手指
+  // ── 后臂（自然摆动，压在身后）──
+  const freeA=jumping?-32:-sw*30;
+  ctx.save();ctx.translate(-6.5,26.5);ctx.rotate(freeA*Math.PI/180);
+  heroPart(HERO.jacketShade,-2.5,-1.8,5,12,2.4);
+  heroDisc(HERO.skinShade,0,11.8,2.4);
   ctx.restore();
+
+  // ── 双腿 ──
+  function leg(ox,a,shade){
+    ctx.save();ctx.translate(ox,46);ctx.rotate(a*Math.PI/180);
+    heroPart(shade?HERO.pantsShade:HERO.pants,-3.2,-1,6.4,14,2.2);
+    heroPart(HERO.boot,-3.6,11.4,9.2,6.6,2.6);
+    ctx.fillStyle=HERO.sole;ctx.fillRect(-3.2,16.6,8.4,1.2);
+    ctx.restore();
+  }
+  const legA=jumping?0:sw*26;
+  if(jumping){ leg(-3,-24,true); leg(3.5,20,false); }
+  else{ leg(-3,-legA,true); leg(3.5,legA,false); }
+
+  // ── 躯干：夹克 + 腰带 ──
+  heroPart(HERO.jacket,-8.5,23,17,23.5,4.6);
+  ctx.fillStyle=HERO.jacketLight;heroRR(-7,24.2,6.5,3,1.5);ctx.fill();            // 肩部受光
+  ctx.fillStyle=HERO.jacketShade;heroRR(-6.2,28.6,5.6,4.4,1.2);ctx.fill();        // 胸袋
+  ctx.strokeStyle=HERO.jacketShade;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(2.4,26);ctx.lineTo(2.4,40);ctx.stroke(); // 拉链
+  ctx.strokeStyle=HERO.line;ctx.lineWidth=1.4;
+  ctx.fillStyle=HERO.boot;ctx.fillRect(-8,40.2,16,3.6);                            // 腰带
+  ctx.fillStyle='#d7b45a';ctx.fillRect(1,40.6,3.8,2.8);                            // 带扣
+
+  // ── 围巾：飘带 + 绕颈一圈 ──
+  const flap=Math.sin(t*0.012)*1.4+(jumping?-2.5:0)+sw*1.1;
+  ctx.beginPath();
+  ctx.moveTo(-5,22.5);ctx.quadraticCurveTo(-10,22.5+flap,-16,25+flap*2);
+  ctx.lineTo(-14,30+flap*2);ctx.quadraticCurveTo(-9,27+flap,-3,26.5);ctx.closePath();
+  ctx.fillStyle=HERO.scarfShade;ctx.fill();ctx.stroke();
+  heroPart(HERO.scarf,-7.6,20.6,15,6,3);
+
+  // ── 头：大头比例 ──
+  // 后脑发
+  ctx.beginPath();ctx.ellipse(-5.2,10,4.6,6.6,0,0,Math.PI*2);ctx.fillStyle=HERO.hair;ctx.fill();ctx.stroke();
+  heroDisc(HERO.skin,0.5,11.5,9);
+  heroDisc(HERO.skinShade,-5.6,13.2,1.9);   // 耳
+  // 刘海 / 头发
+  ctx.beginPath();
+  ctx.moveTo(-8.4,10.6);
+  ctx.quadraticCurveTo(-9.6,0.6,0.6,0.8);
+  ctx.quadraticCurveTo(10.6,0.8,9.4,10.4);
+  ctx.lineTo(8.2,7.8);ctx.lineTo(5.6,10.2);ctx.lineTo(3.4,7);ctx.lineTo(0.6,9.8);ctx.lineTo(-2.2,6.8);ctx.lineTo(-5,9.4);ctx.lineTo(-7,7.6);
+  ctx.closePath();
+  ctx.fillStyle=HERO.hair;ctx.fill();ctx.stroke();
+  ctx.strokeStyle=HERO.hairLight;ctx.lineWidth=0.9;
+  ctx.beginPath();ctx.moveTo(-3,3.6);ctx.quadraticCurveTo(1,1.8,5,4);ctx.stroke();
+  ctx.strokeStyle=HERO.line;ctx.lineWidth=1.4;
+  // 脸：眼睛 / 眉 / 嘴 / 腮红
+  const squint=(shootRecoil>2);
+  ctx.fillStyle='#1b1f27';
+  if(squint){
+    ctx.fillRect(-2,12.2,2.6,1.2);ctx.fillRect(3.6,12.2,2.6,1.2);
+  }else{
+    ctx.beginPath();ctx.ellipse(-0.7,12.6,1.3,1.9,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(4.9,12.6,1.3,1.9,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.fillRect(-0.2,11.3,0.7,0.7);ctx.fillRect(5.4,11.3,0.7,0.7);
+  }
+  ctx.strokeStyle='#3a2a22';ctx.lineWidth=0.9;
+  ctx.beginPath();ctx.moveTo(-2.6,9.9);ctx.lineTo(0.8,9.4);ctx.moveTo(3.4,9.4);ctx.lineTo(6.8,9.9);ctx.stroke();
+  ctx.strokeStyle='#a8654a';ctx.lineWidth=0.9;
+  ctx.beginPath();ctx.arc(2.9,15.6,1.7,0.2*Math.PI,0.8*Math.PI);ctx.stroke();
+  ctx.fillStyle='rgba(232,116,59,.28)';ctx.beginPath();ctx.arc(6.8,15.2,1.8,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle=HERO.line;ctx.lineWidth=1.4;
+
+  // ── 流派装扮（和头/躯干同一套比例）──
+  if(playerClass){
+    const pcId=playerClass.id;
+    if(pcId==='marksman'){
+      // 单边蓝色目镜
+      ctx.fillStyle='#222a36';ctx.fillRect(-8.6,10.4,18,3);
+      heroPart('#59b6ff',2.2,9.6,6.6,5,1.6);
+      ctx.fillStyle='rgba(255,255,255,.7)';ctx.fillRect(3.4,10.6,1.8,1);
+    }else if(pcId==='berserker'){
+      // 红额带 + 飘带
+      ctx.fillStyle='#e63946';ctx.fillRect(-8.8,4.8,18.6,2.8);ctx.strokeRect(-8.8,4.8,18.6,2.8);
+      ctx.beginPath();ctx.moveTo(-8,5.6);
+      ctx.quadraticCurveTo(-13,3.6-Math.sin(t*0.01)*2,-17,8.4);ctx.lineTo(-14,9);
+      ctx.quadraticCurveTo(-11,6.8,-7.6,7.4);ctx.closePath();ctx.fillStyle='#e63946';ctx.fill();ctx.stroke();
+    }else if(pcId==='demolition'){
+      // 斜挎弹带 + 耳罩
+      ctx.save();ctx.strokeStyle=HERO.line;ctx.lineWidth=4.6;ctx.beginPath();ctx.moveTo(-7.4,25);ctx.lineTo(7.4,42);ctx.stroke();
+      ctx.strokeStyle='#f08a2e';ctx.lineWidth=2.6;ctx.beginPath();ctx.moveTo(-7.4,25);ctx.lineTo(7.4,42);ctx.stroke();
+      ctx.fillStyle=HERO.line;for(let k=0;k<4;k++){ctx.fillRect(-4.6+k*3.6,28+k*4.1,1.8,2.8);}
+      ctx.restore();
+      heroDisc('#1f2937',-6.4,13,3);
+    }else if(pcId==='beastmaster'){
+      // 毛领 + 狼牙吊坠
+      ctx.beginPath();ctx.ellipse(0,24,9.8,3.6,0,0,Math.PI*2);ctx.fillStyle='#ddd6c6';ctx.fill();ctx.stroke();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(-1.2,27);ctx.lineTo(1.2,27);ctx.lineTo(0,31.4);ctx.closePath();ctx.fill();ctx.stroke();
+    }else if(pcId==='warden'){
+      // 前肩护甲
+      heroPart('#7b8798',3,22.4,10,6.4,2.6);
+      ctx.fillStyle='#e0b84a';ctx.fillRect(4,23,8,1.6);
+    }else if(pcId==='chef'){
+      // 围裙 + 厨师帽
+      heroPart('#f1efe8',-7.4,31,14.8,14,2.2);
+      ctx.fillStyle='#e5594f';ctx.fillRect(-7,31.6,14,2);
+      heroPart('#fbfaf6',-6.6,-4.6,13.4,6.4,3);
+      heroDisc('#fbfaf6',-3,-6,3.6);heroDisc('#fbfaf6',3.8,-6.4,3.8);
+    }
+  }
 
   // ── 持枪手臂与枪械瞄准 ──
   const clampA=Math.max(-1.1,Math.min(1.1,aimA));
@@ -7512,162 +7667,48 @@ function drawPlayer(px,py,facingR,walkT,aimA,jumping,hurtFlash,t,dodge){
   const ra=reloadAnim();
   const recoilOffset=shootRecoil*0.7;
   ctx.save();
-  ctx.translate(9-recoilOffset+ra.handX, 26+ra.dipY+ra.handY);
+  ctx.translate(8.6-recoilOffset+ra.handX, 26.4+ra.dipY+ra.handY);
   ctx.rotate(clampA+ra.tilt);
-  // 大臂与修身夹克袖
-  ctx.fillStyle='#252f3d';ctx.fillRect(-2,0,7,5);
-  ctx.fillStyle='#14171d';ctx.fillRect(4,0,4,4); // 战术手套
+  heroPart(HERO.jacket,-2.6,-2.8,9.8,5.6,2.7);          // 袖子
   ctx.translate(8,1);
   drawGunSprite(ctx,WEAPONS[curWpnIdx].id);
 
-  // 紧握枪柄的手
+  // 握枪的手
   {
     const cw2=WEAPONS[curWpnIdx];
     const isMelee=cw2.meleeWeapon||cw2.id==='warhorn';
     const hx=isMelee?2:4, hy=isMelee?3:4;
-    ctx.fillStyle='#f2c299';
-    ctx.beginPath();ctx.arc(hx,hy+1,2.8,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#14171d';
-    ctx.fillRect(hx-1.5,hy,3,2); // 手套指套
+    ctx.strokeStyle=HERO.line;ctx.lineWidth=1.3;
+    heroDisc(HERO.skin,hx,hy+0.6,2.7);
   }
 
-  // 射击抛壳（轻灵小铜壳）
+  // 射击抛壳
   if(shootRecoil>5 && WEAPONS[curWpnIdx].id!=='minigun' && !WEAPONS[curWpnIdx].meleeWeapon && Math.random()>.6){
     const px2=player.x+(player.facingRight?CHAR_W*.6:CHAR_W*.4), py2=player.y+26;
     const shellDir=player.facingRight?-1:1;
     mkP({x:px2,y:py2,vx:shellDir*(1+Math.random()*1.2),vy:-1.8-Math.random()*1.2,r:1,rDecay:.04,decay:.025,color:'#f3cc66',type:'shard',angle:Math.random()*Math.PI,spin:.25,grav:.28,alpha:1});
   }
 
-  // 枪口微火花
+  // 枪口火光
   if(muzzleFlashT>0){
     const mf=muzzleFlashT/8;
     ctx.save();ctx.translate(18,0);ctx.globalAlpha=mf;
-    ctx.fillStyle='#fff9d0';ctx.beginPath();ctx.arc(0,0,5*mf+1.5,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#ffaa30';ctx.beginPath();ctx.arc(0,0,8*mf+2,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff6c8';ctx.beginPath();ctx.arc(0,0,5*mf+1.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#f2a65a';ctx.beginPath();ctx.arc(0,0,8*mf+2,0,Math.PI*2);ctx.fill();
     ctx.restore();
   }
   ctx.restore();
 
-  // 换弹轻提示
+  // 换弹进度条（头顶）
   if(ra.show){
     const prog=100-reloadAnimT;
-    ctx.save();ctx.globalAlpha=0.85;
-    ctx.fillStyle='rgba(15,20,28,.8)';ctx.fillRect(-14,-12,28,4.5);
-    ctx.fillStyle='#388bfd';ctx.fillRect(-13,-11,26*(prog/100),2.5);
+    ctx.save();
+    ctx.fillStyle='rgba(14,17,22,.85)';heroRR(-14,-13,28,5,2.5);ctx.fill();
+    ctx.fillStyle='#f2a65a';heroRR(-13,-12,26*(prog/100),3,1.5);ctx.fill();
     ctx.restore();
   }
 
-  // ── 帅气阳光大学生小胡的面庞与五官 (Xiao Hu Handsome Face) ──
-  ctx.fillStyle='#d59970';ctx.fillRect(-2.5,13,5,6); // 修长颈部
-  // 清爽少年下颌线条
-  const faceGrad=ctx.createLinearGradient(-5,11,5,22);
-  faceGrad.addColorStop(0,'#fae1cc');
-  faceGrad.addColorStop(1,'#e8b28a');
-  ctx.fillStyle=faceGrad;
-  ctx.beginPath();
-  ctx.moveTo(-5.5,11);
-  ctx.lineTo(5.5,11);
-  ctx.lineTo(4,21);
-  ctx.lineTo(0,23.5); // 帅气微收下巴
-  ctx.lineTo(-4,21);
-  ctx.closePath();
-  ctx.fill();
-
-  // 小巧立体的双耳
-  ctx.fillStyle='#e4ab83';
-  ctx.fillRect(-6.5,14,1.8,3.5);ctx.fillRect(4.8,14,1.8,3.5);
-
-  // 清澈深邃有神的双眸（坚毅帅气眼神）
-  const isSquint=(shootRecoil>2);
-  ctx.fillStyle='#111822';
-  ctx.fillRect(-3.8,14.5,2.6,isSquint?1.2:2.4);
-  ctx.fillRect(1.2,14.5,2.6,isSquint?1.2:2.4);
-  if(!isSquint){
-    // 白色灵动高光点
-    ctx.fillStyle='#ffffff';
-    ctx.fillRect(-3.0,14.8,1.1,1.1);
-    ctx.fillRect(2.0,14.8,1.1,1.1);
-  }
-  // 坚毅剑眉
-  ctx.strokeStyle='#1e2632';ctx.lineWidth=0.9;
-  ctx.beginPath();
-  ctx.moveTo(-4.5,13.2);ctx.lineTo(-1.2,14.0);
-  ctx.moveTo(1.2,14.0);ctx.lineTo(4.5,13.2);
-  ctx.stroke();
-
-  // 自信挺秀微挺的鼻线与嘴角
-  ctx.fillStyle='#d09670';ctx.fillRect(-0.5,17.5,1,2);
-  ctx.fillStyle='#b87654';ctx.fillRect(-2,20.5,4,1);
-
-  // ── 帅气三七分层次碎发（彻底告别大绿头盔！）──
-  const hairDark='#151921', hairMid='#242c38', hairLight='#475569';
-  ctx.fillStyle=hairDark;
-  // 头部后轮廓与发量
-  ctx.beginPath();
-  ctx.arc(0,10.5,7.2,Math.PI*0.8,Math.PI*2.2);
-  ctx.fill();
-  // 前额飘逸层次碎发与刘海
-  ctx.fillStyle=hairMid;
-  ctx.beginPath();
-  ctx.moveTo(-6.5,12);
-  ctx.quadraticCurveTo(-7,6,-2.5,4.5);
-  ctx.quadraticCurveTo(0,3.5,3.5,5);
-  ctx.quadraticCurveTo(7.5,7,6.5,12);
-  ctx.lineTo(3.5,10.5);
-  ctx.lineTo(1.5,13); // 帅气垂额碎发
-  ctx.lineTo(-0.8,10.5);
-  ctx.lineTo(-3.2,13.2); // 侧刘海碎发
-  ctx.lineTo(-5,11);
-  ctx.closePath();
-  ctx.fill();
-  // 缕缕发丝高光微光线
-  ctx.strokeStyle=hairLight;ctx.lineWidth=0.7;
-  ctx.beginPath();
-  ctx.moveTo(-3,6);ctx.quadraticCurveTo(0,4.5,3.5,6.5);
-  ctx.stroke();
-
-  // ═══ 小胡 6 种帅气流派战术装扮配件（精益求精，绝不臃肿）═══
-  if(playerClass){
-    const pcId=playerClass.id;
-    if(pcId==='marksman'){
-      // 🎯 狙击目镜小胡：左眼高科技极简轻量单边蓝光目镜
-      ctx.fillStyle='rgba(56,139,253,0.8)';
-      ctx.fillRect(1,14,3.2,3.2);
-      ctx.strokeStyle='#388bfd';ctx.lineWidth=0.8;
-      ctx.strokeRect(0.5,13.5,4.2,4.2);
-      ctx.beginPath();ctx.moveTo(4.8,15.5);ctx.lineTo(6.5,15.5);ctx.stroke();
-    }else if(pcId==='berserker'){
-      // 🪓 热血发带小胡：赤红战术额带 + 脑后飘逸红飘带
-      ctx.fillStyle='#e63946';ctx.fillRect(-6,8.5,12,2.4);
-      ctx.beginPath();
-      ctx.moveTo(-5.5,9.5);
-      ctx.quadraticCurveTo(-10,7.5-Math.sin(t*0.01)*2,-13,12);
-      ctx.lineTo(-10.5,12);
-      ctx.closePath();
-      ctx.fill();
-    }else if(pcId==='demolition'){
-      // 💥 防暴护目镜小胡：战术耳麦与斜挎战术弹药背带
-      ctx.strokeStyle='#f97316';ctx.lineWidth=2.2;
-      ctx.beginPath();ctx.moveTo(-8,20);ctx.lineTo(7,44);ctx.stroke();
-      ctx.fillStyle='#0f172a';ctx.beginPath();ctx.arc(-5.8,15.5,2.2,0,Math.PI*2);ctx.fill();
-    }else if(pcId==='beastmaster'){
-      // 🐺 战地风衣小胡：立领防风战术斗篷领与狼牙吊坠
-      ctx.fillStyle='#1e293b';
-      ctx.beginPath();ctx.moveTo(-9,20);ctx.lineTo(0,28);ctx.lineTo(9,20);ctx.lineTo(7,17);ctx.lineTo(-7,17);ctx.closePath();ctx.fill();
-      ctx.fillStyle='#f1f5f9';
-      ctx.beginPath();ctx.moveTo(-1,27);ctx.lineTo(1,27);ctx.lineTo(0,31);ctx.closePath();ctx.fill();
-    }else if(pcId==='warden'){
-      // 🛡 外骨骼机甲小胡：左肩精钢合金科技外骨骼护肩
-      ctx.fillStyle='#475569';ctx.fillRect(-11,20,5,8);
-      ctx.fillStyle='#ffd700';ctx.fillRect(-11,20,5,1.5);
-    }else if(pcId==='chef'){
-      // 🍳 暗黑主厨小胡：帅气暗黑战术系带半身围裙
-      ctx.fillStyle='#0f172a';ctx.fillRect(-8,35,16,11);
-      ctx.fillStyle='#ef4444';ctx.fillRect(-8,35,16,1.8);
-    }
-  }
-
-  if(!jumping && dodge<=0){ctx.restore();}
+  if(running){ctx.restore();}
   ctx.restore();
 }
 
@@ -12149,9 +12190,10 @@ function updateClassSkillBtn(){
   const btn=document.getElementById('btn-skill');
   if(btn){
     if(!sk){btn.style.display='none';return;}
-    btn.style.display='block';
-    if(dt>0){btn.classList.add('cd');btn.classList.remove('ready');btn.textContent='⏳'+dt;}
-    else{btn.classList.remove('cd');btn.classList.add('ready');btn.textContent=sk.icon+'\n'+sk.name;}
+    btn.style.display='grid';
+    btn.title=sk.name;
+    if(dt>0){btn.classList.add('cd');btn.classList.remove('ready');btn.dataset.cd=dt;}
+    else{btn.classList.remove('cd');btn.classList.add('ready');btn.dataset.cd='';}
   }
   const hudBtn=document.getElementById('skill-hud-btn');
   if(hudBtn){
@@ -13326,31 +13368,37 @@ function drawCabinTurret() {
   ctx.restore();
 }
 
+// 手机上交互键下面的文字：去掉 emoji / 括号 / 说明，只留一个动词（最多 4 个字）
+function actLabelFrom(text){
+  let t = String(text).replace(/\[[^\]]*\]/g, '').replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '').trim();
+  t = t.split(/[（(—：:·]/)[0].trim().split(/\s+/)[0];
+  return t ? t.slice(0, 4) : '交互';
+}
+
 function setInteractPrompt(text) {
+  const btn = document.getElementById('btn-vehicle');
+  const label = document.getElementById('act-label');
   if (text) {
     vehiclePrompt.style.display = 'block';
-    vehiclePrompt.textContent = text;
-    if (isMobile()) {
-      const btn = document.getElementById('btn-vehicle');
-      if (btn) {
-        btn.style.display = 'block';
-        if((isHordeThreatActive() || wavePhase === 'cleared') && gameState === 'world'){
-          if(wavePhase === 'cleared'){
-            btn.innerHTML = isPlayerNearCabin() ? '🏠<br>[进小屋]' : '🏃<br>[回小屋]';
-          } else {
-            btn.innerHTML = isPlayerNearCabin() ? '🏠<br>[按住闭锁]' : '🏃<br>[回小屋]';
-          }
-        } else {
-          btn.innerHTML = '🚗<br>[ E ]';
-        }
+    // 手机上没有键盘，提示里的 [E] 之类的按键说明没意义
+    vehiclePrompt.textContent = isPhoneUI() ? String(text).replace(/\[[^\]]*\]/g, '').trim() : text;
+    // 只有真正能按 E 做点什么的提示才点亮交互键；"门锁着""向左撤回"之类只是信息，不亮
+    const actionable = /\[\s*(长按\s*)?E\s*\]/.test(text) || /正在闭锁/.test(text);
+    if (isMobile() && btn) {
+      if (actionable) {
+        btn.style.display = 'flex';
+        let lbl;
+        if (/正在闭锁/.test(text)) lbl = '闭锁中';
+        else if ((isHordeThreatActive() || wavePhase === 'cleared') && gameState === 'world' && /小屋/.test(text)) lbl = wavePhase === 'cleared' ? '进小屋' : '长按闭锁';
+        else lbl = actLabelFrom(text);
+        if (label) label.textContent = lbl;
+      } else {
+        btn.style.display = 'none';
       }
     }
   } else {
     vehiclePrompt.style.display = 'none';
-    if (isMobile()) {
-      const btn = document.getElementById('btn-vehicle');
-      if (btn) btn.style.display = 'none';
-    }
+    if (isMobile() && btn) btn.style.display = 'none';
   }
 }
 
@@ -13457,6 +13505,11 @@ function updateInteractionPrompt() {
   if (vehicle.entered) {
     setInteractPrompt(null);
     return;
+  }
+  // 战场求救者就在身边：显示「救人」，手机上会点亮 E 按钮
+  if (gameState === 'world') {
+    const nearSurv = fieldSurvivors.find(sv => sv.state === 'waiting' && sv.near);
+    if (nearSurv) { setInteractPrompt('[ E ] 救人：' + nearSurv.persona.name); return; }
   }
   // 优先：附近有武器宝箱 → 显示拾取提示（任何阶段都显示）
   const nearCrate = findNearbyWeaponCrate();
@@ -18286,7 +18339,7 @@ function drawFieldSurvivors(){
         const w = 62;
         ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(s.x - w/2, gy + 6, w, 20, 6); else ctx.rect(s.x - w/2, gy + 6, w, 20); ctx.fill();
         ctx.fillStyle = '#e8eaed'; ctx.font = '500 12px sans-serif';
-        ctx.fillText('E 救人', s.x, gy + 20);
+        ctx.fillText(isPhoneUI() ? '救人' : 'E 救人', s.x, gy + 20);
       }
     }
     ctx.restore();
@@ -24478,6 +24531,8 @@ function buildRestControls(){
   mkMgmt('📖', '顾客图鉴', '相遇 ' + metCount + '/' + (VIP_CUSTOMERS ? VIP_CUSTOMERS.length : 15), () => openVIPCompendium());
   // 状态文字：粉丝 / 员工 / 设施，一行淡色文字，不做成按钮样子
   const info = document.createElement('div');
+  info.className = 'rest-info';
+  info.className = 'rest-info';
   info.style.cssText = 'align-self:center;margin-left:8px;font-size:.74rem;color:var(--text-2);line-height:1.7;';
   info.innerHTML = '粉丝 ' + wastegramFans + '（' + wastegramRank + '）<br>员工 ' + restHiredStaff.length + '/' + STAFF_POOL.length + ' · 灶 ' + restUpgradeLevel.stoves + ' · 桌 ' + restUpgradeLevel.tables + ' · 装修 ' + restUpgradeLevel.decor;
   mgmtRow.appendChild(info);
@@ -27953,8 +28008,24 @@ function endOvernightMeals(){
 // 注：spawnFloatText 与 drawFloatTexts 已由 Canvas 对象池驱动，实现零 DOM 节点创建与零 GC 抖动。
 
 let bannerTimer=null, lastBannerText='', lastBannerTime=0;
+// 手机上没有键盘：把提示里的「按 E / 按 [N]」之类改成触屏说法
+const PHONE_TEXT_FIXES = [
+  [/按住\s*\[\s*E\s*\]\s*键/g, '按住右下角按钮'],
+  [/长按\s*\[?\s*E\s*\]?/g, '长按右下角按钮'],
+  [/(?:再)?按\s*\[?\s*E\s*\]?\s*键?\s*或\s*(?:按\s*)?\[?\s*[NB]\s*\]?/g, '点右下角按钮'],
+  [/或按\s*\[\s*N\s*\]/g, ''],
+  [/(?:再)?按\s*\[?\s*E\s*\]?\s*键?/g, '点右下角按钮'],
+  [/\[\s*N\s*\]/g, ''],
+];
+function phoneText(t){
+  if(!isPhoneUI()) return t;
+  let r = String(t);
+  PHONE_TEXT_FIXES.forEach(f => { r = r.replace(f[0], f[1]); });
+  return r;
+}
 function addBanner(txt){
   if(!txt) return;
+  txt = phoneText(txt);
   const now = Date.now();
   if(txt === lastBannerText && now - lastBannerTime < 1200) return; // 抑制重复刷屏
   lastBannerText = txt; lastBannerTime = now;
@@ -28188,7 +28259,59 @@ function drawFoodStatusStack(x, y, w){
 
 // 手机上画布被缩小（约 0.65×），HUD 面板放大补偿，保证字号可读
 function hudScale(){ return (typeof isMobile === 'function' && isMobile()) ? 1.35 : 1; }
+// 波次面板要显示什么（画布 HUD 和手机 HTML HUD 共用这一份）
+// 返回 {title, tone:''|'ok'|'danger', right, ratio:0~1|null, barTone:'accent'|'danger', sub}
+function getWaveHudInfo(){
+  const isBuffer = window.__waveSpecial === 'buffer';
+  const isHub = gameState === 'hub';
+  const isBufferWaiting = wavePhase === 'buffer' && !isBuffer;
+  const remaining = waveSpawnQueue + zombies.length;
+  const total = waveTotalThisWave || 1;
+  const phone = isPhoneUI();
+  const o = { title: '', tone: '', right: '', ratio: null, barTone: 'accent', sub: '' };
+  if(isHub){
+    o.title = '据点整备'; o.tone = 'ok'; o.right = '第 ' + (wave + 1) + ' 波前';
+    o.sub = phone ? '走近建筑，点右下角按钮进入' : '进食堂 N · 出击 B';
+  }else if(isBufferWaiting){
+    o.title = '夜晚尸潮将至'; o.tone = 'danger';
+    o.sub = phone ? '回小屋避难（长按右下角按钮）' : '进小屋避难（长按 E）';
+  }else if(isBuffer){
+    o.title = '夜晚尸潮 ×' + ([2,3,5,10][bufferWaveLevel] || 2); o.tone = 'danger';
+    o.right = '剩 ' + remaining; o.ratio = 1 - remaining/total; o.barTone = 'danger';
+    o.sub = phone ? '进小屋点右下角按钮避难' : '进小屋按 E 或 N 避难';
+  }else if(wavePhase === 'boss'){
+    o.title = 'BOSS 战'; o.tone = 'danger'; o.right = '第 ' + wave + ' 波';
+    o.sub = '击败 Boss 进入下一阶段';
+  }else if(wavePhase === 'spawning'){
+    o.title = '第 ' + wave + ' 波'; o.right = '剩 ' + remaining + ' / ' + total; o.ratio = 1 - remaining/total;
+  }else{
+    const PHASE_LABEL = { waiting:'准备中', cleared:'已清场', rest:'休整', shop:'整备', buffer:'夜晚将至' };
+    o.title = wave > 0 ? '第 ' + wave + ' 波' : '准备出击'; o.right = PHASE_LABEL[wavePhase] || '';
+  }
+  return o;
+}
+
+// 手机 HUD 里波次下面的小标签：热搜目标 / 昨晚的饭 / 士气 / 连杀
+function getHudTags(){
+  const tags = [];
+  if(gameState !== 'world') return tags;
+  if(currentTrend){
+    const info = getTrendHuntInfo();
+    const kind = info && info.kinds.length ? info.kinds.map(k => MEAT_TYPES[k].name).join('/') : '';
+    tags.push({ text: '#' + currentTrend.tag + '#  ' + kind + ' ×' + trendMeatToday, hot: trendMeatToday > 0 });
+  }
+  const buffs = activeBattleBuffs.filter(b => BATTLE_BUFF_DEFS[b.id]);
+  if(buffs.length > 0 || activeSignature){
+    const dish = lastMealLog.length ? lastMealLog[0].name : '';
+    tags.push({ text: (activeSignature ? '留饭·' + activeSignature.badge : '饱餐' + (dish ? '·' + dish : '')) + (buffs.length > 1 ? ' +' + (buffs.length - 1) : ''), hot: true });
+  }
+  if(moraleBuff > 0) tags.push({ text: '士气 +' + (moraleBuff * 5) + '%', hot: true });
+  if(frenzyT > 0) tags.push({ text: '狂热 ' + Math.ceil(frenzyT/60) + 's', hot: true });
+  return tags;
+}
+
 function drawWaveHUD(){
+  if(isPhoneUI()) return;   // 手机用 HTML HUD（见 updatePhoneHud）
   ctx.save();
   // ── 连杀狂热：角标 ──
   if(frenzyT>0 && gameState==='world'){
@@ -28205,25 +28328,10 @@ function drawWaveHUD(){
   const hk = hudScale();
   ctx.save(); ctx.translate(GW, 0); ctx.scale(hk, hk); ctx.translate(-GW, 0);
   const pw = 200, px = GW - pw - 10, py = 10, pad = 12, iw = pw - pad * 2;
-  let title, titleColor = HUD.t1, right = '', ratio = null, barColor = HUD.accent, sub = '';
-  if(isHub){
-    title = '据点整备'; titleColor = HUD.ok; right = '第 ' + (wave + 1) + ' 波前';
-    sub = '进食堂 N · 出击 B';
-  }else if(isBufferWaiting){
-    title = '夜晚尸潮将至'; titleColor = HUD.danger;
-    sub = '进小屋避难（长按 E）';
-  }else if(isBuffer){
-    title = '夜晚尸潮 ×' + ([2,3,5,10][bufferWaveLevel] || 2); titleColor = HUD.danger;
-    right = '剩 ' + remaining; ratio = 1 - remaining/total; barColor = HUD.danger;
-    sub = '进小屋按 E 或 N 避难';
-  }else if(wavePhase === 'boss'){
-    title = 'BOSS 战'; titleColor = HUD.danger; right = '第 ' + wave + ' 波';
-    sub = '击败 Boss 进入下一阶段';
-  }else if(wavePhase === 'spawning'){
-    title = '第 ' + wave + ' 波'; right = '剩 ' + remaining + ' / ' + total; ratio = 1 - remaining/total;
-  }else{
-    title = '第 ' + wave + ' 波'; right = wavePhase || '';
-  }
+  const info = getWaveHudInfo();
+  const title = info.title, right = info.right, ratio = info.ratio, sub = info.sub;
+  const titleColor = info.tone === 'danger' ? HUD.danger : info.tone === 'ok' ? HUD.ok : HUD.t1;
+  const barColor = info.barTone === 'danger' ? HUD.danger : HUD.accent;
   const ph = 14 + 20 + (ratio !== null ? 12 : 0) + (sub ? 20 : 0) + 8;
   hudPanel(px, py, pw, ph);
   ctx.font = hudFont(14, 600); ctx.textAlign = 'left'; ctx.fillStyle = titleColor;
@@ -28256,7 +28364,6 @@ function drawWaveHUD(){
 
 function updateCoinUI(){
   coinDisp.textContent=coins;
-  if(isMobile()){const m=document.getElementById('m-coins');if(m)m.textContent='💰 '+coins;}
   const wEl = document.getElementById('hud-wood');
   const sEl = document.getElementById('hud-scrap');
   if (wEl) wEl.textContent = '木材 ' + woodPlanks;
@@ -29112,6 +29219,9 @@ function showTutorial(key, title, lines){
   document.getElementById('tutorial-title').textContent = title;
   const bodyEl = document.getElementById('tutorial-body');
   bodyEl.innerHTML = lines.map(l => `<div class="tutorial-line">${l}</div>`).join('');
+  bodyEl.scrollTop = 0;
+  const _ft = document.getElementById('tutorial-footer'); if(_ft) _ft.innerHTML = '';
+  const _ok = document.getElementById('tutorial-ok-btn'); if(_ok) _ok.style.display = '';
   tutScr.style.display = 'flex';
   tutScr.classList.add('show');
   gameWrap.querySelectorAll('.banner-msg').forEach(el => { el.style.top = '10px'; });  // 已显示的横幅挪到卡片上方，别盖住标题
@@ -30038,9 +30148,9 @@ function startGame(){
   storySceneIdx=0;
   vehicle.exists=false;vehicle.entered=false;vehicle.hp=150;vehicle.vx=0;
   sprite.exists=false;sprite.level=1;sprite.attackTimer=180;sprite.healTimer=480;sprite.shieldReady=true;
-  // Bug修复：#weapon-bar/#hud/#m-status 也是 game-wrap 的直接div子节点但从未进豁免名单——
+  // Bug修复：#weapon-bar/#hud 也是 game-wrap 的直接div子节点但从未进豁免名单——
   // 第二局起会被此清理删掉，随后 buildWeaponBar 对 null 写 innerHTML 崩溃。加入豁免。
-  document.querySelectorAll('#game-wrap > div:not(.overlay):not(canvas):not(#emergency-retreat-hud):not(#tactical-door-wipe):not(#shop-scr):not(#cabin-scr):not(#boss-hpbar):not(#vehicle-prompt):not(#dialogue-box):not(#combo-hud):not(#combo-vignette):not(#chapter-scr):not(#world-progress):not(#home-hp-hud):not(#touch-overlay):not(#tower-popover):not(#cinematic-scr):not(#restaurant-scr):not(#transition-overlay):not(#rest-end-scr):not(#dave-transition):not(#tutorial-scr):not(#codex-scr):not(#vip-compendium-scr):not(#main-menu-scr):not(#settings-scr):not(#wastegram-hud):not(#wastegram-notify):not(#weapon-bar):not(#hud):not(#m-status):not(#wave-dlg-bar):not(#backpack-modal):not(#expedition-modal):not(#duff-workshop-modal)').forEach(e=>e.remove());
+  document.querySelectorAll('#game-wrap > div:not(.overlay):not(canvas):not(#emergency-retreat-hud):not(#tactical-door-wipe):not(#shop-scr):not(#cabin-scr):not(#boss-hpbar):not(#vehicle-prompt):not(#dialogue-box):not(#combo-hud):not(#combo-vignette):not(#chapter-scr):not(#world-progress):not(#home-hp-hud):not(#touch-overlay):not(#mhud):not(#tower-popover):not(#cinematic-scr):not(#restaurant-scr):not(#transition-overlay):not(#rest-end-scr):not(#dave-transition):not(#tutorial-scr):not(#codex-scr):not(#vip-compendium-scr):not(#main-menu-scr):not(#settings-scr):not(#wastegram-hud):not(#wastegram-notify):not(#weapon-bar):not(#hud):not(#m-status):not(#wave-dlg-bar):not(#backpack-modal):not(#expedition-modal):not(#duff-workshop-modal)').forEach(e=>e.remove());
   scEl.textContent='0';killsEl.textContent='0';updateHpUI();updateCoinUI();
   buildWeaponBar();refreshWBar();updateAmmoUI();
   waveTxt.textContent='第 1 波';bossHpBar.style.display='none';setInteractPrompt(null);
@@ -30169,6 +30279,38 @@ function setupTutorialSteps(onComplete){
       </div>`
     },
   ];
+  // 手机：操作说明按触屏重写（原文是键鼠：A/D、鼠标、TAB、E），并压成 3 步
+  if(isMobile()){
+    steps.length = 0;
+    steps.push({
+      title: '怎么操作',
+      html: `<div style="text-align:left;line-height:1.6;">
+        <div style="margin-bottom:6px;"><b>目标</b>：守住 15 波尸潮，活到直升机撤离。</div>
+        <div style="margin-bottom:5px;"><b>左下摇杆</b>：左右拖动移动，向上推跳跃。</div>
+        <div style="margin-bottom:5px;"><b>右下红色按钮</b>：开火，会自动瞄准最近的僵尸。按住连射。</div>
+        <div style="margin-bottom:5px;"><b>绿色 ↑ / 翻滚</b>：跳跃 / 闪避（闪避有无敌帧）。</div>
+        <div style="margin-bottom:5px;"><b>装填 · 商店 · 行囊</b>：右侧小按钮。商店里买武器和升级。</div>
+        <div style="margin-bottom:5px;"><b>E 键</b>：靠近可交互的东西（基座、门、求救的人）时亮起，点它。</div>
+        <div style="margin-bottom:5px;"><b>菜单</b>（右上）：图鉴、远征、改造、建设、暂停。</div>
+      </div>`
+    },{
+      title: '一天怎么过',
+      html: `<div style="text-align:left;line-height:1.6;">
+        <div style="margin-bottom:5px;"><b>白天</b>：守住城墙，打僵尸。城墙外偶尔有人求救，走近点 E 救下，<b>晚上他会来你的食堂吃饭</b>。</div>
+        <div style="margin-bottom:5px;"><b>清场后</b>：回据点小屋避难，睡觉回血、升级城墙、买塔防。</div>
+        <div style="margin-bottom:5px;"><b>晚上</b>：用僵尸肉在食堂做菜赚金币。可以「留一份」带去战场，明天更强。</div>
+        <div style="margin-bottom:5px;"><b>黎明</b>：出击下一波。每 5 波一个 Boss。</div>
+        <div style="margin-bottom:5px;">升级会弹出三选一天赋，每局不同。</div>
+      </div>`
+    },{
+      title: '准备好了',
+      html: `<div style="text-align:left;line-height:1.6;">
+        <div style="margin-bottom:5px;">开局配备战术手枪、150 金币、5 块肉。</div>
+        <div style="margin-bottom:5px;">第 1 波是普通感染者，走位拉扯、打头更疼。</div>
+        <div style="color:#e5594f;margin-top:6px;">城墙是生命线：墙破了你会持续掉血。</div>
+      </div>`
+    });
+  }
   // 渲染当前步
   const bodyEl = document.getElementById('tutorial-body');
   function renderStep(){
@@ -30180,10 +30322,12 @@ function setupTutorialSteps(onComplete){
       return;
     }
     document.getElementById('tutorial-title').innerHTML = step.title;
-    bodyEl.innerHTML = step.html + `<div style="margin-top:10px;text-align:center;">
-      <button class="big-btn" id="tut-next-btn" style="font-size:.85rem;padding:6px 24px;">${_tutorialStep < steps.length-1 ? '下一步 ▶' : '开始战斗 ⚔️'}</button>
-      <button class="big-btn" id="tut-skip-btn" style="font-size:.75rem;padding:6px 16px;margin-left:8px;border-color:#6a5a4a;color:#b0a284;">跳过教程</button>
-    </div>`;
+    bodyEl.innerHTML = step.html;
+    bodyEl.scrollTop = 0;
+    document.getElementById('tutorial-ok-btn').style.display = 'none';
+    document.getElementById('tutorial-footer').innerHTML =
+      `<button class="big-btn" id="tut-skip-btn" style="color:var(--text-2);">跳过教程</button>
+       <button class="big-btn primary" id="tut-next-btn">${_tutorialStep < steps.length-1 ? '下一步' : '开始战斗'}</button>`;
     document.getElementById('tut-next-btn').onclick = () => {
       sndClick();
       _tutorialStep++;

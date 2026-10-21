@@ -17,7 +17,7 @@ function createMockCtx() {
     createLinearGradient(){ return { addColorStop(){} }; },
     createRadialGradient(){ return { addColorStop(){} }; },
     scale(){}, translate(){}, rotate(){}, transform(){}, setTransform(){},
-    setLineDash(){}, clip(){}, drawImage(){},
+    setLineDash(){}, clip(){}, drawImage(){}, quadraticCurveTo(){}, bezierCurveTo(){}, arcTo(){},
     shadowColor: '', shadowBlur: 0, shadowOffsetX: 0, shadowOffsetY: 0,
     fillStyle: '', strokeStyle: '', lineWidth: 1, lineCap: '', lineJoin: '',
     font: '', textAlign: '', textBaseline: '', globalAlpha: 1, globalCompositeOperation: 'source-over'
@@ -494,6 +494,39 @@ assert(!drawErr, '食堂画面含伙伴时可绘制', drawErr && drawErr.stack);
 let fsErr = null;
 try { run(`gameState='world'; fieldSurvivors=[{x:1000,vip:null,persona:generateNormalCustomerPersona(),hp:50,state:'waiting',t:3,near:true,fade:1}]; drawFieldSurvivors();`); } catch (e) { fsErr = e; }
 assert(!fsErr, '战场求救者可绘制', fsErr && fsErr.stack);
+
+// ── 主角重绘：所有流派 × 各种姿态都能画，且 save/restore 配平（不污染后续绘制）──
+let heroErr = null;
+try {
+  run(`
+    window.__heroDepth = 0;
+    const _s = ctx.save.bind(ctx), _r = ctx.restore.bind(ctx);
+    ctx.save = function(){ window.__heroDepth++; return _s(); };
+    ctx.restore = function(){ window.__heroDepth--; return _r(); };
+    [null,'marksman','berserker','demolition','beastmaster','warden','chef'].forEach(id => {
+      playerClass = id ? {id} : null;
+      [[0,false,0],[0.25,false,0],[0.5,false,0],[0,true,0],[0.3,false,12]].forEach(p => drawPlayer(100,286,true,p[0],0.2,p[1],false,1234,p[2]));
+      drawPlayer(100,286,false,0.1,-0.3,false,true,1234,0);
+    });
+    playerClass = null;
+    ctx.save = _s; ctx.restore = _r;
+  `);
+} catch (e) { heroErr = e; }
+assert(!heroErr, '主角在所有流派/姿态下都能绘制', heroErr && heroErr.stack);
+assert(run(`window.__heroDepth`) === 0, '主角绘制 save/restore 配平');
+
+// ── 手机 HUD 的数据来源 ──
+run(`gameState = 'world'; wave = 3; wavePhase = 'spawning'; waveSpawnQueue = 4; zombies = []; waveTotalThisWave = 8;`);
+assert(run(`getWaveHudInfo().title`) === '第 3 波' && run(`getWaveHudInfo().right`) === '剩 4 / 8' && Math.abs(run(`getWaveHudInfo().ratio`) - 0.5) < 1e-9, '波次面板：标题/剩余/进度');
+run(`wavePhase = 'waiting';`);
+assert(run(`getWaveHudInfo().right`) === '准备中', '波次状态用中文，不显示内部英文名');
+run(`gameState = 'hub';`);
+assert(run(`getWaveHudInfo().tone`) === 'ok', '据点整备面板用绿色调');
+run(`gameState = 'world'; wavePhase = 'spawning';`);
+assert(run(`actLabelFrom('[ E ] 救人：阿狗')`) === '救人', '交互键标签：救人');
+assert(run(`actLabelFrom('[ E ] 招募 狙击手阿强 (💰60)')`) === '招募', '交互键标签：招募');
+assert(run(`actLabelFrom('[ E ] 搜刮战地医疗箱 (急救包×2)')`) === '搜刮战地', '交互键标签：最多四个字');
+assert(run(`actLabelFrom('🚪 [ 长按 E ] 紧急闭锁入屋避难')`) === '紧急闭锁', '交互键标签：去掉 emoji 和按键说明');
 
 console.log(`\n========================================`);
 console.log(`FINAL RESULT: Passed: ${testsPassed}, Failed: ${testsFailed}`);

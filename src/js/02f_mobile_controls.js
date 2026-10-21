@@ -1,15 +1,25 @@
 // ═══════════════════════════════════════════
-//  MOBILE TOUCH CONTROLS
+//  MOBILE TOUCH CONTROLS（手机操控层）
+//  布局：左下浮动摇杆；右下一个大攻击键 + 弧形副键；商店/行囊/侦察/菜单在右上角。
+//  所有按键统一走 Pointer 事件：触屏、窄窗口里的鼠标都能点，也不会一次点击触发两次。
 // ═══════════════════════════════════════════
 // 与 CSS 里的手机媒体查询保持同一个条件：窄屏，或「粗指针(触屏)且宽度不超过 1100」
 const MOBILE_MQ = '(max-width: 840px), (pointer: coarse) and (max-width: 1100px)';
 const isMobile = ()=> window.innerWidth <= 840 || (window.matchMedia && window.matchMedia(MOBILE_MQ).matches) || ('ontouchstart' in window);
 
-// 手机：画布按 #game-wrap 剩余空间等比缩放（不用 object-fit，避免触点换算偏移）
+// body.phone：整套手机界面（HUD / 操控键 / 菜单面板）的总开关，样式见 style_phone.css
+function syncPhoneClass(){
+  const on = !!(window.matchMedia && window.matchMedia(MOBILE_MQ).matches);
+  try{ if(document.body && document.body.classList) document.body.classList.toggle('phone', on); }catch(e){}
+  return on;
+}
+const isPhoneUI = ()=>{ try{ return !!(document.body && document.body.classList && document.body.classList.contains('phone')); }catch(e){ return false; } };
+
+// 手机：画布在整块屏幕里等比放大（不用 object-fit，避免触点换算偏移）
 function layoutMobile(){
   const cv = document.getElementById('gc'), wrap = document.getElementById('game-wrap');
   if(!cv || !wrap) return;
-  if(!window.matchMedia || !window.matchMedia(MOBILE_MQ).matches){ cv.style.width = ''; cv.style.height = ''; return; }
+  if(!syncPhoneClass()){ cv.style.width = ''; cv.style.height = ''; return; }
   const w = wrap.clientWidth, h = wrap.clientHeight;
   if(!w || !h) return;
   const k = Math.min(w / 1100, h / 500);
@@ -19,69 +29,92 @@ function layoutMobile(){
 window.addEventListener('resize', layoutMobile);
 window.addEventListener('orientationchange', () => setTimeout(layoutMobile, 150));
 window.addEventListener('load', layoutMobile);
+layoutMobile();
 setTimeout(layoutMobile, 0);
 
-// ── Joystick ──────────────────────────────
-const joyZone  = document.getElementById('joy-zone');
-const joyKnob  = document.getElementById('joy-knob');
-const JOY_R    = 34; // max knob travel radius
-let joyActive  = false;
-let joyId      = -1;
-let joyOx=0, joyOy=0; // origin of this touch
-
-function joyStart(e){
-  e.preventDefault();
-  const t = e.changedTouches[0];
-  joyId = t.identifier;
-  const r = joyZone.getBoundingClientRect();
-  joyOx = r.left + r.width/2;
-  joyOy = r.top  + r.height/2;
-  joyActive = true;
-  joyMove(e);
+// 按住类按键：pointerdown → down()，pointerup/cancel → up()。多指同时按各自独立。
+function bindPress(el, down, up){
+  if(!el) return;
+  const ids = new Set();
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    try{ el.setPointerCapture(e.pointerId); }catch(_){}
+    ids.add(e.pointerId);
+    if(el.classList) el.classList.add('pressed');
+    down(e);
+  });
+  const end = e => {
+    if(!ids.delete(e.pointerId)) return;
+    if(ids.size === 0 && el.classList) el.classList.remove('pressed');
+    if(up) up(e);
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  el.addEventListener('lostpointercapture', end);
 }
-function joyMove(e){
-  e.preventDefault();
-  if(!joyActive) return;
-  let t = null;
-  for(let i=0;i<e.touches.length;i++) if(e.touches[i].identifier===joyId){t=e.touches[i];break;}
-  if(!t) return;
-  const dx = t.clientX - joyOx;
-  const dy = t.clientY - joyOy;
-  const dist = Math.sqrt(dx*dx+dy*dy);
-  const clamp = Math.min(dist, JOY_R);
-  const nx = dist>0 ? dx/dist : 0;
-  const ny = dist>0 ? dy/dist : 0;
-  // Move knob visually
+
+// ── 摇杆（浮动式）──────────────────────────
+// 手指落在左下摇杆区的任何位置，底盘就以落点为中心；松手后回到原位。
+const joyZone = document.getElementById('joy-zone');
+const joyBase = document.getElementById('joy-base');
+const joyKnob = document.getElementById('joy-knob');
+let joyActive = false;
+let joyId = -1;
+let joyOx = 0, joyOy = 0, joyR = 36;   // 本次触摸的中心点 / 旋钮最大位移
+
+function joyPlace(e){
+  const dx = e.clientX - joyOx, dy = e.clientY - joyOy;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const clamp = Math.min(dist, joyR);
+  const nx = dist > 0 ? dx / dist : 0;
+  const ny = dist > 0 ? dy / dist : 0;
   joyKnob.style.transform = `translate(calc(-50% + ${nx*clamp}px), calc(-50% + ${ny*clamp}px))`;
-  // Map to keys — horizontal only (vertical would be jump, handled by btn)
-  keys.l = nx < -0.35 && clamp > 8;
-  keys.r = nx >  0.35 && clamp > 8;
-  // Vertical: swipe up = jump
-  if(ny < -0.5 && clamp > 20 && player.onGround) keys.j = true;
+  // 只用水平方向（竖直方向向上滑 = 跳）
+  keys.l = nx < -0.35 && clamp > joyR * 0.22;
+  keys.r = nx >  0.35 && clamp > joyR * 0.22;
+  if(ny < -0.5 && clamp > joyR * 0.6 && player.onGround) keys.j = true;
   else if(ny >= -0.3) keys.j = false;
 }
-function joyEnd(e){
-  e.preventDefault();
-  let found = false;
-  for(let i=0;i<e.touches.length;i++) if(e.touches[i].identifier===joyId) found=true;
-  if(!found){
-    joyActive=false; joyId=-1;
-    keys.l=false; keys.r=false; keys.j=false;
-    joyKnob.style.transform='translate(-50%,-50%)';
-  }
+if(joyZone){
+  joyZone.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if(joyActive) return;
+    try{ joyZone.setPointerCapture(e.pointerId); }catch(_){}
+    joyId = e.pointerId;
+    const z = joyZone.getBoundingClientRect(), half = (joyBase.offsetWidth || 120) / 2;
+    // 底盘整个留在摇杆区内
+    joyOx = Math.min(z.right - half, Math.max(z.left + half, e.clientX));
+    joyOy = Math.min(z.bottom - half, Math.max(z.top + half, e.clientY));
+    joyBase.style.left = (joyOx - z.left) + 'px';
+    joyBase.style.top  = (joyOy - z.top) + 'px';
+    joyR = (joyBase.offsetWidth || 120) * 0.3;
+    joyActive = true;
+    joyZone.classList.add('on');
+    joyPlace(e);
+  });
+  joyZone.addEventListener('pointermove', e => { if(joyActive && e.pointerId === joyId){ e.preventDefault(); joyPlace(e); } });
+  const joyEnd = e => {
+    if(!joyActive || e.pointerId !== joyId) return;
+    joyActive = false; joyId = -1;
+    keys.l = false; keys.r = false; keys.j = false;
+    joyKnob.style.transform = 'translate(-50%,-50%)';
+    joyBase.style.left = ''; joyBase.style.top = '';
+    joyZone.classList.remove('on');
+  };
+  joyZone.addEventListener('pointerup', joyEnd);
+  joyZone.addEventListener('pointercancel', joyEnd);
+  joyZone.addEventListener('lostpointercapture', joyEnd);
 }
-joyZone.addEventListener('touchstart', joyStart, {passive:false});
-joyZone.addEventListener('touchmove',  joyMove,  {passive:false});
-joyZone.addEventListener('touchend',   joyEnd,   {passive:false});
-joyZone.addEventListener('touchcancel',joyEnd,   {passive:false});
 
-// ── Fire button ───────────────────────────
+// ── 攻击键 ────────────────────────────────
 const btnFire = document.getElementById('btn-fire');
-let fireTouch = -1;
 let fireTouchInterval = null;
 
-function touchFire(toX, toY) {
+function touchFire() {
   if (!gameRunning || shopOpen || cabinUIOpen) return;
+  const w0 = cw();
+  // 弹匣空了自动装填：手机上没有"按 R"的习惯，别让玩家对着空枪干按
+  if (!isReloading && w0.id !== 'minigun' && !w0.noRefill && !w0.meleeWeapon && wAmmo[curWpnIdx] <= 0) { reloadWeapon(); return; }
   mouseHeld = true;
   const near = findNearestEnemy(player.x + CHAR_W / 2, player.y + CHAR_H / 2, 9999);
   if (near) {
@@ -90,138 +123,70 @@ function touchFire(toX, toY) {
   }
   fireWeapon(lastMX, lastMY);
 }
-
-btnFire.addEventListener('touchstart', e => {
-  e.preventDefault();
-  btnFire.classList.add('pressed');
-  const t = e.changedTouches[0];
-  fireTouch = t.identifier;
-  touchFire(lastMX, lastMY);
-  // v52修：清旧间隔防堆叠；近战自动武器不建循环（同黑屏根因）
-  if (fireTouchInterval) { clearInterval(fireTouchInterval); fireTouchInterval = null; }
-  if ((cw().autofire || cw().id === 'minigun') && !cw().meleeWeapon) {
-    fireTouchInterval = setInterval(() => { if (gameRunning && !shopOpen && !cabinUIOpen) touchFire(lastMX, lastMY); }, getFireInterval());
-  }
-}, { passive: false });
-btnFire.addEventListener('touchend', e => {
-  e.preventDefault();
-  btnFire.classList.remove('pressed');
+function stopFireLoop(){
   mouseHeld = false;
   if (fireTouchInterval) { clearInterval(fireTouchInterval); fireTouchInterval = null; }
-  fireTouch = -1;
   stopAuto();
-}, { passive: false });
-
-// ── Jump button ───────────────────────────
-const btnJump = document.getElementById('btn-jump');
-btnJump.addEventListener('touchstart', e => {
-  e.preventDefault();
-  btnJump.classList.add('pressed');
-  keys.j = true;
-}, { passive: false });
-btnJump.addEventListener('touchend', e => {
-  e.preventDefault();
-  btnJump.classList.remove('pressed');
-  keys.j = false;
-}, { passive: false });
-
-// ── Dodge button (mobile) ─────────────────
-const btnDodge = document.getElementById('btn-dodge');
-if(btnDodge){
-  btnDodge.addEventListener('touchstart', e => {
-    e.preventDefault();
-    btnDodge.classList.add('pressed');
-    tryDodge();
-  }, { passive: false });
-  btnDodge.addEventListener('touchend', e => {
-    e.preventDefault();
-    btnDodge.classList.remove('pressed');
-  }, { passive: false });
 }
+bindPress(btnFire, () => {
+  touchFire();
+  // v52修：清旧间隔防堆叠；近战自动武器不建循环（同黑屏根因）
+  if (fireTouchInterval) { clearInterval(fireTouchInterval); fireTouchInterval = null; }
+  // 近战不建循环（连击会把角色推出世界边界，见桌面版同处注释）；
+  // 自动武器按射速连发；点射武器按住时按"手速"连发（间隔不低于 280ms）——手机上不用狂点
+  const w = cw();
+  if (!w.meleeWeapon) {
+    const iv = (w.autofire || w.id === 'minigun') ? getFireInterval() : Math.max(getFireInterval(), 280);
+    fireTouchInterval = setInterval(() => { if (gameRunning && !shopOpen && !cabinUIOpen) touchFire(); }, iv);
+  }
+}, stopFireLoop);
 
-// ── Reload button ─────────────────────────
-document.getElementById('btn-reload').addEventListener('touchstart', e => {
-  e.preventDefault(); reloadWeapon();
-}, { passive: false });
+// ── 跳 / 翻滚 / 装填 / 流派技能 / 换枪 ─────────
+bindPress(document.getElementById('btn-jump'), () => { keys.j = true; }, () => { keys.j = false; });
+bindPress(document.getElementById('btn-dodge'), () => { tryDodge(); });
+bindPress(document.getElementById('btn-reload'), () => { reloadWeapon(); });
+bindPress(document.getElementById('btn-skill'), () => { tryClassSkill(); });
+bindPress(document.getElementById('btn-swap'), () => {
+  if (!ownedWeapons || ownedWeapons.length < 2) return;
+  const i = ownedWeapons.indexOf(curWpnIdx);
+  switchWeapon(ownedWeapons[(i + 1) % ownedWeapons.length]);
+});
 
-// ── v53 Class skill button (mobile) ───────
-const btnSkill = document.getElementById('btn-skill');
-if(btnSkill){
-  btnSkill.addEventListener('touchstart', e => {
-    e.preventDefault();
-    btnSkill.classList.add('pressed');
-    tryClassSkill();
-  }, { passive: false });
-  btnSkill.addEventListener('touchend', e => {
-    e.preventDefault();
-    btnSkill.classList.remove('pressed');
-  }, { passive: false });
-}
+// ── 右上角：商店 / 行囊 / 侦察 ───────────────
+bindPress(document.getElementById('btn-shop-m'), () => { if (shopOpen) closeShop(); else openShop(); });
+bindPress(document.getElementById('btn-backpack'), () => { toggleBackpack(); });
+// 菜单：弹出面板；点黑色遮罩关闭（刚打开的 350ms 内忽略遮罩点击，避免同一次点按立刻把它关掉）
+bindPress(document.getElementById('mh-menu'), () => {
+  const h = document.getElementById('header');
+  window._menuOpenedAt = Date.now();
+  if(h) h.classList.toggle('menu-open');
+});
+bindPress(document.getElementById('btn-scout'), () => { scoutView = true; }, () => { scoutView = false; });
 
-// ── Shop button mobile ────────────────────
-document.getElementById('btn-shop-m').addEventListener('touchstart', e => {
-  e.preventDefault(); if (shopOpen) closeShop(); else openShop();
-}, { passive: false });
-const bBp = document.getElementById('btn-backpack');
-if (bBp) {
-  bBp.addEventListener('touchstart', e => {
-    e.preventDefault();
-    toggleBackpack();
-  }, { passive: false });
-}
-
-// ── Vehicle / Interact button (Mobile) ────
-const btnVehicle = document.getElementById('btn-vehicle');
-if(btnVehicle){
-  const onMobileInteractStart = (e) => {
-    e.preventDefault();
-    keys.holdInteract = true;
-    if((isHordeThreatActive() || wavePhase === 'cleared') && gameState === 'world'){
-      if(typeof unboxActive !== 'undefined' && unboxActive){ closeUnboxCard(true); return; }
-      if(typeof rescueNearestCompanion === 'function' && rescueNearestCompanion()) return;
-      if(tryPickupWeaponCrate()) return;
-      if(isPlayerNearCabin()){
-        if(wavePhase === 'cleared'){
-          enterCabinShelter();
-        } else {
-          startCabinHold();
-        }
+// ── 交互键（救人 / 进屋 / 拾取 / 建造…）────────
+bindPress(document.getElementById('btn-vehicle'), () => {
+  keys.holdInteract = true;
+  if((isHordeThreatActive() || wavePhase === 'cleared') && gameState === 'world'){
+    if(typeof unboxActive !== 'undefined' && unboxActive){ closeUnboxCard(true); return; }
+    if(typeof rescueNearestCompanion === 'function' && rescueNearestCompanion()) return;
+    if(rescueNearestSurvivor()) return;
+    if(tryPickupWeaponCrate()) return;
+    if(isPlayerNearCabin()){
+      if(wavePhase === 'cleared'){
+        enterCabinShelter();
       } else {
-        addBanner('🏃 距离小屋太远！快向左撤回据点小屋门前！');
+        startCabinHold();
       }
-      return;
+    } else {
+      addBanner('🏃 距离小屋太远！快向左撤回据点小屋门前！');
     }
-    handleInteractAction();
-  };
-  const onMobileInteractEnd = (e) => {
-    e.preventDefault();
-    keys.holdInteract = false;
-    if(cabinHoldTimer > 0 || cabinHoldActive) cancelCabinHold();
-  };
-  btnVehicle.addEventListener('touchstart', onMobileInteractStart, { passive: false });
-  btnVehicle.addEventListener('touchend', onMobileInteractEnd, { passive: false });
-  btnVehicle.addEventListener('touchcancel', onMobileInteractEnd, { passive: false });
-  btnVehicle.addEventListener('pointerdown', onMobileInteractStart);
-  btnVehicle.addEventListener('pointerup', onMobileInteractEnd);
-  btnVehicle.addEventListener('pointercancel', onMobileInteractEnd);
-}
-
-// ── Scout view button (mobile) ────────────
-const btnScout = document.getElementById('btn-scout');
-btnScout.addEventListener('touchstart', e => {
-  e.preventDefault();
-  scoutView = true;
-  btnScout.classList.add('active');
-}, { passive: false });
-btnScout.addEventListener('touchend', e => {
-  e.preventDefault();
-  scoutView = false;
-  btnScout.classList.remove('active');
-}, { passive: false });
-btnScout.addEventListener('touchcancel', e => {
-  scoutView = false;
-  btnScout.classList.remove('active');
-}, { passive: false });
+    return;
+  }
+  handleInteractAction();
+}, () => {
+  keys.holdInteract = false;
+  if(cabinHoldTimer > 0 || cabinHoldActive) cancelCabinHold();
+});
 
 // ── Canvas touch = aim ────────────────────
 // 放置模式：触摸点击地图放置塔/陷阱
@@ -258,56 +223,89 @@ canvas.addEventListener('touchmove', e => {
   lastMY = (t.clientY - r.top) * sy;
 }, { passive: false });
 
-// ── Mobile weapon strip ───────────────────
-function buildMobileWpnStrip() {
-  const strip = document.getElementById('wpn-strip');
-  if(!strip)return;  // 防御：wpn-strip 不存在时跳过
-  strip.innerHTML = '';
-  ownedWeapons.forEach((wi, slot) => {
-    const w = WEAPONS[wi];
-    const rar = WEAPON_RARITY[w.rarity]||WEAPON_RARITY.common;
-    const btn = document.createElement('div');
-    btn.className = 'wpn-btn' + (wi === curWpnIdx ? ' active-w' : '');
-    btn.id = 'mwb' + wi;
-    btn.style.borderColor = wi === curWpnIdx ? '#ffe066' : rar.color;
-    const mNoAmmo = w.classWeapon && (w.id==='warhorn'||w.id==='quakehammer'||w.id==='bloodblades');
-    btn.innerHTML = `<span class="wi2">${w.icon}</span><span class="wa2">${(mNoAmmo || w.id==='minigun') ? '∞' : wAmmo[wi]}</span>`;
-    btn.addEventListener('touchstart', e => { e.preventDefault(); switchWeapon(wi); }, { passive: false });
-    strip.appendChild(btn);
-  });
+// ── 手机 HUD：把游戏状态写进 #mhud（只在值变了才碰 DOM）──────
+const _phCache = {}, _phEl = {};
+function phEl(id){ return _phEl[id] || (_phEl[id] = document.getElementById(id)); }
+function phText(id, v){ const k = 't' + id; if(_phCache[k] === v) return; _phCache[k] = v; const el = phEl(id); if(el) el.textContent = v; }
+function phPct(id, ratio){
+  const r = Math.max(0, Math.min(1, ratio)), v = (r * 100).toFixed(1) + '%', k = 'w' + id;
+  if(_phCache[k] === v) return; _phCache[k] = v;
+  const el = phEl(id); if(el) el.style.width = v;
 }
-function refreshMobileStrip() {
-  ownedWeapons.forEach((wi) => {
-    const w = WEAPONS[wi];
-    const rar = WEAPON_RARITY[w.rarity]||WEAPON_RARITY.common;
-    const btn = document.getElementById('mwb' + wi);
-    if (!btn) return;
-    btn.className = 'wpn-btn' + (wi === curWpnIdx ? ' active-w' : '');
-    btn.style.borderColor = wi === curWpnIdx ? '#ffe066' : rar.color;
-    const ammoEl = btn.querySelector('.wa2');
-    if (ammoEl) ammoEl.textContent = w.id === 'minigun' ? '∞' : wAmmo[wi];
-  });
-}
+function phClass(id, cls, on){ const k = 'c' + id + cls; if(_phCache[k] === !!on) return; _phCache[k] = !!on; const el = phEl(id); if(el) el.classList.toggle(cls, !!on); }
+function phHref(id, href){ const k = 'h' + id; if(_phCache[k] === href) return; _phCache[k] = href; const el = phEl(id); const u = el && el.querySelector('use'); if(u) u.setAttribute('href', href); }
 
-// ── Mobile status bar update ──────────────
-function updateMobileStatus() {
+function updatePhoneHud(){
+  if(!isPhoneUI()) return;
+  // 左上：血量 / 等级 / 围墙 + 家园
+  phText('mh-hp-val', Math.max(0, Math.ceil(health)));
+  phPct('mh-hp-fill', health / maxHp);
+  phClass('mh-hp-fill', 'low', health / maxHp < 0.3);
+  phText('mh-lv-val', 'Lv.' + playerLevel);
+  phPct('mh-xp-fill', playerXp / Math.max(1, playerXpNeed));
+  const showDef = gameState === 'world';
+  phClass('mhud', 'no-def', !showDef);
+  if(showDef){
+    const wallMax = WALL_HP_PER_LEVEL[wallLevel] || 1, wr = wallHp / wallMax, hr = homeHp / HOME_HP_MAX;
+    phPct('mh-wall-fill', wallLevel > 0 ? wr : 0);
+    phClass('mh-wall-fill', 'low', wallLevel > 0 && wr < 0.3);
+    phPct('mh-home-fill', hr);
+    phClass('mh-home-fill', 'low', hr < 0.25);
+    phClass('mh-home-fill', 'mid', hr >= 0.25 && hr <= 0.5);
+  }
+  // 顶部居中：波次
+  const info = getWaveHudInfo();
+  phText('mh-wave-title', info.title);
+  phText('mh-wave-right', info.right);
+  phClass('mh-wave-title', 'danger', info.tone === 'danger');
+  phClass('mh-wave-title', 'ok', info.tone === 'ok');
+  phClass('mhud', 'no-prog', info.ratio === null);
+  if(info.ratio !== null) phPct('mh-wave-fill', info.ratio);
+  phClass('mh-wave-fill', 'danger', info.barTone === 'danger');
+  phText('mh-sub', info.sub);
+  phHref('mh-tod', timeOfDay === 'night' ? '#i-moon' : '#i-sun');
+  phClass('mh-tod', 'night', timeOfDay === 'night');
+  // 标签行：热搜 / 昨晚的饭 / 士气 / 连杀
+  const tags = getHudTags();
+  const tk = tags.map(t => t.text).join('|');
+  if(_phCache.tags !== tk){
+    _phCache.tags = tk;
+    const box = phEl('mh-tags');
+    if(box){
+      box.textContent = '';
+      tags.forEach(t => { const d = document.createElement('span'); d.className = 'mh-tag' + (t.hot ? ' hot' : ''); d.textContent = t.text; box.appendChild(d); });
+    }
+  }
+  // 右上：金币
+  phText('mh-coin-val', coins);
+  // 右下：弹药 / 装填环 / 换枪
   const w = cw();
-  document.getElementById('m-ammo').textContent = w.id === 'minigun' ? '∞' : (`${wAmmo[curWpnIdx]}/${weaponMagSize(w)}`);
-  document.getElementById('m-wave').textContent = '第 ' + wave + ' 波';
-  document.getElementById('m-coins').textContent = '💰 ' + coins;
-  document.getElementById('m-rld-bar').style.width = rldF.style.width || '0%';
+  const noAmmo = w.id === 'minigun' || w.meleeWeapon || (w.classWeapon && (w.id === 'warhorn' || w.id === 'quakehammer' || w.id === 'bloodblades'));
+  const cur = wAmmo[curWpnIdx];
+  phText('fire-ammo', (noAmmo || cur === 9999) ? '∞' : cur);
+  phClass('btn-fire', 'low', !noAmmo && cur !== 9999 && cur <= Math.max(1, Math.floor(weaponMagSize(w) * 0.25)));
+  phText('swap-icon', w.icon);
+  phClass('btn-swap', 'solo', !ownedWeapons || ownedWeapons.length < 2);
+  const ring = phEl('fire-ring-c');
+  if(ring){
+    const p = isReloading ? Math.min(1, Math.max(0, parseFloat(rldF.style.width) / 100 || 0)) : 0;
+    const v = isReloading ? (295.3 * (1 - p)).toFixed(1) : '295.3';
+    if(_phCache.ring !== v){ _phCache.ring = v; ring.style.strokeDashoffset = v; }
+    phClass('btn-fire', 'reloading', isReloading);
+  }
 }
 
-// ── Mobile status tick ────────────────────
+// 弹药/武器变化时刷新（旧的武器条已并入攻击键和换枪键，函数名沿用以免改动调用方）
+function buildMobileWpnStrip(){ updatePhoneHud(); }
+function refreshMobileStrip(){ updatePhoneHud(); }
+function updateMobileStatus(){ updatePhoneHud(); }
+
+// ── 每帧调用，约每 4 帧刷新一次 HUD ──
 let mStatusTimer = 0;
 function mobileStatusTick() {
-  if (!isMobile()) return;
+  if (!isPhoneUI()) return;
   mStatusTimer++;
-  if (mStatusTimer % 20 === 0) {
-    updateMobileStatus();
-    document.getElementById('m-wave').textContent = waveTxt.textContent;
-    document.getElementById('m-rld-bar').style.width = rldF.style.width || '0%';
-  }
+  if (mStatusTimer % 4 === 0) updatePhoneHud();
 }
 
 // ═══════════════════════════════════════════
