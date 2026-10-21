@@ -2,3 +2,11 @@ node_modules/
 .DS_Store
 Thumbs.db
 dist/_verify_tmp.html
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/app/src/main/assets/index.html
+*.apk

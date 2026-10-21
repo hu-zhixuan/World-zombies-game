@@ -1,0 +1,54 @@
+plugins {
+    id 'com.android.application'
+}
+
+// 版本号由 CI 通过环境变量传入（tag v56.1 → APP_VERSION=56.1）；本地默认 56.0
+def appVersion = System.getenv('APP_VERSION') ?: '56.0'
+def appVersionCode = (System.getenv('APP_VERSION_CODE') ?: '56').toInteger()
+
+android {
+    namespace 'com.huzhixuan.wave15'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.huzhixuan.wave15'
+        minSdk 26
+        targetSdk 34
+        versionCode appVersionCode
+        versionName appVersion
+    }
+
+    signingConfigs {
+        // 有正式密钥（CI 里通过 secrets 提供）就用正式密钥；否则用仓库里的 debug 密钥，
+        // 保证每次构建签名一致，用户可以直接覆盖安装升级。
+        release {
+            def ks = System.getenv('KEYSTORE_FILE')
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('KEYSTORE_PASSWORD')
+                keyAlias System.getenv('KEY_ALIAS')
+                keyPassword System.getenv('KEY_PASSWORD')
+            } else {
+                storeFile file('../debug.keystore')
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint {
+        abortOnError false
+    }
+}

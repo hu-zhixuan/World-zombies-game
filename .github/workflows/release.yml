@@ -1,0 +1,82 @@
+# 推送形如 v56.1 的标签 → 自动测试、编译 APK、创建 GitHub Release，附上：
+#   wave15-<版本>.apk              安卓版（直接安装）
+#   zombie-game-<版本>.html        电脑版（双击用浏览器打开）
+# 也可以在 Actions 页面手动运行（填一个标签名）。
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的标签名，例如 v56.1'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 回归测试
+        run: npm test
+
+      - name: 构建电脑版 HTML
+        run: npm run build
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: 准备安卓工程（页面 + 版本号 + 可选正式签名）
+        run: |
+          VERSION="${TAG#v}"
+          echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "APP_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          node tools/copy_to_android.js
+          # 配了 KEYSTORE_BASE64 等 secrets 就用正式密钥签名；没配就用仓库里的 debug 密钥（签名固定，可覆盖升级）
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+            echo "KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: 编译 APK
+        working-directory: android
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: 整理发布文件
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/release/app-release.apk "out/wave15-${TAG}.apk"
+          cp dist/zombie-game-v56.html "out/zombie-game-${TAG}.html"
+          ls -la out
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: 十五波围城 ${{ env.TAG }}
+          generate_release_notes: true
+          body: |
+            ## 下载
+            - **安卓**：`wave15-${{ env.TAG }}.apk`（Android 8.0 及以上，横屏；首次安装需允许「安装未知来源应用」）
+            - **电脑**：`zombie-game-${{ env.TAG }}.html`，下载后双击用 Chrome / Edge 打开即可，不需要安装
+          files: |
+            out/wave15-${{ env.TAG }}.apk
+            out/zombie-game-${{ env.TAG }}.html
