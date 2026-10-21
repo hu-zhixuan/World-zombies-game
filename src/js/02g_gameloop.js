@@ -164,6 +164,7 @@ function gameLoop(){
     const aimA = getAimAngle();
     drawPlayer(player.x, player.y, player.facingRight, player.walkT, aimA, !player.onGround, player.iframes > 0, frameT, dodgeT);
     drawCompanions();
+    drawFieldSurvivors();
     drawParticles();
     ctx.restore();
 
@@ -194,6 +195,7 @@ function gameLoop(){
   if(!frozen){
     safeSubsystem('Player', () => updatePlayer());
     safeSubsystem('Companions', () => updateCompanions());
+    safeSubsystem('Survivors', () => { if(gameState === 'world') updateFieldSurvivors(); });
     safeSubsystem('Interaction', () => updateInteractionPrompt());
     safeSubsystem('Vehicle', () => updateVehicle(frameT));
     safeSubsystem('Sprite', () => updateSprite(frameT));
@@ -757,6 +759,7 @@ function gameLoop(){
     }
   }
   drawCompanions();
+  drawFieldSurvivors();
   if(sprite.exists)drawSprite(sprite,frameT);
   drawParticles();
   drawLamps(frameT);      // 路灯光晕（覆盖实体，照亮夜路）

@@ -476,6 +476,7 @@ function checkNewVIPUnlocks(){
       if(!known){
         if(!vipCompendium[vip.id]) vipCompendium[vip.id] = { met:false, meetCount:0, bestQuality:null, lastVisit:0 };
         vipCompendium[vip.id].unlocked = true;
+        vipCompendium[vip.id].unlockedWave = wave;   // 兜底：解锁满 3 天仍没在战场遇到，会自己找上门
         const tierInfo = VIP_TIERS[vip.tier];
         addBanner(`${tierInfo.icon} 新VIP解锁！${tierInfo.name} · ${vip.name} —— 粉丝数 ${wastegramFans}！`);
         // 触发一段提示音
@@ -502,6 +503,7 @@ RestEventBus.on(EVT.CUSTOMER_SERVED, (data) => {
   if(data.customer && data.customer._trendMatched){
     fanGain *= 2;
   }
+  if(restState && restState.crew && restState.crew.zhao) fanGain *= 1.2;   // 通信兵小赵广播招客
   fanGain = Math.floor(fanGain);
   wastegramFans += fanGain;
   updateWastegramRank();
@@ -707,6 +709,16 @@ function _doStartRestaurant(){
     drinksServed: 0,  // 饮料送出计数（每日任务用）
   };
   vipActiveInRestaurant = null;  // 重置VIP占位
+  // ── 白天的人晚上来：战场救下的幸存者/VIP 是今晚的预约客人 ──
+  restState.reservedGuests = takeTonightGuests();
+  if(restState.reservedGuests.length > 0){
+    addBanner('今晚有 ' + restState.reservedGuests.length + ' 位白天救下的客人要来');
+  }
+  // ── 老伙伴在店里帮忙：张端盘、林查卫生、强修灶、赵广播招客 ──
+  const crew = getStoryCrew();
+  restState.staff.push(...crew);
+  restState.crew = { lin: crew.some(c => c.id === 'crew_lin'), qiang: crew.some(c => c.id === 'crew_qiang'), zhao: crew.some(c => c.id === 'crew_zhao') };
+  if(restState.crew.qiang) restState.cookSpeedBuff = (restState.cookSpeedBuff || 1) * 1.1;
   generateDailyTasks();  // 生成本夜每日任务（Kairosoft 式）
   if(!currentTrend) rollDailyTrend();  // 热搜已在白天第一波刷新；仅读档等缺失时补掷
   checkNewVIPUnlocks();  // 同步VIP解锁状态（加载存档后可能粉丝已够解锁）

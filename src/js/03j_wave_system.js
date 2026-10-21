@@ -10,6 +10,7 @@ function nextWave(){
     return;
   }
   wave++;waveTxt.textContent='第 '+wave+' 波';
+  fieldSurvivors = []; tonightGuests = [];  // 新的一天：昨天没来得及入店的预约作废
   wavePhase='waiting'; // 防止章节卡/对话期间误判清场
   safehouseRestUsed = false;
   safehouseCraftUsed = false;
@@ -160,6 +161,9 @@ function startWaveContent(){
     return;
   }
 
+  // ── 普通波：城墙外可能有人求救（救下的人晚上来食堂）──
+  maybeSpawnFieldSurvivor();
+
   // ── 普通波：成批刷怪 ──
   // 波次特殊机制：每波有特殊类型（非Boss波）
   let waveSpecialType = 'normal';
@@ -260,6 +264,7 @@ function onWaveCleared(){
   // 正常波清场
   addBanner(`✅ 第 ${wave} 波大捷！击杀 ${waveKilledThisWave} 只`);
   endOvernightMeals();
+  clearFieldSurvivors();
   
   // ── 【做减法：战后强磁吸】全场肉块与金币瞬间吸入背包 ──
   vacuumAllLoot();

@@ -12,7 +12,7 @@ const code = scriptMatch[1];
 function createMockCtx() {
   return {
     save(){}, restore(){}, beginPath(){}, closePath(){}, moveTo(){}, lineTo(){},
-    stroke(){}, fill(){}, arc(){}, rect(){}, fillRect(){}, strokeRect(){}, clearRect(){},
+    stroke(){}, fill(){}, arc(){}, ellipse(){}, roundRect(){}, rect(){}, fillRect(){}, strokeRect(){}, clearRect(){},
     fillText(){}, strokeText(){}, measureText(){ return { width: 50 }; },
     createLinearGradient(){ return { addColorStop(){} }; },
     createRadialGradient(){ return { addColorStop(){} }; },
@@ -428,6 +428,72 @@ run(`dreamPickedWave = 0; selectDreamInsight(DREAM_INSIGHTS[2]);`);
 assert(run(`dreamPickedWave`) === 3, '做梦会记下是哪一天');
 run(`meatInventory.normal = 0; health = 10; openDreamModal();`);
 assert(run(`meatInventory.normal === 0 && health === maxHp`), '同一天不能再做梦,只是睡一觉回血');
+
+
+// -------------------------------------------------------------
+// Test Set 6: 白天救下的人晚上来食堂（P0-1）
+// -------------------------------------------------------------
+console.log('\n--- Running Test Set 6: Rescued On The Field, Seated At Night ---');
+run(`vipCompendium = {}; wastegramFans = 600; wave = 1; gameState = 'world'; fieldSurvivors = []; tonightGuests = []; zombies = [];`);
+assert(run(`getFieldEncounterVIPs().map(v => v.id).join(',')`).startsWith('agou'), '粉丝够的 VIP 在战场上等着被遇见');
+assert(run(`isVIPFieldMet('agou')`) === false, '没遇见过的 VIP 不会来店');
+
+// 第 1 天必有一个求救者（教学），且是 VIP
+const surv = run(`maybeSpawnFieldSurvivor(); fieldSurvivors.length`);
+assert(surv === 1 && run(`fieldSurvivors[0].vip.id`) === 'agou', '第 1 天战场上必出现求救者(阿狗)');
+assert(run(`fieldSurvivors[0].x > RIGHT_WALL_X + 200`), '求救者在城墙外');
+
+// 远了救不了，近了可以
+run(`player.x = 100; fieldSurvivors[0].near = false; updateFieldSurvivors();`);
+assert(run(`rescueNearestSurvivor()`) === false, '离得远按 E 救不到人');
+run(`player.x = fieldSurvivors[0].x - 20; updateFieldSurvivors();`);
+assert(run(`fieldSurvivors[0].near`) === true, '走近后进入可救范围');
+assert(run(`rescueNearestSurvivor()`) === true, '按 E 救下求救者');
+assert(run(`vipCompendium.agou.fieldMet === true && isVIPFieldMet('agou')`), '救下 VIP 即「遇见」,之后才会来店');
+assert(run(`tonightGuests.length === 1 && tonightGuests[0].kind === 'vip' && tonightGuests[0].vipId === 'agou'`), '救下的 VIP 记入今晚的预约');
+
+// 僵尸会啃求救者
+run(`fieldSurvivors = []; tonightGuests = []; fieldSurvivors.push({x: 1000, vip: null, persona: generateNormalCustomerPersona(), hp: 100, state:'waiting', t:0, near:false, fade:1});
+     zombies = [{alive:true, x: 980}, {alive:true, x: 985}]; player.x = 100; frameT = 1;`);
+for (let i = 0; i < 400; i++) run(`updateFieldSurvivors();`);
+assert(run(`fieldSurvivors.length`) === 0 && run(`tonightGuests.length`) === 0, '来不及救,被僵尸啃死,不会成为食客');
+run(`zombies = [];`);
+
+// 普通幸存者 → 晚上以同样的名字入座
+run(`fieldSurvivors = []; tonightGuests = []; fieldSurvivors.push({x: 1000, vip: null, persona: {name:'测试阿福', skin:'#d4a574', hair:'#111', shirt:'#456'}, hp:100, state:'waiting', t:0, near:true, fade:1});`);
+run(`rescueNearestSurvivor();`);
+assert(run(`tonightGuests[0].kind === 'survivor' && tonightGuests[0].persona.name === '测试阿福'`), '救下的普通幸存者记入预约并保留名字');
+
+// 开张:预约客人第一个入座，沿用战场上的名字，付得更多
+run(`meatInventory.normal = 20; gameState = 'hub'; wave = 2; _doStartRestaurant();`);
+assert(run(`restState.reservedGuests.length`) === 1 && run(`tonightGuests.length`) === 0, '开张时预约转入当晚客人表');
+run(`spawnRestCustomer();`);
+assert(run(`restState.customers[0] && restState.customers[0].rescued === true && restState.customers[0].persona.name === '测试阿福'`), '获救的人第一个入座,名字和战场上一致');
+assert(run(`restState.reservedGuests.length`) === 0, '入座后预约被消耗');
+
+// VIP:未遇见则不来；遇见(预约)则当晚必来
+run(`vipCompendium = {agou:{met:false, unlocked:true, unlockedWave: 1}}; wave = 2; wastegramFans = 600; restState.vipVisitedThisNight = []; vipActiveInRestaurant = null; restState.reservedGuests = [];`);
+assert(run(`maybeSpawnVIPCustomer()`) === null, '粉丝够但没遇见过的 VIP 不会来店');
+run(`vipActiveInRestaurant = null; wave = 5;`);
+assert(run(`isVIPFieldMet('agou')`) === true, '解锁满 3 天仍没遇见,会自己找上门(兜底)');
+run(`wave = 2; vipActiveInRestaurant = null; restState.vipVisitedThisNight = []; vipCompendium.agou.fieldMet = true; restState.reservedGuests = [{kind:'vip', vipId:'agou'}];`);
+assert(run(`const r = maybeSpawnVIPCustomer(); r && r.vip.id`) === 'agou', '白天救下的 VIP 当晚必到');
+assert(run(`restState.reservedGuests.length`) === 0, 'VIP 到场后预约消耗');
+
+// 伙伴在店里帮忙
+run(`wave = 1;`); assert(run(`getStoryCrew().length`) === 0, '第 1 天还没有伙伴在店里');
+run(`wave = 2;`); assert(run(`getStoryCrew().map(c => c.id).join()`) === 'crew_zhang' && run(`getStoryCrew()[0].type`) === 'server', '老兵张加入后在店里端盘(自动上菜)');
+run(`wave = 8;`); assert(run(`getStoryCrew().length`) === 4, '四位伙伴都加入后全部在店里');
+run(`meatInventory.normal = 20; gameState = 'hub'; wave = 8; _doStartRestaurant();`);
+assert(run(`restState.crew.lin && restState.crew.qiang && restState.crew.zhao`), '林/强/赵的岗位效果生效');
+assert(run(`restState.cookSpeedBuff > 1.09`), '阿强修灶:烹饪速度 +10%');
+assert(run(`restState.staff.filter(s => s.crew).length`) === 4, '伙伴作为店员出现在店里');
+let drawErr = null;
+try { run(`drawRestaurant();`); } catch (e) { drawErr = e; }
+assert(!drawErr, '食堂画面含伙伴时可绘制', drawErr && drawErr.stack);
+let fsErr = null;
+try { run(`gameState='world'; fieldSurvivors=[{x:1000,vip:null,persona:generateNormalCustomerPersona(),hp:50,state:'waiting',t:3,near:true,fade:1}]; drawFieldSurvivors();`); } catch (e) { fsErr = e; }
+assert(!fsErr, '战场求救者可绘制', fsErr && fsErr.stack);
 
 console.log(`\n========================================`);
 console.log(`FINAL RESULT: Passed: ${testsPassed}, Failed: ${testsFailed}`);

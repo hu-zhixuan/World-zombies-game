@@ -320,23 +320,31 @@ function getUnlockedVIPs(){
 function maybeSpawnVIPCustomer(){
   // 一次只允许一个VIP在店
   if(vipActiveInRestaurant) return null;
-  const unlocked = getUnlockedVIPs();
+  const unlocked = getUnlockedVIPs().filter(v => isVIPFieldMet(v.id));   // 粉丝够 + 已在战场遇见
   if(unlocked.length === 0) return null;
   // 筛选本夜未来访的
   const available = unlocked.filter(v => !restState.vipVisitedThisNight || !restState.vipVisitedThisNight.includes(v.id));
   if(available.length === 0) return null;
-  // VIP出现概率：基础60% + 每多一个未访问VIP +8%（确保玩家容易遇到VIP）
-  // 如果本夜还没来过任何VIP，则100%出现（保证每夜至少一个VIP剧情）
-  const noVIPTonight = !restState.vipVisitedThisNight || restState.vipVisitedThisNight.length === 0;
-  const chance = noVIPTonight ? 1.0 : (0.60 + available.length * 0.08);
-  if(Math.random() > chance) return null;
-  // 按权重选择
-  const totalWeight = available.reduce((s,v) => s + v.weight, 0);
-  let roll = Math.random() * totalWeight;
-  let chosen = available[0];
-  for(const v of available){
-    roll -= v.weight;
-    if(roll <= 0){ chosen = v; break; }
+  // 白天在战场救下的 VIP：当晚必到
+  const reservedVip = (restState.reservedGuests || []).find(g => g.kind === 'vip' && available.some(v => v.id === g.vipId));
+  let chosen;
+  if(reservedVip){
+    chosen = available.find(v => v.id === reservedVip.vipId);
+    restState.reservedGuests = restState.reservedGuests.filter(g => g !== reservedVip);
+  }else{
+    // VIP出现概率：基础60% + 每多一个未访问VIP +8%（确保玩家容易遇到VIP）
+    // 如果本夜还没来过任何VIP，则100%出现（保证每夜至少一个VIP剧情）
+    const noVIPTonight = !restState.vipVisitedThisNight || restState.vipVisitedThisNight.length === 0;
+    const chance = noVIPTonight ? 1.0 : (0.60 + available.length * 0.08);
+    if(Math.random() > chance) return null;
+    // 按权重选择
+    const totalWeight = available.reduce((s,v) => s + v.weight, 0);
+    let roll = Math.random() * totalWeight;
+    chosen = available[0];
+    for(const v of available){
+      roll -= v.weight;
+      if(roll <= 0){ chosen = v; break; }
+    }
   }
   // 记录本夜已访问
   if(!restState.vipVisitedThisNight) restState.vipVisitedThisNight = [];
@@ -354,6 +362,10 @@ function triggerVIPFirstMeet(vip, onComplete){
   const lines = [];
   // 开场：阶级介绍
   lines.push({ scene:'hub', label:`${tierInfo.icon} ${tierInfo.name} · ${vip.name}` });
+  // 白天在战场救下的人，兑现承诺来店里了
+  if(vipCompendium[vip.id] && vipCompendium[vip.id].fieldMet){
+    lines.push({ npc:'ming', text:'（白天在城外救下的那个人，循着承诺找来了。）' });
+  }
   // 初遇剧情台词
   vip.firstMeet.forEach(line => {
     if(line.npc){

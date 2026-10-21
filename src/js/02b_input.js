@@ -23,6 +23,8 @@ function handleInteractAction() {
   }
   // ── v49批3：救援倒地伙伴（战斗世界最优先）──
   if (gameState === 'world' && rescueNearestCompanion()) return;
+  // ── 战场求救：救下城墙外的幸存者（晚上来食堂）──
+  if (gameState === 'world' && rescueNearestSurvivor()) return;
   // 优先：附近有武器宝箱 → E 拾取（任何阶段都可以拾取武器）
   if (gameState !== 'building') {
     if (tryPickupWeaponCrate()) return;

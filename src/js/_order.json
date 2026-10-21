@@ -25,6 +25,7 @@
   "03h_zombies_and_firing.js",
   "03i_reload_combat.js",
   "03j_wave_system.js",
+  "03k_survivor_rescue.js",
   "04a_hub.js",
   "04b_workshop_expedition.js",
   "04c_oldtown.js",

@@ -397,8 +397,9 @@ function spawnRestCustomer(){
   restTables.forEach(t => {
     t.seats.forEach(s => { if(!s.occupied) emptySeats.push(s); });
   });
-  // 检查是否生成VIP顾客（粉丝数驱动）
-  const vipResult = maybeSpawnVIPCustomer();
+  // 白天救下的幸存者优先入座；没有预约时才看 VIP 来访
+  const reservedSurvivor = (restState.reservedGuests || []).find(g => g.kind === 'survivor') || null;
+  const vipResult = reservedSurvivor ? null : maybeSpawnVIPCustomer();
 
   // 构建顾客数据（无order字段）
   function buildCustomer(seat, isQueuing){
@@ -420,8 +421,8 @@ function spawnRestCustomer(){
       }
     } else {
       ctype = pickCustomerType();
-      // 为每个普通顾客生成名字+故事
-      persona = generateNormalCustomerPersona();
+      // 为每个普通顾客生成名字+故事（白天救下的人沿用战场上的名字和外貌）
+      persona = reservedSurvivor ? reservedSurvivor.persona : generateNormalCustomerPersona();
     }
     const decorBonus = 1 + restUpgradeLevel.decor * 0.1;
     const patience = (35 + Math.random()*20) * ctype.patienceMul * decorBonus;
@@ -465,7 +466,12 @@ function spawnRestCustomer(){
       vipId: vipResult ? vipResult.vip.id : null,
       personalityType: vipResult ? vipResult.vip.personalityType : null,
       sleeping: false,
+      rescued: !!reservedSurvivor && !vipResult,   // 白天在战场救下的人
     };
+    if(customer.rescued){
+      restState.reservedGuests = restState.reservedGuests.filter(g => g !== reservedSurvivor);
+      customer.patience *= 1.2; customer.maxPatience = customer.patience;
+    }
     return customer;
   }
 
@@ -572,7 +578,7 @@ function restLoop(now){
       spawnRestCustomer();
     }
     // 生成间隔：10-15秒一个（大幅减慢，给玩家时间做菜）
-    const influencerMul = 1 + (restState.influencerBoost || 0) * 0.3;
+    const influencerMul = (1 + (restState.influencerBoost || 0) * 0.3) * ((restState.crew && restState.crew.zhao) ? 1.15 : 1);
     const baseInterval = Math.max(8.0, (12.0 - wastegramFans * 0.001) / influencerMul);
     restState.spawnTimer = baseInterval + Math.random() * 4.0;
   }
@@ -858,7 +864,8 @@ function restLoop(now){
   });
   // ── 员工被动加成：每有一个员工，顾客耐心衰减减慢5%（最多减慢30%）──
   // 在 customer update 中通过 restState.staffPatienceBonus 读取
-  restState.staffPatienceBonus = Math.min(0.3, restState.staff.length * 0.05);
+  const hiredCount = restState.staff.filter(s => !s.crew).length;
+  restState.staffPatienceBonus = Math.min(0.4, hiredCount * 0.05 + ((restState.crew && restState.crew.lin) ? 0.1 : 0));
 
   // 更新浮动文字
   for(let i = restState.floatTexts.length - 1; i >= 0; i--){
@@ -965,7 +972,8 @@ function serveCustomer(c){
   const isVipCust = (c.ctype.id === 'vip' || c.ctype.id === 'gourmet' || c.ctype.id === 'critic' || c.ctype.id === 'influencer');
   const bpVipBonus = (isVipCust && typeof getBackpackVipTipBonus === 'function') ? getBackpackVipTipBonus() : 0;
   const bpDishBonus = (typeof getBackpackDishPriceBonus === 'function') ? getBackpackDishPriceBonus() : 0;
-  const tipMul = c.ctype.tipMul * (1 + bpVipBonus) * c.satisfaction * decorBonus * qInfo.mult * synergyMult * trendMult;
+  const rescuedMul = c.rescued ? 1.5 : 1;   // 白天被你救下的人，付得更多
+  const tipMul = rescuedMul * c.ctype.tipMul * (1 + bpVipBonus) * c.satisfaction * decorBonus * qInfo.mult * synergyMult * trendMult;
   // ── 经营重做：米其林大厨 Lv3+ 菜品加价20%（员工养成激活）──
   let chefPriceBonus = 1;
   const chef3 = restState.staff.find(s => s.id === 'cook3' && s.level >= 3);
@@ -978,6 +986,11 @@ function serveCustomer(c){
   if(c.ctype.id === 'vip' || c.ctype.id === 'gourmet' || c.ctype.id === 'critic' || c.ctype.id === 'influencer') restState.vipServed++;
   coins += pay;
   updateCoinUI();
+  if(c.rescued){
+    addRestFloatText('谢谢你白天救了我！', c.walkX, c.seat.y - 100, '#9be89b');
+    restRep = Math.min(60, restRep + 1);
+    wastegramFans += 5;
+  }
   // 相性触发提示
   if(synergyNames.length > 0){
     addRestFloatText('✨ ' + synergyNames[0] + '! x' + synergyMult.toFixed(1), c.walkX, c.seat.y - 75, '#ff44dd');
@@ -1735,6 +1748,20 @@ function drawRestaurant(){
         ctx2.font = 'bold 9px sans-serif';
         ctx2.fillText('上菜!', sx, sy - 42);
       }
+    } else if(staff.type === 'crew'){
+      // 老伙伴：站在各自的岗位上，头顶写岗位
+      const pos = { crew_lin:[REST_CANVAS_W*0.92, 300], crew_qiang:[(restStoves[0] ? restStoves[0].x : 150) - 46, 126], crew_zhao:[REST_CANVAS_W*0.80, 128] }[staff.id] || [REST_CANVAS_W*0.9, 300];
+      const sx = pos[0], sy = pos[1] + walkBob;
+      ctx2.fillStyle = 'rgba(0,0,0,.35)';
+      ctx2.beginPath(); ctx2.ellipse(sx, sy + 25, 10, 3, 0, 0, Math.PI * 2); ctx2.fill();
+      ctx2.fillStyle = staff.color; ctx2.fillRect(sx - 8, sy - 18, 16, 22);
+      ctx2.fillStyle = '#d4a574'; ctx2.fillRect(sx - 5, sy - 27, 10, 9);
+      ctx2.fillStyle = '#3a2818'; ctx2.fillRect(sx - 5, sy - 29, 10, 4);
+      ctx2.fillStyle = '#000'; ctx2.fillRect(sx - 3, sy - 24, 1.5, 1.5); ctx2.fillRect(sx + 1, sy - 24, 1.5, 1.5);
+      ctx2.fillStyle = '#e8eaed'; ctx2.font = '600 10px sans-serif'; ctx2.textAlign = 'center';
+      ctx2.fillText(staff.name, sx, sy - 44);
+      ctx2.fillStyle = '#9aa0a8'; ctx2.font = '10px sans-serif';
+      ctx2.fillText(staff.role, sx, sy - 33);
     } else if(staff.type === 'server'){
       const sx = 620 + (i * 30);
       const sy = 165 + walkBob;
@@ -2030,7 +2057,7 @@ function drawRestaurant(){
       ctx2.font = 'bold 9px Microsoft YaHei UI,sans-serif';
       ctx2.textAlign = 'center';
       const nameY = uiNameY;   // 所有状态统一锚点（旧版 seated/walking 两个值=不同状态高度跳变）
-      const nameW = ctx2.measureText(c.persona.name).width + 8;
+      const nameW = ctx2.measureText(c.persona.name + (c.rescued ? '（获救）' : '')).width + 8;
       // 背景框
       ctx2.fillStyle = 'rgba(0,0,0,.7)';
       ctx2.fillRect(cx - nameW/2, nameY - 8, nameW, 11);
@@ -2039,7 +2066,7 @@ function drawRestaurant(){
       ctx2.strokeRect(cx - nameW/2, nameY - 8, nameW, 11);
       // 名字
       ctx2.fillStyle = c.persona.shirt || '#d4a574';
-      ctx2.fillText(c.persona.name, cx, nameY);
+      ctx2.fillText(c.persona.name + (c.rescued ? '（获救）' : ''), cx, nameY);
     }
     // 顾客类型图标（非VIP；锚在名牌左侧对称位——右侧已有耐心条，避免堆叠）
     if(!c.isVIP && c.ctype.id !== 'normal' && c.state === 'seated'){

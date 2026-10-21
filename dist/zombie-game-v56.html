@@ -4617,6 +4617,8 @@ function handleInteractAction() {
   }
   // ── v49批3：救援倒地伙伴（战斗世界最优先）──
   if (gameState === 'world' && rescueNearestCompanion()) return;
+  // ── 战场求救：救下城墙外的幸存者（晚上来食堂）──
+  if (gameState === 'world' && rescueNearestSurvivor()) return;
   // 优先：附近有武器宝箱 → E 拾取（任何阶段都可以拾取武器）
   if (gameState !== 'building') {
     if (tryPickupWeaponCrate()) return;
@@ -6013,6 +6015,7 @@ function gameLoop(){
     const aimA = getAimAngle();
     drawPlayer(player.x, player.y, player.facingRight, player.walkT, aimA, !player.onGround, player.iframes > 0, frameT, dodgeT);
     drawCompanions();
+    drawFieldSurvivors();
     drawParticles();
     ctx.restore();
 
@@ -6043,6 +6046,7 @@ function gameLoop(){
   if(!frozen){
     safeSubsystem('Player', () => updatePlayer());
     safeSubsystem('Companions', () => updateCompanions());
+    safeSubsystem('Survivors', () => { if(gameState === 'world') updateFieldSurvivors(); });
     safeSubsystem('Interaction', () => updateInteractionPrompt());
     safeSubsystem('Vehicle', () => updateVehicle(frameT));
     safeSubsystem('Sprite', () => updateSprite(frameT));
@@ -6606,6 +6610,7 @@ function gameLoop(){
     }
   }
   drawCompanions();
+  drawFieldSurvivors();
   if(sprite.exists)drawSprite(sprite,frameT);
   drawParticles();
   drawLamps(frameT);      // 路灯光晕（覆盖实体，照亮夜路）
@@ -17667,6 +17672,7 @@ function nextWave(){
     return;
   }
   wave++;waveTxt.textContent='第 '+wave+' 波';
+  fieldSurvivors = []; tonightGuests = [];  // 新的一天：昨天没来得及入店的预约作废
   wavePhase='waiting'; // 防止章节卡/对话期间误判清场
   safehouseRestUsed = false;
   safehouseCraftUsed = false;
@@ -17817,6 +17823,9 @@ function startWaveContent(){
     return;
   }
 
+  // ── 普通波：城墙外可能有人求救（救下的人晚上来食堂）──
+  maybeSpawnFieldSurvivor();
+
   // ── 普通波：成批刷怪 ──
   // 波次特殊机制：每波有特殊类型（非Boss波）
   let waveSpecialType = 'normal';
@@ -17917,6 +17926,7 @@ function onWaveCleared(){
   // 正常波清场
   addBanner(`✅ 第 ${wave} 波大捷！击杀 ${waveKilledThisWave} 只`);
   endOvernightMeals();
+  clearFieldSurvivors();
   
   // ── 【做减法：战后强磁吸】全场肉块与金币瞬间吸入背包 ──
   vacuumAllLoot();
@@ -18056,6 +18066,208 @@ function checkEnvNarration(){
   }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  【战场求救】白天救下的人，晚上坐在食堂里吃饭
+//  - 每个白天波次开头，城墙外可能有人求救（VIP 先在这里"遇见"，之后才会来店；也可能是普通幸存者）
+//  - 走近按 E 救下；僵尸路过会啃他，来不及就救不下
+//  - 救下的人记入 tonightGuests：晚上开张时优先入座，付小费更多、涨粉；VIP 当晚必来
+//  食堂和战场因此共用同一批人，两段玩法是一个故事。
+// ════════════════════════════════════════════════════════════════════════════
+
+let fieldSurvivors = [];   // 战场上正在求救的人
+let tonightGuests = [];    // 今晚会来食堂的人 [{kind:'survivor', persona} | {kind:'vip', vipId}]
+
+const SURVIVOR_RESCUE_RANGE = 60;     // 走到多近可以按 E 救人
+const SURVIVOR_HP = 100;
+const SURVIVOR_BITE_PER_FRAME = 0.35; // 每只靠近的僵尸每帧对求救者的伤害
+
+// ── VIP 与战场的关系 ──
+// 一个 VIP 能来店的条件：粉丝够 + 已经遇见过（战场救下 / 旧存档里见过）。
+// 兜底：粉丝解锁满 3 天仍没在战场遇到，会自己找上门，避免玩家一直碰不到。
+function isVIPFieldMet(vipId){
+  const comp = vipCompendium[vipId];
+  if(!comp) return false;
+  if(comp.fieldMet || comp.met) return true;
+  if(comp.unlockedWave === undefined) return comp.unlocked === true;   // 旧存档里已解锁的
+  return wave - comp.unlockedWave >= 3;
+}
+
+// 现在能在战场上遇到的 VIP：粉丝够、还没遇见
+function getFieldEncounterVIPs(){
+  return VIP_CUSTOMERS.filter(v => wastegramFans >= v.unlockFans && !(vipCompendium[v.id] && (vipCompendium[v.id].fieldMet || vipCompendium[v.id].met)));
+}
+
+function _vipShortName(vip){ const p = vip.name.split('·'); return p[p.length - 1]; }
+
+function _survivorFromVIP(vip){
+  return { name: _vipShortName(vip), skin:'#d4a574', hair:'#3a2a1a', shirt: vip.color || '#8b6914' };
+}
+
+// ── 每个白天波次开头调用（startWaveContent，Boss 波不刷）──
+function maybeSpawnFieldSurvivor(){
+  fieldSurvivors = [];
+  const vips = getFieldEncounterVIPs();
+  let s = null;
+  if(wave === 1 && vips.length > 0){
+    s = { vip: vips[0] };                       // 第一天必有一个：教会玩家"救人 → 晚上来店"
+  }else if(vips.length > 0 && Math.random() < 0.5){
+    s = { vip: vips[Math.floor(Math.random() * vips.length)] };
+  }else if(Math.random() < 0.4){
+    s = {};
+  }
+  if(!s) return null;
+  const x = RIGHT_WALL_X + 240 + Math.random() * 300;
+  const persona = s.vip ? _survivorFromVIP(s.vip) : generateNormalCustomerPersona();
+  const surv = { x, vip: s.vip || null, persona, hp: SURVIVOR_HP, state: 'waiting', t: 0, near: false, fade: 1 };
+  fieldSurvivors.push(surv);
+  addBanner('城墙外有人求救：' + persona.name + '！走近按 E 救人');
+  return surv;
+}
+
+// ── 每帧（world 状态）──
+function updateFieldSurvivors(){
+  if(fieldSurvivors.length === 0) return;
+  const px = player.x + CHAR_W / 2;
+  for(let i = fieldSurvivors.length - 1; i >= 0; i--){
+    const s = fieldSurvivors[i];
+    s.t++;
+    if(s.state === 'waiting'){
+      let biters = 0;
+      for(const z of zombies){ if(z.alive && Math.abs((z.x + 22) - s.x) < 40) biters++; }
+      if(biters > 0){
+        s.hp -= SURVIVOR_BITE_PER_FRAME * biters;
+        if(frameT % 20 === 0) spawnFloatText('救命!', s.x, groundYAt(s.x) - CHAR_H - 20, '#e5594f');
+      }
+      s.near = Math.abs(px - s.x) < SURVIVOR_RESCUE_RANGE;
+      if(s.hp <= 0){
+        addBanner('没能救下 ' + s.persona.name + '……');
+        if(typeof sndHurt === 'function') try{ sndHurt(); }catch(e){}
+        fieldSurvivors.splice(i, 1);
+      }
+    }else if(s.state === 'saved'){
+      s.x -= 3.2;                       // 被救下后自己跑回小屋
+      s.fade -= 0.012;
+      if(s.fade <= 0 || s.x < RIGHT_WALL_X - 40) fieldSurvivors.splice(i, 1);
+    }
+  }
+}
+
+// ── E 键：救下最近的求救者（handleInteractAction 调用，返回是否处理了）──
+function rescueNearestSurvivor(){
+  for(const s of fieldSurvivors){
+    if(s.state === 'waiting' && s.near){
+      s.state = 'saved';
+      onSurvivorRescued(s);
+      return true;
+    }
+  }
+  return false;
+}
+
+function onSurvivorRescued(s){
+  const y = groundYAt(s.x) - CHAR_H - 20;
+  try{ sndHeal(); }catch(e){}
+  coins += 10; updateCoinUI();
+  if(s.vip){
+    const vip = s.vip;
+    if(!vipCompendium[vip.id]) vipCompendium[vip.id] = { met:false, meetCount:0, bestQuality:null, lastVisit:0 };
+    vipCompendium[vip.id].fieldMet = true;
+    vipCompendium[vip.id].fieldMetWave = wave;
+    tonightGuests.push({ kind:'vip', vipId: vip.id });
+    spawnFloatText('谢谢你！今晚我去你的店', s.x, y, vip.accent || '#f2a65a');
+    pushSideNotification('救下了 ' + vip.name, vip.bg, '今晚会来食堂', vip.color, 'vip');
+  }else{
+    tonightGuests.push({ kind:'survivor', persona: s.persona });
+    spawnFloatText('谢谢！晚上去吃饭', s.x, y, '#9be89b');
+    addBanner('救下了 ' + s.persona.name + '，今晚会来食堂');
+  }
+}
+
+// 一波结束：没救的人自己撤离
+function clearFieldSurvivors(){
+  if(fieldSurvivors.some(s => s.state === 'waiting')) addBanner('求救的人自己摸黑撤走了');
+  fieldSurvivors = [];
+}
+
+// ── 绘制（世界坐标，在 drawCompanions 之后调用）──
+function drawFieldSurvivors(){
+  if(gameState !== 'world' || fieldSurvivors.length === 0) return;
+  fieldSurvivors.forEach(s => {
+    const gy = groundYAt(s.x);
+    const p = s.persona;
+    const bob = s.state === 'saved' ? Math.sin(s.t * 0.6) * 2 : Math.sin(s.t * 0.15) * 1;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, s.fade);
+    // 影子
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    ctx.beginPath(); ctx.ellipse(s.x, gy - 2, 12, 3, 0, 0, Math.PI * 2); ctx.fill();
+    const top = gy - 54 + bob;
+    // 身体 / 腿
+    ctx.fillStyle = p.shirt || '#5a6a7a';
+    ctx.fillRect(s.x - 8, top + 18, 16, 22);
+    ctx.fillStyle = '#2b2f36';
+    ctx.fillRect(s.x - 7, top + 40, 6, 12); ctx.fillRect(s.x + 1, top + 40, 6, 12);
+    // 手臂：求救时高举挥动，被救后下垂
+    ctx.strokeStyle = p.skin || '#d4a574'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    const wave1 = s.state === 'waiting' ? Math.sin(s.t * 0.25) * 6 : 0;
+    ctx.beginPath();
+    if(s.state === 'waiting'){
+      ctx.moveTo(s.x - 8, top + 22); ctx.lineTo(s.x - 14 + wave1, top + 4);
+      ctx.moveTo(s.x + 8, top + 22); ctx.lineTo(s.x + 14 - wave1, top + 4);
+    }else{
+      ctx.moveTo(s.x - 8, top + 22); ctx.lineTo(s.x - 11, top + 36);
+      ctx.moveTo(s.x + 8, top + 22); ctx.lineTo(s.x + 11, top + 36);
+    }
+    ctx.stroke();
+    // 头 + 头发
+    ctx.fillStyle = p.skin || '#d4a574';
+    ctx.fillRect(s.x - 6, top + 6, 12, 12);
+    ctx.fillStyle = p.hair || '#3a2a1a';
+    ctx.fillRect(s.x - 7, top + 3, 14, 6);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(s.x - 3, top + 11, 2, 2); ctx.fillRect(s.x + 1, top + 11, 2, 2);
+    if(s.state === 'waiting'){
+      // 头顶感叹号
+      const bubY = top - 12 + Math.sin(s.t * 0.2) * 2;
+      ctx.fillStyle = 'rgba(12,13,15,.9)';
+      ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(s.x - 9, bubY - 12, 18, 18, 5); else ctx.rect(s.x - 9, bubY - 12, 18, 18); ctx.fill();
+      ctx.fillStyle = '#f2a65a'; ctx.font = '600 14px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('!', s.x, bubY + 2);
+      // 名字 + 血条
+      ctx.font = '500 11px sans-serif'; ctx.fillStyle = '#e8eaed';
+      ctx.fillText(p.name + (s.vip ? '（VIP）' : ''), s.x, top - 28);
+      if(s.hp < SURVIVOR_HP){
+        ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(s.x - 16, top - 24, 32, 3);
+        ctx.fillStyle = '#e5594f'; ctx.fillRect(s.x - 16, top - 24, 32 * Math.max(0, s.hp / SURVIVOR_HP), 3);
+      }
+      if(s.near){
+        ctx.fillStyle = 'rgba(12,13,15,.92)';
+        const w = 62;
+        ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(s.x - w/2, gy + 6, w, 20, 6); else ctx.rect(s.x - w/2, gy + 6, w, 20); ctx.fill();
+        ctx.fillStyle = '#e8eaed'; ctx.font = '500 12px sans-serif';
+        ctx.fillText('E 救人', s.x, gy + 20);
+      }
+    }
+    ctx.restore();
+  });
+}
+
+// ── 食堂：今晚的预约客人 ──
+function takeTonightGuests(){
+  const g = tonightGuests.slice();
+  tonightGuests = [];
+  return g;
+}
+
+// ── 老伙伴在店里帮忙：张端盘、林查卫生、强修灶、赵广播招客 ──
+function getStoryCrew(){
+  const crew = [];
+  if(wave >= 2) crew.push({ id:'crew_zhang', type:'server', crew:true, name:'老兵张', role:'端盘', color:'#ffaa66', skill:0.8, timer:0, target:null, serveFlash:0 });
+  if(wave >= 4) crew.push({ id:'crew_lin',   type:'crew',   crew:true, name:'护士小林', role:'查卫生', desc:'顾客更有耐心', color:'#ff88aa', timer:0, serveFlash:0 });
+  if(wave >= 6) crew.push({ id:'crew_qiang', type:'crew',   crew:true, name:'工程师阿强', role:'修灶', desc:'烹饪速度 +10%', color:'#88ccff', timer:0, serveFlash:0 });
+  if(wave >= 8) crew.push({ id:'crew_zhao',  type:'crew',   crew:true, name:'通信兵小赵', role:'广播招客', desc:'客流 +15%，涨粉 +20%', color:'#88ffcc', timer:0, serveFlash:0 });
+  return crew;
+}
 // ═══════════════════════════════════════════
 
 
@@ -21510,23 +21722,31 @@ function getUnlockedVIPs(){
 function maybeSpawnVIPCustomer(){
   // 一次只允许一个VIP在店
   if(vipActiveInRestaurant) return null;
-  const unlocked = getUnlockedVIPs();
+  const unlocked = getUnlockedVIPs().filter(v => isVIPFieldMet(v.id));   // 粉丝够 + 已在战场遇见
   if(unlocked.length === 0) return null;
   // 筛选本夜未来访的
   const available = unlocked.filter(v => !restState.vipVisitedThisNight || !restState.vipVisitedThisNight.includes(v.id));
   if(available.length === 0) return null;
-  // VIP出现概率：基础60% + 每多一个未访问VIP +8%（确保玩家容易遇到VIP）
-  // 如果本夜还没来过任何VIP，则100%出现（保证每夜至少一个VIP剧情）
-  const noVIPTonight = !restState.vipVisitedThisNight || restState.vipVisitedThisNight.length === 0;
-  const chance = noVIPTonight ? 1.0 : (0.60 + available.length * 0.08);
-  if(Math.random() > chance) return null;
-  // 按权重选择
-  const totalWeight = available.reduce((s,v) => s + v.weight, 0);
-  let roll = Math.random() * totalWeight;
-  let chosen = available[0];
-  for(const v of available){
-    roll -= v.weight;
-    if(roll <= 0){ chosen = v; break; }
+  // 白天在战场救下的 VIP：当晚必到
+  const reservedVip = (restState.reservedGuests || []).find(g => g.kind === 'vip' && available.some(v => v.id === g.vipId));
+  let chosen;
+  if(reservedVip){
+    chosen = available.find(v => v.id === reservedVip.vipId);
+    restState.reservedGuests = restState.reservedGuests.filter(g => g !== reservedVip);
+  }else{
+    // VIP出现概率：基础60% + 每多一个未访问VIP +8%（确保玩家容易遇到VIP）
+    // 如果本夜还没来过任何VIP，则100%出现（保证每夜至少一个VIP剧情）
+    const noVIPTonight = !restState.vipVisitedThisNight || restState.vipVisitedThisNight.length === 0;
+    const chance = noVIPTonight ? 1.0 : (0.60 + available.length * 0.08);
+    if(Math.random() > chance) return null;
+    // 按权重选择
+    const totalWeight = available.reduce((s,v) => s + v.weight, 0);
+    let roll = Math.random() * totalWeight;
+    chosen = available[0];
+    for(const v of available){
+      roll -= v.weight;
+      if(roll <= 0){ chosen = v; break; }
+    }
   }
   // 记录本夜已访问
   if(!restState.vipVisitedThisNight) restState.vipVisitedThisNight = [];
@@ -21544,6 +21764,10 @@ function triggerVIPFirstMeet(vip, onComplete){
   const lines = [];
   // 开场：阶级介绍
   lines.push({ scene:'hub', label:`${tierInfo.icon} ${tierInfo.name} · ${vip.name}` });
+  // 白天在战场救下的人，兑现承诺来店里了
+  if(vipCompendium[vip.id] && vipCompendium[vip.id].fieldMet){
+    lines.push({ npc:'ming', text:'（白天在城外救下的那个人，循着承诺找来了。）' });
+  }
   // 初遇剧情台词
   vip.firstMeet.forEach(line => {
     if(line.npc){
@@ -23722,6 +23946,7 @@ function checkNewVIPUnlocks(){
       if(!known){
         if(!vipCompendium[vip.id]) vipCompendium[vip.id] = { met:false, meetCount:0, bestQuality:null, lastVisit:0 };
         vipCompendium[vip.id].unlocked = true;
+        vipCompendium[vip.id].unlockedWave = wave;   // 兜底：解锁满 3 天仍没在战场遇到，会自己找上门
         const tierInfo = VIP_TIERS[vip.tier];
         addBanner(`${tierInfo.icon} 新VIP解锁！${tierInfo.name} · ${vip.name} —— 粉丝数 ${wastegramFans}！`);
         // 触发一段提示音
@@ -23748,6 +23973,7 @@ RestEventBus.on(EVT.CUSTOMER_SERVED, (data) => {
   if(data.customer && data.customer._trendMatched){
     fanGain *= 2;
   }
+  if(restState && restState.crew && restState.crew.zhao) fanGain *= 1.2;   // 通信兵小赵广播招客
   fanGain = Math.floor(fanGain);
   wastegramFans += fanGain;
   updateWastegramRank();
@@ -23953,6 +24179,16 @@ function _doStartRestaurant(){
     drinksServed: 0,  // 饮料送出计数（每日任务用）
   };
   vipActiveInRestaurant = null;  // 重置VIP占位
+  // ── 白天的人晚上来：战场救下的幸存者/VIP 是今晚的预约客人 ──
+  restState.reservedGuests = takeTonightGuests();
+  if(restState.reservedGuests.length > 0){
+    addBanner('今晚有 ' + restState.reservedGuests.length + ' 位白天救下的客人要来');
+  }
+  // ── 老伙伴在店里帮忙：张端盘、林查卫生、强修灶、赵广播招客 ──
+  const crew = getStoryCrew();
+  restState.staff.push(...crew);
+  restState.crew = { lin: crew.some(c => c.id === 'crew_lin'), qiang: crew.some(c => c.id === 'crew_qiang'), zhao: crew.some(c => c.id === 'crew_zhao') };
+  if(restState.crew.qiang) restState.cookSpeedBuff = (restState.cookSpeedBuff || 1) * 1.1;
   generateDailyTasks();  // 生成本夜每日任务（Kairosoft 式）
   if(!currentTrend) rollDailyTrend();  // 热搜已在白天第一波刷新；仅读档等缺失时补掷
   checkNewVIPUnlocks();  // 同步VIP解锁状态（加载存档后可能粉丝已够解锁）
@@ -24765,8 +25001,9 @@ function spawnRestCustomer(){
   restTables.forEach(t => {
     t.seats.forEach(s => { if(!s.occupied) emptySeats.push(s); });
   });
-  // 检查是否生成VIP顾客（粉丝数驱动）
-  const vipResult = maybeSpawnVIPCustomer();
+  // 白天救下的幸存者优先入座；没有预约时才看 VIP 来访
+  const reservedSurvivor = (restState.reservedGuests || []).find(g => g.kind === 'survivor') || null;
+  const vipResult = reservedSurvivor ? null : maybeSpawnVIPCustomer();
 
   // 构建顾客数据（无order字段）
   function buildCustomer(seat, isQueuing){
@@ -24788,8 +25025,8 @@ function spawnRestCustomer(){
       }
     } else {
       ctype = pickCustomerType();
-      // 为每个普通顾客生成名字+故事
-      persona = generateNormalCustomerPersona();
+      // 为每个普通顾客生成名字+故事（白天救下的人沿用战场上的名字和外貌）
+      persona = reservedSurvivor ? reservedSurvivor.persona : generateNormalCustomerPersona();
     }
     const decorBonus = 1 + restUpgradeLevel.decor * 0.1;
     const patience = (35 + Math.random()*20) * ctype.patienceMul * decorBonus;
@@ -24833,7 +25070,12 @@ function spawnRestCustomer(){
       vipId: vipResult ? vipResult.vip.id : null,
       personalityType: vipResult ? vipResult.vip.personalityType : null,
       sleeping: false,
+      rescued: !!reservedSurvivor && !vipResult,   // 白天在战场救下的人
     };
+    if(customer.rescued){
+      restState.reservedGuests = restState.reservedGuests.filter(g => g !== reservedSurvivor);
+      customer.patience *= 1.2; customer.maxPatience = customer.patience;
+    }
     return customer;
   }
 
@@ -24940,7 +25182,7 @@ function restLoop(now){
       spawnRestCustomer();
     }
     // 生成间隔：10-15秒一个（大幅减慢，给玩家时间做菜）
-    const influencerMul = 1 + (restState.influencerBoost || 0) * 0.3;
+    const influencerMul = (1 + (restState.influencerBoost || 0) * 0.3) * ((restState.crew && restState.crew.zhao) ? 1.15 : 1);
     const baseInterval = Math.max(8.0, (12.0 - wastegramFans * 0.001) / influencerMul);
     restState.spawnTimer = baseInterval + Math.random() * 4.0;
   }
@@ -25226,7 +25468,8 @@ function restLoop(now){
   });
   // ── 员工被动加成：每有一个员工，顾客耐心衰减减慢5%（最多减慢30%）──
   // 在 customer update 中通过 restState.staffPatienceBonus 读取
-  restState.staffPatienceBonus = Math.min(0.3, restState.staff.length * 0.05);
+  const hiredCount = restState.staff.filter(s => !s.crew).length;
+  restState.staffPatienceBonus = Math.min(0.4, hiredCount * 0.05 + ((restState.crew && restState.crew.lin) ? 0.1 : 0));
 
   // 更新浮动文字
   for(let i = restState.floatTexts.length - 1; i >= 0; i--){
@@ -25333,7 +25576,8 @@ function serveCustomer(c){
   const isVipCust = (c.ctype.id === 'vip' || c.ctype.id === 'gourmet' || c.ctype.id === 'critic' || c.ctype.id === 'influencer');
   const bpVipBonus = (isVipCust && typeof getBackpackVipTipBonus === 'function') ? getBackpackVipTipBonus() : 0;
   const bpDishBonus = (typeof getBackpackDishPriceBonus === 'function') ? getBackpackDishPriceBonus() : 0;
-  const tipMul = c.ctype.tipMul * (1 + bpVipBonus) * c.satisfaction * decorBonus * qInfo.mult * synergyMult * trendMult;
+  const rescuedMul = c.rescued ? 1.5 : 1;   // 白天被你救下的人，付得更多
+  const tipMul = rescuedMul * c.ctype.tipMul * (1 + bpVipBonus) * c.satisfaction * decorBonus * qInfo.mult * synergyMult * trendMult;
   // ── 经营重做：米其林大厨 Lv3+ 菜品加价20%（员工养成激活）──
   let chefPriceBonus = 1;
   const chef3 = restState.staff.find(s => s.id === 'cook3' && s.level >= 3);
@@ -25346,6 +25590,11 @@ function serveCustomer(c){
   if(c.ctype.id === 'vip' || c.ctype.id === 'gourmet' || c.ctype.id === 'critic' || c.ctype.id === 'influencer') restState.vipServed++;
   coins += pay;
   updateCoinUI();
+  if(c.rescued){
+    addRestFloatText('谢谢你白天救了我！', c.walkX, c.seat.y - 100, '#9be89b');
+    restRep = Math.min(60, restRep + 1);
+    wastegramFans += 5;
+  }
   // 相性触发提示
   if(synergyNames.length > 0){
     addRestFloatText('✨ ' + synergyNames[0] + '! x' + synergyMult.toFixed(1), c.walkX, c.seat.y - 75, '#ff44dd');
@@ -26103,6 +26352,20 @@ function drawRestaurant(){
         ctx2.font = 'bold 9px sans-serif';
         ctx2.fillText('上菜!', sx, sy - 42);
       }
+    } else if(staff.type === 'crew'){
+      // 老伙伴：站在各自的岗位上，头顶写岗位
+      const pos = { crew_lin:[REST_CANVAS_W*0.92, 300], crew_qiang:[(restStoves[0] ? restStoves[0].x : 150) - 46, 126], crew_zhao:[REST_CANVAS_W*0.80, 128] }[staff.id] || [REST_CANVAS_W*0.9, 300];
+      const sx = pos[0], sy = pos[1] + walkBob;
+      ctx2.fillStyle = 'rgba(0,0,0,.35)';
+      ctx2.beginPath(); ctx2.ellipse(sx, sy + 25, 10, 3, 0, 0, Math.PI * 2); ctx2.fill();
+      ctx2.fillStyle = staff.color; ctx2.fillRect(sx - 8, sy - 18, 16, 22);
+      ctx2.fillStyle = '#d4a574'; ctx2.fillRect(sx - 5, sy - 27, 10, 9);
+      ctx2.fillStyle = '#3a2818'; ctx2.fillRect(sx - 5, sy - 29, 10, 4);
+      ctx2.fillStyle = '#000'; ctx2.fillRect(sx - 3, sy - 24, 1.5, 1.5); ctx2.fillRect(sx + 1, sy - 24, 1.5, 1.5);
+      ctx2.fillStyle = '#e8eaed'; ctx2.font = '600 10px sans-serif'; ctx2.textAlign = 'center';
+      ctx2.fillText(staff.name, sx, sy - 44);
+      ctx2.fillStyle = '#9aa0a8'; ctx2.font = '10px sans-serif';
+      ctx2.fillText(staff.role, sx, sy - 33);
     } else if(staff.type === 'server'){
       const sx = 620 + (i * 30);
       const sy = 165 + walkBob;
@@ -26398,7 +26661,7 @@ function drawRestaurant(){
       ctx2.font = 'bold 9px Microsoft YaHei UI,sans-serif';
       ctx2.textAlign = 'center';
       const nameY = uiNameY;   // 所有状态统一锚点（旧版 seated/walking 两个值=不同状态高度跳变）
-      const nameW = ctx2.measureText(c.persona.name).width + 8;
+      const nameW = ctx2.measureText(c.persona.name + (c.rescued ? '（获救）' : '')).width + 8;
       // 背景框
       ctx2.fillStyle = 'rgba(0,0,0,.7)';
       ctx2.fillRect(cx - nameW/2, nameY - 8, nameW, 11);
@@ -26407,7 +26670,7 @@ function drawRestaurant(){
       ctx2.strokeRect(cx - nameW/2, nameY - 8, nameW, 11);
       // 名字
       ctx2.fillStyle = c.persona.shirt || '#d4a574';
-      ctx2.fillText(c.persona.name, cx, nameY);
+      ctx2.fillText(c.persona.name + (c.rescued ? '（获救）' : ''), cx, nameY);
     }
     // 顾客类型图标（非VIP；锚在名牌左侧对称位——右侧已有耐心条，避免堆叠）
     if(!c.isVIP && c.ctype.id !== 'normal' && c.state === 'seated'){
