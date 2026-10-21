@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="zh"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>十五波围城：最后据点 v56 (旧城区远征与双持生态版)</title>
+<style>
+/*@@STYLE1@@*/</style>
+</head>
+<body>
+
+<div id="header">
+  <div class="hdr-main">
+    <div id="title">十五波围城<span class="ver">v56</span></div>
+    <div id="stats">
+      <div class="stat">
+        <span class="sl">生命</span><span class="sv" id="hpv">100</span>
+        <div id="hpbw"><div id="hpb" style="width:100%"></div></div>
+      </div>
+      <div class="stat"><span class="sl">分数</span><span class="sv" id="sc">0</span></div>
+      <div class="stat"><span class="sl">击杀</span><span class="sv" id="kls">0</span></div>
+      <div class="stat" hidden><span class="sl">最高</span><span class="sv" id="bst">0</span></div>
+    </div>
+  </div>
+  <div class="hdr-sub">
+    <div class="hdr-info">
+      <span class="hdr-tag">
+        <span id="lv-display">Lv.1</span>
+        <span class="xp-track"><span id="xp-fill" style="display:block"></span></span>
+      </span>
+      <span id="cabin-resources-hud" class="hdr-tag">
+        <span id="hud-wood">木材 0</span>
+        <span id="hud-scrap">废料 0</span>
+      </span>
+      <span id="time-of-day-hud" class="hdr-tag">
+        <span id="tod-icon">☀</span>
+        <span id="tod-label">白天</span>
+      </span>
+      <div id="coin-display">150</div>
+    </div>
+    <button id="hdr-menu-btn" class="hdr-btn" onclick="document.getElementById('header').classList.toggle('menu-open')">菜单</button>
+    <div class="hdr-actions" onclick="document.getElementById('header').classList.remove('menu-open')">
+      <button id="codex-btn" class="hdr-btn" onclick="openCodex()" title="变异体机密图鉴">图鉴</button>
+      <button id="backpack-btn" class="hdr-btn" onclick="toggleBackpack()" title="避难所战术行囊">行囊<span class="key">B</span></button>
+      <button id="expedition-btn" class="hdr-btn" onclick="openExpeditionModal()" title="旧城区远征探险看板">远征</button>
+      <button id="workshop-btn" class="hdr-btn" onclick="openDuffWorkshop()" title="小胡军备改造台">改造<span class="key">M</span></button>
+      <button id="manage-btn" class="hdr-btn" onclick="openManageUI()" title="据点建设与经营管理">建设</button>
+      <button id="next-wave-btn" class="hdr-btn" onclick="skipToNextWave()">下一波</button>
+      <button id="pause-btn" class="hdr-btn" onclick="togglePause()">暂停</button>
+    </div>
+  </div>
+</div>
+
+<div id="rotate-hint"><div>请把手机横过来玩</div><small>十五波围城需要横屏</small></div>
+
+<div id="world-progress">
+  <span class="wp-end">据点</span>
+  <div id="wp-track"><div id="wp-fill" style="width: 0%;"></div></div>
+  <span class="wp-end">电台</span>
+  <span id="wp-text">0%</span>
+</div>
+
+<div id="game-wrap">
+  <div id="combo-vignette" style="opacity: 0;"></div>
+  <div id="combo-hud" style="display: none;"></div>
+  <!-- 🚨 EMERGENCY RETREAT HUD (紧凑微型战术胶囊指示器，居中锚定在游戏画布正上方，绝不遮挡视野) -->
+  <div id="emergency-retreat-hud" class="compact-retreat-hud" style="display:none;position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:300;background:rgba(19,20,21,0.92);backdrop-filter:blur(8px);border:1.5px solid rgba(255,77,109,0.7);border-radius:24px;padding:4px 16px;height:38px;box-sizing:border-box;box-shadow:0 4px 16px rgba(0,0,0,0.6);cursor:pointer;animation:pulseRetreat 0.8s infinite alternate;align-items:center;gap:10px;user-select:none;pointer-events:auto;">
+    <span style="font-size:14px;line-height:1;">🚨</span>
+    <span style="font-family:var(--font-display);font-size:12px;font-weight:600;color:#ffffff;letter-spacing:1px;white-space:nowrap;text-shadow:none;">
+      尸潮压境 · 撤回小屋门前避难
+    </span>
+    <span style="font-size:11px;color:#fca5a5;padding:2px 8px;background:rgba(255,50,50,0.22);border-radius:12px;border:1px solid rgba(255,80,80,0.35);white-space:nowrap;">
+      门前长按E锁门
+    </span>
+  </div>
+  <!-- 休息期倒计时 -->
+  
+  <canvas id="gc" width="1100" height="500"></canvas>
+
+  <!-- ── TOUCH CONTROLS OVERLAY ── -->
+  <div id="touch-overlay">
+    <!-- Mobile weapon strip -->
+    <div id="wpn-strip"><div class="wpn-btn active-w" id="mwb0" style="border-color: rgb(255,224,102);"><span class="wi2">🔫</span><span class="wa2">12</span></div><div class="wpn-btn" id="mwb1" style="border-color: rgb(154,154,154);"><span class="wi2">💥</span><span class="wa2">6</span></div></div>
+    <!-- Joystick -->
+    <div id="joy-zone">
+      <div id="joy-base"></div>
+      <div id="joy-knob"></div>
+    </div>
+    <!-- Action buttons -->
+    <div id="btn-fire">🔫</div>
+    <div id="btn-jump">↑</div>
+    <div id="btn-dodge">🤸<br>翻滚</div>
+    <div id="btn-reload">🔄<br>装填</div>
+    <div id="btn-skill">✨<br>技能</div>
+    <div id="btn-shop-m">🛒<br>商店</div>
+    <div id="btn-backpack" onclick="toggleBackpack()">🎒<br>行囊</div>
+    <div id="btn-vehicle">✋<br>[ E ]</div>
+    <div id="btn-scout">🔍<br>侦察</div>
+  </div>
+
+  <div id="boss-hpbar" style="display: none;">
+    <div id="boss-name">???</div>
+    <div id="boss-hpbg"><div id="boss-hpfill" style="width:100%"></div></div>
+  </div>
+  <div id="vehicle-prompt" style="display: none;">[ E ] 交互</div>
+
+  <!-- SHOP -->
+  <div id="shop-scr">
+    <div id="shop-title">⚙ 军备商店</div>
+    <div id="shop-coins">💰 0 硬币</div>
+    <div id="shop-timer-bar"><div id="shop-timer-fill"></div></div>
+    <div id="shop-grid"></div>
+    <button id="shop-close" onclick="closeShop()">继续战斗 →</button>
+  </div>
+
+  <!-- CABIN UPGRADE + KITCHEN -->
+  <div id="cabin-scr">
+    <div id="cabin-title">🏰 城堡防线指挥所</div>
+    <div style="font-size:.75rem;color:#d2b48c;margin-bottom:6px;letter-spacing:1px;text-align:center;">
+      研发防御要塞科技 · 强化高台城垛 · 统筹战地军备与夜间餐饮后勤
+    </div>
+    <div id="cabin-tabs">
+      <div class="cabin-tab active" onclick="switchCabinTab('upgrade')">🏰 基地工事与塔防防线</div>
+      <div class="cabin-tab" onclick="switchCabinTab('shop')">📦 战地补给军备</div>
+      <div class="cabin-tab" onclick="switchCabinTab('kitchen')">📋 战饭菜单整备</div>
+      <div class="cabin-tab" onclick="switchCabinTab('workshop')">🛠️ 小胡军备改造台</div>
+    </div>
+    <div id="cabin-resources">
+      <span id="cabin-res-wood">木材: 0</span>
+      <span id="cabin-res-scrap">金属废料: 0</span>
+      <span id="cabin-res-coins">硬币: 0</span>
+    </div>
+    <!-- 升级面板 -->
+    <div id="cabin-upgrade-panel">
+      <div id="cabin-grid"></div>
+    </div>
+    <!-- 商店面板 -->
+    <div id="cabin-shop-panel" style="display:none;width:100%;flex-direction:column;align-items:center;">
+      <div id="cabin-shop-coins" style="font-family:var(--font-display);font-size:1.1rem;color:#f0c060;margin-bottom:6px;">💰 0</div>
+      <div id="cabin-shop-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;width:100%;max-width:700px;overflow-y:auto;max-height:300px;"></div>
+    </div>
+    <!-- 厨房面板（经营重做：菜单规划+肉材管理，秒变金币流程已删） -->
+    <div id="cabin-kitchen-panel">
+      <div id="meat-inventory"></div>
+      <div style="width:100%;text-align:center;font-family:var(--font-display);font-weight:600;font-size:.85rem;color:#f0c060;margin-bottom:4px;">
+        📋 规划今晚菜单 —— 顾客只会点你注册的菜
+      </div>
+      <div id="menu-reg-grid"></div>
+      <div id="kitchen-log">白天杀僵尸攒肉 → 这里注册今晚菜单 → 夜晚顾客点单做菜赚金币声望。</div>
+    </div>
+    <!-- 小胡战备改造工坊内嵌面板 -->
+    <div id="cabin-workshop-panel" style="display:none;width:100%;flex-direction:column;align-items:center;padding:8px 12px;overflow-y:auto;max-height:360px;">
+      <div id="cabin-ws-content" style="width:100%;max-width:760px;"></div>
+    </div>
+    <button id="cabin-close" onclick="closeCabinUpgradeUI()">继续 →</button>
+  </div>
+
+  <!-- NIGHT RESTAURANT（夜晚餐厅实时经营） -->
+  <div id="restaurant-scr">
+    <div id="rest-hud">
+      <div id="rest-rep">声望: 0</div>
+      <div id="rest-timer" style="display: none;">75s</div>
+      <div id="rest-earnings">收入: 0金</div>
+      <div id="rep-tier-display">门可罗雀</div>
+      <div id="trending-display"><span id="trending-text">热搜加载中…</span></div>
+      <div id="rest-fans-display" class="rest-chip" onclick="openVIPCompendium()" title="点击查看VIP顾客图鉴">粉丝 0</div>
+      <button id="rest-vip-btn" class="rest-chip" onclick="openVIPCompendium()">图鉴</button>
+      <button id="cooksta-toggle-btn" onclick="toggleCookstaPanel()">Cooksta<span class="cooksta-badge" id="cooksta-badge" style="display:none;">0</span></button>
+      <button id="rest-music-btn" class="rest-chip" onclick="cycleRestMusic()" title="切换餐厅背景音乐">音乐</button>
+      <button id="rest-mute-btn" class="rest-chip" onclick="toggleRestMute()" title="静音/取消静音">声音</button>
+      <button id="rest-close-btn" class="rest-chip danger" onclick="earlyCloseRestaurant()">提前打烊</button>
+    </div>
+    <div id="rest-canvas-wrap">
+      <canvas id="rest-canvas" width="1100" height="440"></canvas>
+      <!-- 每日任务面板（右上角悬浮，不挡canvas主体） -->
+      <div id="daily-tasks-panel" class="collapsed">
+        <div id="daily-tasks-title" onclick="toggleDailyTasksPanel()">🎯 今夜任务 ▸</div>
+        <div id="daily-tasks-list"></div>
+      </div>
+      <!-- Cooksta 社交媒体面板（可展开） -->
+      <div id="cooksta-panel">
+        <div id="cooksta-panel-header"></div>
+        <div id="cooksta-feed"></div>
+      </div>
+    </div>
+    <div id="rest-controls"></div>
+    <div id="rest-end-scr">
+      <div class="end-card">
+        <h2 class="end-title">夜晚打烊结算</h2>
+        <div id="rest-end-stats"></div>
+        <div class="end-actions">
+          <button class="big-btn" onclick="finishRestaurantToWorkshop()">军备改造台</button>
+          <button class="big-btn primary" onclick="closeRestaurant()">迎接黎明，出击</button>
+        </div>
+      </div>
+    </div>
+    <!-- 餐厅雇佣/升级模态框 -->
+    <div id="rest-modal" onclick="if(event.target===this)closeRestModal()">
+      <div id="rest-modal-box">
+        <div id="rest-modal-title">面板</div>
+        <div id="rest-modal-coins">💰 0</div>
+        <div id="rest-modal-list"></div>
+        <button id="rest-modal-close" onclick="closeRestModal()">关闭 ✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STORY INTRO SCREEN -->
+  <div class="overlay" id="story-intro-scr" style="display: none;">
+  <div id="story-intro-inner">
+      <div id="story-chapter-label">序章</div>
+      <div id="story-title-text">末日降临</div>
+      <div id="story-typewriter">没人知道病毒从哪里来。
+一夜之间，城市沦陷。感染者失去理智，只剩攻击本能，成群结队扑向幸存者。
+政府垮台，通讯中断，救援遥遥无期。
+
+你记得那天——街角的消防栓被失控的公交车撞断，水柱直冲上天，喷了三天三夜没人管。
+那是文明最后的喘息。</div>
+      <div id="story-btn-row">
+        <button class="story-btn" id="story-next-btn" onclick="storyNext()" style="display: inline-block;">继续 ▶</button>
+        <button class="story-btn story-skip-btn" onclick="storySkip()">跳过剧情</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ZOMBIE CODEX SCREEN（僵尸图鉴）—— 必须在 story-intro-scr 外部，否则父级 display:none 会隐藏子级 -->
+  
+
+  <!-- BETWEEN-WAVE DIALOGUE BOX (旧版废弃对白框已清空，对白已统一至 wave-dlg-bar) -->
+  <div id="dialogue-box" style="display:none"></div>
+
+  <!-- TOP NON-MODAL WAVE DIALOGUE BAR -->
+  <div id="wave-dlg-bar" style="display:none;">
+    <div class="wd-top-bar">
+      <span>📻 据点战术无线电 · 频道 104.2</span>
+      <span id="wd-page-indicator" style="color:#ffd875;">[第 1 / 1 句]</span>
+      <span style="color:#f2a65a;">🟢 信号正常</span>
+    </div>
+    <div class="wd-main">
+      <div id="wd-avatar" class="wd-avatar">🧔</div>
+      <div class="wd-body">
+        <div class="wd-speaker-row">
+          <span id="wd-speaker" class="wd-speaker">小胡</span>
+          <span id="wd-tag" class="wd-tag">据点守卫</span>
+        </div>
+        <div id="wd-text" class="wd-text">无线电准备就绪...</div>
+      </div>
+      <div class="wd-actions">
+        <div class="wd-btn-next" onclick="event.stopPropagation();advWaveDlg()">[点击/T] 推进 ▶</div>
+        <div class="wd-btn-close" onclick="event.stopPropagation();clearWaveDlg()">[Esc/✕] 跳过</div>
+      </div>
+    </div>
+    <div class="wd-timer-track">
+      <div id="wd-timer-fill" class="wd-timer-fill" style="width:100%;"></div>
+    </div>
+  </div>
+
+  <!-- BACKPACK / INVENTORY MODAL (避难所战术行囊系统) -->
+  <div id="backpack-modal" style="display:none;">
+    <div id="bp-backdrop" onclick="closeBackpack()"></div>
+    <div id="bp-window">
+      <div id="bp-header">
+        <div id="bp-title-wrap">
+          <span style="font-size:1.6rem;">🎒</span>
+          <div>
+            <div id="bp-title">避难所战术行囊</div>
+            <div id="bp-subtitle">肉鸽战利品收集 · 供给餐厅烹饪 · 赋能城堡防线设计</div>
+          </div>
+        </div>
+        <div id="bp-summary">
+          <span id="bp-stat-items">物品: 0</span>
+          <span id="bp-stat-wood">🪵 0</span>
+          <span id="bp-stat-scrap">⚙️ 0</span>
+          <span id="bp-stat-coins">💰 0</span>
+          <button id="bp-close-btn" onclick="closeBackpack()">✕ 关闭 (Esc)</button>
+        </div>
+      </div>
+      <div id="bp-nav">
+        <button class="bp-tab active" id="bptab-all" onclick="switchBpTab('all')">全部物品</button>
+        <button class="bp-tab" id="bptab-restaurant" onclick="switchBpTab('restaurant')">🍳 餐厅食材与调味</button>
+        <button class="bp-tab" id="bptab-cabin" onclick="switchBpTab('cabin')">🏰 城堡防务与建材</button>
+        <button class="bp-tab" id="bptab-tactical" onclick="switchBpTab('tactical')">⚔️ 战术生存与遗物</button>
+        <div style="flex:1;"></div>
+        <button class="bp-action-btn" onclick="sortBackpack()">🔄 一键整理</button>
+        <button class="bp-action-btn" onclick="transferAllBackpack()">📦 一键存入据点/厨房</button>
+      </div>
+      <div id="bp-body">
+        <div id="bp-grid">
+          <!-- Item slots generated dynamically -->
+        </div>
+        <div id="bp-inspector">
+          <div id="bp-inspector-empty">点击物资查看详情与操作</div>
+          <div id="bp-inspector-content" style="display:none;">
+            <div class="bp-compact-card">
+              <div class="bp-compact-header">
+                <span id="bp-insp-icon" class="bp-compact-icon">🥩</span>
+                <div class="bp-compact-title-wrap">
+                  <div id="bp-insp-name" class="bp-compact-name">鲜美僵尸肉</div>
+                  <div class="bp-compact-meta">
+                    <span id="bp-insp-rarity" class="bp-rarity-pill">普通品质</span>
+                    <span id="bp-insp-qty" class="bp-qty-pill">持有: ×0</span>
+                  </div>
+                </div>
+              </div>
+              <div id="bp-insp-desc" class="bp-compact-desc">基础末日肉料，夜间营业制作烤串与浓汤的核心消耗品。</div>
+              <div id="bp-insp-actions" class="bp-compact-actions"></div>
+            </div>
+            <div class="bp-dual-panel">
+              <div class="bp-dual-title">
+                <span>⚔️ 当前出战军备 (双持槽位)</span>
+                <button class="bp-mod-link" onclick="openDuffWorkshop()" title="打开小胡军备改造台">🛠️ 改装台</button>
+              </div>
+              <div id="bp-dual-slot-0" class="bp-weapon-card"></div>
+              <div id="bp-dual-slot-1" class="bp-weapon-card"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPEDITION MODAL (旧城区远征探险看板 - Dave the Diver 风格) -->
+  <div id="expedition-modal" style="display:none;">
+    <div id="exp-backdrop" onclick="closeExpeditionModal()"></div>
+    <div id="exp-window">
+      <div id="exp-header">
+        <div id="exp-title-wrap">
+          <span style="font-size:1.8rem;">🗺️</span>
+          <div>
+            <div id="exp-title">旧城区远征探险路线图</div>
+            <div id="exp-subtitle">潜入旧城区废墟搜寻战略物资与随从 · 带回的战利品直接入库避难所行囊</div>
+          </div>
+        </div>
+        <button id="exp-close-btn" onclick="closeExpeditionModal()">✕ 关闭 (Esc)</button>
+      </div>
+      <div id="exp-grid">
+        <!-- 动态生成 3 个远征副本卡片 -->
+      </div>
+      <div id="exp-footer">
+        <span>💡 <b>探险指南</b>：进入副本后清理感染者，在房间各功能台按 <b>[E]</b> 搜刮物资，随后前往最左侧大门 <b>[E]</b> 满载返回据点。</span>
+        <button class="bp-action-btn" onclick="closeExpeditionModal()">返回据点</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HU'S WEAPON WORKSHOP MODAL (小胡军备改造台) -->
+  <div id="duff-workshop-modal" style="display:none;">
+    <div style="position:absolute;inset:0;background:rgba(9,10,11,0.92);" onclick="closeDuffWorkshop()"></div>
+    <div class="ws-window">
+      <div class="ws-header">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:2rem;line-height:1;);">🛠️</span>
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="font-family:var(--font-display);font-size:1.3rem;color:#f2a65a;font-weight:600;letter-spacing:1px;text-shadow:none;">
+                小胡战术工坊 · Hu's Tactical Workshop
+              </div>
+              <span style="font-size:0.6rem;padding:2px 8px;border-radius:4px;background:rgba(242,166,90,0.18);border:1px solid #f2a65a;color:#f2a65a;font-weight:700;letter-spacing:1px;">工科生小胡自研</span>
+            </div>
+            <div style="font-size:0.68rem;color:#a3a7af;margin-top:2px;">大学生小胡的战术配件改造台 · 扩容弹夹 / 红点瞄准镜 / 消音制退器 / 元素符石 · 消耗金币与机械零件</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;font-size:0.85rem;">
+          <span id="ws-coins" style="color:#ffd700;font-weight:600;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:20px;border:1px solid rgba(255,215,0,0.3);">💰 0</span>
+          <span id="ws-scrap" style="color:#f2a65a;font-weight:600;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:20px;border:1px solid rgba(242,166,90,0.3);">⚙️ 0</span>
+          <button style="background:rgba(180,40,40,0.25);border:1px solid #ff5555;color:#ff9999;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:700;transition:all .15s;" onmouseover="this.style.background='rgba(220,50,50,0.4)'" onmouseout="this.style.background='rgba(180,40,40,0.25)'" onclick="closeDuffWorkshop()">✕ 关闭 (Esc)</button>
+        </div>
+      </div>
+      <div id="ws-body" style="display:flex;flex:1;overflow:hidden;min-height:400px;">
+        <!-- Left: Slot Selector -->
+        <div style="width:270px;border-right:1.5px solid rgba(242,166,90,0.2);background:rgba(16,17,18,0.65);padding:14px;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-family:var(--font-display);font-size:0.8rem;color:#f0c060;font-weight:700;letter-spacing:1px;display:flex;align-items:center;gap:6px;">
+            <span>⚔️</span> 选择改装武器槽位 (上限2把):
+          </div>
+          <div id="ws-slots-container" style="display:flex;flex-direction:column;gap:8px;"></div>
+          <div style="margin-top:auto;font-size:0.66rem;color:#a3a7af;line-height:1.55;background:rgba(11,12,13,0.7);padding:10px;border-radius:8px;border:1px solid rgba(242,166,90,0.25);border-left:3px solid #f2a65a;">
+            🎓 <b>工科小胡备忘录</b>：机械工程学没白学！白天防线与远征搜刮的机械零件，加上夜间深夜食堂赚取的金币，都能在这里转化为扎实火力和弹道升级！
+          </div>
+        </div>
+        <!-- Right: Mod tracks & Awakening -->
+        <div id="ws-details" style="flex:1;padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;"></div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- CINEMATIC FULL-SCREEN DIALOGUE v2.0（视觉小说式剧情演出） -->
+  <div id="cinematic-scr" class="">
+    <div id="cin-scene-bg" class="scene-hub"></div>
+    <div id="cin-particles"><div class="cin-particle" style="left: 41.4921%; bottom: -10px; animation-duration: 9.93074s; animation-delay: 0.630259s; height: 2.66365px; width: 2.66365px; opacity: 0.402234;"></div><div class="cin-particle" style="left: 27.5694%; bottom: -10px; animation-duration: 10.8699s; animation-delay: 5.69719s; height: 2.14772px; width: 2.14772px; opacity: 0.231852;"></div><div class="cin-particle" style="left: 99.8707%; bottom: -10px; animation-duration: 9.35781s; animation-delay: 1.92858s; height: 2.61977px; width: 2.61977px; opacity: 0.524417;"></div><div class="cin-particle" style="left: 19.726%; bottom: -10px; animation-duration: 11.1728s; animation-delay: 3.71302s; height: 2.13429px; width: 2.13429px; opacity: 0.599268;"></div><div class="cin-particle" style="left: 1.89596%; bottom: -10px; animation-duration: 10.7398s; animation-delay: 2.93592s; height: 1.73699px; width: 1.73699px; opacity: 0.467079;"></div><div class="cin-particle" style="left: 24.0933%; bottom: -10px; animation-duration: 6.17842s; animation-delay: 2.43916s; height: 1.4627px; width: 1.4627px; opacity: 0.290163;"></div><div class="cin-particle" style="left: 45.8398%; bottom: -10px; animation-duration: 10.9229s; animation-delay: 1.26738s; height: 2.52123px; width: 2.52123px; opacity: 0.539603;"></div><div class="cin-particle" style="left: 32.0547%; bottom: -10px; animation-duration: 6.88138s; animation-delay: 3.58575s; height: 1.12992px; width: 1.12992px; opacity: 0.348164;"></div><div class="cin-particle" style="left: 90.652%; bottom: -10px; animation-duration: 13.2528s; animation-delay: 2.7833s; height: 2.45702px; width: 2.45702px; opacity: 0.446894;"></div><div class="cin-particle" style="left: 51.632%; bottom: -10px; animation-duration: 13.2028s; animation-delay: 0.0425524s; height: 2.35895px; width: 2.35895px; opacity: 0.259705;"></div><div class="cin-particle" style="left: 82.5055%; bottom: -10px; animation-duration: 13.3866s; animation-delay: 4.56389s; height: 2.15118px; width: 2.15118px; opacity: 0.278494;"></div><div class="cin-particle" style="left: 92.3734%; bottom: -10px; animation-duration: 8.04768s; animation-delay: 2.79948s; height: 1.19873px; width: 1.19873px; opacity: 0.282113;"></div><div class="cin-particle" style="left: 1.71068%; bottom: -10px; animation-duration: 8.12092s; animation-delay: 0.191296s; height: 2.72856px; width: 2.72856px; opacity: 0.201844;"></div><div class="cin-particle" style="left: 67.9803%; bottom: -10px; animation-duration: 13.0211s; animation-delay: 1.14037s; height: 2.44243px; width: 2.44243px; opacity: 0.511534;"></div><div class="cin-particle" style="left: 48.0881%; bottom: -10px; animation-duration: 7.56272s; animation-delay: 2.9915s; height: 1.6612px; width: 1.6612px; opacity: 0.279212;"></div><div class="cin-particle" style="left: 90.979%; bottom: -10px; animation-duration: 9.58873s; animation-delay: 0.406015s; height: 1.77641px; width: 1.77641px; opacity: 0.305265;"></div><div class="cin-particle" style="left: 69.4028%; bottom: -10px; animation-duration: 7.23025s; animation-delay: 3.92324s; height: 1.70216px; width: 1.70216px; opacity: 0.40829;"></div><div class="cin-particle" style="left: 11.4855%; bottom: -10px; animation-duration: 12.2088s; animation-delay: 3.64215s; height: 2.12047px; width: 2.12047px; opacity: 0.494637;"></div><div class="cin-particle" style="left: 71.0367%; bottom: -10px; animation-duration: 8.33292s; animation-delay: 4.67275s; height: 1.91504px; width: 1.91504px; opacity: 0.499868;"></div><div class="cin-particle" style="left: 44.5324%; bottom: -10px; animation-duration: 9.91712s; animation-delay: 2.23572s; height: 1.85487px; width: 1.85487px; opacity: 0.220584;"></div><div class="cin-particle" style="left: 43.2314%; bottom: -10px; animation-duration: 13.8837s; animation-delay: 0.3231s; height: 1.93982px; width: 1.93982px; opacity: 0.254895;"></div><div class="cin-particle" style="left: 23.532%; bottom: -10px; animation-duration: 8.76379s; animation-delay: 5.2451s; height: 1.82182px; width: 1.82182px; opacity: 0.526554;"></div><div class="cin-particle" style="left: 72.8114%; bottom: -10px; animation-duration: 7.3223s; animation-delay: 1.72977s; height: 1.83026px; width: 1.83026px; opacity: 0.337093;"></div><div class="cin-particle" style="left: 19.1321%; bottom: -10px; animation-duration: 10.9906s; animation-delay: 0.284792s; height: 2.68066px; width: 2.68066px; opacity: 0.582306;"></div><div class="cin-particle" style="left: 28.4063%; bottom: -10px; animation-duration: 9.57022s; animation-delay: 0.43148s; height: 2.79701px; width: 2.79701px; opacity: 0.539079;"></div></div>
+    <div id="cin-scene-label" class="">— 避难所 —</div>
+    <button id="cin-skip" onclick="event.stopPropagation();skipCinematic()">跳过 &gt;&gt;</button>
+    <div id="cinematic-stage"></div>
+    <div id="cinematic-box" onclick="event.stopPropagation();advanceCinematic()">
+      <div id="cin-speaker-bar">
+        <div id="cin-speaker-icon" style="border-color: rgb(240,192,96); color: rgb(240,192,96); background: rgba(240,192,96, 0.2);">胡</div>
+        <div id="cin-speaker" style="color: rgb(240,192,96);">小胡</div>
+      </div>
+      <div id="cin-text-area">
+        <div id="cin-text">第一夜，我杀了七只僵尸。饿急眼了，割了块肉烤了。
+……别说，味道还真不赖。
+（我在心里给自己道了个歉。然后又咬了一口。）</div>
+      </div>
+      <div id="cin-control-bar">
+        <span id="cin-tap">点击 / 空格 继续 ▶</span>
+        <span id="cin-progress">3 / 6</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ZOMBIE CODEX SCREEN（僵尸图鉴界面） -->
+  <div id="codex-scr">
+    <div id="codex-header">
+      <h2 style="font-family:var(--font-display);font-weight:600;font-size:1.6rem;color:var(--dave-coin-yellow);letter-spacing:1px;">🧟 僵尸图鉴</h2>
+      <div id="codex-stats">已发现: 0 / 16 | 总击杀: 0</div>
+    </div>
+    <div id="codex-grid"></div>
+    <button id="codex-close" onclick="closeCodex()">返回</button>
+  </div>
+
+  <!-- VIP CUSTOMER COMPENDIUM SCREEN（VIP顾客图鉴） -->
+  <div id="vip-compendium-scr">
+    <div id="vip-compendium-header">
+      <h2 style="font-family:var(--font-display);font-weight:600;font-size:1.5rem;color:#dd88ff;letter-spacing:1px;text-shadow:none;">📖 常客与VIP顾客图鉴</h2>
+      <div id="vip-compendium-stats">已解锁 0/15 · 粉丝 0</div>
+    </div>
+    <div id="vip-compendium-grid"></div>
+    <button id="vip-compendium-close" onclick="closeVIPCompendium()">返回</button>
+  </div>
+
+  <!-- TRANSITION OVERLAY（场景过渡遮罩） -->
+  <div id="transition-overlay">
+    <div class="trans-bg"></div>
+    <div class="trans-stars"></div>
+    <div class="trans-content">
+      <div class="trans-icon"></div>
+      <div class="trans-title"></div>
+      <div class="trans-sub"></div>
+    </div>
+  </div>
+
+  <!-- DAVE-STYLE TRANSITION（戴夫式减压舱过渡） -->
+  <div id="dave-transition">
+    <div class="dt-stage dt-walkscene">
+      <div class="dt-floor"></div>
+      <div class="dt-door"><div class="dt-doorlight"></div></div>
+      <div class="dt-silhouette"></div>
+      <!-- 顾客剪影会动态插入 -->
+    </div>
+    <div class="dt-blackscreen"></div>
+    <div class="dt-reveal">
+      <div class="dt-reveal-icon">餐</div>
+      <div class="dt-reveal-title">夜幕降临 · 餐厅营业</div>
+      <div class="dt-reveal-sub">推开木门，迎接夜晚的客人们</div>
+    </div>
+  </div>
+
+  <!-- MAIN MENU SCREEN -->
+  <div class="overlay" id="start-scr" style="display: none;">
+    <h2>🏰 十五波围城：最后据点 <span style="font-size:1.1rem;color:#f0c060;font-weight:normal;">v56</span></h2>
+    <div class="ctrl-grid" style="margin:4px 0 6px">
+      <div class="ctrl-row"><b>A/D 或 ←/→</b> 移动</div>
+      <div class="ctrl-row"><b>W/空格/↑</b> 跳跃</div>
+      <div class="ctrl-row"><b>鼠标点击</b> 射击</div>
+      <div class="ctrl-row"><b>1-2</b> 切换主副武器 · <b>Q</b> 快速切枪</div>
+      <div class="ctrl-row"><b>R</b> 换弹 · <b>TAB</b> 商店</div>
+      <div class="ctrl-row"><b>Q</b> 按住侦察战场（查看来袭）</div>
+      <div class="ctrl-row"><b>Shift/Ctrl</b> 闪避翻滚（无敌帧）</div>
+      <div class="ctrl-row"><b>X</b> 流派觉醒技（各流派专属主动技能）</div>
+      <div class="ctrl-row"><b>E</b> 拾取武器/远征探险/进建筑/据点交互</div>
+      <div class="ctrl-row"><b>F</b> 快速近战 · <b>右键</b> 蓄力重击(松开释放) · <b>空格</b> 翻滚闪避</div>
+      <div class="ctrl-row" style="color:var(--yellow)"><b>N</b> 据点内直接进餐厅 · <b>B</b> 避难所战术行囊</div>
+    </div>
+    <p style="color:var(--yellow);font-size:.75rem">击败僵尸掉落武器宝箱与行囊战略物资 · 双持武器上限2把 · [E] 自由拾取与替换</p>
+    <button class="big-btn" onclick="startGame()">开始战斗</button>
+  </div>
+
+  <!-- MAIN MENU SCREEN（全新重塑：末世要塞夜景动态背景 + 霓虹深夜食堂 + 磨砂玻璃战术终端 + 存档看板） -->
+  
+
+
+  <!-- ✨ DREAMLAND MEDITATION MODAL (小胡的潜意识梦境) -->
+  <div id="dream-modal" class="overlay" style="display:none;position:fixed;inset:0;z-index:220;background:rgba(7,8,9,0.94);backdrop-filter:blur(18px);justify-content:center;align-items:center;flex-direction:column;">
+    <div class="dream-box" style="position:relative;width:92%;max-width:840px;background:rgba(25,26,28,0.95);border:1.5px solid rgba(119,125,136,0.4);border-radius:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.15);padding:24px;display:flex;flex-direction:column;align-items:center;">
+      <div style="font-family:var(--font-display);font-size:0.75rem;letter-spacing:1px;color:#777d88;text-transform:uppercase;margin-bottom:4px;text-shadow:none;">
+        LUCID DREAM MEDITATION · SUBMIT TO SLEEP
+      </div>
+      <h2 style="font-family:var(--font-display);font-weight:600;font-size:1.8rem;color:#f2a65a;letter-spacing:1px;margin-bottom:6px;text-shadow:none;">
+        ✨ 小胡的潜意识梦境 · 深层冥想
+      </h2>
+      <p style="font-size:0.85rem;color:#a0a4ac;margin-bottom:18px;text-align:center;max-width:620px;line-height:1.5;">
+        末世无眠之夜，小胡在微光中闭上双眼。梦里的收获带不上战场，却会留在这间小屋里……选一个今夜的梦（每天一次）：
+      </p>
+      <div id="dream-cards-container" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;width:100%;margin-bottom:18px;">
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;">
+        <button class="tactical-btn" onclick="closeDreamModal(false)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);color:#a0a4ac;padding:8px 22px;border-radius:6px;cursor:pointer;font-family:var(--font-display);font-size:0.85rem;">
+          暂不冥想 · 直接入睡
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="main-menu-scr" style="display: flex; position: fixed; inset: 0; z-index: 110; overflow: hidden; background: #0a0a0b; justify-content: center; align-items: center;">
+    <canvas id="menu-bg-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;"></canvas>
+    <div id="menu-vignette-overlay" style="position:absolute;inset:0;pointer-events:none;z-index:2;background:rgba(19,20,21,0.3);"></div>
+
+    <div id="menu-content-wrap" style="position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;max-width:960px;width:94%;max-height:94vh;padding:12px 16px;">
+      
+      <!-- 顶部招牌：要塞霸气冷色 + 深夜食堂暖色霓虹闪烁碰撞 -->
+      <div id="menu-header" style="text-align:center;margin-bottom:14px;">
+        <div style="font-family:var(--font-display);font-size:0.75rem;letter-spacing:1px;color:rgba(199,201,206,0.7);text-transform:uppercase;margin-bottom:3px;text-shadow:none;">
+          ⚡ FORTRESS DEFENSE & MIDNIGHT REFUGE ⚡
+        </div>
+        <h1 style="font-family:var(--font-display);font-weight:600;font-size:2.8rem;color:#f5f0eb;letter-spacing:1px;margin:0 0 4px 0;text-shadow:0 3px 6px #000000;">
+          十五波围城
+        </h1>
+        <div class="menu-neon-canteen-sign" style="font-family:var(--font-display);font-size:1.1rem;color:#ffaa33;letter-spacing:1px;font-weight:600;text-shadow:none;margin-bottom:6px;">
+          <span class="neon-flicker">🍜</span> 废土要塞 · 深夜秘密食堂 <span class="neon-flicker">🥢</span>
+        </div>
+        <div style="display:inline-block;padding:2px 14px;border-radius:12px;background:rgba(255,200,80,0.12);border:1px solid rgba(255,200,80,0.4);font-family:var(--font-display);font-size:0.72rem;color:#f0c060;letter-spacing:1.5px;box-shadow:none;">
+          v56 · 昼夜循环深夜食堂 · 小胡军备改装与超武觉醒进化版
+        </div>
+      </div>
+
+      <!-- 双栏磨砂玻璃战术卡片 -->
+      <div id="menu-cards-row" style="display:flex;gap:20px;width:100%;justify-content:center;align-items:stretch;flex-wrap:wrap;">
+        
+        <!-- 左侧：指挥终端行动卡片 -->
+        <div class="glass-tactical-card" style="flex:1;min-width:280px;max-width:360px;background:rgba(25,26,29,0.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(242,166,90,0.25);border-radius:14px;box-shadow:0 12px 35px rgba(0,0,0,0.7),inset 0 1px 0 rgba(255,255,255,0.1);padding:16px;display:flex;flex-direction:column;">
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(143,148,157,0.2);padding-bottom:8px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-display);font-size:0.9rem;font-weight:700;color:#f2a65a;letter-spacing:1px;">
+              <span>🎮</span> 战地指挥终端
+            </div>
+            <span style="font-size:0.6rem;padding:2px 6px;border-radius:4px;background:rgba(39,174,96,0.25);border:1px solid #27ae60;color:#88ffaa;">TERMINAL ONLINE</span>
+          </div>
+
+          <div id="menu-btns" style="display:flex;flex-direction:column;gap:10px;flex:1;">
+            <button class="tactical-menu-btn btn-new" onclick="startGame()" onmouseenter="sndBtnHover()">
+              <span class="tmb-icon">🆕</span>
+              <div class="tmb-text-wrap">
+                <span class="tmb-title">新游戏</span>
+                <span class="tmb-sub">重置并开启全新末日防线</span>
+              </div>
+            </button>
+
+            <button class="tactical-menu-btn btn-continue" id="continue-btn" onclick="continueGame()" onmouseenter="sndBtnHover()" style="display:block;">
+              <span class="tmb-icon">📂</span>
+              <div class="tmb-text-wrap">
+                <span class="tmb-title">继续游戏</span>
+                <span class="tmb-sub" id="continue-hint">读取自动保存之要塞防线</span>
+              </div>
+            </button>
+
+            <button class="tactical-menu-btn btn-settings" onclick="openSettings()" onmouseenter="sndBtnHover()">
+              <span class="tmb-icon">⚙</span>
+              <div class="tmb-text-wrap">
+                <span class="tmb-title">战地设置</span>
+                <span class="tmb-sub">背景音乐 · 音效 · 触屏/按键</span>
+              </div>
+            </button>
+
+            <button class="tactical-menu-btn btn-codex" onclick="openCodex()" onmouseenter="sndBtnHover()">
+              <span class="tmb-icon">🧟</span>
+              <div class="tmb-text-wrap">
+                <span class="tmb-title">僵尸图鉴</span>
+                <span class="tmb-sub">16种感染者抗性 · 掉落食材</span>
+              </div>
+            </button>
+
+            <button class="tactical-menu-btn btn-download" onclick="downloadGame()" onmouseenter="sndBtnHover()">
+              <span class="tmb-icon">💾</span>
+              <div class="tmb-text-wrap">
+                <span class="tmb-title">下载单机版</span>
+                <span class="tmb-sub">完整离线打包保存至电脑游玩</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 右侧：存档与作战情报看板卡片 -->
+        <div class="glass-tactical-card" id="save-intel-card" style="flex:1.2;min-width:320px;max-width:440px;background:rgba(25,26,29,0.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(240,192,96,0.3);border-radius:14px;box-shadow:0 12px 35px rgba(0,0,0,0.7),inset 0 1px 0 rgba(255,255,255,0.1);padding:16px;display:flex;flex-direction:column;">
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(240,192,96,0.2);padding-bottom:8px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-display);font-size:0.9rem;font-weight:700;color:#f0c060;letter-spacing:1px;">
+              <span>📋</span> 要塞防区战备看板
+            </div>
+            <span id="save-status-badge" style="font-size:0.6rem;padding:2px 8px;border-radius:4px;background:rgba(240,192,96,0.2);border:1px solid #f0c060;color:#f0c060;font-weight:700;">检测中...</span>
+          </div>
+
+          <!-- 原版 save-info 保留 DOM 节点以供现有脚本引用 -->
+          <p id="save-info" style="display:none;"></p>
+
+          <div id="save-intel-content" style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+            <!-- 动态渲染存档看板或新手简报 -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 底部操作提示 -->
+      <div style="margin-top:14px;font-size:0.68rem;color:rgba(196,199,204,0.6);text-align:center;letter-spacing:1px;">
+        💡 <b>操作指南</b>：1/2 切换双持武器 · 空格跳跃/翻滚 · 白天杀僵尸搜集肉块与零件 · 夜晚经营食堂赚金币 · 小胡改造台觉醒终极超武
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SETTINGS SCREEN -->
+  <div class="overlay" id="settings-scr" style="display: none; background: rgba(10,10,11,0.94); backdrop-filter: blur(14px); z-index: 112;">
+    <div class="glass-tactical-card" style="width:90%;max-width:380px;background:rgba(26,27,30,0.88);border:1.5px solid rgba(242,166,90,0.3);border-radius:16px;box-shadow:0 12px 35px rgba(0,0,0,0.7);padding:24px 20px;display:flex;flex-direction:column;align-items:center;">
+      <h2 style="color:#ffd700;font-size:1.8rem;letter-spacing:1px;margin-bottom:18px;text-shadow:none;">⚙ 战备系统设置</h2>
+      <div style="display:flex;flex-direction:column;gap:14px;width:100%;margin-bottom:22px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(37,39,43,0.5);padding:8px 14px;border-radius:8px;border:1px solid rgba(242,166,90,0.18);">
+          <span style="color:#e7e8eb;font-size:.88rem;font-weight:600;">🎵 背景音乐 (BGM)</span>
+          <button id="setting-bgm" onclick="toggleSettingBgm()" style="background:rgba(46,204,113,0.2);border:1.5px solid #2ecc71;color:#55ff99;padding:4px 16px;border-radius:20px;cursor:pointer;font-size:.78rem;font-weight:700;">开</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(37,39,43,0.5);padding:8px 14px;border-radius:8px;border:1px solid rgba(242,166,90,0.18);">
+          <span style="color:#e7e8eb;font-size:.88rem;font-weight:600;">🔊 战斗音效 (SFX)</span>
+          <button id="setting-sfx" onclick="toggleSettingSfx()" style="background:rgba(46,204,113,0.2);border:1.5px solid #2ecc71;color:#55ff99;padding:4px 16px;border-radius:20px;cursor:pointer;font-size:.78rem;font-weight:700;">开</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(37,39,43,0.5);padding:8px 14px;border-radius:8px;border:1px solid rgba(242,166,90,0.18);">
+          <span style="color:#e7e8eb;font-size:.88rem;font-weight:600;">📱 触屏适配控制</span>
+          <span id="device-info" style="color:#a3a7af;font-size:.72rem;font-family:var(--font-display);">检测中...</span>
+        </div>
+      </div>
+      <button class="big-btn" onclick="closeSettings()" style="width:100%;border-color:#f2a65a;color:#f2a65a;background:rgba(100,105,116,0.2);box-shadow:none;">返回主菜单 ▶</button>
+    </div>
+  </div>
+
+  <!-- PAUSE MENU SCREEN -->
+  <div class="overlay" id="pause-scr" style="display: none; background: rgba(10,10,11, 0.94); backdrop-filter: blur(14px); z-index: 90;">
+    <div class="glass-tactical-card" style="width:90%;max-width:320px;background:rgba(26,27,30,0.88);border:1.5px solid rgba(242,166,90,0.3);border-radius:16px;box-shadow:0 12px 35px rgba(0,0,0,0.7);padding:24px 20px;display:flex;flex-direction:column;align-items:center;">
+      <h2 style="color:#ffd700;font-size:1.8rem;letter-spacing:1px;margin-bottom:16px;text-shadow:none;">⏸ 战局暂停</h2>
+      <div style="display:flex; flex-direction:column; gap:10px; width:100%;">
+        <button class="big-btn" onclick="togglePause()" style="border-color:#2ecc71; color:#55ff99; background:rgba(46,204,113,0.2);box-shadow:none;">▶ 继续坚守防线</button>
+        <button class="big-btn" onclick="saveGameToFile()" style="border-color:#f39c12; color:#ffd700; background:rgba(243,156,18,0.2);box-shadow:none;">💾 保存作战档案</button>
+        <button class="big-btn" onclick="triggerLoadFile()" style="border-color:#777d88; color:#f2a65a; background:rgba(119,125,136,0.2);box-shadow:none;">📂 载入作战档案</button>
+        <button class="big-btn" onclick="returnToMainMenu()" style="border-color:#a855f7; color:#e9d5ff; background:rgba(168,85,247,0.2);box-shadow:none;">🏰 返回要塞主菜单</button>
+        <button class="big-btn" onclick="togglePause(); endGame();" style="border-color:#ff4d6d; color:#ff99ab; background:rgba(255,77,109,0.2);box-shadow:none;">☠ 放弃据点撤退</button>
+      </div>
+      <input type="file" id="save-file-input" style="display:none" onchange="loadGameFromFile(event)">
+    </div>
+  </div>
+
+  <!-- CHAPTER CARD SCREEN（阶段二-4） -->
+  <div class="overlay" id="chapter-scr" style="display: none;" onclick="dismissChapterCard()">
+    <div id="chapter-label">第一章</div>
+    <div id="chapter-title">围城初夜</div>
+    <div id="chapter-sub">1 — 4 波 · 尸潮初临</div>
+    <div id="chapter-text">病毒爆发后的第一夜。尸潮从城区涌来，扑向你的城堡据点。
+围墙还没建好，武器弹药有限。
+守住前四波，攒金币升级城墙——这是活过今夜的关键。</div>
+    <button id="chapter-btn" onclick="event.stopPropagation();dismissChapterCard()">开始 ▶</button>
+    <div style="font-size:0.68rem;color:#959aa3;margin-top:10px;letter-spacing:1px;">点击任意处或按任意键立即迎战</div>
+  </div>
+
+  <!-- TUTORIAL SCREEN（教程引导） -->
+  <div id="tutorial-scr" style="display: none;">
+    <div class="tutorial-box">
+      <div id="tutorial-title">🎮 新手教程 · 第1步：基础操作</div>
+      <div id="tutorial-body"></div>
+      <button id="tutorial-ok-btn" onclick="dismissTutorial()">明白了 ▶</button>
+    </div>
+  </div>
+
+  <!-- PERK CHOICE SCREEN（肉鸽天赋三选一） -->
+  <div class="overlay" id="perk-choice-scr" style="display:none;background:rgba(12,12,13,.96);z-index:115;">
+    <div id="perk-choice-level" style="font-family:var(--font-display);font-size:1.4rem;color:#ffee44;letter-spacing:1px;margin-bottom:18px;text-shadow:none;"></div>
+    <div id="perk-choice-list" style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;"></div>
+  </div>
+
+  <!-- TOWER POPOVER (升级/出售已部署的塔) -->
+  <div id="tower-popover" style="display:none;position:absolute;z-index:112;background:rgba(10,11,12,.97);border:2px solid #888888;border-radius:8px;padding:10px;min-width:180px;font-family:var(--font-body);pointer-events:auto;">
+    <div id="tp-title" style="font-family:var(--font-display);font-size:1rem;color:#ffee44;letter-spacing:1px;margin-bottom:4px;text-align:center;"></div>
+    <div id="tp-stats" style="font-size:.68rem;color:#9a8f6a;margin-bottom:8px;text-align:center;line-height:1.5;"></div>
+    <button id="tp-upgrade" style="display:block;width:100%;font-family:var(--font-body);font-size:.72rem;padding:6px;margin-bottom:5px;background:#1a1400;border:1px solid #f39c12;color:#f39c12;cursor:pointer;border-radius:3px;letter-spacing:1px;"></button>
+    <!-- v52塔防强化：维修按钮（塔有HP可被拆，按损血计费） -->
+    <button id="tp-repair" style="display:block;width:100%;font-family:var(--font-body);font-size:.72rem;padding:6px;margin-bottom:5px;background:#001a08;border:1px solid #44ff66;color:#44ff66;cursor:pointer;border-radius:3px;letter-spacing:1px;"></button>
+    <button id="tp-sell" style="display:block;width:100%;font-family:var(--font-body);font-size:.72rem;padding:6px;background:#1a0000;border:1px solid #c0392b;color:#c0392b;cursor:pointer;border-radius:3px;letter-spacing:1px;">💰 出售 (返还50%)</button>
+    <button id="tp-close" style="display:block;width:100%;font-family:var(--font-body);font-size:.68rem;padding:4px;margin-top:5px;background:transparent;border:1px solid #8a8474;color:#b0a284;cursor:pointer;border-radius:3px;">关闭</button>
+  </div>
+
+  <!-- ENDING SCREEN -->
+  <div class="overlay" id="ending-scr" style="display:none;background:rgba(0,0,0,.96)">
+    <div id="ending-inner">
+      <div id="ending-chapter-label">终章</div>
+      <div id="ending-title"></div>
+      <div id="ending-typewriter"></div>
+      <div id="ending-stats"></div>
+      <button class="story-btn" onclick="endingDone()" style="margin-top:14px">再次出发 ↺</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="over-scr" style="display:none;background:rgba(10,10,11,0.95);backdrop-filter:blur(14px);">
+    <div class="glass-tactical-card" style="width:90%;max-width:360px;background:rgba(24,16,22,0.92);border:1.5px solid rgba(255,77,109,0.4);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.85);padding:24px 20px;display:flex;flex-direction:column;align-items:center;">
+      <h2 style="color:#ff4d6d;font-size:2rem;letter-spacing:1px;margin-bottom:8px;text-shadow:none;">☠ 防线沦陷</h2>
+      <p id="over-txt" style="color:#d3d5d9;font-size:0.85rem;margin-bottom:18px;"></p>
+      <div style="display:flex;flex-direction:column;gap:10px;width:100%;">
+        <button class="big-btn" onclick="startGame()" style="border-color:#2ecc71;color:#55ff99;background:rgba(46,204,113,0.25);box-shadow:none;">↺ 重新召集出击</button>
+        <button class="big-btn" onclick="showMainMenu()" style="border-color:#ffd700;color:#ffd700;background:rgba(255,215,0,0.2);box-shadow:none;">🏰 返回要塞大厅</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="weapon-bar"></div>
+<div id="hud">
+  <div id="ammo-wrap"><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div></div>
+  <div id="rldw" style="display: none;"><div id="rldf"></div></div>
+  <div id="wave-txt">第 1 波 · 准备中...</div>
+  <div style="display:flex;gap:5px;align-items:center">
+    <button id="skill-hud-btn" onclick="tryClassSkill()" style="display:none;">[X] 技能</button>
+    <button id="shop-btn" onclick="openShop()">商店<span class="key">Tab</span></button>
+    <button id="rld-btn" onclick="reloadWeapon()">装填<span class="key">R</span></button>
+  </div>
+</div>
+
+<!-- Mobile status bar -->
+<div id="m-status">
+  <div id="m-ammo">-- / --</div>
+  <div id="m-rld-wrap"><div id="m-rld-bar"></div></div>
+  <div id="m-wave">第 1 波</div>
+  <div id="m-coins">💰 0</div>
+</div>
+
+<style>
+/*@@STYLE2@@*/</style>
+
+<script>
+/*@@SCRIPT@@*/</script>
+
+</body></html>

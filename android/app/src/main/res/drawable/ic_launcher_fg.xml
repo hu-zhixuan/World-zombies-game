@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- 城堡剪影：三座塔 + 城门，强调色 #F2A65A -->
+    <path android:fillColor="#F2A65A"
+        android:pathData="M30,40h8v-6h4v6h6v-6h4v6h8v-6h4v6h6v-6h4v6h2v34h-46z" />
+    <path android:fillColor="#131518"
+        android:pathData="M49,74v-14a5,5 0,0 1,10 0v14z" />
+    <path android:fillColor="#131518"
+        android:pathData="M36,52h5v7h-5zM67,52h5v7h-5z" />
+</vector>

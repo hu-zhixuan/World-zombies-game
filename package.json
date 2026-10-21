@@ -1,0 +1,12 @@
+{
+  "name": "world-zombies-game",
+  "version": "56.0.0",
+  "private": true,
+  "description": "十五波围城：最后据点 —— 单文件 HTML5 游戏，由 src/ 拼接构建",
+  "scripts": {
+    "build": "node build.js",
+    "test": "node test_suite.js",
+    "apk": "npm run build && node tools/copy_to_android.js && cd android && ./gradlew assembleRelease"
+  },
+  "license": "MIT"
+}

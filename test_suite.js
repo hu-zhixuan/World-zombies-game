@@ -12,7 +12,7 @@ const code = scriptMatch[1];
 function createMockCtx() {
   return {
     save(){}, restore(){}, beginPath(){}, closePath(){}, moveTo(){}, lineTo(){},
-    stroke(){}, fill(){}, arc(){}, rect(){}, fillRect(){}, strokeRect(){}, clearRect(){},
+    stroke(){}, fill(){}, arc(){}, ellipse(){}, roundRect(){}, rect(){}, fillRect(){}, strokeRect(){}, clearRect(){},
     fillText(){}, strokeText(){}, measureText(){ return { width: 50 }; },
     createLinearGradient(){ return { addColorStop(){} }; },
     createRadialGradient(){ return { addColorStop(){} }; },
@@ -25,7 +25,8 @@ function createMockCtx() {
 }
 
 const mockElem = {
-  style: {},
+  style: { setProperty(){}, removeProperty(){} },
+  dataset: {},
   classList: { add(){}, remove(){}, contains(){ return false; } },
   innerHTML: '',
   innerText: '',
@@ -68,6 +69,8 @@ const sandbox = {
   clearTimeout: (id) => clearTimeout(id),
   setInterval: (fn) => setInterval(fn, 1000),
   clearInterval: (id) => clearInterval(id),
+  performance: { now: () => Date.now() },
+  Audio: function() { return { play(){ return Promise.resolve(); }, pause(){}, addEventListener(){}, volume: 1 }; },
   requestAnimationFrame: () => 1,
   cancelAnimationFrame: () => {},
   localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
@@ -327,6 +330,170 @@ try {
   console.error('buildCabinUpgradeUI failed:', e);
 }
 assert(cabinBuilt === true, 'buildCabinUpgradeUI executes cleanly and builds defense hub UI');
+
+
+// -------------------------------------------------------------
+// Test Set 4: 每日热搜挪到白天（P2-6）
+// -------------------------------------------------------------
+console.log('\n--- Running Test Set 4: Daily Trend In The Daytime ---');
+run(`wave = 1; restRep = 0; currentTrend = null; trendMeatToday = 0;`);
+let earlyAllMatch = true;
+for (let i = 0; i < 60; i++) {
+  run(`currentTrend = null; rollDailyTrend();`);
+  if (!run(`trendMatchableNow(currentTrend)`)) earlyAllMatch = false;
+}
+assert(earlyAllMatch, '开局(只解锁烤肉串)掷出的热搜一定有菜能匹配');
+assert(run(`DAILY_TRENDS.some(t => !trendMatchableNow(t))`), '开局存在匹配不上的热搜(被过滤掉的那部分)');
+
+run(`currentTrend = DAILY_TRENDS.find(t => t.id === 'homestyle'); trendMeatToday = 0;`);
+assert(run(`getTrendHuntInfo().kinds.join(',')`) === 'normal', '「家常」热搜的目标肉是普通肉');
+assert(run(`getTrendHuntInfo().zombieNames.length > 0`), '热搜目标肉能映射到会掉它的僵尸名');
+run(`noteTrendMeat('normal', 2); noteTrendMeat('tank', 5);`);
+assert(run(`trendMeatToday`) === 2, '只有命中热搜目标肉才计数', `got ${run('trendMeatToday')}`);
+
+run(`currentTrend = null; trendMeatToday = 3; wave = 1; wavePhase = 'x'; gameRunning = true;`);
+run(`startWaveContent();`);
+assert(run(`currentTrend !== null`), '白天波次开始(startWaveContent)就已经刷出今日热搜');
+assert(run(`trendMeatToday`) === 0, '新的一天目标肉计数清零');
+const trendBefore = run(`currentTrend.id`);
+let openErr = null;
+try { run(`meatInventory.normal = 5; gameState = 'hub'; _doStartRestaurant();`); } catch (e) { openErr = e; }
+assert(!openErr, '_doStartRestaurant 在测试环境下可执行', openErr && openErr.stack);
+assert(run(`currentTrend.id`) === trendBefore, '晚上开张不重掷热搜', `before=${trendBefore} after=${run('currentTrend.id')}`);
+
+
+// -------------------------------------------------------------
+// Test Set 5: 食堂成为唯一的备战饭（P1-3）
+// -------------------------------------------------------------
+console.log('\n--- Running Test Set 5: Restaurant Is The Only Pre-Battle Meal ---');
+assert(run(`typeof openTacticalFeastModal`) === 'undefined' && run(`typeof TACTICAL_FEASTS`) === 'undefined', '据点战备特餐已移除(弹窗函数与 TACTICAL_FEASTS 不再存在)');
+assert(run(`REST_RECIPES.filter(r => r.signatureId).every(r => DISH_SIGNATURES.some(g => g.id === r.signatureId))`), '每个菜谱的 signatureId 都指向存在的招牌特效');
+assert(run(`DISH_SIGNATURES.every(g => REST_RECIPES.some(r => r.signatureId === g.id))`), '五个战斗特效都挂在了某道菜上(没有孤儿特效)');
+
+const rec = id => `REST_RECIPES.find(r => r.id === '${id}')`;
+run(`queuedBattleBuffs = [];`);
+assert(run(`queueDishBuff(${rec('grilled_meat')}, 'poor')`) === false && run(`queuedBattleBuffs.length`) === 0, 'poor 品质的菜不产生增益');
+run(`queueDishBuff(${rec('grilled_meat')}, 'good')`);
+assert(run(`queuedBattleBuffs.length`) === 1 && run(`queuedBattleBuffs[0].boosted`) === false, 'good 品质入队,不带强化');
+assert(run(`queueDishBuff(${rec('grilled_meat')}, 'perfect')`) === true && run(`queuedBattleBuffs.length`) === 1 && run(`queuedBattleBuffs[0].boosted`), 'perfect 刷新同名增益并带强化');
+run(`queueDishBuff(${rec('grilled_meat')}, 'good')`);
+assert(run(`queuedBattleBuffs[0].boosted`) === true, '后来的低品质菜不会覆盖已有的高品质增益');
+
+// 留饭:卖出和留饭的取舍
+run(`queuedBattleBuffs = []; queuedFamilyMeal = null; lastMealLog = []; activeSignature = null; activeBattleBuffs = [];
+     hiredCompanions = [{name:'张', type:'sniper', hp:5, maxHp:100, downed:true}];
+     restState = restState || {};`);
+assert(run(`canPackFamilyMeal()`) === true, '一开始可以留饭');
+run(`packFamilyMeal(${rec('grilled_meat')}, 'perfect');`);
+assert(run(`queuedFamilyMeal && queuedFamilyMeal.signatureId`) === 'spicy', '烤肉串留饭 → 麻辣爆烤(翻滚烈焰)');
+assert(run(`canPackFamilyMeal()`) === false, '一晚只能留一份');
+assert(run(`queuedBattleBuffs.some(b => b.family && b.boosted)`), '留饭同时排进更强的数值增益');
+run(`packFamilyMeal(${rec('steak')}, 'burned');`);
+assert(run(`queuedFamilyMeal.recipeId`) === 'grilled_meat', '烤焦的留饭作废,不会覆盖已留的');
+
+run(`wave = 1; applyOvernightMeals();`);
+assert(run(`activeSignature && activeSignature.id`) === 'spicy', '下一波开战前吃下留饭 → 招牌特效生效');
+assert(run(`queuedFamilyMeal`) === null, '留饭吃完即清空');
+assert(run(`hiredCompanions[0].downed === false && hiredCompanions[0].hp === 100 && hiredCompanions[0].mealBoost === 1.25`), '队友同享:满血站起来且射速提升');
+assert(run(`lastMealLog.some(m => m.family && m.name === '烤肉串')`), '战斗 HUD 记录了昨晚吃了什么');
+assert(run(`activeBattleBuffs.length === 1 && activeBattleBuffs[0].dishName === '烤肉串'`), '数值增益带着菜名,HUD 能说清来自哪道菜');
+run(`endOvernightMeals();`);
+assert(run(`activeSignature === null && hiredCompanions[0].mealBoost === 1 && lastMealLog.length === 0`), '一波结束,饭吃完了:特效、队友加成、HUD 记录都清掉');
+
+// 存档往返:完美强化标记与菜名不再丢
+run(`queuedBattleBuffs = []; queueDishBuff(${rec('meat_soup')}, 'legendary'); queuedFamilyMeal = {recipeId:'steak', name:'铁板厚肉', quality:'good', signatureId:'frost'};`);
+const saved = JSON.parse(JSON.stringify(run(`buildSaveState()`)));
+assert(saved.queuedBattleBuffs[0].boosted === true && saved.queuedBattleBuffs[0].dishName === '僵尸浓汤', '存档保留增益的强化标记和菜名');
+assert(saved.queuedFamilyMeal && saved.queuedFamilyMeal.signatureId === 'frost', '存档保留还没吃的留饭');
+let restoreErr = null;
+try { run(`queuedBattleBuffs = []; queuedFamilyMeal = null;`); sandbox.__saved = saved; run(`restoreSaveState(__saved);`); } catch (e) { restoreErr = e; }
+assert(!restoreErr, 'restoreSaveState 可执行', restoreErr && restoreErr.stack);
+assert(run(`queuedBattleBuffs[0].boosted === true && queuedFamilyMeal.name === '铁板厚肉'`), '读档后强化标记和留饭恢复');
+// 旧存档只有 activeTacticalMealId 时,特效 id 仍被识别
+const legacy = JSON.parse(JSON.stringify(saved)); delete legacy.activeSignatureId; legacy.activeTacticalMealId = 'dragon';
+sandbox.__legacy = legacy; run(`restoreSaveState(__legacy);`);
+assert(run(`activeSignature && activeSignature.id`) === 'dragon', '旧存档的 activeTacticalMealId 仍能恢复特效');
+
+// 梦境:非战斗奖励,每天一次
+run(`wave = 3; dreamPickedWave = 0; meatInventory = {normal:0,fast:0,tank:0,elite:0}; woodPlanks = 0; scrapMetal = 0; wastegramFans = 0; restRep = 0; coins = 0; nextTrendPreview = null; currentTrend = null;`);
+assert(run(`DREAM_INSIGHTS.length`) === 6, '梦境有 6 个选项');
+let dreamErr = null;
+try { run(`DREAM_INSIGHTS.forEach(d => d.apply());`); } catch (e) { dreamErr = e; }
+assert(!dreamErr, '六个梦全部可执行', dreamErr && dreamErr.stack);
+assert(run(`meatInventory.normal === 3 && woodPlanks === 4 && scrapMetal === 4 && wastegramFans === 40`), '梦的奖励真实落到资源上');
+assert(run(`nextTrendPreview !== null`), '预知之梦抽好了明日热搜');
+run(`const want = nextTrendPreview.id; window.__want = want; rollDailyTrend();`);
+assert(run(`currentTrend.id === window.__want && nextTrendPreview === null`), '第二天的热搜就是梦里预知的那一条');
+run(`dreamPickedWave = 0; selectDreamInsight(DREAM_INSIGHTS[2]);`);
+assert(run(`dreamPickedWave`) === 3, '做梦会记下是哪一天');
+run(`meatInventory.normal = 0; health = 10; openDreamModal();`);
+assert(run(`meatInventory.normal === 0 && health === maxHp`), '同一天不能再做梦,只是睡一觉回血');
+
+
+// -------------------------------------------------------------
+// Test Set 6: 白天救下的人晚上来食堂（P0-1）
+// -------------------------------------------------------------
+console.log('\n--- Running Test Set 6: Rescued On The Field, Seated At Night ---');
+run(`vipCompendium = {}; wastegramFans = 600; wave = 1; gameState = 'world'; fieldSurvivors = []; tonightGuests = []; zombies = [];`);
+assert(run(`getFieldEncounterVIPs().map(v => v.id).join(',')`).startsWith('agou'), '粉丝够的 VIP 在战场上等着被遇见');
+assert(run(`isVIPFieldMet('agou')`) === false, '没遇见过的 VIP 不会来店');
+
+// 第 1 天必有一个求救者（教学），且是 VIP
+const surv = run(`maybeSpawnFieldSurvivor(); fieldSurvivors.length`);
+assert(surv === 1 && run(`fieldSurvivors[0].vip.id`) === 'agou', '第 1 天战场上必出现求救者(阿狗)');
+assert(run(`fieldSurvivors[0].x > RIGHT_WALL_X + 200`), '求救者在城墙外');
+
+// 远了救不了，近了可以
+run(`player.x = 100; fieldSurvivors[0].near = false; updateFieldSurvivors();`);
+assert(run(`rescueNearestSurvivor()`) === false, '离得远按 E 救不到人');
+run(`player.x = fieldSurvivors[0].x - 20; updateFieldSurvivors();`);
+assert(run(`fieldSurvivors[0].near`) === true, '走近后进入可救范围');
+assert(run(`rescueNearestSurvivor()`) === true, '按 E 救下求救者');
+assert(run(`vipCompendium.agou.fieldMet === true && isVIPFieldMet('agou')`), '救下 VIP 即「遇见」,之后才会来店');
+assert(run(`tonightGuests.length === 1 && tonightGuests[0].kind === 'vip' && tonightGuests[0].vipId === 'agou'`), '救下的 VIP 记入今晚的预约');
+
+// 僵尸会啃求救者
+run(`fieldSurvivors = []; tonightGuests = []; fieldSurvivors.push({x: 1000, vip: null, persona: generateNormalCustomerPersona(), hp: 100, state:'waiting', t:0, near:false, fade:1});
+     zombies = [{alive:true, x: 980}, {alive:true, x: 985}]; player.x = 100; frameT = 1;`);
+for (let i = 0; i < 400; i++) run(`updateFieldSurvivors();`);
+assert(run(`fieldSurvivors.length`) === 0 && run(`tonightGuests.length`) === 0, '来不及救,被僵尸啃死,不会成为食客');
+run(`zombies = [];`);
+
+// 普通幸存者 → 晚上以同样的名字入座
+run(`fieldSurvivors = []; tonightGuests = []; fieldSurvivors.push({x: 1000, vip: null, persona: {name:'测试阿福', skin:'#d4a574', hair:'#111', shirt:'#456'}, hp:100, state:'waiting', t:0, near:true, fade:1});`);
+run(`rescueNearestSurvivor();`);
+assert(run(`tonightGuests[0].kind === 'survivor' && tonightGuests[0].persona.name === '测试阿福'`), '救下的普通幸存者记入预约并保留名字');
+
+// 开张:预约客人第一个入座，沿用战场上的名字，付得更多
+run(`meatInventory.normal = 20; gameState = 'hub'; wave = 2; _doStartRestaurant();`);
+assert(run(`restState.reservedGuests.length`) === 1 && run(`tonightGuests.length`) === 0, '开张时预约转入当晚客人表');
+run(`spawnRestCustomer();`);
+assert(run(`restState.customers[0] && restState.customers[0].rescued === true && restState.customers[0].persona.name === '测试阿福'`), '获救的人第一个入座,名字和战场上一致');
+assert(run(`restState.reservedGuests.length`) === 0, '入座后预约被消耗');
+
+// VIP:未遇见则不来；遇见(预约)则当晚必来
+run(`vipCompendium = {agou:{met:false, unlocked:true, unlockedWave: 1}}; wave = 2; wastegramFans = 600; restState.vipVisitedThisNight = []; vipActiveInRestaurant = null; restState.reservedGuests = [];`);
+assert(run(`maybeSpawnVIPCustomer()`) === null, '粉丝够但没遇见过的 VIP 不会来店');
+run(`vipActiveInRestaurant = null; wave = 5;`);
+assert(run(`isVIPFieldMet('agou')`) === true, '解锁满 3 天仍没遇见,会自己找上门(兜底)');
+run(`wave = 2; vipActiveInRestaurant = null; restState.vipVisitedThisNight = []; vipCompendium.agou.fieldMet = true; restState.reservedGuests = [{kind:'vip', vipId:'agou'}];`);
+assert(run(`const r = maybeSpawnVIPCustomer(); r && r.vip.id`) === 'agou', '白天救下的 VIP 当晚必到');
+assert(run(`restState.reservedGuests.length`) === 0, 'VIP 到场后预约消耗');
+
+// 伙伴在店里帮忙
+run(`wave = 1;`); assert(run(`getStoryCrew().length`) === 0, '第 1 天还没有伙伴在店里');
+run(`wave = 2;`); assert(run(`getStoryCrew().map(c => c.id).join()`) === 'crew_zhang' && run(`getStoryCrew()[0].type`) === 'server', '老兵张加入后在店里端盘(自动上菜)');
+run(`wave = 8;`); assert(run(`getStoryCrew().length`) === 4, '四位伙伴都加入后全部在店里');
+run(`meatInventory.normal = 20; gameState = 'hub'; wave = 8; _doStartRestaurant();`);
+assert(run(`restState.crew.lin && restState.crew.qiang && restState.crew.zhao`), '林/强/赵的岗位效果生效');
+assert(run(`restState.cookSpeedBuff > 1.09`), '阿强修灶:烹饪速度 +10%');
+assert(run(`restState.staff.filter(s => s.crew).length`) === 4, '伙伴作为店员出现在店里');
+let drawErr = null;
+try { run(`drawRestaurant();`); } catch (e) { drawErr = e; }
+assert(!drawErr, '食堂画面含伙伴时可绘制', drawErr && drawErr.stack);
+let fsErr = null;
+try { run(`gameState='world'; fieldSurvivors=[{x:1000,vip:null,persona:generateNormalCustomerPersona(),hp:50,state:'waiting',t:3,near:true,fade:1}]; drawFieldSurvivors();`); } catch (e) { fsErr = e; }
+assert(!fsErr, '战场求救者可绘制', fsErr && fsErr.stack);
 
 console.log(`\n========================================`);
 console.log(`FINAL RESULT: Passed: ${testsPassed}, Failed: ${testsFailed}`);
