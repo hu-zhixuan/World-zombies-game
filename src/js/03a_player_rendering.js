@@ -378,113 +378,178 @@ function drawWorldScenery(t){
 
 //  PLAYER SPRITE
 // ═══════════════════════════════════════════
+// 主角配色：橄榄绿夹克 + 暖橙围巾（和界面强调色同一个橙），夜景里剪影也认得出
+const HERO = {
+  line:'#0e1116',
+  jacket:'#6e7f4c', jacketShade:'#566339', jacketLight:'#8a9b63',
+  pants:'#4b5563', pantsShade:'#39414c',
+  boot:'#2d2622', sole:'#15110f',
+  scarf:'#e8743b', scarfShade:'#c45a28',
+  skin:'#f3cba5', skinShade:'#dba982',
+  hair:'#2b1f1a', hairLight:'#4a382c',
+  glove:'#3b3329', pack:'#8a6a45', packShade:'#6d522f',
+};
+// 路径：圆角矩形（不依赖 ctx.roundRect）
+function heroRR(x,y,w,h,r){
+  r=Math.min(r,w/2,h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+// 一块带描边的色块
+function heroPart(fill,x,y,w,h,r){ heroRR(x,y,w,h,r); ctx.fillStyle=fill; ctx.fill(); ctx.stroke(); }
+function heroDisc(fill,x,y,r){ ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();ctx.stroke(); }
+
 function drawPlayer(px,py,facingR,walkT,aimA,jumping,hurtFlash,t,dodge){
   ctx.save();
   ctx.translate(px+CHAR_W/2,py+CHAR_H);
   if(!facingR)ctx.scale(-1,1);
   if(hurtFlash&&Math.floor(t/80)%2===0)ctx.globalAlpha=.25;
-  
-  // ── 翻滚动画：身手敏捷利落翻滚 ──
+
+  // 脚下阴影（先画，翻滚时留在地面上）
+  const shadowS=jumping?Math.max(.2,1-(CHAR_GY-py)/150):1;
+  ctx.save();ctx.globalAlpha*=.3*shadowS;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(0,0,14*shadowS,3.6*shadowS,0,0,Math.PI*2);ctx.fill();ctx.restore();
+
+  // 翻滚：绕身体中心滚一圈并压扁
   if(dodge>0){
     const dp=dodge/20;
+    ctx.translate(0,-CHAR_H/2);
     ctx.rotate((1-dp)*Math.PI*2*(facingR?1:-1));
     ctx.scale(1,0.65+dp*0.35);
+    ctx.translate(0,CHAR_H/2);
     if(t%2===0){
-      mkP({x:px+CHAR_W/2,y:py+CHAR_H/2,vx:(facingR?-1:1)*(Math.random()*1.5),vy:-Math.random()*1.5,r:2+Math.random()*1.5,rDecay:.05,decay:.05,color:'rgba(80,160,240,.45)',type:'circle',grav:.05,alpha:.5,blur:true});
+      mkP({x:px+CHAR_W/2,y:py+CHAR_H/2,vx:(facingR?-1:1)*(Math.random()*1.5),vy:-Math.random()*1.5,r:2+Math.random()*1.5,rDecay:.05,decay:.05,color:'rgba(240,240,240,.4)',type:'circle',grav:.05,alpha:.5,blur:true});
     }
   }
-  
-  // 角色脚下小巧阴影
-  const shadowS=jumping?Math.max(.2,1-(CHAR_GY-py)/150):1;
-  ctx.save();ctx.globalAlpha=.3*shadowS;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(0,0,13*shadowS,3.5*shadowS,0,0,Math.PI*2);ctx.fill();ctx.restore();
   ctx.translate(0,-CHAR_H);
 
-  // 跑动前倾
-  if(!jumping && dodge<=0){
-    const runLean = 0.08 + Math.sin(walkT*Math.PI*2)*0.02;
+  // 跑动：整体前倾 + 随步伐上下起伏
+  const sw=jumping?0:Math.sin(walkT*Math.PI*2);
+  const running=!jumping&&dodge<=0;
+  if(running){
     ctx.save();
-    ctx.translate(0, CHAR_H);
-    ctx.rotate(runLean);
-    ctx.translate(0, -CHAR_H);
+    ctx.translate(0,CHAR_H);ctx.rotate(0.07+sw*0.015);ctx.translate(0,-CHAR_H);
+    ctx.translate(0,Math.abs(sw)*1.3);
   }
+  // 后坐力：身体微微后仰
+  if(shootRecoil*0.4>0.3&&dodge<=0) ctx.translate(-shootRecoil*0.14,0);
 
-  // 后坐力躯干微退
-  const shoulderRecoil = shootRecoil*0.4;
-  if(shoulderRecoil>0.3 && dodge<=0){
-    ctx.translate(-shoulderRecoil*0.35, 0);
-  }
+  ctx.strokeStyle=HERO.line;ctx.lineWidth=1.4;ctx.lineJoin='round';ctx.lineCap='round';
 
-  // ── 双腿与高帮战术马丁靴 ──
-  const legA=jumping?0:Math.sin(walkT*Math.PI*2)*20;
-  const bootA=jumping?0:Math.sin(walkT*Math.PI*2+.5)*12;
-  function drawBoot(ox,la,ba){
-    ctx.save();ctx.translate(ox,52);ctx.rotate(la*Math.PI/180);ctx.translate(0,11);ctx.rotate(ba*Math.PI/180);
-    // 高帮战靴皮面
-    ctx.fillStyle='#14171d';ctx.fillRect(-4,2,11,5);
-    ctx.fillStyle='#232832';ctx.fillRect(-3,-1,7,4);
-    // 鞋底防滑齿
-    ctx.fillStyle='#0d0f12';ctx.fillRect(-4,6,11,1.5);
-    // 战术鞋带金属扣
-    ctx.fillStyle='#5a6578';ctx.fillRect(-1,1,2,1);ctx.fillRect(-1,3,2,1);
-    ctx.restore();
-  }
-  drawBoot(-5,-legA,-bootA);drawBoot(5,legA,bootA);
+  // ── 背包（躯干身后）──
+  heroPart(HERO.packShade,-14,25,9,16,3);
+  ctx.fillStyle=HERO.pack;ctx.fillRect(-13,26,3,10);
 
-  function drawLeg(ox,la){
-    ctx.save();ctx.translate(ox,50);ctx.rotate(la*Math.PI/180);
-    // 修身战术束脚工装裤
-    const legGrad=ctx.createLinearGradient(-4,0,4,0);
-    legGrad.addColorStop(0,'#1e2530');legGrad.addColorStop(0.5,'#2b3545');legGrad.addColorStop(1,'#1b212b');
-    ctx.fillStyle=legGrad;ctx.fillRect(-4,0,8,13);
-    // 膝盖耐磨补强块
-    ctx.fillStyle='#161b24';ctx.fillRect(-3,4,6,5);
-    ctx.restore();
-  }
-  drawLeg(-5,-legA);drawLeg(5,legA);
-
-  // 战术腰带与合金快拆扣
-  ctx.fillStyle='#14171c';ctx.fillRect(-9,46,18,5);
-  ctx.fillStyle='#4b5563';ctx.fillRect(-2,46.5,4,4); // 银灰合金带扣
-  ctx.fillStyle='#1f2937';ctx.fillRect(5,47,3,4); // 侧挂战术小包
-
-  // ── 帅气修身暗夜战术立领夹克 (Torso & Jacket) ──
-  const jacketGrad=ctx.createLinearGradient(-9,18,9,46);
-  jacketGrad.addColorStop(0,'#1c232d');
-  jacketGrad.addColorStop(0.5,'#252f3d');
-  jacketGrad.addColorStop(1,'#181e26');
-  ctx.fillStyle=jacketGrad;
-  ctx.beginPath();
-  // 挺拔倒梯形上身剪裁
-  ctx.moveTo(-9,20);
-  ctx.lineTo(9,20);
-  ctx.lineTo(8,46);
-  ctx.lineTo(-8,46);
-  ctx.closePath();
-  ctx.fill();
-
-  // 战术立领
-  ctx.fillStyle='#13171f';
-  ctx.fillRect(-6,17,12,4);
-  // 领口内搭暗黑纯色T恤
-  ctx.fillStyle='#0f1115';
-  ctx.beginPath();
-  ctx.moveTo(-3,20);ctx.lineTo(3,20);ctx.lineTo(0,24);ctx.closePath();
-  ctx.fill();
-
-  // 帅气拉链与战术胸线
-  ctx.strokeStyle='#475569';ctx.lineWidth=1;
-  ctx.beginPath();ctx.moveTo(0,22);ctx.lineTo(0,46);ctx.stroke();
-  // 胸前战术织带扣
-  ctx.fillStyle='#11151a';ctx.fillRect(-7,25,5,5);ctx.fillRect(2,25,5,5);
-  ctx.fillStyle='#388bfd';ctx.fillRect(4,26,1.5,1.5); // 科技微光芯片指示灯
-
-  // 左手/副手自然摆动
-  const freeA=jumping?-15:-Math.sin(walkT*Math.PI*2)*18;
-  ctx.save();ctx.translate(-9,24);ctx.rotate(freeA*Math.PI/180);
-  ctx.fillStyle='#252f3d';ctx.fillRect(-3,0,6,15); // 袖子
-  ctx.fillStyle='#14171d';ctx.fillRect(-2.5,12,5,3); // 战术手套腕带
-  ctx.fillStyle='#f2c299';ctx.fillRect(-2,15,4,4); // 少年手指
+  // ── 后臂（自然摆动，压在身后）──
+  const freeA=jumping?-32:-sw*30;
+  ctx.save();ctx.translate(-6.5,26.5);ctx.rotate(freeA*Math.PI/180);
+  heroPart(HERO.jacketShade,-2.5,-1.8,5,12,2.4);
+  heroDisc(HERO.skinShade,0,11.8,2.4);
   ctx.restore();
+
+  // ── 双腿 ──
+  function leg(ox,a,shade){
+    ctx.save();ctx.translate(ox,46);ctx.rotate(a*Math.PI/180);
+    heroPart(shade?HERO.pantsShade:HERO.pants,-3.2,-1,6.4,14,2.2);
+    heroPart(HERO.boot,-3.6,11.4,9.2,6.6,2.6);
+    ctx.fillStyle=HERO.sole;ctx.fillRect(-3.2,16.6,8.4,1.2);
+    ctx.restore();
+  }
+  const legA=jumping?0:sw*26;
+  if(jumping){ leg(-3,-24,true); leg(3.5,20,false); }
+  else{ leg(-3,-legA,true); leg(3.5,legA,false); }
+
+  // ── 躯干：夹克 + 腰带 ──
+  heroPart(HERO.jacket,-8.5,23,17,23.5,4.6);
+  ctx.fillStyle=HERO.jacketLight;heroRR(-7,24.2,6.5,3,1.5);ctx.fill();            // 肩部受光
+  ctx.fillStyle=HERO.jacketShade;heroRR(-6.2,28.6,5.6,4.4,1.2);ctx.fill();        // 胸袋
+  ctx.strokeStyle=HERO.jacketShade;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(2.4,26);ctx.lineTo(2.4,40);ctx.stroke(); // 拉链
+  ctx.strokeStyle=HERO.line;ctx.lineWidth=1.4;
+  ctx.fillStyle=HERO.boot;ctx.fillRect(-8,40.2,16,3.6);                            // 腰带
+  ctx.fillStyle='#d7b45a';ctx.fillRect(1,40.6,3.8,2.8);                            // 带扣
+
+  // ── 围巾：飘带 + 绕颈一圈 ──
+  const flap=Math.sin(t*0.012)*1.4+(jumping?-2.5:0)+sw*1.1;
+  ctx.beginPath();
+  ctx.moveTo(-5,22.5);ctx.quadraticCurveTo(-10,22.5+flap,-16,25+flap*2);
+  ctx.lineTo(-14,30+flap*2);ctx.quadraticCurveTo(-9,27+flap,-3,26.5);ctx.closePath();
+  ctx.fillStyle=HERO.scarfShade;ctx.fill();ctx.stroke();
+  heroPart(HERO.scarf,-7.6,20.6,15,6,3);
+
+  // ── 头：大头比例 ──
+  // 后脑发
+  ctx.beginPath();ctx.ellipse(-5.2,10,4.6,6.6,0,0,Math.PI*2);ctx.fillStyle=HERO.hair;ctx.fill();ctx.stroke();
+  heroDisc(HERO.skin,0.5,11.5,9);
+  heroDisc(HERO.skinShade,-5.6,13.2,1.9);   // 耳
+  // 刘海 / 头发
+  ctx.beginPath();
+  ctx.moveTo(-8.4,10.6);
+  ctx.quadraticCurveTo(-9.6,0.6,0.6,0.8);
+  ctx.quadraticCurveTo(10.6,0.8,9.4,10.4);
+  ctx.lineTo(8.2,7.8);ctx.lineTo(5.6,10.2);ctx.lineTo(3.4,7);ctx.lineTo(0.6,9.8);ctx.lineTo(-2.2,6.8);ctx.lineTo(-5,9.4);ctx.lineTo(-7,7.6);
+  ctx.closePath();
+  ctx.fillStyle=HERO.hair;ctx.fill();ctx.stroke();
+  ctx.strokeStyle=HERO.hairLight;ctx.lineWidth=0.9;
+  ctx.beginPath();ctx.moveTo(-3,3.6);ctx.quadraticCurveTo(1,1.8,5,4);ctx.stroke();
+  ctx.strokeStyle=HERO.line;ctx.lineWidth=1.4;
+  // 脸：眼睛 / 眉 / 嘴 / 腮红
+  const squint=(shootRecoil>2);
+  ctx.fillStyle='#1b1f27';
+  if(squint){
+    ctx.fillRect(-2,12.2,2.6,1.2);ctx.fillRect(3.6,12.2,2.6,1.2);
+  }else{
+    ctx.beginPath();ctx.ellipse(-0.7,12.6,1.3,1.9,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.ellipse(4.9,12.6,1.3,1.9,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff';ctx.fillRect(-0.2,11.3,0.7,0.7);ctx.fillRect(5.4,11.3,0.7,0.7);
+  }
+  ctx.strokeStyle='#3a2a22';ctx.lineWidth=0.9;
+  ctx.beginPath();ctx.moveTo(-2.6,9.9);ctx.lineTo(0.8,9.4);ctx.moveTo(3.4,9.4);ctx.lineTo(6.8,9.9);ctx.stroke();
+  ctx.strokeStyle='#a8654a';ctx.lineWidth=0.9;
+  ctx.beginPath();ctx.arc(2.9,15.6,1.7,0.2*Math.PI,0.8*Math.PI);ctx.stroke();
+  ctx.fillStyle='rgba(232,116,59,.28)';ctx.beginPath();ctx.arc(6.8,15.2,1.8,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle=HERO.line;ctx.lineWidth=1.4;
+
+  // ── 流派装扮（和头/躯干同一套比例）──
+  if(playerClass){
+    const pcId=playerClass.id;
+    if(pcId==='marksman'){
+      // 单边蓝色目镜
+      ctx.fillStyle='#222a36';ctx.fillRect(-8.6,10.4,18,3);
+      heroPart('#59b6ff',2.2,9.6,6.6,5,1.6);
+      ctx.fillStyle='rgba(255,255,255,.7)';ctx.fillRect(3.4,10.6,1.8,1);
+    }else if(pcId==='berserker'){
+      // 红额带 + 飘带
+      ctx.fillStyle='#e63946';ctx.fillRect(-8.8,4.8,18.6,2.8);ctx.strokeRect(-8.8,4.8,18.6,2.8);
+      ctx.beginPath();ctx.moveTo(-8,5.6);
+      ctx.quadraticCurveTo(-13,3.6-Math.sin(t*0.01)*2,-17,8.4);ctx.lineTo(-14,9);
+      ctx.quadraticCurveTo(-11,6.8,-7.6,7.4);ctx.closePath();ctx.fillStyle='#e63946';ctx.fill();ctx.stroke();
+    }else if(pcId==='demolition'){
+      // 斜挎弹带 + 耳罩
+      ctx.save();ctx.strokeStyle=HERO.line;ctx.lineWidth=4.6;ctx.beginPath();ctx.moveTo(-7.4,25);ctx.lineTo(7.4,42);ctx.stroke();
+      ctx.strokeStyle='#f08a2e';ctx.lineWidth=2.6;ctx.beginPath();ctx.moveTo(-7.4,25);ctx.lineTo(7.4,42);ctx.stroke();
+      ctx.fillStyle=HERO.line;for(let k=0;k<4;k++){ctx.fillRect(-4.6+k*3.6,28+k*4.1,1.8,2.8);}
+      ctx.restore();
+      heroDisc('#1f2937',-6.4,13,3);
+    }else if(pcId==='beastmaster'){
+      // 毛领 + 狼牙吊坠
+      ctx.beginPath();ctx.ellipse(0,24,9.8,3.6,0,0,Math.PI*2);ctx.fillStyle='#ddd6c6';ctx.fill();ctx.stroke();
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(-1.2,27);ctx.lineTo(1.2,27);ctx.lineTo(0,31.4);ctx.closePath();ctx.fill();ctx.stroke();
+    }else if(pcId==='warden'){
+      // 前肩护甲
+      heroPart('#7b8798',3,22.4,10,6.4,2.6);
+      ctx.fillStyle='#e0b84a';ctx.fillRect(4,23,8,1.6);
+    }else if(pcId==='chef'){
+      // 围裙 + 厨师帽
+      heroPart('#f1efe8',-7.4,31,14.8,14,2.2);
+      ctx.fillStyle='#e5594f';ctx.fillRect(-7,31.6,14,2);
+      heroPart('#fbfaf6',-6.6,-4.6,13.4,6.4,3);
+      heroDisc('#fbfaf6',-3,-6,3.6);heroDisc('#fbfaf6',3.8,-6.4,3.8);
+    }
+  }
 
   // ── 持枪手臂与枪械瞄准 ──
   const clampA=Math.max(-1.1,Math.min(1.1,aimA));
@@ -502,162 +567,48 @@ function drawPlayer(px,py,facingR,walkT,aimA,jumping,hurtFlash,t,dodge){
   const ra=reloadAnim();
   const recoilOffset=shootRecoil*0.7;
   ctx.save();
-  ctx.translate(9-recoilOffset+ra.handX, 26+ra.dipY+ra.handY);
+  ctx.translate(8.6-recoilOffset+ra.handX, 26.4+ra.dipY+ra.handY);
   ctx.rotate(clampA+ra.tilt);
-  // 大臂与修身夹克袖
-  ctx.fillStyle='#252f3d';ctx.fillRect(-2,0,7,5);
-  ctx.fillStyle='#14171d';ctx.fillRect(4,0,4,4); // 战术手套
+  heroPart(HERO.jacket,-2.6,-2.8,9.8,5.6,2.7);          // 袖子
   ctx.translate(8,1);
   drawGunSprite(ctx,WEAPONS[curWpnIdx].id);
 
-  // 紧握枪柄的手
+  // 握枪的手
   {
     const cw2=WEAPONS[curWpnIdx];
     const isMelee=cw2.meleeWeapon||cw2.id==='warhorn';
     const hx=isMelee?2:4, hy=isMelee?3:4;
-    ctx.fillStyle='#f2c299';
-    ctx.beginPath();ctx.arc(hx,hy+1,2.8,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#14171d';
-    ctx.fillRect(hx-1.5,hy,3,2); // 手套指套
+    ctx.strokeStyle=HERO.line;ctx.lineWidth=1.3;
+    heroDisc(HERO.skin,hx,hy+0.6,2.7);
   }
 
-  // 射击抛壳（轻灵小铜壳）
+  // 射击抛壳
   if(shootRecoil>5 && WEAPONS[curWpnIdx].id!=='minigun' && !WEAPONS[curWpnIdx].meleeWeapon && Math.random()>.6){
     const px2=player.x+(player.facingRight?CHAR_W*.6:CHAR_W*.4), py2=player.y+26;
     const shellDir=player.facingRight?-1:1;
     mkP({x:px2,y:py2,vx:shellDir*(1+Math.random()*1.2),vy:-1.8-Math.random()*1.2,r:1,rDecay:.04,decay:.025,color:'#f3cc66',type:'shard',angle:Math.random()*Math.PI,spin:.25,grav:.28,alpha:1});
   }
 
-  // 枪口微火花
+  // 枪口火光
   if(muzzleFlashT>0){
     const mf=muzzleFlashT/8;
     ctx.save();ctx.translate(18,0);ctx.globalAlpha=mf;
-    ctx.fillStyle='#fff9d0';ctx.beginPath();ctx.arc(0,0,5*mf+1.5,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#ffaa30';ctx.beginPath();ctx.arc(0,0,8*mf+2,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#fff6c8';ctx.beginPath();ctx.arc(0,0,5*mf+1.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#f2a65a';ctx.beginPath();ctx.arc(0,0,8*mf+2,0,Math.PI*2);ctx.fill();
     ctx.restore();
   }
   ctx.restore();
 
-  // 换弹轻提示
+  // 换弹进度条（头顶）
   if(ra.show){
     const prog=100-reloadAnimT;
-    ctx.save();ctx.globalAlpha=0.85;
-    ctx.fillStyle='rgba(15,20,28,.8)';ctx.fillRect(-14,-12,28,4.5);
-    ctx.fillStyle='#388bfd';ctx.fillRect(-13,-11,26*(prog/100),2.5);
+    ctx.save();
+    ctx.fillStyle='rgba(14,17,22,.85)';heroRR(-14,-13,28,5,2.5);ctx.fill();
+    ctx.fillStyle='#f2a65a';heroRR(-13,-12,26*(prog/100),3,1.5);ctx.fill();
     ctx.restore();
   }
 
-  // ── 帅气阳光大学生小胡的面庞与五官 (Xiao Hu Handsome Face) ──
-  ctx.fillStyle='#d59970';ctx.fillRect(-2.5,13,5,6); // 修长颈部
-  // 清爽少年下颌线条
-  const faceGrad=ctx.createLinearGradient(-5,11,5,22);
-  faceGrad.addColorStop(0,'#fae1cc');
-  faceGrad.addColorStop(1,'#e8b28a');
-  ctx.fillStyle=faceGrad;
-  ctx.beginPath();
-  ctx.moveTo(-5.5,11);
-  ctx.lineTo(5.5,11);
-  ctx.lineTo(4,21);
-  ctx.lineTo(0,23.5); // 帅气微收下巴
-  ctx.lineTo(-4,21);
-  ctx.closePath();
-  ctx.fill();
-
-  // 小巧立体的双耳
-  ctx.fillStyle='#e4ab83';
-  ctx.fillRect(-6.5,14,1.8,3.5);ctx.fillRect(4.8,14,1.8,3.5);
-
-  // 清澈深邃有神的双眸（坚毅帅气眼神）
-  const isSquint=(shootRecoil>2);
-  ctx.fillStyle='#111822';
-  ctx.fillRect(-3.8,14.5,2.6,isSquint?1.2:2.4);
-  ctx.fillRect(1.2,14.5,2.6,isSquint?1.2:2.4);
-  if(!isSquint){
-    // 白色灵动高光点
-    ctx.fillStyle='#ffffff';
-    ctx.fillRect(-3.0,14.8,1.1,1.1);
-    ctx.fillRect(2.0,14.8,1.1,1.1);
-  }
-  // 坚毅剑眉
-  ctx.strokeStyle='#1e2632';ctx.lineWidth=0.9;
-  ctx.beginPath();
-  ctx.moveTo(-4.5,13.2);ctx.lineTo(-1.2,14.0);
-  ctx.moveTo(1.2,14.0);ctx.lineTo(4.5,13.2);
-  ctx.stroke();
-
-  // 自信挺秀微挺的鼻线与嘴角
-  ctx.fillStyle='#d09670';ctx.fillRect(-0.5,17.5,1,2);
-  ctx.fillStyle='#b87654';ctx.fillRect(-2,20.5,4,1);
-
-  // ── 帅气三七分层次碎发（彻底告别大绿头盔！）──
-  const hairDark='#151921', hairMid='#242c38', hairLight='#475569';
-  ctx.fillStyle=hairDark;
-  // 头部后轮廓与发量
-  ctx.beginPath();
-  ctx.arc(0,10.5,7.2,Math.PI*0.8,Math.PI*2.2);
-  ctx.fill();
-  // 前额飘逸层次碎发与刘海
-  ctx.fillStyle=hairMid;
-  ctx.beginPath();
-  ctx.moveTo(-6.5,12);
-  ctx.quadraticCurveTo(-7,6,-2.5,4.5);
-  ctx.quadraticCurveTo(0,3.5,3.5,5);
-  ctx.quadraticCurveTo(7.5,7,6.5,12);
-  ctx.lineTo(3.5,10.5);
-  ctx.lineTo(1.5,13); // 帅气垂额碎发
-  ctx.lineTo(-0.8,10.5);
-  ctx.lineTo(-3.2,13.2); // 侧刘海碎发
-  ctx.lineTo(-5,11);
-  ctx.closePath();
-  ctx.fill();
-  // 缕缕发丝高光微光线
-  ctx.strokeStyle=hairLight;ctx.lineWidth=0.7;
-  ctx.beginPath();
-  ctx.moveTo(-3,6);ctx.quadraticCurveTo(0,4.5,3.5,6.5);
-  ctx.stroke();
-
-  // ═══ 小胡 6 种帅气流派战术装扮配件（精益求精，绝不臃肿）═══
-  if(playerClass){
-    const pcId=playerClass.id;
-    if(pcId==='marksman'){
-      // 🎯 狙击目镜小胡：左眼高科技极简轻量单边蓝光目镜
-      ctx.fillStyle='rgba(56,139,253,0.8)';
-      ctx.fillRect(1,14,3.2,3.2);
-      ctx.strokeStyle='#388bfd';ctx.lineWidth=0.8;
-      ctx.strokeRect(0.5,13.5,4.2,4.2);
-      ctx.beginPath();ctx.moveTo(4.8,15.5);ctx.lineTo(6.5,15.5);ctx.stroke();
-    }else if(pcId==='berserker'){
-      // 🪓 热血发带小胡：赤红战术额带 + 脑后飘逸红飘带
-      ctx.fillStyle='#e63946';ctx.fillRect(-6,8.5,12,2.4);
-      ctx.beginPath();
-      ctx.moveTo(-5.5,9.5);
-      ctx.quadraticCurveTo(-10,7.5-Math.sin(t*0.01)*2,-13,12);
-      ctx.lineTo(-10.5,12);
-      ctx.closePath();
-      ctx.fill();
-    }else if(pcId==='demolition'){
-      // 💥 防暴护目镜小胡：战术耳麦与斜挎战术弹药背带
-      ctx.strokeStyle='#f97316';ctx.lineWidth=2.2;
-      ctx.beginPath();ctx.moveTo(-8,20);ctx.lineTo(7,44);ctx.stroke();
-      ctx.fillStyle='#0f172a';ctx.beginPath();ctx.arc(-5.8,15.5,2.2,0,Math.PI*2);ctx.fill();
-    }else if(pcId==='beastmaster'){
-      // 🐺 战地风衣小胡：立领防风战术斗篷领与狼牙吊坠
-      ctx.fillStyle='#1e293b';
-      ctx.beginPath();ctx.moveTo(-9,20);ctx.lineTo(0,28);ctx.lineTo(9,20);ctx.lineTo(7,17);ctx.lineTo(-7,17);ctx.closePath();ctx.fill();
-      ctx.fillStyle='#f1f5f9';
-      ctx.beginPath();ctx.moveTo(-1,27);ctx.lineTo(1,27);ctx.lineTo(0,31);ctx.closePath();ctx.fill();
-    }else if(pcId==='warden'){
-      // 🛡 外骨骼机甲小胡：左肩精钢合金科技外骨骼护肩
-      ctx.fillStyle='#475569';ctx.fillRect(-11,20,5,8);
-      ctx.fillStyle='#ffd700';ctx.fillRect(-11,20,5,1.5);
-    }else if(pcId==='chef'){
-      // 🍳 暗黑主厨小胡：帅气暗黑战术系带半身围裙
-      ctx.fillStyle='#0f172a';ctx.fillRect(-8,35,16,11);
-      ctx.fillStyle='#ef4444';ctx.fillRect(-8,35,16,1.8);
-    }
-  }
-
-  if(!jumping && dodge<=0){ctx.restore();}
+  if(running){ctx.restore();}
   ctx.restore();
 }
 

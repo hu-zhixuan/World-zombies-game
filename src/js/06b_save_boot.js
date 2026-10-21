@@ -599,9 +599,9 @@ function startGame(){
   storySceneIdx=0;
   vehicle.exists=false;vehicle.entered=false;vehicle.hp=150;vehicle.vx=0;
   sprite.exists=false;sprite.level=1;sprite.attackTimer=180;sprite.healTimer=480;sprite.shieldReady=true;
-  // Bug修复：#weapon-bar/#hud/#m-status 也是 game-wrap 的直接div子节点但从未进豁免名单——
+  // Bug修复：#weapon-bar/#hud 也是 game-wrap 的直接div子节点但从未进豁免名单——
   // 第二局起会被此清理删掉，随后 buildWeaponBar 对 null 写 innerHTML 崩溃。加入豁免。
-  document.querySelectorAll('#game-wrap > div:not(.overlay):not(canvas):not(#emergency-retreat-hud):not(#tactical-door-wipe):not(#shop-scr):not(#cabin-scr):not(#boss-hpbar):not(#vehicle-prompt):not(#dialogue-box):not(#combo-hud):not(#combo-vignette):not(#chapter-scr):not(#world-progress):not(#home-hp-hud):not(#touch-overlay):not(#tower-popover):not(#cinematic-scr):not(#restaurant-scr):not(#transition-overlay):not(#rest-end-scr):not(#dave-transition):not(#tutorial-scr):not(#codex-scr):not(#vip-compendium-scr):not(#main-menu-scr):not(#settings-scr):not(#wastegram-hud):not(#wastegram-notify):not(#weapon-bar):not(#hud):not(#m-status):not(#wave-dlg-bar):not(#backpack-modal):not(#expedition-modal):not(#duff-workshop-modal)').forEach(e=>e.remove());
+  document.querySelectorAll('#game-wrap > div:not(.overlay):not(canvas):not(#emergency-retreat-hud):not(#tactical-door-wipe):not(#shop-scr):not(#cabin-scr):not(#boss-hpbar):not(#vehicle-prompt):not(#dialogue-box):not(#combo-hud):not(#combo-vignette):not(#chapter-scr):not(#world-progress):not(#home-hp-hud):not(#touch-overlay):not(#mhud):not(#tower-popover):not(#cinematic-scr):not(#restaurant-scr):not(#transition-overlay):not(#rest-end-scr):not(#dave-transition):not(#tutorial-scr):not(#codex-scr):not(#vip-compendium-scr):not(#main-menu-scr):not(#settings-scr):not(#wastegram-hud):not(#wastegram-notify):not(#weapon-bar):not(#hud):not(#m-status):not(#wave-dlg-bar):not(#backpack-modal):not(#expedition-modal):not(#duff-workshop-modal)').forEach(e=>e.remove());
   scEl.textContent='0';killsEl.textContent='0';updateHpUI();updateCoinUI();
   buildWeaponBar();refreshWBar();updateAmmoUI();
   waveTxt.textContent='第 1 波';bossHpBar.style.display='none';setInteractPrompt(null);
@@ -730,6 +730,38 @@ function setupTutorialSteps(onComplete){
       </div>`
     },
   ];
+  // 手机：操作说明按触屏重写（原文是键鼠：A/D、鼠标、TAB、E），并压成 3 步
+  if(isMobile()){
+    steps.length = 0;
+    steps.push({
+      title: '怎么操作',
+      html: `<div style="text-align:left;line-height:1.6;">
+        <div style="margin-bottom:6px;"><b>目标</b>：守住 15 波尸潮，活到直升机撤离。</div>
+        <div style="margin-bottom:5px;"><b>左下摇杆</b>：左右拖动移动，向上推跳跃。</div>
+        <div style="margin-bottom:5px;"><b>右下红色按钮</b>：开火，会自动瞄准最近的僵尸。按住连射。</div>
+        <div style="margin-bottom:5px;"><b>绿色 ↑ / 翻滚</b>：跳跃 / 闪避（闪避有无敌帧）。</div>
+        <div style="margin-bottom:5px;"><b>装填 · 商店 · 行囊</b>：右侧小按钮。商店里买武器和升级。</div>
+        <div style="margin-bottom:5px;"><b>E 键</b>：靠近可交互的东西（基座、门、求救的人）时亮起，点它。</div>
+        <div style="margin-bottom:5px;"><b>菜单</b>（右上）：图鉴、远征、改造、建设、暂停。</div>
+      </div>`
+    },{
+      title: '一天怎么过',
+      html: `<div style="text-align:left;line-height:1.6;">
+        <div style="margin-bottom:5px;"><b>白天</b>：守住城墙，打僵尸。城墙外偶尔有人求救，走近点 E 救下，<b>晚上他会来你的食堂吃饭</b>。</div>
+        <div style="margin-bottom:5px;"><b>清场后</b>：回据点小屋避难，睡觉回血、升级城墙、买塔防。</div>
+        <div style="margin-bottom:5px;"><b>晚上</b>：用僵尸肉在食堂做菜赚金币。可以「留一份」带去战场，明天更强。</div>
+        <div style="margin-bottom:5px;"><b>黎明</b>：出击下一波。每 5 波一个 Boss。</div>
+        <div style="margin-bottom:5px;">升级会弹出三选一天赋，每局不同。</div>
+      </div>`
+    },{
+      title: '准备好了',
+      html: `<div style="text-align:left;line-height:1.6;">
+        <div style="margin-bottom:5px;">开局配备战术手枪、150 金币、5 块肉。</div>
+        <div style="margin-bottom:5px;">第 1 波是普通感染者，走位拉扯、打头更疼。</div>
+        <div style="color:#e5594f;margin-top:6px;">城墙是生命线：墙破了你会持续掉血。</div>
+      </div>`
+    });
+  }
   // 渲染当前步
   const bodyEl = document.getElementById('tutorial-body');
   function renderStep(){
@@ -741,10 +773,12 @@ function setupTutorialSteps(onComplete){
       return;
     }
     document.getElementById('tutorial-title').innerHTML = step.title;
-    bodyEl.innerHTML = step.html + `<div style="margin-top:10px;text-align:center;">
-      <button class="big-btn" id="tut-next-btn" style="font-size:.85rem;padding:6px 24px;">${_tutorialStep < steps.length-1 ? '下一步 ▶' : '开始战斗 ⚔️'}</button>
-      <button class="big-btn" id="tut-skip-btn" style="font-size:.75rem;padding:6px 16px;margin-left:8px;border-color:#6a5a4a;color:#b0a284;">跳过教程</button>
-    </div>`;
+    bodyEl.innerHTML = step.html;
+    bodyEl.scrollTop = 0;
+    document.getElementById('tutorial-ok-btn').style.display = 'none';
+    document.getElementById('tutorial-footer').innerHTML =
+      `<button class="big-btn" id="tut-skip-btn" style="color:var(--text-2);">跳过教程</button>
+       <button class="big-btn primary" id="tut-next-btn">${_tutorialStep < steps.length-1 ? '下一步' : '开始战斗'}</button>`;
     document.getElementById('tut-next-btn').onclick = () => {
       sndClick();
       _tutorialStep++;

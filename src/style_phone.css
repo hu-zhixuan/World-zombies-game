@@ -1,0 +1,277 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   手机界面（body.phone，由 layoutMobile() 按媒体查询打开）
+
+   原则
+   · 画布铺满整屏，HUD 只占四个角，中间留给战场
+   · 操作区只在左右两个拇指够得到的角：左下摇杆，右下一个大攻击键 + 弧形副键
+   · 一个强调色（暖橙）；其余全是半透明深灰玻璃 + 白色线性图标，不用渐变、不用发光
+   · 尺寸以屏幕高度为基准：1u = 1% 屏高（至少 3.4px），不同手机按比例缩放
+═══════════════════════════════════════════════════════════════════════ */
+body.phone {
+  --u: clamp(3.4px, 1vh, 5px);
+  --ins-l: env(safe-area-inset-left, 0px);
+  --ins-r: env(safe-area-inset-right, 0px);
+  --glass: rgba(14, 16, 20, .62);
+  --ink: rgba(255, 255, 255, .92);
+  display: block; height: 100vh; overflow: hidden; background: #000;
+}
+@supports (height: 1dvh) { body.phone { --u: clamp(3.4px, 1dvh, 5px); height: 100dvh; } }
+
+body.phone #world-progress, body.phone #weapon-bar, body.phone #hud { display: none !important; }
+body.phone #game-wrap { position: fixed; inset: 0; width: auto; max-width: none; display: flex; align-items: center; justify-content: center; background: #000; }
+body.phone #gc { flex: none; touch-action: none; cursor: default; }
+body.phone .kbd-only { display: none !important; }
+
+/* ── 菜单面板：右上角菜单键打开，点遮罩关闭 ── */
+body.phone #header { position: fixed; inset: 0; z-index: 400; display: none; padding: 0; gap: 0; max-width: none; border: 0; background: rgba(0, 0, 0, .6); }
+body.phone #header.menu-open { display: flex; align-items: center; justify-content: center; }
+body.phone .hdr-main, body.phone .hdr-info, body.phone #hdr-menu-btn { display: none !important; }
+body.phone .hdr-sub { display: contents; }
+body.phone .hdr-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; width: min(560px, 88%); padding: 14px; background: var(--s1); border: 1px solid var(--line-hi); border-radius: 16px; }
+body.phone .hdr-actions .hdr-btn { justify-content: center; padding: 14px 6px; font-size: 14px; border-radius: 10px; background: var(--s2); border-color: var(--line); }
+body.phone .hdr-actions .hdr-btn:active { background: var(--s3); }
+body.phone .hdr-actions .key { display: none; }
+
+/* 竖屏提示 */
+@media (orientation: portrait) and (max-width: 840px) {
+  #rotate-hint { display: flex; position: fixed; inset: 0; z-index: 9999; background: var(--s0); color: var(--text-1);
+    flex-direction: column; align-items: center; justify-content: center; gap: 10px; font-size: 1.1rem; text-align: center; padding: 24px; }
+  #rotate-hint small { color: var(--text-2); font-size: .8rem; }
+}
+
+/* ══════════ HUD ══════════ */
+body.phone #mhud, body.phone #touch-overlay { display: block; }
+body.phone.rest-mode #mhud, body.phone.rest-mode #touch-overlay { display: none; }
+#mhud { position: absolute; inset: 0; z-index: 55; pointer-events: none; color: var(--ink); font-family: var(--font-body); font-size: 13px; font-variant-numeric: tabular-nums; }
+.mh-tl, .mh-tc, .mh-tr { position: absolute; top: calc(2.2 * var(--u)); display: flex; }
+.mh-tl { left: calc(var(--ins-l) + 2.6 * var(--u)); flex-direction: column; align-items: flex-start; gap: calc(1.1 * var(--u)); }
+.mh-tc { left: 50%; transform: translateX(-50%); flex-direction: column; align-items: center; gap: calc(1.1 * var(--u)); max-width: 36%; }
+.mh-tr { right: calc(var(--ins-r) + 2.6 * var(--u)); align-items: center; gap: calc(1.4 * var(--u)); }
+
+.mh-chip { display: flex; align-items: center; gap: 7px; height: max(26px, calc(6.8 * var(--u))); padding: 0 11px; border-radius: 999px; background: var(--glass); border: 1px solid rgba(255, 255, 255, .1); white-space: nowrap; }
+.mh-chip .ic { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mh-chip b { font-weight: 700; font-size: 13px; }
+.mh-bar { position: relative; width: calc(20 * var(--u)); height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .16); overflow: hidden; flex: none; }
+.mh-bar > i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; border-radius: 3px; background: #e5594f; transition: width .15s; }
+.mh-bar.xs { width: calc(14 * var(--u)); height: 3px; }
+
+/* 左上：血量 / 等级 / 围墙 + 家园 */
+.mh-hp .ic { color: #e5594f; }
+#mh-hp-fill.low { animation: hpLow .7s ease-in-out infinite alternate; }
+@keyframes hpLow { to { opacity: .45; } }
+.mh-lv { display: flex; align-items: center; gap: 6px; padding-left: 5px; font-size: 11px; color: rgba(255, 255, 255, .72); text-shadow: 0 1px 2px rgba(0, 0, 0, .7); }
+#mh-xp-fill { background: var(--accent); width: 0; }
+.mh-def { height: max(22px, calc(5.6 * var(--u))); gap: 12px; padding: 0 10px; }
+.mh-mini { display: flex; align-items: center; gap: 5px; color: rgba(255, 255, 255, .8); }
+.mh-mini .ic { width: 13px; height: 13px; }
+.mh-def .mh-bar { width: calc(11 * var(--u)); }
+#mh-wall-fill { background: #cfd4dc; }
+#mh-home-fill { background: #6fbf8b; }
+#mh-home-fill.mid { background: var(--accent); }
+#mh-wall-fill.low, #mh-home-fill.low { background: #e5594f; }
+#mhud.no-def .mh-def { display: none; }
+
+/* 顶部居中：波次 */
+.mh-wave { position: relative; overflow: hidden; gap: 8px; height: max(28px, calc(7.2 * var(--u))); padding: 0 14px; }
+.mh-wave .ic { color: var(--accent); width: 16px; height: 16px; }
+.mh-wave .ic.night { color: #aab4c8; }
+#mh-wave-title { font-size: 14px; }
+#mh-wave-title.danger { color: #ff7b70; }
+#mh-wave-title.ok { color: #8fd4a6; }
+#mh-wave-right { font-size: 12px; color: rgba(255, 255, 255, .66); }
+#mh-wave-right:empty { display: none; }
+.mh-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255, 255, 255, .1); }
+.mh-prog > i { display: block; width: 0; height: 100%; background: var(--accent); transition: width .2s; }
+.mh-prog > i.danger { background: #e5594f; }
+#mhud.no-prog .mh-prog { display: none; }
+.mh-sub { font-size: 11.5px; padding: 3px 10px; border-radius: 10px; background: var(--glass); color: rgba(255, 255, 255, .78); text-align: center; }
+.mh-sub:empty { display: none; }
+.mh-tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; }
+.mh-tags:empty { display: none; }
+.mh-tag { font-size: 11px; padding: 2px 9px; border-radius: 9px; background: var(--glass); color: rgba(255, 255, 255, .7); }
+.mh-tag.hot { color: var(--accent); }
+
+/* 右上：金币 + 商店 / 行囊 / 侦察 / 菜单 */
+.mh-coin .ic { color: var(--accent); width: 16px; height: 16px; }
+.mh-ibtn { pointer-events: auto; touch-action: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  width: max(34px, calc(8.8 * var(--u))); height: max(34px, calc(8.8 * var(--u))); border-radius: 11px; display: grid; place-items: center;
+  background: var(--glass); border: 1px solid rgba(255, 255, 255, .12); color: var(--ink); }
+.mh-ibtn svg { width: 54%; height: 54%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mh-ibtn.pressed { background: rgba(255, 255, 255, .24); }
+
+/* ══════════ 操控层 ══════════ */
+#touch-overlay { position: absolute; inset: 0; z-index: 60; pointer-events: none; }
+.tb { position: absolute; display: grid; place-items: center; border-radius: 50%; background: var(--glass); border: 1.5px solid rgba(255, 255, 255, .22);
+  color: var(--ink); pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  transition: transform .06s, background .06s; }
+.tb svg { width: 48%; height: 48%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.tb.pressed { transform: scale(.92); background: rgba(255, 255, 255, .26); }
+
+/* 摇杆：浮动式，手指落在左下区域任何位置都行 */
+#joy-zone { position: absolute; left: var(--ins-l); bottom: 0; width: calc(60 * var(--u)); height: calc(60 * var(--u)); pointer-events: auto; touch-action: none; }
+#joy-base { position: absolute; left: 36.7%; top: 63.3%; width: calc(30 * var(--u)); height: calc(30 * var(--u)); transform: translate(-50%, -50%);
+  border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .05); pointer-events: none; }
+#joy-zone.on #joy-base { border-color: rgba(255, 255, 255, .45); background: rgba(255, 255, 255, .1); }
+.jc { position: absolute; top: 50%; width: 0; height: 0; border: calc(1.7 * var(--u)) solid transparent; transform: translateY(-50%); }
+.jl { left: calc(1.2 * var(--u)); border-left: 0; border-right-color: rgba(255, 255, 255, .34); }
+.jr { right: calc(1.2 * var(--u)); border-right: 0; border-left-color: rgba(255, 255, 255, .34); }
+#joy-knob { position: absolute; left: 50%; top: 50%; width: 46%; height: 46%; border-radius: 50%;
+  background: rgba(255, 255, 255, .28); border: 1.5px solid rgba(255, 255, 255, .5); transform: translate(-50%, -50%); pointer-events: none; }
+#joy-zone.on #joy-knob { background: rgba(255, 255, 255, .42); }
+
+/* 攻击键：全屏最显眼的东西，也是唯一的实心强调色 */
+#btn-fire { width: calc(24 * var(--u)); height: calc(24 * var(--u)); right: calc(var(--ins-r) + 3 * var(--u)); bottom: calc(4 * var(--u));
+  background: var(--accent); border-color: rgba(255, 255, 255, .45); color: #1b1208;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(.5 * var(--u)); }
+#btn-fire.pressed { background: #f6b472; }
+#btn-fire .ico { width: calc(9 * var(--u)); height: calc(9 * var(--u)); stroke-width: 2.2; }
+#fire-ammo { font: 800 calc(3.9 * var(--u)) / 1 var(--font-num); letter-spacing: .02em; }
+#btn-fire.low #fire-ammo { color: #9d2218; }
+#btn-fire .fire-ring { position: absolute; inset: auto; left: -6px; top: -6px; width: calc(100% + 12px); height: calc(100% + 12px); transform: rotate(-90deg); }
+#btn-fire .fire-ring circle { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 295.3; stroke-dashoffset: 295.3; }
+
+#btn-jump   { width: calc(15 * var(--u)); height: calc(15 * var(--u)); right: calc(var(--ins-r) + 7.5 * var(--u));  bottom: calc(36.5 * var(--u)); }
+#btn-dodge  { width: calc(15 * var(--u)); height: calc(15 * var(--u)); right: calc(var(--ins-r) + 30.5 * var(--u)); bottom: calc(22.5 * var(--u)); }
+#btn-swap   { width: calc(12 * var(--u)); height: calc(12 * var(--u)); right: calc(var(--ins-r) + 30 * var(--u));   bottom: calc(46 * var(--u)); }
+#btn-reload { width: calc(12 * var(--u)); height: calc(12 * var(--u)); right: calc(var(--ins-r) + 34 * var(--u));   bottom: calc(5 * var(--u)); }
+#btn-skill  { width: calc(13 * var(--u)); height: calc(13 * var(--u)); right: calc(var(--ins-r) + 8.5 * var(--u));  bottom: calc(57.5 * var(--u)); display: none; }
+#swap-icon { font-size: calc(5.4 * var(--u)); line-height: 1; }
+#btn-swap .badge { position: absolute; right: -2px; bottom: -2px; width: calc(4.8 * var(--u)); height: calc(4.8 * var(--u)); padding: 2px; border-radius: 50%;
+  background: #2a2d33; border: 1px solid rgba(255, 255, 255, .3); stroke-width: 2.6; }
+#btn-swap.solo { display: none; }
+#btn-skill.ready { border-color: var(--accent); color: var(--accent); }
+#btn-skill.cd { opacity: .65; }
+#btn-skill.cd svg { opacity: .2; }
+#btn-skill[data-cd]:not([data-cd=""])::after { content: attr(data-cd); position: absolute; font: 700 calc(4.2 * var(--u)) var(--font-num); color: #fff; }
+
+/* 交互键：只有附近有可交互的东西才出现（救人 / 进小屋 / 拾取 / 建造…） */
+#btn-vehicle { width: calc(16 * var(--u)); height: calc(16 * var(--u)); right: calc(var(--ins-r) + 49 * var(--u)); bottom: calc(10 * var(--u));
+  display: none; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  background: rgba(242, 166, 90, .22); border: 2px solid var(--accent); color: var(--accent); animation: actPulse 1.3s ease-in-out infinite; }
+#btn-vehicle svg { width: 38%; height: 38%; }
+#act-label { font: 700 calc(3.2 * var(--u)) / 1.1 var(--font-body); }
+@keyframes actPulse { 50% { transform: scale(1.07); } }
+
+/* 据点里不需要战斗键 */
+body.phone.hub-mode #btn-fire, body.phone.hub-mode #btn-reload, body.phone.hub-mode #btn-swap, body.phone.hub-mode #btn-skill, body.phone.hub-mode #btn-dodge { display: none !important; }
+
+/* ══════════ 提示 / 对话 / Boss ══════════ */
+body.phone .banner-msg { top: calc(21 * var(--u)) !important; max-width: 46%; padding: 5px 14px !important; font-size: 12.5px !important; line-height: 1.35;
+  white-space: normal !important; text-align: center; background: var(--glass) !important; border: 1px solid rgba(255, 255, 255, .12) !important; border-radius: 12px !important; box-shadow: none !important; }
+body.phone:has(#wave-dlg-bar.open) .banner-msg { top: calc(42 * var(--u)) !important; }
+body.phone #vehicle-prompt { bottom: calc(1.6 * var(--u)); max-width: 34%; padding: 4px 12px; font-size: 12px; white-space: normal; text-align: center; background: var(--glass); border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; }
+body.phone #wave-dlg-bar { top: calc(21 * var(--u)); width: 46%; max-width: 440px; }
+body.phone .wd-top-bar { display: none; }
+body.phone .wd-main { padding: 8px 10px; gap: 8px; }
+body.phone .wd-avatar { width: 28px; height: 28px; font-size: .8rem; }
+body.phone .wd-text { font-size: .8rem; line-height: 1.45; }
+body.phone .wd-actions { flex-direction: row; align-items: center; margin-left: 0; }
+body.phone #boss-hpbar { top: calc(21 * var(--u)); width: 34%; }
+body.phone #emergency-retreat-hud { top: calc(21 * var(--u)) !important; }
+body.phone #combo-hud { top: calc(24 * var(--u)); left: calc(var(--ins-l) + 2.6 * var(--u)); transform: none; animation: none; }
+
+/* ══════════ 弹层：小屏上可滚动、不被切掉 ══════════ */
+body.phone #perk-choice-scr, body.phone #shop-scr, body.phone #cabin-scr, body.phone #tutorial-scr, body.phone #rest-end-scr { overflow-y: auto; }
+body.phone #perk-choice-scr, body.phone #tutorial-scr, body.phone #rest-end-scr { justify-content: flex-start; }
+body.phone #perk-choice-scr > :first-child, body.phone #tutorial-scr > :first-child, body.phone #rest-end-scr > :first-child { margin-top: auto; }
+body.phone #perk-choice-scr > :last-child, body.phone #tutorial-scr > :last-child, body.phone #rest-end-scr > :last-child { margin-bottom: auto; }
+body.phone .perk-card { font-size: .9em; }
+body.phone .tutorial-box { width: 96%; padding: 12px 16px; border-radius: 12px; }
+body.phone #tutorial-title { font-size: 1rem; margin-bottom: 8px; }
+body.phone .tutorial-line, body.phone #tutorial-body { font-size: .82rem; line-height: 1.5; }
+body.phone #tutorial-footer { margin-top: 10px; }
+body.phone #tutorial-footer .big-btn { margin-top: 0; padding: 9px 22px; }
+
+/* 商店 / 指挥所：标题压小，关闭按钮钉在底部，随时点得到 */
+body.phone #shop-scr, body.phone #cabin-scr { padding: 6px 12px 0; }
+body.phone #shop-title { font-size: 1.05rem; margin: 0; }
+body.phone #shop-coins { font-size: .8rem; margin: 2px 0 4px; padding: 1px 12px; }
+body.phone #shop-timer-bar { margin-bottom: 4px; width: 160px; }
+body.phone #shop-grid { gap: 6px; margin-bottom: 8px; }
+body.phone #shop-close, body.phone #cabin-close { position: sticky; bottom: 0; margin-top: auto; padding: 8px 32px; z-index: 5; box-shadow: 0 -8px 16px rgba(0, 0, 0, .5); }
+
+/* ══════════ 食堂：工具栏压成各一行，把高度还给营业画面 ══════════ */
+body.phone #rest-hud { padding: 4px 10px; gap: 6px; flex-wrap: nowrap; overflow-x: auto; font-size: .72rem; }
+body.phone #rest-hud > * { flex: none; white-space: nowrap; font-size: .72rem; }
+body.phone #rest-timer { font-size: .95rem; }
+body.phone #rest-fans-display, body.phone #rest-vip-btn, body.phone #rest-music-btn, body.phone #rest-mute-btn, body.phone #rep-tier-display { display: none; }
+body.phone .rest-chip, body.phone #cooksta-toggle-btn { padding: 3px 8px; font-size: .7rem; }
+body.phone #trending-display { padding: 3px 8px; max-width: 220px; }
+body.phone #trending-text { font-size: .7rem; }
+body.phone #rest-controls { padding: 4px 8px; gap: 3px; flex-direction: column; flex-wrap: nowrap; max-height: none; overflow: visible; }
+body.phone #rest-controls > div { flex-wrap: nowrap !important; overflow-x: auto; justify-content: flex-start !important; width: 100%; margin-bottom: 0 !important; padding-bottom: 2px; }
+body.phone .rest-stock-row { font-size: .66rem !important; gap: 8px !important; }
+body.phone .dish-btn { min-width: 58px !important; padding: 3px 8px; flex: none; }
+body.phone .dish-btn-icon { font-size: 1rem !important; }
+body.phone .dish-btn-name { font-size: .66rem; }
+body.phone .dish-btn-cost { font-size: .58rem; }
+body.phone .rest-info { display: none; }
+body.phone #daily-tasks-panel { top: 4px; right: 4px; width: 150px; padding: 4px 8px; }
+
+/* ══════════ 第二轮微调：对话条 / 商店 / 天赋 ══════════ */
+body.phone #wave-dlg-bar { width: 54%; max-width: 480px; }
+body.phone:has(#wave-dlg-bar.open) .banner-msg { top: calc(56 * var(--u)) !important; }
+body.phone .wd-text { font-size: 12.5px; line-height: 1.45; }
+body.phone .wd-speaker-row { margin-bottom: 0; }
+
+/* 商店：四列紧凑卡片，一屏看得下 */
+body.phone #shop-grid { grid-template-columns: repeat(4, 1fr); max-width: none; gap: 6px; }
+body.phone .si { padding: 6px 6px 8px; gap: 2px; border-radius: 10px; }
+body.phone .si-icon { font-size: 1.35rem; filter: none; }
+body.phone .si-name { font-size: .74rem; letter-spacing: 0; }
+body.phone .si-desc { font-size: .62rem; line-height: 1.3; }
+body.phone .si-cost { font-size: .72rem; margin-top: 2px; padding: 1px 8px; }
+body.phone #shop-title { font-size: 1rem; }
+
+/* 天赋三选一：卡片压矮，标题变小 */
+body.phone #perk-choice-scr h2, body.phone #perk-choice-scr > div:first-child { font-size: 1.15rem; }
+body.phone .perk-card { width: 170px; min-height: 0; padding: 12px 12px 10px; }
+body.phone .perk-icon { font-size: 2rem; margin-top: 2px; }
+body.phone .perk-name { font-size: 1.05rem; }
+body.phone .perk-desc { font-size: .72rem; line-height: 1.45; }
+
+/* ══════════ 主菜单：手机上收成一屏——标题 + 四个按钮 ══════════ */
+body.phone #menu-content-wrap { justify-content: center; max-height: 100%; padding: 8px 16px; }
+body.phone #menu-header { margin-bottom: 10px; }
+body.phone #menu-header > div:first-child { display: none; }
+body.phone #menu-header h1 { font-size: 2rem !important; margin-bottom: 2px !important; }
+body.phone #menu-header .menu-neon-canteen-sign { font-size: .95rem !important; margin-bottom: 4px !important; }
+body.phone #menu-header > div:last-child { font-size: .66rem !important; padding: 1px 10px !important; }
+body.phone #menu-cards-row { flex-wrap: nowrap; }
+body.phone #save-intel-card, body.phone #menu-content-wrap > div:last-child { display: none !important; }
+body.phone #menu-cards-row > .glass-tactical-card:first-child { max-width: 560px !important; min-width: 0 !important; padding: 12px !important; }
+body.phone #menu-cards-row > .glass-tactical-card:first-child > div:first-child { display: none !important; }
+body.phone #menu-btns { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px !important; }
+body.phone #menu-btns .btn-new { grid-column: 1 / -1; }
+body.phone #menu-btns .btn-download { display: none; }
+body.phone #menu-btns .tactical-menu-btn { padding: 10px 12px; }
+
+/* ══════════ 第三轮：流派选择 / 指挥所 / 提示层级 ══════════ */
+/* 提示横幅压在 HUD 之上、全屏弹层之下，不再盖在商店/章节卡上 */
+body.phone .banner-msg { z-index: 70 !important; }
+
+/* 流派选择：六张卡排成一行 */
+body.phone #perk-choice-scr { padding: 6px 10px; }
+body.phone #perk-choice-level { font-size: 1.05rem !important; margin-bottom: 8px !important; }
+body.phone #perk-choice-list { gap: 8px !important; flex-wrap: nowrap !important; }
+body.phone #perk-choice-list .perk-card[data-class] { width: calc((100% - 40px) / 6) !important; min-width: 0; min-height: 0 !important; padding: 8px !important; gap: 4px !important; }
+body.phone #perk-choice-list .perk-card[data-class] .perk-icon { font-size: 1.6rem !important; }
+body.phone #perk-choice-list .perk-card[data-class] .perk-name { font-size: .78rem !important; }
+body.phone #perk-choice-list .perk-card[data-class] .perk-desc { font-size: .6rem !important; line-height: 1.35 !important; }
+body.phone #perk-choice-list .perk-card[data-class] > div:last-child { display: none; }
+
+/* 指挥所：标题和说明压缩，标签页一行 */
+body.phone #cabin-title { font-size: 1.1rem; margin: 0; }
+body.phone #cabin-scr > div:nth-child(2) { display: none; }
+body.phone #cabin-tabs { margin-bottom: 6px; gap: 4px; }
+body.phone .cabin-tab { padding: 6px 4px; font-size: .72rem; text-align: center; }
+body.phone #cabin-resources { margin-bottom: 6px; gap: 12px; font-size: .8rem; padding: 3px 14px; }
+
+/* ══════════ 剧情演出：压成一屏 ══════════ */
+body.phone #cinematic-stage { top: 8%; bottom: 40%; }
+body.phone .portrait-body { transform: scale(.8); transform-origin: bottom center; }
+body.phone #cinematic-box { margin-bottom: 2%; }
+body.phone #cin-text-area { padding: 10px 18px 6px; min-height: 0; }
+body.phone #cin-text { font-size: .88rem; line-height: 1.6; min-height: 0; }
+body.phone #cin-speaker-bar { padding: 5px 16px; }
+body.phone #cin-skip { top: 8px; right: 10px; }

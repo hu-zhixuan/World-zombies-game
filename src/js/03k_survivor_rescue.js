@@ -177,7 +177,7 @@ function drawFieldSurvivors(){
         const w = 62;
         ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(s.x - w/2, gy + 6, w, 20, 6); else ctx.rect(s.x - w/2, gy + 6, w, 20); ctx.fill();
         ctx.fillStyle = '#e8eaed'; ctx.font = '500 12px sans-serif';
-        ctx.fillText('E 救人', s.x, gy + 20);
+        ctx.fillText(isPhoneUI() ? '救人' : 'E 救人', s.x, gy + 20);
       }
     }
     ctx.restore();
