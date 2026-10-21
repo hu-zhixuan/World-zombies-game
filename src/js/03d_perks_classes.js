@@ -303,12 +303,12 @@ function showClassChoice(onDone){
   let html = '';
   START_CLASSES.forEach(c=>{
     const sk = CLASS_SKILLS[c.id];
-    html += `<div class="perk-card" data-class="${c.id}" style="border-color:${c.color};width:160px;min-height:240px;background:linear-gradient(180deg,#161a22,#0b0e14);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 18px rgba(0,0,0,0.6);">
-      <div class="perk-rarity" style="color:${c.color};background:${c.color}22;border:1px solid ${c.color}55;font-weight:800;border-radius:4px;padding:2px 6px;align-self:flex-start;font-size:0.6rem;">${c.title||'战术装扮'}</div>
+    html += `<div class="perk-card" data-class="${c.id}" style="border-color:${c.color};width:160px;min-height:240px;background:#1a1b1e;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 18px rgba(0,0,0,0.6);">
+      <div class="perk-rarity" style="color:${c.color};background:${c.color}22;border:1px solid ${c.color}55;font-weight:600;border-radius:4px;padding:2px 6px;align-self:flex-start;font-size:0.6rem;">${c.title||'战术装扮'}</div>
       <div class="perk-icon" style="font-size:2.2rem;line-height:1;margin:4px 0;text-align:center;">${c.icon}</div>
-      <div class="perk-name" style="color:#fff;font-size:0.96rem;font-weight:900;text-align:center;">${c.name}</div>
-      <div class="perk-desc" style="font-size:0.68rem;color:#c9d1d9;line-height:1.45;flex:1;">${c.desc}</div>
-      <div style="font-size:0.62rem;color:#5be4ff;background:rgba(91,228,255,0.08);padding:4px 6px;border-radius:4px;border:1px solid rgba(91,228,255,0.2);">觉醒[X]：${sk?sk.name+' - '+sk.desc:''}</div>
+      <div class="perk-name" style="color:#ffffff;font-size:0.96rem;font-weight:600;text-align:center;">${c.name}</div>
+      <div class="perk-desc" style="font-size:0.68rem;color:#ced0d4;line-height:1.45;flex:1;">${c.desc}</div>
+      <div style="font-size:0.62rem;color:#f2a65a;background:rgba(242,166,90,0.08);padding:4px 6px;border-radius:4px;border:1px solid rgba(242,166,90,0.2);">觉醒[X]：${sk?sk.name+' - '+sk.desc:''}</div>
       <div style="font-size:0.6rem;color:#f85149;margin-top:2px;font-weight:700;">🎖️ 第3波通关交付专属神兵：${c.weaponName}</div>
       <div style="font-size:0.58rem;color:#8b949e;text-align:center;border-top:1px dashed rgba(255,255,255,0.1);padding-top:4px;">开局统一配备⚪制式手枪自卫</div>
     </div>`;

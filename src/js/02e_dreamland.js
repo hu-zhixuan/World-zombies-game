@@ -38,22 +38,22 @@ function openDreamModal(){
     picks.forEach(p => {
       const card = document.createElement('div');
       card.className = 'dream-card';
-      card.style.cssText = 'background:rgba(14,20,34,0.92);border:1.5px solid rgba(0,240,255,0.3);border-radius:10px;padding:16px;cursor:pointer;display:flex;flex-direction:column;align-items:center;text-align:center;transition:all .2s ease;box-shadow:0 4px 15px rgba(0,0,0,0.5);';
+      card.style.cssText = 'background:rgba(22,23,26,0.92);border:1.5px solid rgba(119,125,136,0.3);border-radius:10px;padding:16px;cursor:pointer;display:flex;flex-direction:column;align-items:center;text-align:center;transition:all .2s ease;box-shadow:0 4px 15px rgba(0,0,0,0.5);';
       card.innerHTML = `
-        <div style="font-size:2.8rem;margin-bottom:8px;filter:drop-shadow(0 0 12px rgba(0,240,255,0.6));">${p.icon}</div>
-        <div style="font-family:var(--font-display);font-size:1.15rem;font-weight:800;color:#e0f2fe;letter-spacing:1px;margin-bottom:6px;">${p.name}</div>
-        <div style="font-size:0.8rem;color:#94a3b8;line-height:1.45;margin-bottom:14px;flex:1;">${p.desc}</div>
-        <button class="tactical-btn" style="width:100%;padding:7px;background:linear-gradient(90deg,rgba(0,240,255,0.25),rgba(0,180,255,0.45));border:1px solid #00f0ff;color:#e0f7fa;border-radius:6px;font-weight:800;font-size:0.85rem;cursor:pointer;">
+        <div style="font-size:2.8rem;margin-bottom:8px;);">${p.icon}</div>
+        <div style="font-family:var(--font-display);font-size:1.15rem;font-weight:600;color:#f2a65a;letter-spacing:1px;margin-bottom:6px;">${p.name}</div>
+        <div style="font-size:0.8rem;color:#a0a4ac;line-height:1.45;margin-bottom:14px;flex:1;">${p.desc}</div>
+        <button class="tactical-btn" style="width:100%;padding:7px;background:rgba(119,125,136,0.25);border:1px solid #777d88;color:#f2a65a;border-radius:6px;font-weight:600;font-size:0.85rem;cursor:pointer;">
           悟入此梦
         </button>
       `;
       card.onmouseenter = () => {
-        card.style.borderColor = '#00f0ff';
+        card.style.borderColor = '#777d88';
         card.style.transform = 'translateY(-4px)';
-        card.style.boxShadow = '0 8px 25px rgba(0,240,255,0.45)';
+        card.style.boxShadow = '0 8px 25px rgba(119,125,136,0.45)';
       };
       card.onmouseleave = () => {
-        card.style.borderColor = 'rgba(0,240,255,0.3)';
+        card.style.borderColor = 'rgba(119,125,136,0.3)';
         card.style.transform = 'translateY(0)';
         card.style.boxShadow = '0 4px 15px rgba(0,0,0,0.5)';
       };
@@ -130,7 +130,7 @@ function showSignatureDeliveryModal(w){
   if(!modal){
     modal = document.createElement('div');
     modal.id = 'signature-delivery-modal';
-    modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(4,6,10,0.88);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);animation:fadeIn .25s ease;';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(7,7,7,0.88);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);animation:fadeIn .25s ease;';
     document.body.appendChild(modal);
   }
 
@@ -138,35 +138,35 @@ function showSignatureDeliveryModal(w){
   const clsTitle = playerClass ? (playerClass.title || playerClass.name) : '战术装扮';
 
   modal.innerHTML = `
-    <div style="background:linear-gradient(180deg,#1c1214,#0a0c10);border:2px solid #f85149;border-radius:16px;box-shadow:0 0 40px rgba(248,81,73,0.55),0 8px 32px rgba(0,0,0,0.85);max-width:530px;width:92%;padding:26px 24px;text-align:center;position:relative;color:#f0f6fc;font-family:var(--font-display);">
-      <div style="font-size:0.75rem;font-weight:800;letter-spacing:3px;color:#f85149;text-transform:uppercase;">
+    <div style="background:#1c1214;border:2px solid #f85149;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.85);max-width:530px;width:92%;padding:26px 24px;text-align:center;position:relative;color:#f2a65a;font-family:var(--font-display);">
+      <div style="font-size:0.75rem;font-weight:600;letter-spacing:1px;color:#f85149;text-transform:uppercase;">
         ★ 阶段里程碑 · 避难所战备空投 ★
       </div>
-      <div style="font-size:1.45rem;font-weight:900;color:#fff;margin:8px 0 4px;text-shadow:0 0 16px rgba(248,81,73,0.8);">
+      <div style="font-size:1.45rem;font-weight:600;color:#ffffff;margin:8px 0 4px;text-shadow:none;">
         小胡专属神兵战备交付！
       </div>
       <div style="font-size:0.8rem;color:#8b949e;line-height:1.5;margin-bottom:18px;">
         坚守完成第 3 波狂暴尸潮，成功撤退避难所！<br>
-        帅气勇敢的大学生 <b style="color:#5be4ff;">${clsName}</b> 战备空投解封，正式装备红色神兵！
+        帅气勇敢的大学生 <b style="color:#f2a65a;">${clsName}</b> 战备空投解封，正式装备红色神兵！
       </div>
 
-      <div style="background:linear-gradient(180deg,rgba(248,81,73,0.14),rgba(0,0,0,0.45));border:1px solid rgba(248,81,73,0.4);border-radius:12px;padding:16px;margin-bottom:20px;display:flex;align-items:center;gap:16px;text-align:left;">
-        <span style="font-size:3rem;line-height:1;filter:drop-shadow(0 0 12px rgba(248,81,73,0.6));background:rgba(0,0,0,0.5);padding:10px;border-radius:10px;border:1px solid rgba(248,81,73,0.3);">${w.icon}</span>
+      <div style="background:rgba(248,81,73,0.14);border:1px solid rgba(248,81,73,0.4);border-radius:12px;padding:16px;margin-bottom:20px;display:flex;align-items:center;gap:16px;text-align:left;">
+        <span style="font-size:3rem;line-height:1;);background:rgba(0,0,0,0.5);padding:10px;border-radius:10px;border:1px solid rgba(248,81,73,0.3);">${w.icon}</span>
         <div style="flex:1;">
           <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:1.15rem;font-weight:800;color:#f85149;">${w.name}</span>
-            <span style="font-size:0.62rem;background:#f85149;color:#fff;padding:2px 6px;border-radius:4px;font-weight:700;">🔴 神兵专属</span>
+            <span style="font-size:1.15rem;font-weight:600;color:#f85149;">${w.name}</span>
+            <span style="font-size:0.62rem;background:#f85149;color:#ffffff;padding:2px 6px;border-radius:4px;font-weight:700;">🔴 神兵专属</span>
           </div>
-          <div style="font-size:0.72rem;color:#c9d1d9;margin-top:5px;line-height:1.4;">
+          <div style="font-size:0.72rem;color:#ced0d4;margin-top:5px;line-height:1.4;">
             ${w.trait}
           </div>
-          <div style="font-size:0.66rem;color:#5be4ff;margin-top:6px;font-weight:700;">
+          <div style="font-size:0.66rem;color:#f2a65a;margin-top:6px;font-weight:700;">
             ✔ 已配发至 2 号武器槽 · 满弹药就绪
           </div>
         </div>
       </div>
 
-      <button id="btn-claim-signature" style="background:linear-gradient(180deg,#f85149,#b91c1c);color:#fff;border:none;border-radius:8px;padding:12px 36px;font-size:0.95rem;font-weight:800;cursor:pointer;box-shadow:0 0 18px rgba(248,81,73,0.5);font-family:var(--font-display);letter-spacing:1px;" onclick="document.getElementById('signature-delivery-modal').style.display='none';addBanner('🔥 已装备🔴神兵专属「${w.name}」！尽情倾泻火力！');">
+      <button id="btn-claim-signature" style="background:#f85149;color:#ffffff;border:none;border-radius:8px;padding:12px 36px;font-size:0.95rem;font-weight:600;cursor:pointer;box-shadow:none;font-family:var(--font-display);letter-spacing:1px;" onclick="document.getElementById('signature-delivery-modal').style.display='none';addBanner('🔥 已装备🔴神兵专属「${w.name}」！尽情倾泻火力！');">
         提枪迎战 · 继续出击
       </button>
     </div>

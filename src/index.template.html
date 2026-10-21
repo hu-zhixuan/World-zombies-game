@@ -62,9 +62,9 @@
   <div id="combo-vignette" style="opacity: 0;"></div>
   <div id="combo-hud" style="display: none;"></div>
   <!-- 🚨 EMERGENCY RETREAT HUD (紧凑微型战术胶囊指示器，居中锚定在游戏画布正上方，绝不遮挡视野) -->
-  <div id="emergency-retreat-hud" class="compact-retreat-hud" style="display:none;position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:300;background:rgba(14,18,26,0.92);backdrop-filter:blur(8px);border:1.5px solid rgba(255,77,109,0.7);border-radius:24px;padding:4px 16px;height:38px;box-sizing:border-box;box-shadow:0 4px 16px rgba(0,0,0,0.6),0 0 12px rgba(255,50,50,0.25);cursor:pointer;animation:pulseRetreat 0.8s infinite alternate;align-items:center;gap:10px;user-select:none;pointer-events:auto;">
+  <div id="emergency-retreat-hud" class="compact-retreat-hud" style="display:none;position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:300;background:rgba(19,20,21,0.92);backdrop-filter:blur(8px);border:1.5px solid rgba(255,77,109,0.7);border-radius:24px;padding:4px 16px;height:38px;box-sizing:border-box;box-shadow:0 4px 16px rgba(0,0,0,0.6);cursor:pointer;animation:pulseRetreat 0.8s infinite alternate;align-items:center;gap:10px;user-select:none;pointer-events:auto;">
     <span style="font-size:14px;line-height:1;">🚨</span>
-    <span style="font-family:var(--font-display);font-size:12px;font-weight:800;color:#fff;letter-spacing:1px;white-space:nowrap;text-shadow:0 0 8px rgba(255,60,60,0.6);">
+    <span style="font-family:var(--font-display);font-size:12px;font-weight:600;color:#ffffff;letter-spacing:1px;white-space:nowrap;text-shadow:none;">
       尸潮压境 · 撤回小屋门前避难
     </span>
     <span style="font-size:11px;color:#fca5a5;padding:2px 8px;background:rgba(255,50,50,0.22);border-radius:12px;border:1px solid rgba(255,80,80,0.35);white-space:nowrap;">
@@ -78,7 +78,7 @@
   <!-- ── TOUCH CONTROLS OVERLAY ── -->
   <div id="touch-overlay">
     <!-- Mobile weapon strip -->
-    <div id="wpn-strip"><div class="wpn-btn active-w" id="mwb0" style="border-color: rgb(255, 224, 102);"><span class="wi2">🔫</span><span class="wa2">12</span></div><div class="wpn-btn" id="mwb1" style="border-color: rgb(154, 154, 154);"><span class="wi2">💥</span><span class="wa2">6</span></div></div>
+    <div id="wpn-strip"><div class="wpn-btn active-w" id="mwb0" style="border-color: rgb(255,224,102);"><span class="wi2">🔫</span><span class="wa2">12</span></div><div class="wpn-btn" id="mwb1" style="border-color: rgb(154,154,154);"><span class="wi2">💥</span><span class="wa2">6</span></div></div>
     <!-- Joystick -->
     <div id="joy-zone">
       <div id="joy-base"></div>
@@ -140,7 +140,7 @@
     <!-- 厨房面板（经营重做：菜单规划+肉材管理，秒变金币流程已删） -->
     <div id="cabin-kitchen-panel">
       <div id="meat-inventory"></div>
-      <div style="width:100%;text-align:center;font-family:var(--font-display);font-weight:800;font-size:.85rem;color:#f0c060;margin-bottom:4px;">
+      <div style="width:100%;text-align:center;font-family:var(--font-display);font-weight:600;font-size:.85rem;color:#f0c060;margin-bottom:4px;">
         📋 规划今晚菜单 —— 顾客只会点你注册的菜
       </div>
       <div id="menu-reg-grid"></div>
@@ -232,7 +232,7 @@
     <div class="wd-top-bar">
       <span>📻 据点战术无线电 · 频道 104.2</span>
       <span id="wd-page-indicator" style="color:#ffd875;">[第 1 / 1 句]</span>
-      <span style="color:#5be4ff;">🟢 信号正常</span>
+      <span style="color:#f2a65a;">🟢 信号正常</span>
     </div>
     <div class="wd-main">
       <div id="wd-avatar" class="wd-avatar">🧔</div>
@@ -343,35 +343,35 @@
 
   <!-- HU'S WEAPON WORKSHOP MODAL (小胡军备改造台) -->
   <div id="duff-workshop-modal" style="display:none;">
-    <div style="position:absolute;inset:0;background:rgba(6,8,14,0.92);" onclick="closeDuffWorkshop()"></div>
+    <div style="position:absolute;inset:0;background:rgba(9,10,11,0.92);" onclick="closeDuffWorkshop()"></div>
     <div class="ws-window">
       <div class="ws-header">
         <div style="display:flex;align-items:center;gap:12px;">
-          <span style="font-size:2rem;line-height:1;filter:drop-shadow(0 0 10px rgba(91,228,255,0.6));">🛠️</span>
+          <span style="font-size:2rem;line-height:1;);">🛠️</span>
           <div>
             <div style="display:flex;align-items:center;gap:8px;">
-              <div style="font-family:var(--font-display);font-size:1.3rem;color:#5be4ff;font-weight:900;letter-spacing:1px;text-shadow:0 0 16px rgba(91,228,255,0.6);">
+              <div style="font-family:var(--font-display);font-size:1.3rem;color:#f2a65a;font-weight:600;letter-spacing:1px;text-shadow:none;">
                 小胡战术工坊 · Hu's Tactical Workshop
               </div>
-              <span style="font-size:0.6rem;padding:2px 8px;border-radius:4px;background:rgba(91,228,255,0.18);border:1px solid #5be4ff;color:#5be4ff;font-weight:700;letter-spacing:1px;">工科生小胡自研</span>
+              <span style="font-size:0.6rem;padding:2px 8px;border-radius:4px;background:rgba(242,166,90,0.18);border:1px solid #f2a65a;color:#f2a65a;font-weight:700;letter-spacing:1px;">工科生小胡自研</span>
             </div>
-            <div style="font-size:0.68rem;color:#94a8be;margin-top:2px;">大学生小胡的战术配件改造台 · 扩容弹夹 / 红点瞄准镜 / 消音制退器 / 元素符石 · 消耗金币与机械零件</div>
+            <div style="font-size:0.68rem;color:#a3a7af;margin-top:2px;">大学生小胡的战术配件改造台 · 扩容弹夹 / 红点瞄准镜 / 消音制退器 / 元素符石 · 消耗金币与机械零件</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:14px;font-size:0.85rem;">
-          <span id="ws-coins" style="color:#ffd700;font-weight:800;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:20px;border:1px solid rgba(255,215,0,0.3);">💰 0</span>
-          <span id="ws-scrap" style="color:#5be4ff;font-weight:800;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:20px;border:1px solid rgba(91,228,255,0.3);">⚙️ 0</span>
+          <span id="ws-coins" style="color:#ffd700;font-weight:600;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:20px;border:1px solid rgba(255,215,0,0.3);">💰 0</span>
+          <span id="ws-scrap" style="color:#f2a65a;font-weight:600;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:20px;border:1px solid rgba(242,166,90,0.3);">⚙️ 0</span>
           <button style="background:rgba(180,40,40,0.25);border:1px solid #ff5555;color:#ff9999;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:700;transition:all .15s;" onmouseover="this.style.background='rgba(220,50,50,0.4)'" onmouseout="this.style.background='rgba(180,40,40,0.25)'" onclick="closeDuffWorkshop()">✕ 关闭 (Esc)</button>
         </div>
       </div>
       <div id="ws-body" style="display:flex;flex:1;overflow:hidden;min-height:400px;">
         <!-- Left: Slot Selector -->
-        <div style="width:270px;border-right:1.5px solid rgba(91,228,255,0.2);background:rgba(10,15,24,0.65);padding:14px;display:flex;flex-direction:column;gap:10px;">
+        <div style="width:270px;border-right:1.5px solid rgba(242,166,90,0.2);background:rgba(16,17,18,0.65);padding:14px;display:flex;flex-direction:column;gap:10px;">
           <div style="font-family:var(--font-display);font-size:0.8rem;color:#f0c060;font-weight:700;letter-spacing:1px;display:flex;align-items:center;gap:6px;">
             <span>⚔️</span> 选择改装武器槽位 (上限2把):
           </div>
           <div id="ws-slots-container" style="display:flex;flex-direction:column;gap:8px;"></div>
-          <div style="margin-top:auto;font-size:0.66rem;color:#94a8be;line-height:1.55;background:rgba(6,10,18,0.7);padding:10px;border-radius:8px;border:1px solid rgba(91,228,255,0.25);border-left:3px solid #5be4ff;">
+          <div style="margin-top:auto;font-size:0.66rem;color:#a3a7af;line-height:1.55;background:rgba(11,12,13,0.7);padding:10px;border-radius:8px;border:1px solid rgba(242,166,90,0.25);border-left:3px solid #f2a65a;">
             🎓 <b>工科小胡备忘录</b>：机械工程学没白学！白天防线与远征搜刮的机械零件，加上夜间深夜食堂赚取的金币，都能在这里转化为扎实火力和弹道升级！
           </div>
         </div>
@@ -391,8 +391,8 @@
     <div id="cinematic-stage"></div>
     <div id="cinematic-box" onclick="event.stopPropagation();advanceCinematic()">
       <div id="cin-speaker-bar">
-        <div id="cin-speaker-icon" style="border-color: rgb(240, 192, 96); color: rgb(240, 192, 96); background: radial-gradient(circle, rgba(240, 192, 96, 0.2), transparent);">胡</div>
-        <div id="cin-speaker" style="color: rgb(240, 192, 96);">小胡</div>
+        <div id="cin-speaker-icon" style="border-color: rgb(240,192,96); color: rgb(240,192,96); background: rgba(240,192,96, 0.2);">胡</div>
+        <div id="cin-speaker" style="color: rgb(240,192,96);">小胡</div>
       </div>
       <div id="cin-text-area">
         <div id="cin-text">第一夜，我杀了七只僵尸。饿急眼了，割了块肉烤了。
@@ -409,7 +409,7 @@
   <!-- ZOMBIE CODEX SCREEN（僵尸图鉴界面） -->
   <div id="codex-scr">
     <div id="codex-header">
-      <h2 style="font-family:var(--font-display);font-weight:800;font-size:1.6rem;color:var(--dave-coin-yellow);letter-spacing:2px;">🧟 僵尸图鉴</h2>
+      <h2 style="font-family:var(--font-display);font-weight:600;font-size:1.6rem;color:var(--dave-coin-yellow);letter-spacing:1px;">🧟 僵尸图鉴</h2>
       <div id="codex-stats">已发现: 0 / 16 | 总击杀: 0</div>
     </div>
     <div id="codex-grid"></div>
@@ -419,7 +419,7 @@
   <!-- VIP CUSTOMER COMPENDIUM SCREEN（VIP顾客图鉴） -->
   <div id="vip-compendium-scr">
     <div id="vip-compendium-header">
-      <h2 style="font-family:var(--font-display);font-weight:800;font-size:1.5rem;color:#dd88ff;letter-spacing:2px;text-shadow:0 0 20px rgba(221,136,255,.4);">📖 常客与VIP顾客图鉴</h2>
+      <h2 style="font-family:var(--font-display);font-weight:600;font-size:1.5rem;color:#dd88ff;letter-spacing:1px;text-shadow:none;">📖 常客与VIP顾客图鉴</h2>
       <div id="vip-compendium-stats">已解锁 0/15 · 粉丝 0</div>
     </div>
     <div id="vip-compendium-grid"></div>
@@ -455,7 +455,7 @@
 
   <!-- MAIN MENU SCREEN -->
   <div class="overlay" id="start-scr" style="display: none;">
-    <h2>🏰 十五波围城：最后据点 <span style="font-size:1.1rem;color:#f0c060;font-weight:normal;">v55</span></h2>
+    <h2>🏰 十五波围城：最后据点 <span style="font-size:1.1rem;color:#f0c060;font-weight:normal;">v56</span></h2>
     <div class="ctrl-grid" style="margin:4px 0 6px">
       <div class="ctrl-row"><b>A/D 或 ←/→</b> 移动</div>
       <div class="ctrl-row"><b>W/空格/↑</b> 跳跃</div>
@@ -478,46 +478,46 @@
 
 
   <!-- ✨ DREAMLAND MEDITATION MODAL (小胡的潜意识梦境) -->
-  <div id="dream-modal" class="overlay" style="display:none;position:fixed;inset:0;z-index:220;background:rgba(4,6,12,0.94);backdrop-filter:blur(18px);justify-content:center;align-items:center;flex-direction:column;">
-    <div class="dream-box" style="position:relative;width:92%;max-width:840px;background:linear-gradient(180deg,rgba(15,22,38,0.95),rgba(8,12,22,0.98));border:1.5px solid rgba(0,240,255,0.4);border-radius:14px;box-shadow:0 0 45px rgba(0,180,255,0.25),inset 0 1px 0 rgba(255,255,255,0.15);padding:24px;display:flex;flex-direction:column;align-items:center;">
-      <div style="font-family:var(--font-display);font-size:0.75rem;letter-spacing:4px;color:#00f0ff;text-transform:uppercase;margin-bottom:4px;text-shadow:0 0 10px rgba(0,240,255,0.6);">
+  <div id="dream-modal" class="overlay" style="display:none;position:fixed;inset:0;z-index:220;background:rgba(7,8,9,0.94);backdrop-filter:blur(18px);justify-content:center;align-items:center;flex-direction:column;">
+    <div class="dream-box" style="position:relative;width:92%;max-width:840px;background:rgba(25,26,28,0.95);border:1.5px solid rgba(119,125,136,0.4);border-radius:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.15);padding:24px;display:flex;flex-direction:column;align-items:center;">
+      <div style="font-family:var(--font-display);font-size:0.75rem;letter-spacing:1px;color:#777d88;text-transform:uppercase;margin-bottom:4px;text-shadow:none;">
         LUCID DREAM MEDITATION · SUBMIT TO SLEEP
       </div>
-      <h2 style="font-family:var(--font-display);font-weight:900;font-size:1.8rem;color:#f0f8ff;letter-spacing:3px;margin-bottom:6px;text-shadow:0 0 20px rgba(120,180,255,0.6);">
+      <h2 style="font-family:var(--font-display);font-weight:600;font-size:1.8rem;color:#f2a65a;letter-spacing:1px;margin-bottom:6px;text-shadow:none;">
         ✨ 小胡的潜意识梦境 · 深层冥想
       </h2>
-      <p style="font-size:0.85rem;color:#94a3b8;margin-bottom:18px;text-align:center;max-width:620px;line-height:1.5;">
+      <p style="font-size:0.85rem;color:#a0a4ac;margin-bottom:18px;text-align:center;max-width:620px;line-height:1.5;">
         末世无眠之夜，小胡在微光中闭上双眼。梦里的收获带不上战场，却会留在这间小屋里……选一个今夜的梦（每天一次）：
       </p>
       <div id="dream-cards-container" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;width:100%;margin-bottom:18px;">
       </div>
       <div style="display:flex;gap:12px;align-items:center;">
-        <button class="tactical-btn" onclick="closeDreamModal(false)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);color:#94a3b8;padding:8px 22px;border-radius:6px;cursor:pointer;font-family:var(--font-display);font-size:0.85rem;">
+        <button class="tactical-btn" onclick="closeDreamModal(false)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.2);color:#a0a4ac;padding:8px 22px;border-radius:6px;cursor:pointer;font-family:var(--font-display);font-size:0.85rem;">
           暂不冥想 · 直接入睡
         </button>
       </div>
     </div>
   </div>
 
-  <div class="overlay" id="main-menu-scr" style="display: flex; position: fixed; inset: 0; z-index: 110; overflow: hidden; background: #07090e; justify-content: center; align-items: center;">
+  <div class="overlay" id="main-menu-scr" style="display: flex; position: fixed; inset: 0; z-index: 110; overflow: hidden; background: #0a0a0b; justify-content: center; align-items: center;">
     <canvas id="menu-bg-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;"></canvas>
-    <div id="menu-vignette-overlay" style="position:absolute;inset:0;pointer-events:none;z-index:2;background:radial-gradient(ellipse at center, rgba(12,16,28,0.3) 0%, rgba(4,6,10,0.92) 85%);"></div>
+    <div id="menu-vignette-overlay" style="position:absolute;inset:0;pointer-events:none;z-index:2;background:rgba(19,20,21,0.3);"></div>
 
     <div id="menu-content-wrap" style="position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;max-width:960px;width:94%;max-height:94vh;padding:12px 16px;">
       
       <!-- 顶部招牌：要塞霸气冷色 + 深夜食堂暖色霓虹闪烁碰撞 -->
       <div id="menu-header" style="text-align:center;margin-bottom:14px;">
-        <div style="font-family:var(--font-display);font-size:0.75rem;letter-spacing:4px;color:rgba(180,200,225,0.7);text-transform:uppercase;margin-bottom:3px;text-shadow:0 0 10px rgba(0,180,255,0.3);">
+        <div style="font-family:var(--font-display);font-size:0.75rem;letter-spacing:1px;color:rgba(199,201,206,0.7);text-transform:uppercase;margin-bottom:3px;text-shadow:none;">
           ⚡ FORTRESS DEFENSE & MIDNIGHT REFUGE ⚡
         </div>
-        <h1 style="font-family:var(--font-display);font-weight:900;font-size:2.8rem;color:#f5f0eb;letter-spacing:4px;margin:0 0 4px 0;text-shadow:0 0 25px rgba(255,107,107,0.6),0 3px 6px #000;">
+        <h1 style="font-family:var(--font-display);font-weight:600;font-size:2.8rem;color:#f5f0eb;letter-spacing:1px;margin:0 0 4px 0;text-shadow:0 3px 6px #000000;">
           十五波围城
         </h1>
-        <div class="menu-neon-canteen-sign" style="font-family:var(--font-display);font-size:1.1rem;color:#ffaa33;letter-spacing:3px;font-weight:800;text-shadow:0 0 10px #ff8800,0 0 24px rgba(255,120,0,0.8),0 0 35px rgba(255,60,0,0.5);margin-bottom:6px;">
+        <div class="menu-neon-canteen-sign" style="font-family:var(--font-display);font-size:1.1rem;color:#ffaa33;letter-spacing:1px;font-weight:600;text-shadow:none;margin-bottom:6px;">
           <span class="neon-flicker">🍜</span> 废土要塞 · 深夜秘密食堂 <span class="neon-flicker">🥢</span>
         </div>
-        <div style="display:inline-block;padding:2px 14px;border-radius:12px;background:rgba(255,200,80,0.12);border:1px solid rgba(255,200,80,0.4);font-family:var(--font-display);font-size:0.72rem;color:#f0c060;letter-spacing:1.5px;box-shadow:0 0 12px rgba(240,192,96,0.25);">
-          v55 · 昼夜循环深夜食堂 · 小胡军备改装与超武觉醒进化版
+        <div style="display:inline-block;padding:2px 14px;border-radius:12px;background:rgba(255,200,80,0.12);border:1px solid rgba(255,200,80,0.4);font-family:var(--font-display);font-size:0.72rem;color:#f0c060;letter-spacing:1.5px;box-shadow:none;">
+          v56 · 昼夜循环深夜食堂 · 小胡军备改装与超武觉醒进化版
         </div>
       </div>
 
@@ -525,16 +525,16 @@
       <div id="menu-cards-row" style="display:flex;gap:20px;width:100%;justify-content:center;align-items:stretch;flex-wrap:wrap;">
         
         <!-- 左侧：指挥终端行动卡片 -->
-        <div class="glass-tactical-card" style="flex:1;min-width:280px;max-width:360px;background:rgba(18,24,36,0.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(120,160,220,0.25);border-radius:14px;box-shadow:0 12px 35px rgba(0,0,0,0.7),inset 0 1px 0 rgba(255,255,255,0.1);padding:16px;display:flex;flex-direction:column;">
-          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(100,140,200,0.2);padding-bottom:8px;margin-bottom:12px;">
-            <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-display);font-size:0.9rem;font-weight:700;color:#9bc8ff;letter-spacing:1px;">
+        <div class="glass-tactical-card" style="flex:1;min-width:280px;max-width:360px;background:rgba(25,26,29,0.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(242,166,90,0.25);border-radius:14px;box-shadow:0 12px 35px rgba(0,0,0,0.7),inset 0 1px 0 rgba(255,255,255,0.1);padding:16px;display:flex;flex-direction:column;">
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(143,148,157,0.2);padding-bottom:8px;margin-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-display);font-size:0.9rem;font-weight:700;color:#f2a65a;letter-spacing:1px;">
               <span>🎮</span> 战地指挥终端
             </div>
             <span style="font-size:0.6rem;padding:2px 6px;border-radius:4px;background:rgba(39,174,96,0.25);border:1px solid #27ae60;color:#88ffaa;">TERMINAL ONLINE</span>
           </div>
 
           <div id="menu-btns" style="display:flex;flex-direction:column;gap:10px;flex:1;">
-            <button class="tactical-menu-btn btn-new" onclick="startGame()" onmouseenter="sndBtnHover()" style="border-color:#27ae60;color:#88ffaa;background:linear-gradient(90deg,rgba(39,174,96,0.22),rgba(20,60,35,0.5));">
+            <button class="tactical-menu-btn btn-new" onclick="startGame()" onmouseenter="sndBtnHover()">
               <span class="tmb-icon">🆕</span>
               <div class="tmb-text-wrap">
                 <span class="tmb-title">新游戏</span>
@@ -542,7 +542,7 @@
               </div>
             </button>
 
-            <button class="tactical-menu-btn btn-continue" id="continue-btn" onclick="continueGame()" onmouseenter="sndBtnHover()" style="border-color:var(--cyan);color:#a8f0ff;background:linear-gradient(90deg,rgba(0,212,255,0.2),rgba(10,45,70,0.5));display:block;">
+            <button class="tactical-menu-btn btn-continue" id="continue-btn" onclick="continueGame()" onmouseenter="sndBtnHover()" style="display:block;">
               <span class="tmb-icon">📂</span>
               <div class="tmb-text-wrap">
                 <span class="tmb-title">继续游戏</span>
@@ -550,7 +550,7 @@
               </div>
             </button>
 
-            <button class="tactical-menu-btn btn-settings" onclick="openSettings()" onmouseenter="sndBtnHover()" style="border-color:var(--yellow);color:#ffe088;background:linear-gradient(90deg,rgba(243,156,18,0.18),rgba(60,40,10,0.45));">
+            <button class="tactical-menu-btn btn-settings" onclick="openSettings()" onmouseenter="sndBtnHover()">
               <span class="tmb-icon">⚙</span>
               <div class="tmb-text-wrap">
                 <span class="tmb-title">战地设置</span>
@@ -558,7 +558,7 @@
               </div>
             </button>
 
-            <button class="tactical-menu-btn btn-codex" onclick="openCodex()" onmouseenter="sndBtnHover()" style="border-color:#aa4444;color:#ff9999;background:linear-gradient(90deg,rgba(170,68,68,0.2),rgba(50,15,15,0.45));">
+            <button class="tactical-menu-btn btn-codex" onclick="openCodex()" onmouseenter="sndBtnHover()">
               <span class="tmb-icon">🧟</span>
               <div class="tmb-text-wrap">
                 <span class="tmb-title">僵尸图鉴</span>
@@ -566,7 +566,7 @@
               </div>
             </button>
 
-            <button class="tactical-menu-btn btn-download" onclick="downloadGame()" onmouseenter="sndBtnHover()" style="border-color:#9b59b6;color:#e8b8ff;background:linear-gradient(90deg,rgba(155,89,182,0.2),rgba(45,20,55,0.45));">
+            <button class="tactical-menu-btn btn-download" onclick="downloadGame()" onmouseenter="sndBtnHover()">
               <span class="tmb-icon">💾</span>
               <div class="tmb-text-wrap">
                 <span class="tmb-title">下载单机版</span>
@@ -577,7 +577,7 @@
         </div>
 
         <!-- 右侧：存档与作战情报看板卡片 -->
-        <div class="glass-tactical-card" id="save-intel-card" style="flex:1.2;min-width:320px;max-width:440px;background:rgba(18,24,36,0.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(240,192,96,0.3);border-radius:14px;box-shadow:0 12px 35px rgba(0,0,0,0.7),inset 0 1px 0 rgba(255,255,255,0.1);padding:16px;display:flex;flex-direction:column;">
+        <div class="glass-tactical-card" id="save-intel-card" style="flex:1.2;min-width:320px;max-width:440px;background:rgba(25,26,29,0.78);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(240,192,96,0.3);border-radius:14px;box-shadow:0 12px 35px rgba(0,0,0,0.7),inset 0 1px 0 rgba(255,255,255,0.1);padding:16px;display:flex;flex-direction:column;">
           <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(240,192,96,0.2);padding-bottom:8px;margin-bottom:12px;">
             <div style="display:flex;align-items:center;gap:6px;font-family:var(--font-display);font-size:0.9rem;font-weight:700;color:#f0c060;letter-spacing:1px;">
               <span>📋</span> 要塞防区战备看板
@@ -596,7 +596,7 @@
       </div>
 
       <!-- 底部操作提示 -->
-      <div style="margin-top:14px;font-size:0.68rem;color:rgba(180,195,220,0.6);text-align:center;letter-spacing:1px;">
+      <div style="margin-top:14px;font-size:0.68rem;color:rgba(196,199,204,0.6);text-align:center;letter-spacing:1px;">
         💡 <b>操作指南</b>：1/2 切换双持武器 · 空格跳跃/翻滚 · 白天杀僵尸搜集肉块与零件 · 夜晚经营食堂赚金币 · 小胡改造台觉醒终极超武
       </div>
 
@@ -604,37 +604,37 @@
   </div>
 
   <!-- SETTINGS SCREEN -->
-  <div class="overlay" id="settings-scr" style="display: none; background: rgba(6,9,15,0.94); backdrop-filter: blur(14px); z-index: 112;">
-    <div class="glass-tactical-card" style="width:90%;max-width:380px;background:rgba(18,24,38,0.88);border:1.5px solid rgba(120,160,220,0.3);border-radius:16px;box-shadow:0 12px 35px rgba(0,0,0,0.7);padding:24px 20px;display:flex;flex-direction:column;align-items:center;">
-      <h2 style="color:#ffd700;font-size:1.8rem;letter-spacing:3px;margin-bottom:18px;text-shadow:0 0 16px rgba(255,215,0,0.4);">⚙ 战备系统设置</h2>
+  <div class="overlay" id="settings-scr" style="display: none; background: rgba(10,10,11,0.94); backdrop-filter: blur(14px); z-index: 112;">
+    <div class="glass-tactical-card" style="width:90%;max-width:380px;background:rgba(26,27,30,0.88);border:1.5px solid rgba(242,166,90,0.3);border-radius:16px;box-shadow:0 12px 35px rgba(0,0,0,0.7);padding:24px 20px;display:flex;flex-direction:column;align-items:center;">
+      <h2 style="color:#ffd700;font-size:1.8rem;letter-spacing:1px;margin-bottom:18px;text-shadow:none;">⚙ 战备系统设置</h2>
       <div style="display:flex;flex-direction:column;gap:14px;width:100%;margin-bottom:22px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(25,35,55,0.5);padding:8px 14px;border-radius:8px;border:1px solid rgba(120,160,220,0.18);">
-          <span style="color:#e2e8f0;font-size:.88rem;font-weight:600;">🎵 背景音乐 (BGM)</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(37,39,43,0.5);padding:8px 14px;border-radius:8px;border:1px solid rgba(242,166,90,0.18);">
+          <span style="color:#e7e8eb;font-size:.88rem;font-weight:600;">🎵 背景音乐 (BGM)</span>
           <button id="setting-bgm" onclick="toggleSettingBgm()" style="background:rgba(46,204,113,0.2);border:1.5px solid #2ecc71;color:#55ff99;padding:4px 16px;border-radius:20px;cursor:pointer;font-size:.78rem;font-weight:700;">开</button>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(25,35,55,0.5);padding:8px 14px;border-radius:8px;border:1px solid rgba(120,160,220,0.18);">
-          <span style="color:#e2e8f0;font-size:.88rem;font-weight:600;">🔊 战斗音效 (SFX)</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(37,39,43,0.5);padding:8px 14px;border-radius:8px;border:1px solid rgba(242,166,90,0.18);">
+          <span style="color:#e7e8eb;font-size:.88rem;font-weight:600;">🔊 战斗音效 (SFX)</span>
           <button id="setting-sfx" onclick="toggleSettingSfx()" style="background:rgba(46,204,113,0.2);border:1.5px solid #2ecc71;color:#55ff99;padding:4px 16px;border-radius:20px;cursor:pointer;font-size:.78rem;font-weight:700;">开</button>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(25,35,55,0.5);padding:8px 14px;border-radius:8px;border:1px solid rgba(120,160,220,0.18);">
-          <span style="color:#e2e8f0;font-size:.88rem;font-weight:600;">📱 触屏适配控制</span>
-          <span id="device-info" style="color:#94a8be;font-size:.72rem;font-family:var(--font-display);">检测中...</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(37,39,43,0.5);padding:8px 14px;border-radius:8px;border:1px solid rgba(242,166,90,0.18);">
+          <span style="color:#e7e8eb;font-size:.88rem;font-weight:600;">📱 触屏适配控制</span>
+          <span id="device-info" style="color:#a3a7af;font-size:.72rem;font-family:var(--font-display);">检测中...</span>
         </div>
       </div>
-      <button class="big-btn" onclick="closeSettings()" style="width:100%;border-color:#5be4ff;color:#5be4ff;background:linear-gradient(180deg,rgba(0,180,216,0.2),rgba(0,120,160,0.3));box-shadow:0 0 14px rgba(0,180,216,0.35);">返回主菜单 ▶</button>
+      <button class="big-btn" onclick="closeSettings()" style="width:100%;border-color:#f2a65a;color:#f2a65a;background:rgba(100,105,116,0.2);box-shadow:none;">返回主菜单 ▶</button>
     </div>
   </div>
 
   <!-- PAUSE MENU SCREEN -->
-  <div class="overlay" id="pause-scr" style="display: none; background: rgba(6, 9, 15, 0.94); backdrop-filter: blur(14px); z-index: 90;">
-    <div class="glass-tactical-card" style="width:90%;max-width:320px;background:rgba(18,24,38,0.88);border:1.5px solid rgba(120,160,220,0.3);border-radius:16px;box-shadow:0 12px 35px rgba(0,0,0,0.7);padding:24px 20px;display:flex;flex-direction:column;align-items:center;">
-      <h2 style="color:#ffd700;font-size:1.8rem;letter-spacing:3px;margin-bottom:16px;text-shadow:0 0 16px rgba(255,215,0,0.4);">⏸ 战局暂停</h2>
+  <div class="overlay" id="pause-scr" style="display: none; background: rgba(10,10,11, 0.94); backdrop-filter: blur(14px); z-index: 90;">
+    <div class="glass-tactical-card" style="width:90%;max-width:320px;background:rgba(26,27,30,0.88);border:1.5px solid rgba(242,166,90,0.3);border-radius:16px;box-shadow:0 12px 35px rgba(0,0,0,0.7);padding:24px 20px;display:flex;flex-direction:column;align-items:center;">
+      <h2 style="color:#ffd700;font-size:1.8rem;letter-spacing:1px;margin-bottom:16px;text-shadow:none;">⏸ 战局暂停</h2>
       <div style="display:flex; flex-direction:column; gap:10px; width:100%;">
-        <button class="big-btn" onclick="togglePause()" style="border-color:#2ecc71; color:#55ff99; background:linear-gradient(180deg,rgba(46,204,113,0.2),rgba(39,174,96,0.3));box-shadow:0 0 12px rgba(46,204,113,0.35);">▶ 继续坚守防线</button>
-        <button class="big-btn" onclick="saveGameToFile()" style="border-color:#f39c12; color:#ffd700; background:linear-gradient(180deg,rgba(243,156,18,0.2),rgba(211,84,0,0.3));box-shadow:0 0 12px rgba(243,156,18,0.35);">💾 保存作战档案</button>
-        <button class="big-btn" onclick="triggerLoadFile()" style="border-color:#00d4ff; color:#a5f3fc; background:linear-gradient(180deg,rgba(0,212,255,0.2),rgba(0,140,200,0.3));box-shadow:0 0 12px rgba(0,212,255,0.35);">📂 载入作战档案</button>
-        <button class="big-btn" onclick="returnToMainMenu()" style="border-color:#a855f7; color:#e9d5ff; background:linear-gradient(180deg,rgba(168,85,247,0.2),rgba(126,34,206,0.3));box-shadow:0 0 12px rgba(168,85,247,0.35);">🏰 返回要塞主菜单</button>
-        <button class="big-btn" onclick="togglePause(); endGame();" style="border-color:#ff4d6d; color:#ff99ab; background:linear-gradient(180deg,rgba(255,77,109,0.2),rgba(200,30,60,0.3));box-shadow:0 0 12px rgba(255,77,109,0.35);">☠ 放弃据点撤退</button>
+        <button class="big-btn" onclick="togglePause()" style="border-color:#2ecc71; color:#55ff99; background:rgba(46,204,113,0.2);box-shadow:none;">▶ 继续坚守防线</button>
+        <button class="big-btn" onclick="saveGameToFile()" style="border-color:#f39c12; color:#ffd700; background:rgba(243,156,18,0.2);box-shadow:none;">💾 保存作战档案</button>
+        <button class="big-btn" onclick="triggerLoadFile()" style="border-color:#777d88; color:#f2a65a; background:rgba(119,125,136,0.2);box-shadow:none;">📂 载入作战档案</button>
+        <button class="big-btn" onclick="returnToMainMenu()" style="border-color:#a855f7; color:#e9d5ff; background:rgba(168,85,247,0.2);box-shadow:none;">🏰 返回要塞主菜单</button>
+        <button class="big-btn" onclick="togglePause(); endGame();" style="border-color:#ff4d6d; color:#ff99ab; background:rgba(255,77,109,0.2);box-shadow:none;">☠ 放弃据点撤退</button>
       </div>
       <input type="file" id="save-file-input" style="display:none" onchange="loadGameFromFile(event)">
     </div>
@@ -649,7 +649,7 @@
 围墙还没建好，武器弹药有限。
 守住前四波，攒金币升级城墙——这是活过今夜的关键。</div>
     <button id="chapter-btn" onclick="event.stopPropagation();dismissChapterCard()">开始 ▶</button>
-    <div style="font-size:0.68rem;color:#8892b0;margin-top:10px;letter-spacing:1px;">点击任意处或按任意键立即迎战</div>
+    <div style="font-size:0.68rem;color:#959aa3;margin-top:10px;letter-spacing:1px;">点击任意处或按任意键立即迎战</div>
   </div>
 
   <!-- TUTORIAL SCREEN（教程引导） -->
@@ -662,14 +662,14 @@
   </div>
 
   <!-- PERK CHOICE SCREEN（肉鸽天赋三选一） -->
-  <div class="overlay" id="perk-choice-scr" style="display:none;background:rgba(10,5,20,.96);z-index:115;">
-    <div id="perk-choice-level" style="font-family:var(--font-display);font-size:1.4rem;color:#ffee44;letter-spacing:3px;margin-bottom:18px;text-shadow:0 0 20px rgba(255,238,68,.6);"></div>
+  <div class="overlay" id="perk-choice-scr" style="display:none;background:rgba(12,12,13,.96);z-index:115;">
+    <div id="perk-choice-level" style="font-family:var(--font-display);font-size:1.4rem;color:#ffee44;letter-spacing:1px;margin-bottom:18px;text-shadow:none;"></div>
     <div id="perk-choice-list" style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center;"></div>
   </div>
 
   <!-- TOWER POPOVER (升级/出售已部署的塔) -->
-  <div id="tower-popover" style="display:none;position:absolute;z-index:112;background:rgba(10,8,14,.97);border:2px solid #888;border-radius:8px;padding:10px;min-width:180px;font-family:var(--font-body);pointer-events:auto;">
-    <div id="tp-title" style="font-family:var(--font-display);font-size:1rem;color:#ffee44;letter-spacing:2px;margin-bottom:4px;text-align:center;"></div>
+  <div id="tower-popover" style="display:none;position:absolute;z-index:112;background:rgba(10,11,12,.97);border:2px solid #888888;border-radius:8px;padding:10px;min-width:180px;font-family:var(--font-body);pointer-events:auto;">
+    <div id="tp-title" style="font-family:var(--font-display);font-size:1rem;color:#ffee44;letter-spacing:1px;margin-bottom:4px;text-align:center;"></div>
     <div id="tp-stats" style="font-size:.68rem;color:#9a8f6a;margin-bottom:8px;text-align:center;line-height:1.5;"></div>
     <button id="tp-upgrade" style="display:block;width:100%;font-family:var(--font-body);font-size:.72rem;padding:6px;margin-bottom:5px;background:#1a1400;border:1px solid #f39c12;color:#f39c12;cursor:pointer;border-radius:3px;letter-spacing:1px;"></button>
     <!-- v52塔防强化：维修按钮（塔有HP可被拆，按损血计费） -->
@@ -689,13 +689,13 @@
     </div>
   </div>
 
-  <div class="overlay" id="over-scr" style="display:none;background:rgba(6,9,15,0.95);backdrop-filter:blur(14px);">
+  <div class="overlay" id="over-scr" style="display:none;background:rgba(10,10,11,0.95);backdrop-filter:blur(14px);">
     <div class="glass-tactical-card" style="width:90%;max-width:360px;background:rgba(24,16,22,0.92);border:1.5px solid rgba(255,77,109,0.4);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.85);padding:24px 20px;display:flex;flex-direction:column;align-items:center;">
-      <h2 style="color:#ff4d6d;font-size:2rem;letter-spacing:3px;margin-bottom:8px;text-shadow:0 0 20px rgba(255,77,109,0.6);">☠ 防线沦陷</h2>
-      <p id="over-txt" style="color:#cbd5e1;font-size:0.85rem;margin-bottom:18px;"></p>
+      <h2 style="color:#ff4d6d;font-size:2rem;letter-spacing:1px;margin-bottom:8px;text-shadow:none;">☠ 防线沦陷</h2>
+      <p id="over-txt" style="color:#d3d5d9;font-size:0.85rem;margin-bottom:18px;"></p>
       <div style="display:flex;flex-direction:column;gap:10px;width:100%;">
-        <button class="big-btn" onclick="startGame()" style="border-color:#2ecc71;color:#55ff99;background:linear-gradient(180deg,rgba(46,204,113,0.25),rgba(39,174,96,0.35));box-shadow:0 0 14px rgba(46,204,113,0.35);">↺ 重新召集出击</button>
-        <button class="big-btn" onclick="showMainMenu()" style="border-color:#ffd700;color:#ffd700;background:linear-gradient(180deg,rgba(255,215,0,0.2),rgba(200,140,20,0.3));box-shadow:0 0 14px rgba(255,215,0,0.3);">🏰 返回要塞大厅</button>
+        <button class="big-btn" onclick="startGame()" style="border-color:#2ecc71;color:#55ff99;background:rgba(46,204,113,0.25);box-shadow:none;">↺ 重新召集出击</button>
+        <button class="big-btn" onclick="showMainMenu()" style="border-color:#ffd700;color:#ffd700;background:rgba(255,215,0,0.2);box-shadow:none;">🏰 返回要塞大厅</button>
       </div>
     </div>
   </div>

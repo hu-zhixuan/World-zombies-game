@@ -24,11 +24,11 @@ function playTacticalDoorTransition(onComplete){
   if(!wipe){
     wipe = document.createElement('div');
     wipe.id = 'tactical-door-wipe';
-    wipe.style.cssText = 'position:fixed;inset:0;z-index:350;background:#06080d;pointer-events:none;opacity:0;transition:opacity 0.20s ease;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+    wipe.style.cssText = 'position:fixed;inset:0;z-index:350;background:#09090a;pointer-events:none;opacity:0;transition:opacity 0.20s ease;display:flex;flex-direction:column;align-items:center;justify-content:center;';
     wipe.innerHTML = `
-      <div style="font-size:3.2rem;margin-bottom:8px;filter:drop-shadow(0 0 16px rgba(0,240,255,0.7));">🚪</div>
-      <div style="font-family:var(--font-display);font-size:1.6rem;font-weight:900;color:#f0f6fc;letter-spacing:4px;text-shadow:0 0 20px rgba(0,240,255,0.6);">安全门闭锁 · 撤入秘密小屋</div>
-      <div style="font-size:0.8rem;color:#64748b;margin-top:4px;letter-spacing:2px;">DOOR SEALED · SAFE REFUGE ENTERED</div>
+      <div style="font-size:3.2rem;margin-bottom:8px;);">🚪</div>
+      <div style="font-family:var(--font-display);font-size:1.6rem;font-weight:600;color:#f2a65a;letter-spacing:1px;text-shadow:none;">安全门闭锁 · 撤入秘密小屋</div>
+      <div style="font-size:0.8rem;color:#6f7580;margin-top:4px;letter-spacing:1px;">DOOR SEALED · SAFE REFUGE ENTERED</div>
     `;
     document.body.appendChild(wipe);
   }

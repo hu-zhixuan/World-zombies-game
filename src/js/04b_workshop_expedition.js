@@ -143,7 +143,7 @@ function renderDuffWorkshopUI(){
       <div class="ws-slot-card ${isActive ? 'active' : ''}" onclick="switchWorkshopSlot(${sIdx})">
         <span style="font-size:1.7rem;line-height:1;background:rgba(0,0,0,0.45);padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);">${w.icon}</span>
         <div style="flex:1;overflow:hidden;">
-          <div style="font-family:var(--font-display);font-size:0.88rem;font-weight:800;color:#f5deb3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          <div style="font-family:var(--font-display);font-size:0.88rem;font-weight:600;color:#f5deb3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
             [${sIdx+1}] ${name}
           </div>
           <div style="font-size:0.62rem;color:${rarCol};font-weight:700;margin-top:2px;">
@@ -204,13 +204,13 @@ function renderDuffWorkshopUI(){
         <div style="display:flex;align-items:center;gap:12px;min-width:170px;">
           <span style="font-size:1.5rem;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">${t.icon}</span>
           <div>
-            <div style="font-family:var(--font-display);font-size:0.88rem;font-weight:800;color:#f5deb3;">${t.name}</div>
+            <div style="font-family:var(--font-display);font-size:0.88rem;font-weight:600;color:#f5deb3;">${t.name}</div>
             <div style="display:flex;gap:4px;margin-top:4px;">${pipsHtml}</div>
           </div>
         </div>
-        <div style="flex:1;font-size:0.7rem;color:#c0d0e4;line-height:1.4;">
-          <div>当前效果: <b style="color:#5be4ff;">${t.currentBonus}</b> ${rank < 3 ? `➔ 下级: <b style="color:#ffd700;text-shadow:0 0 6px rgba(255,215,0,0.4);">${t.nextBonus}</b>` : ''}</div>
-          <div style="color:#8094a8;font-size:0.63rem;margin-top:2px;">${t.desc}</div>
+        <div style="flex:1;font-size:0.7rem;color:#cfd1d5;line-height:1.4;">
+          <div>当前效果: <b style="color:#f2a65a;">${t.currentBonus}</b> ${rank < 3 ? `➔ 下级: <b style="color:#ffd700;text-shadow:none;">${t.nextBonus}</b>` : ''}</div>
+          <div style="color:#8d929b;font-size:0.63rem;margin-top:2px;">${t.desc}</div>
         </div>
         <button class="btn-ws-upgrade" ${disabledAttr} onclick="upgradeWeaponMod('${curW.id}', '${t.key}')">${btnText}</button>
       </div>
@@ -227,9 +227,9 @@ function renderDuffWorkshopUI(){
     awakenSectionHtml = `
       <div class="ws-awaken-box">
         <div style="display:flex;align-items:center;gap:14px;">
-          <span style="font-size:2.4rem;line-height:1;filter:drop-shadow(0 0 10px rgba(255,215,0,0.6));">${evoData.icon}</span>
+          <span style="font-size:2.4rem;line-height:1;);">${evoData.icon}</span>
           <div>
-            <div style="font-family:var(--font-display);font-size:1.05rem;font-weight:900;color:#ffd700;letter-spacing:1px;text-shadow:0 0 12px rgba(255,215,0,0.5);display:flex;align-items:center;gap:8px;">
+            <div style="font-family:var(--font-display);font-size:1.05rem;font-weight:600;color:#ffd700;letter-spacing:1px;text-shadow:none;display:flex;align-items:center;gap:8px;">
               <span>【超级武器觉醒】${evoData.name}</span>
               <span style="font-size:0.58rem;padding:2px 6px;border-radius:3px;background:rgba(255,215,0,0.2);border:1px solid #ffd700;color:#ffd700;">终极形态</span>
             </div>
@@ -240,11 +240,11 @@ function renderDuffWorkshopUI(){
         </div>
         <div>
           ${isAwakened ? `
-            <div style="padding:8px 16px;border-radius:6px;background:rgba(255,215,0,0.25);border:1.5px solid #ffd700;color:#ffd700;font-weight:800;font-size:0.85rem;text-shadow:0 0 8px #ffd700;">
+            <div style="padding:8px 16px;border-radius:6px;background:rgba(255,215,0,0.25);border:1.5px solid #ffd700;color:#ffd700;font-weight:600;font-size:0.85rem;text-shadow:none;">
               🌟 已觉醒天灾超武
             </div>
           ` : isReady ? `
-            <button class="btn-ws-upgrade" style="background:linear-gradient(180deg,#ff8800,#cc4400);border-color:#ffd700;box-shadow:0 0 18px rgba(255,140,0,0.8);font-size:0.88rem;padding:10px 20px;" onclick="evolveWeapon('${curW.id}')">
+            <button class="btn-ws-upgrade" style="background:#ff8800;border-color:#ffd700;box-shadow:none;font-size:0.88rem;padding:10px 20px;" onclick="evolveWeapon('${curW.id}')">
               ⚡ 立即觉醒超武！
             </button>
           ` : `
@@ -262,18 +262,18 @@ function renderDuffWorkshopUI(){
   const curRld = Math.round(curW.reloadMs * Math.pow(0.85, getWeaponMod(curW.id, 'reload')));
 
   detailsContainer.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,rgba(16,24,38,0.9) 0%,rgba(10,16,26,0.96) 100%);border:1px solid rgba(91,228,255,0.35);padding:12px 18px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.45);">
+    <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(25,26,29,0.9);border:1px solid rgba(242,166,90,0.35);padding:12px 18px;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,0.45);">
       <div style="display:flex;align-items:center;gap:14px;">
-        <span style="font-size:2.2rem;background:rgba(0,0,0,0.4);border:1px solid rgba(91,228,255,0.25);border-radius:10px;padding:8px 12px;">${curW.icon}</span>
+        <span style="font-size:2.2rem;background:rgba(0,0,0,0.4);border:1px solid rgba(242,166,90,0.25);border-radius:10px;padding:8px 12px;">${curW.icon}</span>
         <div>
-          <div style="font-family:var(--font-display);font-size:1.2rem;font-weight:900;color:#f5deb3;display:flex;align-items:center;gap:8px;">
+          <div style="font-family:var(--font-display);font-size:1.2rem;font-weight:600;color:#f5deb3;display:flex;align-items:center;gap:8px;">
             ${curName}
             <span style="font-size:0.65rem;padding:2px 8px;border-radius:4px;background:${curRarCol}22;border:1px solid ${curRarCol};color:${curRarCol};font-weight:700;">
               ${isEvo ? '🌟 超武' : (WEAPON_RARITY[curW.rarity]?.badge || curW.rarity)}
             </span>
-            <span style="font-size:0.58rem;padding:2px 7px;border-radius:3px;background:rgba(91,228,255,0.12);border:1px solid rgba(91,228,255,0.4);color:#5be4ff;font-family:var(--font-display);">小胡工科改装机修槽</span>
+            <span style="font-size:0.58rem;padding:2px 7px;border-radius:3px;background:rgba(242,166,90,0.12);border:1px solid rgba(242,166,90,0.4);color:#f2a65a;font-family:var(--font-display);">小胡工科改装机修槽</span>
           </div>
-          <div style="font-size:0.68rem;color:#9cb0c6;margin-top:4px;display:flex;gap:12px;flex-wrap:wrap;">
+          <div style="font-size:0.68rem;color:#acafb6;margin-top:4px;display:flex;gap:12px;flex-wrap:wrap;">
             <span>💥 威力: <b style="color:#f5deb3;">${curDmg}</b></span>
             <span>📦 弹匣: <b style="color:#f5deb3;">${curMag}</b></span>
             <span>⚡ 换弹: <b style="color:#f5deb3;">${curRld}ms</b></span>
@@ -282,10 +282,10 @@ function renderDuffWorkshopUI(){
         </div>
       </div>
       <div style="text-align:right;">
-        <div style="font-family:var(--font-display);font-size:1.05rem;color:${curRarCol};font-weight:900;text-shadow:0 0 10px ${curRarCol}66;">
+        <div style="font-family:var(--font-display);font-size:1.05rem;color:${curRarCol};font-weight:600;text-shadow:0 0 10px ${curRarCol}66;">
           ${isEvo ? '🌟 终极超武' : (WEAPON_RARITY[curW.rarity]?.badge || '战术武器')}
         </div>
-        <div style="font-size:0.64rem;color:#a0b4cc;margin-top:2px;">特色: <span style="color:#5be4ff;">${curW.tag}</span> · 纯粹机制</div>
+        <div style="font-size:0.64rem;color:#b1b4bb;margin-top:2px;">特色: <span style="color:#f2a65a;">${curW.tag}</span> · 纯粹机制</div>
       </div>
     </div>
 
@@ -313,12 +313,12 @@ function renderCabinWorkshopUI(){
 
   container.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <div style="font-family:var(--font-display);font-size:0.95rem;color:#5be4ff;font-weight:700;">
+      <div style="font-family:var(--font-display);font-size:0.95rem;color:#f2a65a;font-weight:700;">
         🛠️ 小胡军备改造台 (资金 💰${coins} | 零件 ⚙️${scrapMetal})
       </div>
       <div style="display:flex;gap:6px;">
         ${owned.map((idx, sIdx)=>`
-          <button style="padding:3px 10px;border-radius:4px;font-size:0.7rem;cursor:pointer;background:${sIdx===wsActiveSlot?'#5be4ff':'#223244'};color:${sIdx===wsActiveSlot?'#000':'#fff'};border:1px solid #5be4ff;" onclick="switchWorkshopSlot(${sIdx})">
+          <button style="padding:3px 10px;border-radius:4px;font-size:0.7rem;cursor:pointer;background:${sIdx===wsActiveSlot?'#f2a65a':'#2f3237'};color:${sIdx===wsActiveSlot?'#000000':'#ffffff'};border:1px solid #f2a65a;" onclick="switchWorkshopSlot(${sIdx})">
             [${sIdx+1}] ${WEAPONS[idx].icon} ${WEAPONS[idx].name}
           </button>
         `).join('')}
@@ -1019,7 +1019,7 @@ function renderBpInspector(){
   const effBox = document.getElementById('bp-insp-effects');
   if(effBox){
     effBox.innerHTML = `
-      <div class="bp-effect-card" style="border-left:3px solid ${rarCol};background:rgba(0,0,0,0.35);padding:8px 10px;border-radius:6px;font-size:0.72rem;color:#d0d7de;line-height:1.45;">
+      <div class="bp-effect-card" style="border-left:3px solid ${rarCol};background:rgba(0,0,0,0.35);padding:8px 10px;border-radius:6px;font-size:0.72rem;color:#d4d6da;line-height:1.45;">
         <div style="color:#ffd700;font-weight:bold;margin-bottom:3px;">🎯 战术战略效能</div>
         <div>${def.useDesc || def.desc}</div>
       </div>

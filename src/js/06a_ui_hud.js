@@ -138,9 +138,9 @@ function updateTodHUD(){
   if(!icon || !label) return;
   if(timeOfDay === 'night'){
     icon.textContent = '☾';
-    icon.style.color = '#8da2c4';
+    icon.style.color = '#a2a6af';
     label.textContent = '夜晚';
-    label.style.color = '#8da2c4';
+    label.style.color = '#a2a6af';
   } else {
     icon.textContent = '☀';
     icon.style.color = '#f2a65a';
@@ -892,7 +892,7 @@ function updateMainMenuSaveDossier(){
         const tag = isEvo ? '🌟超武' : `Lv.${lv}`;
         const borderCol = isEvo ? '#ffd700' : (WEAPON_RARITY[w.rarity]?.color || '#888');
         return `
-          <div style="flex:1;background:rgba(10,12,18,0.7);border:1.5px solid ${borderCol};border-radius:8px;padding:6px 8px;display:flex;align-items:center;gap:8px;">
+          <div style="flex:1;background:rgba(13,14,15,0.7);border:1.5px solid ${borderCol};border-radius:8px;padding:6px 8px;display:flex;align-items:center;gap:8px;">
             <span style="font-size:1.4rem;">${w.icon}</span>
             <div style="overflow:hidden;flex:1;">
               <div style="font-size:0.75rem;font-weight:700;color:#f5deb3;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">[${sIdx+1}] ${name}</div>
@@ -910,15 +910,15 @@ function updateMainMenuSaveDossier(){
               <span style="color:#88ffaa;font-weight:700;">${wavePct}%</span>
             </div>
             <div style="height:7px;background:rgba(0,0,0,0.5);border:1px solid #5a381e;border-radius:4px;overflow:hidden;">
-              <div style="height:100%;width:${wavePct}%;background:linear-gradient(90deg,#e67e22,#f39c12,#2ecc71);border-radius:4px;box-shadow:0 0 8px rgba(243,156,18,0.5);"></div>
+              <div style="height:100%;width:${wavePct}%;background:#e67e22;border-radius:4px;box-shadow:none;"></div>
             </div>
           </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:0.75rem;background:rgba(10,14,22,0.6);padding:8px 10px;border-radius:8px;border:1px solid rgba(100,140,200,0.15);">
-            <div style="color:#ffd700;font-weight:700;">💰 军费储备: <span style="color:#fff;">${save.coins || 0}</span></div>
-            <div style="color:#ff8866;font-weight:700;">💀 击杀总数: <span style="color:#fff;">${save.killCount || 0}</span></div>
-            <div style="color:#f5deb3;">🪵 防御木材: <span style="color:#fff;">${save.woodPlanks || 0}</span></div>
-            <div style="color:#a0c4ff;">⚙️ 机械零件: <span style="color:#fff;">${save.scrapMetal || 0}</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:0.75rem;background:rgba(15,16,17,0.6);padding:8px 10px;border-radius:8px;border:1px solid rgba(143,148,157,0.15);">
+            <div style="color:#ffd700;font-weight:700;">💰 军费储备: <span style="color:#ffffff;">${save.coins || 0}</span></div>
+            <div style="color:#ff8866;font-weight:700;">💀 击杀总数: <span style="color:#ffffff;">${save.killCount || 0}</span></div>
+            <div style="color:#f5deb3;">🪵 防御木材: <span style="color:#ffffff;">${save.woodPlanks || 0}</span></div>
+            <div style="color:#f2a65a;">⚙️ 机械零件: <span style="color:#ffffff;">${save.scrapMetal || 0}</span></div>
           </div>
 
           <div style="background:rgba(20,12,10,0.6);border:1px solid rgba(200,100,80,0.25);border-radius:8px;padding:8px 10px;">
@@ -932,9 +932,9 @@ function updateMainMenuSaveDossier(){
           </div>
 
           <div>
-            <div style="font-size:0.68rem;color:#a0c0e0;margin-bottom:4px;">⚔️ 当前双持武装配装:</div>
+            <div style="font-size:0.68rem;color:#f2a65a;margin-bottom:4px;">⚔️ 当前双持武装配装:</div>
             <div style="display:flex;gap:8px;">
-              ${wCardsHtml || '<span style="font-size:0.7rem;color:#888;">配装载入中...</span>'}
+              ${wCardsHtml || '<span style="font-size:0.7rem;color:#888888;">配装载入中...</span>'}
             </div>
           </div>
         </div>
@@ -948,9 +948,9 @@ function updateMainMenuSaveDossier(){
   // 无存档简报
   if(badge){
     badge.textContent = '⚪ 等待开局';
-    badge.style.color = '#a0b0c0';
-    badge.style.borderColor = '#4a5568';
-    badge.style.background = 'rgba(74,85,104,0.2)';
+    badge.style.color = '#aaaeb6';
+    badge.style.borderColor = '#53575f';
+    badge.style.background = 'rgba(83,87,95,0.2)';
   }
   if(continueBtn){
     continueBtn.style.display = 'none';
@@ -960,7 +960,7 @@ function updateMainMenuSaveDossier(){
   }
 
   content.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:10px;font-family:var(--font-body);color:#c8d4e4;font-size:0.75rem;line-height:1.6;background:rgba(12,16,24,0.6);border:1px solid rgba(120,150,200,0.2);padding:14px;border-radius:10px;">
+    <div style="display:flex;flex-direction:column;gap:10px;font-family:var(--font-body);color:#d3d5d9;font-size:0.75rem;line-height:1.6;background:rgba(17,18,19,0.6);border:1px solid rgba(153,158,167,0.2);padding:14px;border-radius:10px;">
       <div style="font-family:var(--font-display);font-size:0.85rem;color:#f0c060;font-weight:700;display:flex;align-items:center;gap:6px;">
         <span>📜</span> 作战总指挥部·生存指南
       </div>
@@ -1268,11 +1268,11 @@ function showNewZombieDiscovered(arch){
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;">
       <canvas id="new-zombie-portrait" width="60" height="70" style="background:rgba(40,20,10,.6);border-radius:6px;border:2px solid ${arch.color1||'#c8a878'};"></canvas>
       <div style="text-align:left;">
-        <div style="font-family:var(--font-display);font-size:1.1rem;color:${arch.color1||'#c8a878'};letter-spacing:2px;">${arch.name}</div>
+        <div style="font-family:var(--font-display);font-size:1.1rem;color:${arch.color1||'#c8a878'};letter-spacing:1px;">${arch.name}</div>
         <div style="font-size:.7rem;color:#b0a284;">类型: ${arch.tier||'普通'} · 首次出现: 第${arch.firstWave||1}波</div>
       </div>
     </div>
-    <div style="background:rgba(40,60,90,.3);padding:6px 10px;border-radius:4px;border-left:3px solid #5588cc;font-size:.72rem;color:#88aacc;margin-bottom:6px;text-align:left;">
+    <div style="background:rgba(60,63,70,.3);padding:6px 10px;border-radius:4px;border-left:3px solid #f2a65a;font-size:.72rem;color:#a4a8b0;margin-bottom:6px;text-align:left;">
       <b>⚡ 机制：</b>${arch.mechanicDesc||'无特殊能力'}
     </div>
     <div style="font-size:.7rem;color:#c8c0a8;line-height:1.6;text-align:left;font-style:italic;">${arch.desc||''}</div>
@@ -1381,8 +1381,8 @@ function buildCodexGrid(){
         <span>📊${entry.pts||'?'}分</span>
       </div>
       <div class="codex-card-stats">
-        <span style="color:${(entry.armorPct||0)>=0.5?'#ff9955':'#999'};">🗡️护甲${kills>0?Math.round((entry.armorPct||0)*100)+'%':'?'}</span>
-        <span style="color:${(entry.resistPct||0)>=0.5?'#5be4ff':'#999'};">⚡抗性${kills>0?Math.round((entry.resistPct||0)*100)+'%':'?'}</span>
+        <span style="color:${(entry.armorPct||0)>=0.5?'#ff9955':'#999999'};">🗡️护甲${kills>0?Math.round((entry.armorPct||0)*100)+'%':'?'}</span>
+        <span style="color:${(entry.resistPct||0)>=0.5?'#f2a65a':'#999999'};">⚡抗性${kills>0?Math.round((entry.resistPct||0)*100)+'%':'?'}</span>
       </div>
       ${kills>0 ? `<div class="codex-card-desc">${entry.desc||''}</div>` : ''}
       <div class="codex-card-stats" style="margin-top:6px;">

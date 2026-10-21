@@ -75,22 +75,22 @@ function updateEmergencyRetreatPrompt(){
   if(cabinHoldActive){
     const leftSecs = ((CABIN_HOLD_MAX - cabinHoldTimer) / 60).toFixed(1);
     const pct = Math.floor((cabinHoldTimer / CABIN_HOLD_MAX) * 100);
-    promptEl.style.borderColor = '#00d4ff';
-    promptEl.style.boxShadow = '0 4px 16px rgba(0,0,0,0.6),0 0 14px rgba(0,212,255,0.4)';
+    promptEl.style.borderColor = '#777d88';
+    promptEl.style.boxShadow = '0 4px 16px rgba(0,0,0,0.6),0 0 14px rgba(119,125,136,0.4)';
     promptEl.innerHTML = `
       <span style="font-size:14px;line-height:1;">🔐</span>
-      <span style="font-family:var(--font-display);font-size:12px;font-weight:800;color:#00f0ff;letter-spacing:1px;white-space:nowrap;">正在闭锁入屋... ${leftSecs}s</span>
+      <span style="font-family:var(--font-display);font-size:12px;font-weight:600;color:#777d88;letter-spacing:1px;white-space:nowrap;">正在闭锁入屋... ${leftSecs}s</span>
       <div style="width:90px;height:6px;background:rgba(255,255,255,0.15);border-radius:3px;overflow:hidden;margin:0 4px;">
-        <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#00f0ff,#38bdf8);box-shadow:0 0 8px #00f0ff;"></div>
+        <div style="width:${pct}%;height:100%;background:#777d88;box-shadow:none;"></div>
       </div>
-      <span style="font-family:var(--font-num);font-size:11px;font-weight:800;color:#a5f3fc;">${pct}%</span>
+      <span style="font-family:var(--font-num);font-size:11px;font-weight:600;color:#f2a65a;">${pct}%</span>
     `;
   } else if(near){
     promptEl.style.borderColor = 'rgba(46,204,113,0.85)';
     promptEl.style.boxShadow = '0 4px 16px rgba(0,0,0,0.6),0 0 14px rgba(46,204,113,0.35)';
     promptEl.innerHTML = `
       <span style="font-size:14px;line-height:1;">🚪</span>
-      <span style="font-family:var(--font-display);font-size:12px;font-weight:800;color:#55ff88;letter-spacing:1px;white-space:nowrap;">已抵达小屋大门</span>
+      <span style="font-family:var(--font-display);font-size:12px;font-weight:600;color:#55ff88;letter-spacing:1px;white-space:nowrap;">已抵达小屋大门</span>
       <span style="font-size:11px;font-weight:700;color:#bbf7d0;padding:2px 10px;background:rgba(46,204,113,0.22);border:1px solid rgba(46,204,113,0.5);border-radius:12px;white-space:nowrap;">按住 [E] 锁门避难 (3秒)</span>
     `;
   } else {
@@ -100,7 +100,7 @@ function updateEmergencyRetreatPrompt(){
     promptEl.style.boxShadow = '0 4px 16px rgba(0,0,0,0.6),0 0 12px rgba(255,50,50,0.25)';
     promptEl.innerHTML = `
       <span style="font-size:14px;line-height:1;">🚨</span>
-      <span style="font-family:var(--font-display);font-size:12px;font-weight:800;color:#fff;letter-spacing:1px;white-space:nowrap;text-shadow:0 0 8px rgba(255,60,60,0.6);">尸潮压境 · 撤回小屋门前避难</span>
+      <span style="font-family:var(--font-display);font-size:12px;font-weight:600;color:#ffffff;letter-spacing:1px;white-space:nowrap;text-shadow:none;">尸潮压境 · 撤回小屋门前避难</span>
       <span style="font-size:11px;color:#fca5a5;padding:2px 8px;background:rgba(255,50,50,0.22);border-radius:12px;border:1px solid rgba(255,80,80,0.35);white-space:nowrap;">⬅ 约 ${dist}px · 门前长按E</span>
     `;
   }
@@ -116,7 +116,7 @@ function showEmergencyRetreatPrompt(){
     gw.appendChild(promptEl);
   }
   promptEl.className = 'compact-retreat-hud';
-  promptEl.style.cssText = 'display:flex;position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:300;background:rgba(14,18,26,0.92);backdrop-filter:blur(8px);border:1.5px solid rgba(255,77,109,0.7);border-radius:24px;padding:4px 16px;height:38px;box-sizing:border-box;box-shadow:0 4px 16px rgba(0,0,0,0.6),0 0 12px rgba(255,50,50,0.25);cursor:pointer;animation:pulseRetreat 0.8s infinite alternate;align-items:center;gap:10px;user-select:none;pointer-events:auto;';
+  promptEl.style.cssText = 'display:flex;position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:300;background:rgba(19,20,21,0.92);backdrop-filter:blur(8px);border:1.5px solid rgba(255,77,109,0.7);border-radius:24px;padding:4px 16px;height:38px;box-sizing:border-box;box-shadow:0 4px 16px rgba(0,0,0,0.6);cursor:pointer;animation:pulseRetreat 0.8s infinite alternate;align-items:center;gap:10px;user-select:none;pointer-events:auto;';
   updateEmergencyRetreatPrompt();
   
   if(!promptEl._holdListenersBound){

@@ -655,7 +655,7 @@ function setupTutorialSteps(onComplete){
     {
       title: '🎮 新手教程 · 第1步：基础操作',
       html: `<div style="text-align:left;line-height:1.7;">
-        <div style="background:rgba(40,60,90,.3);padding:6px 10px;border-radius:4px;border-left:3px solid #5be4ff;margin-bottom:8px;">
+        <div style="background:rgba(60,63,70,.3);padding:6px 10px;border-radius:4px;border-left:3px solid #f2a65a;margin-bottom:8px;">
           <b>🎯 目标：</b>守住城堡15波尸潮，活到直升机撤离。
         </div>
         <div style="margin-bottom:6px;"><b>A/D 或 ←/→</b> 移动 · <b>鼠标</b> 瞄准射击 · <b>R</b> 换弹</div>
