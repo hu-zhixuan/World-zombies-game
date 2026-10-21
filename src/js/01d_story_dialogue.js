@@ -201,12 +201,12 @@ function playNextWaveDlg(){
 
   bar.innerHTML = `
     <div class="wd-top-bar">
-      <span>📻 据点无线电通讯 · 频道 104.2</span>
-      <span id="wd-page-indicator" style="color:#ffd875;font-weight:700;">[第 ${waveDlgCurIndex} / ${waveDlgTotalLines} 句]</span>
-      <span style="color:#9be89b;">🟢 信号正常</span>
+      <span>据点无线电 · 频道 104.2</span>
+      <span id="wd-page-indicator" style="color:var(--text-2);">[第 ${waveDlgCurIndex} / ${waveDlgTotalLines} 句]</span>
+      <span style="color:var(--ok);">信号正常</span>
     </div>
     <div class="wd-main">
-      <div class="wd-avatar" style="color:${ch.color};border-color:${ch.color};box-shadow:0 0 10px ${ch.color};">
+      <div class="wd-avatar" style="color:${ch.color};">
         ${ch.initial || (ch.name ? ch.name[0] : '🧔')}
       </div>
       <div class="wd-body">

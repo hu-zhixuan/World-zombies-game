@@ -685,6 +685,6 @@ function railHitscan(x1,y1,x2,y2,dmg,radius){
   targetZombies.forEach(z=>{if(!z.alive)return;const ex=(z.x+22)-x1,ey=(Z_TOP+28)-y1;const proj=ex*nx+ey*ny;const px=ex-proj*nx,py=ey-proj*ny;if(Math.sqrt(px*px+py*py)<R&&proj>0)hitZombie(z,z.x+22,Z_TOP+28,useDmg,x1,y1);});
   if(gameState !== 'building' && boss&&boss.alive){const ex=(boss.x+40)-x1,ey=(GROUND_Y-80)-y1;const proj=ex*nx+ey*ny;const px=ex-proj*nx,py=ey-proj*ny;if(Math.sqrt(px*px+py*py)<R+18&&proj>0)hitBoss(useDmg,boss.x+40,GROUND_Y-80,x1,y1);}
 }
-function flashReloadHint(){rldBtn.style.background='#5a1010';rldBtn.style.borderColor='#ff4444';setTimeout(()=>{rldBtn.style.background='';rldBtn.style.borderColor='';},300);}
-function flashOverheatHint(){rldBtn.textContent='机枪过热!';rldBtn.style.borderColor='#ff6600';setTimeout(()=>{rldBtn.textContent='[R] 装填';rldBtn.style.borderColor='';},1000);}
+function flashReloadHint(){rldBtn.style.background='rgba(229,89,79,.22)';rldBtn.style.borderColor='var(--danger)';setTimeout(()=>{rldBtn.style.background='';rldBtn.style.borderColor='';},300);}
+function flashOverheatHint(){rldBtn.textContent='机枪过热';rldBtn.style.borderColor='var(--danger)';setTimeout(()=>{rldBtn.innerHTML='装填<span class="key">R</span>';rldBtn.style.borderColor='';},1000);}
 

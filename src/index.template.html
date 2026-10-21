@@ -11,48 +11,51 @@
 <body>
 
 <div id="header">
-  <div id="title">🏰 十五波围城 <span style="font-size:0.68rem;color:rgba(240,192,96,0.65);font-weight:normal;vertical-align:middle;margin-left:4px;">v56</span></div>
-  <div id="stats">
-    <div class="stat"><span class="sl">分数</span><span class="sv" id="sc">0</span></div>
-    <div class="stat">
-      <span class="sl">生命</span><span class="sv" id="hpv">100</span>
-      <div id="hpbw"><div id="hpb" style="width:100%"></div></div>
-    </div>
-    <div class="stat"><span class="sl">最高分</span><span class="sv" id="bst">0</span></div>
-    <div class="stat"><span class="sl">击杀</span><span class="sv" id="kls">0</span></div>
-  </div>
-  <div style="display:flex;gap:8px;align-items:center">
-    <!-- 等级 + 经验条（任务7） -->
-    <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-      <span id="lv-display" style="font-family:var(--font-display);font-size:.95rem;color:var(--amber);text-shadow:0 0 8px var(--amber-glow);">Lv.1</span>
-      <div style="width:70px;height:5px;background:var(--wood-950);border-radius:3px;overflow:hidden;border:1px solid var(--wood-600);">
-        <div id="xp-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#c9741c,#f0b860);transition:width .3s;box-shadow:0 0 6px var(--amber-glow);"></div>
+  <div class="hdr-main">
+    <div id="title">十五波围城<span class="ver">v56</span></div>
+    <div id="stats">
+      <div class="stat">
+        <span class="sl">生命</span><span class="sv" id="hpv">100</span>
+        <div id="hpbw"><div id="hpb" style="width:100%"></div></div>
       </div>
+      <div class="stat"><span class="sl">分数</span><span class="sv" id="sc">0</span></div>
+      <div class="stat"><span class="sl">击杀</span><span class="sv" id="kls">0</span></div>
+      <div class="stat" hidden><span class="sl">最高</span><span class="sv" id="bst">0</span></div>
     </div>
-    <div id="cabin-resources-hud" class="hdr-tag">
-      <span id="hud-wood">🪵 0</span>
-      <span id="hud-scrap">⚙️ 0</span>
+  </div>
+  <div class="hdr-sub">
+    <div class="hdr-info">
+      <span class="hdr-tag">
+        <span id="lv-display">Lv.1</span>
+        <span class="xp-track"><span id="xp-fill" style="display:block"></span></span>
+      </span>
+      <span id="cabin-resources-hud" class="hdr-tag">
+        <span id="hud-wood">木材 0</span>
+        <span id="hud-scrap">废料 0</span>
+      </span>
+      <span id="time-of-day-hud" class="hdr-tag">
+        <span id="tod-icon">☀</span>
+        <span id="tod-label">白天</span>
+      </span>
+      <div id="coin-display">150</div>
     </div>
-    <div id="time-of-day-hud" class="hdr-tag">
-      <span id="tod-icon" style="font-size: 1.1rem; color: rgb(255, 204, 102);">☀</span>
-      <span id="tod-label" style="color:#ffcc66;">白天</span>
+    <div class="hdr-actions">
+      <button id="codex-btn" class="hdr-btn" onclick="openCodex()" title="变异体机密图鉴">图鉴</button>
+      <button id="backpack-btn" class="hdr-btn" onclick="toggleBackpack()" title="避难所战术行囊">行囊<span class="key">B</span></button>
+      <button id="expedition-btn" class="hdr-btn" onclick="openExpeditionModal()" title="旧城区远征探险看板">远征</button>
+      <button id="workshop-btn" class="hdr-btn" onclick="openDuffWorkshop()" title="小胡军备改造台">改造<span class="key">M</span></button>
+      <button id="manage-btn" class="hdr-btn" onclick="openManageUI()" title="据点建设与经营管理">建设</button>
+      <button id="next-wave-btn" class="hdr-btn" onclick="skipToNextWave()">下一波</button>
+      <button id="pause-btn" class="hdr-btn" onclick="togglePause()">暂停</button>
     </div>
-    <div id="coin-display">💰 150</div>
-    <button id="codex-btn" class="hdr-btn" onclick="openCodex()" title="变异体机密图鉴">🧟图鉴</button>
-    <button id="backpack-btn" class="hdr-btn" onclick="toggleBackpack()" title="避难所战术行囊 [B / I]">🎒行囊(B)</button>
-    <button id="expedition-btn" class="hdr-btn" onclick="openExpeditionModal()" title="旧城区远征探险看板 [E]">🗺️远征</button>
-    <button id="workshop-btn" class="hdr-btn" onclick="openDuffWorkshop()" title="小胡军备改造台 [M]">🛠️改造(M)</button>
-    <button id="manage-btn" class="hdr-btn" onclick="openManageUI()" title="据点建设与经营管理">🏗️建设</button>
-    <button id="next-wave-btn" class="hdr-btn" onclick="skipToNextWave()">▶ 下一波</button>
-    <button id="pause-btn" class="hdr-btn" onclick="togglePause()">⏸ 暂停</button>
   </div>
 </div>
 
 <div id="world-progress">
-  <span class="wp-end">🏠</span>
+  <span class="wp-end">据点</span>
   <div id="wp-track"><div id="wp-fill" style="width: 0%;"></div></div>
-  <span class="wp-end">📡</span>
-  <span id="wp-text" style="min-width:46px;text-align:right;color:#f0c060;font-family:var(--font-display);letter-spacing:1px;">0%</span>
+  <span class="wp-end">电台</span>
+  <span id="wp-text">0%</span>
 </div>
 
 <div id="game-wrap">
@@ -156,14 +159,14 @@
       <div id="rest-rep">声望: 0</div>
       <div id="rest-timer" style="display: none;">75s</div>
       <div id="rest-earnings">收入: 0金</div>
-      <div id="rep-tier-display">🏚️ 门可罗雀</div>
-      <div id="trending-display"><span id="trending-text">📱 加载热搜...</span></div>
-      <div id="rest-fans-display" style="background:rgba(221,136,255,.15);border:1px solid rgba(221,136,255,.4);color:#dd88ff;padding:2px 6px;border-radius:3px;font-family:var(--font-body);font-size:.62rem;cursor:pointer;" onclick="openVIPCompendium()" title="点击查看VIP顾客图鉴">📱粉丝 0 [E]</div>
-      <button id="rest-vip-btn" onclick="openVIPCompendium()" style="background:rgba(221,136,255,.2);border:1px solid #aa44cc;color:#dd88ff;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:var(--font-body);font-size:.62rem;">📖图鉴</button>
-      <button id="cooksta-toggle-btn" onclick="toggleCookstaPanel()">📱Cooksta<span class="cooksta-badge" id="cooksta-badge" style="display:none;">0</span></button>
-      <button id="rest-music-btn" onclick="cycleRestMusic()" title="切换餐厅背景音乐" style="background:rgba(40,60,90,.6);border:1px solid #5588cc;color:#88ccff;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:var(--font-body);font-size:.62rem;">🎵</button>
-      <button id="rest-mute-btn" onclick="toggleRestMute()" title="静音/取消静音" style="background:rgba(90,60,40,.6);border:1px solid #aa8844;color:#ffcc66;padding:2px 6px;border-radius:3px;cursor:pointer;font-family:var(--font-body);font-size:.62rem;">🔊</button>
-      <button id="rest-close-btn" onclick="earlyCloseRestaurant()" style="background:rgba(120,40,40,.6);border:1px solid #aa4444;color:#ff8888;padding:2px 8px;border-radius:3px;cursor:pointer;font-family:var(--font-body);font-size:.62rem;">提前打烊</button>
+      <div id="rep-tier-display">门可罗雀</div>
+      <div id="trending-display"><span id="trending-text">热搜加载中…</span></div>
+      <div id="rest-fans-display" class="rest-chip" onclick="openVIPCompendium()" title="点击查看VIP顾客图鉴">粉丝 0</div>
+      <button id="rest-vip-btn" class="rest-chip" onclick="openVIPCompendium()">图鉴</button>
+      <button id="cooksta-toggle-btn" onclick="toggleCookstaPanel()">Cooksta<span class="cooksta-badge" id="cooksta-badge" style="display:none;">0</span></button>
+      <button id="rest-music-btn" class="rest-chip" onclick="cycleRestMusic()" title="切换餐厅背景音乐">音乐</button>
+      <button id="rest-mute-btn" class="rest-chip" onclick="toggleRestMute()" title="静音/取消静音">声音</button>
+      <button id="rest-close-btn" class="rest-chip danger" onclick="earlyCloseRestaurant()">提前打烊</button>
     </div>
     <div id="rest-canvas-wrap">
       <canvas id="rest-canvas" width="1100" height="440"></canvas>
@@ -180,12 +183,12 @@
     </div>
     <div id="rest-controls"></div>
     <div id="rest-end-scr">
-      <div class="glass-tactical-card" style="width:90%;max-width:540px;background:rgba(16,22,36,0.96);border:1.5px solid rgba(0,212,255,0.35);border-radius:16px;box-shadow:0 16px 50px rgba(0,0,0,0.85), 0 0 35px rgba(0,212,255,0.15);padding:24px 22px;display:flex;flex-direction:column;align-items:center;max-height:92vh;overflow-y:auto;">
-        <h2 style="font-family:var(--font-display);font-size:2rem;font-weight:900;background:linear-gradient(135deg, #00d4ff 0%, #38ef7d 50%, #ffd700 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 14px rgba(0,212,255,0.5));letter-spacing:3px;margin-bottom:8px;">🌙 夜晚打烊结算</h2>
-        <div id="rest-end-stats" style="font-family:var(--font-body);color:#cbd5e1;font-size:.9rem;line-height:1.8;width:100%;text-align:center;"></div>
-        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;justify-content:center;width:100%;">
-          <button class="big-btn" onclick="finishRestaurantToWorkshop()" style="border-color:#00d4ff;color:#e0f7ff;background:linear-gradient(180deg,rgba(0,212,255,0.25),rgba(0,140,210,0.35));box-shadow:0 0 14px rgba(0,212,255,0.3);font-size:0.88rem;padding:8px 16px;border-radius:8px;">🛠️ 小胡军备改造台 [M]</button>
-          <button class="big-btn" onclick="closeRestaurant()" style="border-color:#2ecc71;color:#e8fdf0;background:linear-gradient(180deg,rgba(46,204,113,0.25),rgba(39,174,96,0.35));box-shadow:0 0 14px rgba(46,204,113,0.3);font-size:0.88rem;padding:8px 16px;border-radius:8px;">迎接黎明出击 →</button>
+      <div class="end-card">
+        <h2 class="end-title">夜晚打烊结算</h2>
+        <div id="rest-end-stats"></div>
+        <div class="end-actions">
+          <button class="big-btn" onclick="finishRestaurantToWorkshop()">军备改造台</button>
+          <button class="big-btn primary" onclick="closeRestaurant()">迎接黎明，出击</button>
         </div>
       </div>
     </div>
@@ -705,8 +708,8 @@
   <div id="wave-txt">第 1 波 · 准备中...</div>
   <div style="display:flex;gap:5px;align-items:center">
     <button id="skill-hud-btn" onclick="tryClassSkill()" style="display:none;">[X] 技能</button>
-    <button id="shop-btn" onclick="openShop()">[ TAB ] 商店</button>
-    <button id="rld-btn" onclick="reloadWeapon()">[R] 装填</button>
+    <button id="shop-btn" onclick="openShop()">商店<span class="key">Tab</span></button>
+    <button id="rld-btn" onclick="reloadWeapon()">装填<span class="key">R</span></button>
   </div>
 </div>
 

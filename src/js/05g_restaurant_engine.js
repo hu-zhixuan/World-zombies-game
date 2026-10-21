@@ -914,12 +914,11 @@ function buildRestControls(){
     btn.style.minWidth = '62px';
     // v52美术：菜品色顶边条（--dish-c 驱动 ::before）
     btn.style.setProperty('--dish-c', recipe.color);
-    btn.style.borderColor = wanted ? '#ffd840' : (canCook ? '#cc6622' : '#553a20');
-    if(wanted) btn.style.boxShadow = `0 0 10px rgba(255,216,64,${0.35+0.25*Math.sin(Date.now()*0.004)})`;
+    if(wanted) btn.style.borderColor = 'var(--accent)';  // 有客在等这道菜：描边变强调色
     btn.innerHTML = `<div class="dish-btn-icon" style="color:${recipe.color};font-size:1.2rem;">${recipe.icon}</div>
-      <div class="dish-btn-name" style="color:${wanted?'#ffd840':'#d2b48c'};font-size:.6rem;">${recipe.name}</div>
-      <div class="dish-btn-cost" style="color:${canCook?'#f0c060':'#aa6666'};">${Object.keys(recipe.cost).map(m=>`${MEAT_TYPES[m].icon}${recipe.cost[m]}`).join('')}${isFinite(batches)&&batches<9?' ×'+batches:''}</div>
-      ${wanted?'<div style="font-size:.5rem;color:#ffd840;">● 有客等</div>':''}`;
+      <div class="dish-btn-name" style="color:${wanted?'var(--accent)':'var(--text-1)'};">${recipe.name}</div>
+      <div class="dish-btn-cost" style="color:${canCook?'var(--text-2)':'var(--danger)'};">${Object.keys(recipe.cost).map(m=>`${MEAT_TYPES[m].icon}${recipe.cost[m]}`).join('')}${isFinite(batches)&&batches<9?' ×'+batches:''}</div>
+      ${wanted?'<div style="font-size:.6rem;color:var(--accent);">有客在等</div>':''}`;
     if(canCook){
       btn.onclick = () => {
         // v50：直点=立即QTE→进灶（去掉弹窗流程）
@@ -931,71 +930,34 @@ function buildRestControls(){
   // ── 管理按钮（同一行续排，不再单独起一行）──
   const mgmtRow = btnRow;  // 同一行
   mgmtRow.style.rowGap = '3px';
-  // 一键上菜按钮（v50模块四：降级为兜底小按钮——主交互是点顾客/出餐口）
-  const serveAllBtn = document.createElement('button');
-  serveAllBtn.className = 'dish-btn';
-  serveAllBtn.style.minWidth = '64px';
-  serveAllBtn.style.borderColor = '#3a7a3a';
-  serveAllBtn.style.setProperty('--dish-c', '#44ff66');  // v52美术：绿色顶边
-  serveAllBtn.style.opacity = '.85';
-  serveAllBtn.innerHTML = '<div class="dish-btn-icon" style="color:#88ff88;font-size:1.1rem;">🍽️</div><div class="dish-btn-name" style="font-size:.5rem;">一键上菜</div>';
-  serveAllBtn.onclick = () => serveAllReadyDishes();
-  mgmtRow.appendChild(serveAllBtn);
-  // 扎啤按钮：对耐心低的顾客使用啤酒QTE恢复耐心
-  const beerBtn = document.createElement('button');
-  beerBtn.className = 'dish-btn';
-  beerBtn.style.minWidth = '66px';
-  beerBtn.style.borderColor = '#cc8844';
-  beerBtn.style.setProperty('--dish-c', '#FFD45E');  // v52美术：啤酒金顶边
-  beerBtn.innerHTML = '<div class="dish-btn-icon" style="color:#FFD45E">🍺</div><div class="dish-btn-name">扎啤QTE</div><div class="dish-btn-cost">恢复耐心</div>';
-  beerBtn.onclick = () => {
-    // 找到耐心最低的就座顾客
+  // 管理按钮：全部同一种灰阶卡片，不再每个一种颜色
+  const mkMgmt = (icon, name, sub, onclick) => {
+    const b = document.createElement('button');
+    b.className = 'dish-btn';
+    b.style.minWidth = '72px';
+    b.innerHTML = `<div class="dish-btn-icon">${icon}</div><div class="dish-btn-name">${name}</div>` + (sub ? `<div class="dish-btn-cost">${sub}</div>` : '');
+    b.onclick = onclick;
+    mgmtRow.appendChild(b);
+    return b;
+  };
+  // 一键上菜（兜底小按钮——主交互是点顾客/出餐口）
+  mkMgmt('🍽️', '一键上菜', '', () => serveAllReadyDishes());
+  // 扎啤：对耐心低的顾客使用啤酒QTE恢复耐心
+  mkMgmt('🍺', '扎啤', '恢复耐心', () => {
     const seated = restState.customers.filter(c => c.state === 'seated');
     if(seated.length === 0){ addBanner('没有就座的顾客'); return; }
     seated.sort((a,b) => a.patience - b.patience);
     serveBeerToCustomer(seated[0]);
-  };
-  mgmtRow.appendChild(beerBtn);
-  // 雇佣员工按钮
-  const hireBtn = document.createElement('button');
-  hireBtn.className = 'dish-btn';
-  hireBtn.style.minWidth = '66px';
-  hireBtn.innerHTML = '<div class="dish-btn-icon" style="color:#88ff88">👥</div><div class="dish-btn-name">雇佣员工</div><div class="dish-btn-cost">管理</div>';
-  hireBtn.onclick = () => openStaffHireUI();
-  mgmtRow.appendChild(hireBtn);
-  // 升级按钮
-  const upgBtn = document.createElement('button');
-  upgBtn.className = 'dish-btn';
-  upgBtn.style.minWidth = '66px';
-  upgBtn.innerHTML = '<div class="dish-btn-icon" style="color:#88ddff">⬆️</div><div class="dish-btn-name">餐厅升级</div><div class="dish-btn-cost">管理</div>';
-  upgBtn.onclick = () => openRestUpgradeUI();
-  mgmtRow.appendChild(upgBtn);
-  // VIP顾客图鉴按钮
-  const compendiumBtn = document.createElement('button');
-  compendiumBtn.className = 'dish-btn';
-  compendiumBtn.style.minWidth = '66px';
-  compendiumBtn.style.borderColor = '#aa44cc';
-  compendiumBtn.style.setProperty('--dish-c', '#dd88ff');  // v52美术：VIP紫顶边
+  });
+  mkMgmt('👥', '雇佣员工', '管理', () => openStaffHireUI());
+  mkMgmt('⬆️', '餐厅升级', '管理', () => openRestUpgradeUI());
   const metCount = Object.keys(vipCompendium || {}).filter(k => vipCompendium[k] && vipCompendium[k].met).length;
-  const unlockedVIPCount = (typeof getUnlockedVIPs === 'function') ? getUnlockedVIPs().length : 0;
-  compendiumBtn.innerHTML = '<div class="dish-btn-icon" style="color:#dd88ff">📖</div><div class="dish-btn-name">顾客图鉴</div><div class="dish-btn-cost">相遇' + metCount + '/' + (VIP_CUSTOMERS ? VIP_CUSTOMERS.length : 15) + '</div>';
-  compendiumBtn.onclick = () => openVIPCompendium();
-  mgmtRow.appendChild(compendiumBtn);
-  // 粉丝数显示
-  const fansInfo = document.createElement('div');
-  fansInfo.style.cssText = 'font-family:Microsoft YaHei UI,sans-serif;font-size:.6rem;color:#dd88ff;padding:2px 6px;background:rgba(221,136,255,.15);border-radius:3px;border:1px solid rgba(221,136,255,.3);';
-  fansInfo.textContent = '📱粉丝' + wastegramFans + '[' + wastegramRank + ']';
-  mgmtRow.appendChild(fansInfo);
-  // 员工数量显示
-  const staffInfo = document.createElement('div');
-  staffInfo.style.cssText = 'font-family:Microsoft YaHei UI,sans-serif;font-size:.6rem;color:#b0a284;padding:2px 6px;background:rgba(40,24,14,.5);border-radius:3px;border:1px solid #4a2c10;';
-  staffInfo.textContent = '👥 员工 ' + restHiredStaff.length + '/' + STAFF_POOL.length;
-  mgmtRow.appendChild(staffInfo);
-  // 升级等级显示
-  const lvlInfo = document.createElement('div');
-  lvlInfo.style.cssText = 'font-family:Microsoft YaHei UI,sans-serif;font-size:.6rem;color:#b0a284;padding:2px 6px;background:rgba(40,24,14,.5);border-radius:3px;border:1px solid #4a2c10;';
-  lvlInfo.textContent = `🔥灶${restUpgradeLevel.stoves} 🪑桌${restUpgradeLevel.tables} ✨装${restUpgradeLevel.decor}`;
-  mgmtRow.appendChild(lvlInfo);
+  mkMgmt('📖', '顾客图鉴', '相遇 ' + metCount + '/' + (VIP_CUSTOMERS ? VIP_CUSTOMERS.length : 15), () => openVIPCompendium());
+  // 状态文字：粉丝 / 员工 / 设施，一行淡色文字，不做成按钮样子
+  const info = document.createElement('div');
+  info.style.cssText = 'align-self:center;margin-left:8px;font-size:.74rem;color:var(--text-2);line-height:1.7;';
+  info.innerHTML = '粉丝 ' + wastegramFans + '（' + wastegramRank + '）<br>员工 ' + restHiredStaff.length + '/' + STAFF_POOL.length + ' · 灶 ' + restUpgradeLevel.stoves + ' · 桌 ' + restUpgradeLevel.tables + ' · 装修 ' + restUpgradeLevel.decor;
+  mgmtRow.appendChild(info);
   ctrl.appendChild(mgmtRow);
 }
 

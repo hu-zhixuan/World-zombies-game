@@ -406,11 +406,11 @@ const BGM_TRACKS = {
 };
 // 餐厅音乐播放列表（玩家可循环切换）
 const REST_MUSIC_PLAYLIST = [
-  {key:'restaurant',         label:'🎵爵士'},
-  {key:'restaurant_lofi',    label:'🎵LoFi'},
-  {key:'restaurant_acoustic',label:'🎵原声'},
-  {key:'restaurant_blues',   label:'🎵蓝调'},
-  {key:'calm',               label:'🎵氛围'},
+  {key:'restaurant',         label:'音乐：爵士'},
+  {key:'restaurant_lofi',    label:'音乐：LoFi'},
+  {key:'restaurant_acoustic',label:'音乐：原声'},
+  {key:'restaurant_blues',   label:'音乐：蓝调'},
+  {key:'calm',               label:'音乐：氛围'},
 ];
 let restMusicIdx = 0;
 let restMusicManual = false;  // 玩家手动切换后，不再自动跟随战斗状态
@@ -422,7 +422,7 @@ function cycleRestMusic(){
   restMusicIdx = (restMusicIdx + 1) % REST_MUSIC_PLAYLIST.length;
   const track = REST_MUSIC_PLAYLIST[restMusicIdx];
   switchBGMTrack(track.key);
-  addBanner('🎶 餐厅音乐切换为：' + track.label.replace('🎵',''));
+  addBanner('餐厅音乐切换为：' + track.label.replace('音乐：',''));
   updateRestMusicBtn();
 }
 function updateRestMusicBtn(){

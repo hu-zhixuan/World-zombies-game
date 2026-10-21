@@ -875,10 +875,10 @@ function restLoop(now){
     document.getElementById('rest-earnings').textContent = '收入: ' + restState.earnings + '金';
     // 更新粉丝数显示
     const fansEl = document.getElementById('rest-fans-display');
-    if(fansEl) fansEl.textContent = '📱粉丝 ' + wastegramFans + ' [' + wastegramRank + ']';
+    if(fansEl) fansEl.textContent = '粉丝 ' + wastegramFans + '（' + wastegramRank + '）';
     // 更新声望阶级显示
     const tierEl = document.getElementById('rep-tier-display');
-    if(tierEl){ const t = getRepTier(); tierEl.textContent = t.icon + ' ' + t.name + ' (声望' + restRep + ')'; tierEl.style.color = t.color; }
+    if(tierEl){ const t = getRepTier(); tierEl.textContent = t.name + '（声望 ' + restRep + '）'; }
     // 更新每日任务面板
     const tasksList = document.getElementById('daily-tasks-list');
     if(tasksList){ tasksList.innerHTML = getDailyTasksHTML(); }
@@ -892,7 +892,7 @@ function restLoop(now){
     const fansDisplay = document.getElementById('rest-fans-display');
     if(fansDisplay){
       const smRank = getSocialMediaRank();
-      fansDisplay.textContent = '📱' + smRank.icon + wastegramFans + '[' + wastegramRank + ']';
+      fansDisplay.textContent = '粉丝 ' + wastegramFans + '（' + wastegramRank + '）';
       fansDisplay.title = smRank.name + ' | ' + smRank.unlock;
     }
     // 更新 Cooksta 徽章（新评价数）

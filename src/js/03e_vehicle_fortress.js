@@ -485,22 +485,21 @@ function drawBuildings() {
     // ── 基地要塞特殊标识（随 fortify 等级动态变化徽章与配色）──
     if(b.id==='cabin'){
       const fortLvl = (typeof cabinUpgrades !== 'undefined' && cabinUpgrades.fortify) ? cabinUpgrades.fortify : 0;
-      const titleTxt = fortLvl === 0 ? '★ 避难小屋 ★' : fortLvl === 1 ? '🛡️ 防空要塞' : fortLvl === 2 ? '🏰 指挥堡垒' : '⚡ 宙斯盾要塞';
-      const borderCol = fortLvl === 0 ? '#00f0ff' : fortLvl === 1 ? '#38bdf8' : fortLvl === 2 ? '#f59e0b' : '#a855f7';
-      const textCol = fortLvl === 0 ? '#00f0ff' : fortLvl === 1 ? '#38bdf8' : fortLvl === 2 ? '#ffd700' : '#c084fc';
+      const titleTxt = fortLvl === 0 ? '避难小屋' : fortLvl === 1 ? '防空要塞' : fortLvl === 2 ? '指挥堡垒' : '宙斯盾要塞';
+      const borderCol = fortLvl <= 1 ? '#454c56' : '#f2a65a';
+      const textCol = fortLvl <= 1 ? '#e8eaed' : '#f2a65a';
       ctx.save();
-      ctx.fillStyle='#0d1522';ctx.fillRect(sx+b.w/2-38,top-30,76,14);
-      ctx.strokeStyle=borderCol;ctx.lineWidth=1.5;ctx.strokeRect(sx+b.w/2-38,top-30,76,14);
-      ctx.fillStyle=textCol;ctx.font='bold 9.5px sans-serif';ctx.textAlign='center';
-      ctx.fillText(titleTxt,sx+b.w/2,top-20);
+      ctx.fillStyle='rgba(12,13,15,.92)';ctx.fillRect(sx+b.w/2-34,top-30,68,16);
+      ctx.strokeStyle=borderCol;ctx.lineWidth=1;ctx.strokeRect(sx+b.w/2-34,top-30,68,16);
+      ctx.fillStyle=textCol;ctx.font='500 10px sans-serif';ctx.textAlign='center';
+      ctx.fillText(titleTxt,sx+b.w/2,top-18.5);
       ctx.restore();
       // 窗户更暖更亮（区别于其他建筑，且随等级更璀璨）
       ctx.fillStyle=`rgba(255,220,120,${winGlow*(1.8 + fortLvl*0.4)})`;
       ctx.fillRect(sx+10,top+20,18,18);
       ctx.fillRect(sx+b.w-28,top+20,18,18);
       // 门框金色发光
-      ctx.shadowBlur=8;ctx.shadowColor='rgba(255,200,80,.6)';
-      ctx.strokeStyle='#ffd840';ctx.lineWidth=2;
+      ctx.strokeStyle='#d8a85a';ctx.lineWidth=2;
       ctx.strokeRect(sx+b.w/2-14,platTop-46,28,46);
       ctx.shadowBlur=0;
       // ── 家园升级可视化：屋顶旁显示已建造的设施图标 ──
@@ -981,7 +980,7 @@ function updateInteractionPrompt() {
   if (nearB) {
     if(nearB.id === 'cabin'){
       if(wavePhase === 'spawning'){
-        setInteractPrompt('🔒 小屋门锁着（波次进行中）· 清完这波等夜晚尸潮来时再进');
+        setInteractPrompt('小屋门锁着（波次进行中）· 清完这波等夜晚尸潮来时再进');
       } else if(wavePhase === 'boss'){
         setInteractPrompt('🔒 小屋门锁着（Boss战中）');
       } else if(wavePhase === 'cleared'){
