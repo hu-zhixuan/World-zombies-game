@@ -9,7 +9,7 @@ const isMobile = ()=> window.innerWidth <= 840 || (window.matchMedia && window.m
 function layoutMobile(){
   const cv = document.getElementById('gc'), wrap = document.getElementById('game-wrap');
   if(!cv || !wrap) return;
-  if(!window.matchMedia(MOBILE_MQ).matches){ cv.style.width = ''; cv.style.height = ''; return; }
+  if(!window.matchMedia || !window.matchMedia(MOBILE_MQ).matches){ cv.style.width = ''; cv.style.height = ''; return; }
   const w = wrap.clientWidth, h = wrap.clientHeight;
   if(!w || !h) return;
   const k = Math.min(w / 1100, h / 500);
