@@ -210,6 +210,23 @@ function drawWaveHUD(){
       ctx.globalAlpha = 1;
     });
   }
+  // ── 今日热搜目标（白天打怪时的小目标：今晚什么菜好卖、已攒多少目标肉）──
+  if(currentTrend && gameState==='world'){
+    const tx = GW - 180, ty = 90;
+    const info = getTrendHuntInfo();
+    const kindTxt = info && info.kinds.length ? info.kinds.map(k => MEAT_TYPES[k].icon + MEAT_TYPES[k].name).join('/') : '';
+    ctx.globalAlpha = .92;
+    ctx.fillStyle = 'rgba(10,6,4,.85)';
+    ctx.fillRect(tx, ty, 170, 18);
+    ctx.strokeStyle = '#ff8844';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(tx, ty, 170, 18);
+    ctx.font = 'bold 10px Microsoft YaHei UI,sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffb070';
+    ctx.fillText('📱#' + currentTrend.tag + '# ' + kindTxt + ' ×' + trendMeatToday, tx + 6, ty + 13);
+    ctx.globalAlpha = 1;
+  }
   // 右上角波次信息面板
   const px = GW - 180, py = 8, pw = 170, ph = 50;
   ctx.fillStyle = 'rgba(10,6,4,.85)';

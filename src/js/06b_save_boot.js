@@ -29,6 +29,8 @@ function buildSaveState() {
     restPendingInfluencerBoost,
     moraleBuff,
     tonightMenu: [...tonightMenu],
+    currentTrendId: currentTrend ? currentTrend.id : null,
+    trendMeatToday,
     queuedBattleBuffs: queuedBattleBuffs.map(b => ({ id: b.id, stacks: b.stacks })),
     activeBattleBuffs: activeBattleBuffs.map(b => ({ id: b.id, stacks: b.stacks, timeLeft: b.timeLeft })),
     wastegramFans,
@@ -365,6 +367,8 @@ function restoreSaveState(state) {
   restPendingInfluencerBoost = state.restPendingInfluencerBoost ?? 0;
   // 经营重做：恢复菜单注册与菜品增益
   tonightMenu = (state.tonightMenu && Array.isArray(state.tonightMenu)) ? [...state.tonightMenu] : [];
+  currentTrend = DAILY_TRENDS.find(t => t.id === state.currentTrendId) || null;
+  trendMeatToday = state.trendMeatToday || 0;
   queuedBattleBuffs = (state.queuedBattleBuffs && Array.isArray(state.queuedBattleBuffs)) ? state.queuedBattleBuffs.map(b => ({...b})) : [];
   activeBattleBuffs = (state.activeBattleBuffs && Array.isArray(state.activeBattleBuffs)) ? state.activeBattleBuffs.map(b => ({...b})) : [];
   // 恢复Wastegram粉丝和VIP图鉴
@@ -542,6 +546,7 @@ function startGame(){
   vipCompendium = {};  // 重置VIP图鉴
   vipActiveInRestaurant = null;  // 重置VIP占位
   currentTrend = null;  // 重置今日热搜
+  trendMeatToday = 0;
   lastSMRankIdx = 0;  // 重置社媒等级索引
   tutorialSeen = {};  // 重置教程（新游戏重新教学）
   cabinUpgrades.turret = 0;

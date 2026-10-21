@@ -17431,6 +17431,7 @@ function collectLoot(item) {
     if(typeof addItemToBackpack === 'function'){
       addItemToBackpack(item.type, item.value, false);
     }
+    noteTrendMeat(k, item.value);  // 今日热搜目标肉计数（战斗 HUD 显示）
     sndCoin();
     const lbl = k==='normal'?'鲜美肉':k==='fast'?'韧性瘦肉':k==='tank'?'霜降厚肉':'异化基因肉';
     const col = k==='normal'?'#c87862':k==='fast'?'#d89878':k==='tank'?'#a85838':'#aa44cc';
@@ -18117,6 +18118,9 @@ function startWaveContent(){
   addBanner(`⚡ 第 ${wave} 波开始！${dayHint?' · '+dayHint:''}`);sndWave();
   // ── v49批1：波次随机变异掷骰（W2起 20%，肉鸽局内随机性）──
   rollWaveMutation();
+  // ── 一天的开头：刷新今日热搜并告诉玩家"白天该打什么、今晚什么菜好卖"（晚上开张沿用，不再重掷）──
+  rollDailyTrend();
+  announceDailyGoal();
   // ── v49批4：波次对白复活（非模态，不阻塞操作）──
   if(typeof queueWaveDialogue === 'function') queueWaveDialogue(wave);
   // ── 行囊被动：温暖羊毛羽绒毯 开局附赠30点坚固护盾 ──
@@ -21875,6 +21879,9 @@ function detectSynergy(usedTags){
 // ── 3. 每日热搜系统 ──
 // 每天刷新一条热搜，匹配标签的菜品售价+30%，且顾客更爱点
 const DAILY_TRENDS = [
+  // 普通肉热搜：开局只解锁烤肉串（普通肉）时，热搜也必须有得匹配，白天的"今日目标"才不落空
+  { id:'homestyle',  tag:'家常',  text:'🏠 #想念家的味道，来点家常的#', desc:'【家常】标签菜品售价+30%', mult:1.3 },
+  { id:'tender',     tag:'鲜嫩',  text:'🥩 #嫩一点，再嫩一点#', desc:'【鲜嫩】标签菜品售价+30%', mult:1.3 },
   { id:'hot_day',    tag:'冰爽',  text:'🌡️ #高温天气，快来一杯冰爽饮料！#', desc:'【冰爽】标签菜品售价+30%', mult:1.3 },
   { id:'spicy_night',tag:'辣',    text:'🌙 #深夜就想吃重口味#', desc:'【辣】标签菜品售价+30%', mult:1.3 },
   { id:'sweet_tooth',tag:'甜',    text:'🍰 #今天心情不好，想吃甜的#', desc:'【甜】标签菜品售价+30%', mult:1.3 },
@@ -21888,10 +21895,52 @@ const DAILY_TRENDS = [
 ];
 
 let currentTrend = null;  // 今日热搜
+let trendMeatToday = 0;   // 今天白天已收集的"热搜目标肉"数量（战斗 HUD 显示进度）
 
+// 这条热搜现在有没有菜能吃到加成（用已解锁菜谱的肉类标签判定）
+function trendMatchableNow(tr){
+  try{
+    return getUnlockedRecipes().some(r => getDishTags(r, null).includes(tr.tag));
+  }catch(e){ return true; }
+}
+
+// 热搜每天在白天第一波开始时刷新（nextWave→startWaveContent），晚上开张直接沿用，
+// 这样玩家打僵尸时就知道今晚什么菜好卖。只在"当前能做出匹配菜"的热搜里抽，且尽量不连续重复。
 function rollDailyTrend(){
-  currentTrend = DAILY_TRENDS[Math.floor(Math.random() * DAILY_TRENDS.length)];
+  let pool = DAILY_TRENDS.filter(trendMatchableNow);
+  if(pool.length === 0) pool = DAILY_TRENDS;
+  if(currentTrend && pool.length > 1) pool = pool.filter(t => t.id !== currentTrend.id);
+  currentTrend = pool[Math.floor(Math.random() * pool.length)];
+  trendMeatToday = 0;
   return currentTrend;
+}
+
+// 热搜标签 → 哪种肉带这个标签 → 哪些僵尸掉这种肉
+function getTrendHuntInfo(){
+  if(!currentTrend) return null;
+  const tag = currentTrend.tag;
+  const kinds = Object.keys(MEAT_TAGS).filter(k => MEAT_TAGS[k].tags.includes(tag));
+  const zombieNames = ZOMBIE_DEX
+    .filter(z => kinds.includes(z.meatKind) && z.firstWave <= wave)
+    .map(z => z.name);
+  return { tag, kinds, zombieNames };
+}
+
+// 战斗里每拾取一块肉调用一次：命中热搜目标肉就累计
+function noteTrendMeat(kind, n){
+  const info = getTrendHuntInfo();
+  if(info && info.kinds.includes(kind)) trendMeatToday += (n || 1);
+}
+
+// 白天第一波开始：公布今日热搜 + 今晚怎么赚、白天该打什么
+function announceDailyGoal(){
+  const info = getTrendHuntInfo();
+  if(!info) return;
+  const kindTxt = info.kinds.map(k => MEAT_TYPES[k].name).join('/');
+  const hunt = info.zombieNames.length > 0
+    ? '白天多打：' + info.zombieNames.slice(0, 3).join('、') + '（掉' + kindTxt + '）'
+    : '白天多打：精英僵尸（掉' + kindTxt + '）';
+  pushSideNotification('📱 今日热搜', currentTrend.text, currentTrend.desc + '｜' + hunt, '#ff8844', 'info');
 }
 
 // 检查菜品是否匹配今日热搜
@@ -24435,13 +24484,13 @@ function _doStartRestaurant(){
   };
   vipActiveInRestaurant = null;  // 重置VIP占位
   generateDailyTasks();  // 生成本夜每日任务（Kairosoft 式）
-  rollDailyTrend();  // 刷新今日热搜（三位一体联动核心）
+  if(!currentTrend) rollDailyTrend();  // 热搜已在白天第一波刷新；仅读档等缺失时补掷
   checkNewVIPUnlocks();  // 同步VIP解锁状态（加载存档后可能粉丝已够解锁）
   checkSocialMediaRankUp();  // 检查社媒等级提升
-  // 显示今日热搜提示
+  // 显示今日热搜提示（白天已公布过一次，这里是开张时的提醒，并告诉玩家白天攒了多少目标肉）
   if(currentTrend){
     setTimeout(() => {
-      addBanner('📱 今日热搜：' + currentTrend.text + ' (' + currentTrend.desc + ')');
+      addBanner('📱 今日热搜：' + currentTrend.text + ' (' + currentTrend.desc + ')' + (trendMeatToday > 0 ? ' · 白天已备目标肉×' + trendMeatToday : ''));
     }, 2000);
   }
   restPendingInfluencerBoost = 0;  // 加载后清零
@@ -28190,6 +28239,23 @@ function drawWaveHUD(){
       ctx.globalAlpha = 1;
     });
   }
+  // ── 今日热搜目标（白天打怪时的小目标：今晚什么菜好卖、已攒多少目标肉）──
+  if(currentTrend && gameState==='world'){
+    const tx = GW - 180, ty = 90;
+    const info = getTrendHuntInfo();
+    const kindTxt = info && info.kinds.length ? info.kinds.map(k => MEAT_TYPES[k].icon + MEAT_TYPES[k].name).join('/') : '';
+    ctx.globalAlpha = .92;
+    ctx.fillStyle = 'rgba(10,6,4,.85)';
+    ctx.fillRect(tx, ty, 170, 18);
+    ctx.strokeStyle = '#ff8844';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(tx, ty, 170, 18);
+    ctx.font = 'bold 10px Microsoft YaHei UI,sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffb070';
+    ctx.fillText('📱#' + currentTrend.tag + '# ' + kindTxt + ' ×' + trendMeatToday, tx + 6, ty + 13);
+    ctx.globalAlpha = 1;
+  }
   // 右上角波次信息面板
   const px = GW - 180, py = 8, pw = 170, ph = 50;
   ctx.fillStyle = 'rgba(10,6,4,.85)';
@@ -29537,6 +29603,8 @@ function buildSaveState() {
     restPendingInfluencerBoost,
     moraleBuff,
     tonightMenu: [...tonightMenu],
+    currentTrendId: currentTrend ? currentTrend.id : null,
+    trendMeatToday,
     queuedBattleBuffs: queuedBattleBuffs.map(b => ({ id: b.id, stacks: b.stacks })),
     activeBattleBuffs: activeBattleBuffs.map(b => ({ id: b.id, stacks: b.stacks, timeLeft: b.timeLeft })),
     wastegramFans,
@@ -29873,6 +29941,8 @@ function restoreSaveState(state) {
   restPendingInfluencerBoost = state.restPendingInfluencerBoost ?? 0;
   // 经营重做：恢复菜单注册与菜品增益
   tonightMenu = (state.tonightMenu && Array.isArray(state.tonightMenu)) ? [...state.tonightMenu] : [];
+  currentTrend = DAILY_TRENDS.find(t => t.id === state.currentTrendId) || null;
+  trendMeatToday = state.trendMeatToday || 0;
   queuedBattleBuffs = (state.queuedBattleBuffs && Array.isArray(state.queuedBattleBuffs)) ? state.queuedBattleBuffs.map(b => ({...b})) : [];
   activeBattleBuffs = (state.activeBattleBuffs && Array.isArray(state.activeBattleBuffs)) ? state.activeBattleBuffs.map(b => ({...b})) : [];
   // 恢复Wastegram粉丝和VIP图鉴
@@ -30050,6 +30120,7 @@ function startGame(){
   vipCompendium = {};  // 重置VIP图鉴
   vipActiveInRestaurant = null;  // 重置VIP占位
   currentTrend = null;  // 重置今日热搜
+  trendMeatToday = 0;
   lastSMRankIdx = 0;  // 重置社媒等级索引
   tutorialSeen = {};  // 重置教程（新游戏重新教学）
   cabinUpgrades.turret = 0;

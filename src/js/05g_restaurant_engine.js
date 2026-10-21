@@ -708,13 +708,13 @@ function _doStartRestaurant(){
   };
   vipActiveInRestaurant = null;  // 重置VIP占位
   generateDailyTasks();  // 生成本夜每日任务（Kairosoft 式）
-  rollDailyTrend();  // 刷新今日热搜（三位一体联动核心）
+  if(!currentTrend) rollDailyTrend();  // 热搜已在白天第一波刷新；仅读档等缺失时补掷
   checkNewVIPUnlocks();  // 同步VIP解锁状态（加载存档后可能粉丝已够解锁）
   checkSocialMediaRankUp();  // 检查社媒等级提升
-  // 显示今日热搜提示
+  // 显示今日热搜提示（白天已公布过一次，这里是开张时的提醒，并告诉玩家白天攒了多少目标肉）
   if(currentTrend){
     setTimeout(() => {
-      addBanner('📱 今日热搜：' + currentTrend.text + ' (' + currentTrend.desc + ')');
+      addBanner('📱 今日热搜：' + currentTrend.text + ' (' + currentTrend.desc + ')' + (trendMeatToday > 0 ? ' · 白天已备目标肉×' + trendMeatToday : ''));
     }, 2000);
   }
   restPendingInfluencerBoost = 0;  // 加载后清零

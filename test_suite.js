@@ -25,7 +25,8 @@ function createMockCtx() {
 }
 
 const mockElem = {
-  style: {},
+  style: { setProperty(){}, removeProperty(){} },
+  dataset: {},
   classList: { add(){}, remove(){}, contains(){ return false; } },
   innerHTML: '',
   innerText: '',
@@ -68,6 +69,8 @@ const sandbox = {
   clearTimeout: (id) => clearTimeout(id),
   setInterval: (fn) => setInterval(fn, 1000),
   clearInterval: (id) => clearInterval(id),
+  performance: { now: () => Date.now() },
+  Audio: function() { return { play(){ return Promise.resolve(); }, pause(){}, addEventListener(){}, volume: 1 }; },
   requestAnimationFrame: () => 1,
   cancelAnimationFrame: () => {},
   localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
@@ -327,6 +330,36 @@ try {
   console.error('buildCabinUpgradeUI failed:', e);
 }
 assert(cabinBuilt === true, 'buildCabinUpgradeUI executes cleanly and builds defense hub UI');
+
+
+// -------------------------------------------------------------
+// Test Set 4: 每日热搜挪到白天（P2-6）
+// -------------------------------------------------------------
+console.log('\n--- Running Test Set 4: Daily Trend In The Daytime ---');
+run(`wave = 1; restRep = 0; currentTrend = null; trendMeatToday = 0;`);
+let earlyAllMatch = true;
+for (let i = 0; i < 60; i++) {
+  run(`currentTrend = null; rollDailyTrend();`);
+  if (!run(`trendMatchableNow(currentTrend)`)) earlyAllMatch = false;
+}
+assert(earlyAllMatch, '开局(只解锁烤肉串)掷出的热搜一定有菜能匹配');
+assert(run(`DAILY_TRENDS.some(t => !trendMatchableNow(t))`), '开局存在匹配不上的热搜(被过滤掉的那部分)');
+
+run(`currentTrend = DAILY_TRENDS.find(t => t.id === 'homestyle'); trendMeatToday = 0;`);
+assert(run(`getTrendHuntInfo().kinds.join(',')`) === 'normal', '「家常」热搜的目标肉是普通肉');
+assert(run(`getTrendHuntInfo().zombieNames.length > 0`), '热搜目标肉能映射到会掉它的僵尸名');
+run(`noteTrendMeat('normal', 2); noteTrendMeat('tank', 5);`);
+assert(run(`trendMeatToday`) === 2, '只有命中热搜目标肉才计数', `got ${run('trendMeatToday')}`);
+
+run(`currentTrend = null; trendMeatToday = 3; wave = 1; wavePhase = 'x'; gameRunning = true;`);
+run(`startWaveContent();`);
+assert(run(`currentTrend !== null`), '白天波次开始(startWaveContent)就已经刷出今日热搜');
+assert(run(`trendMeatToday`) === 0, '新的一天目标肉计数清零');
+const trendBefore = run(`currentTrend.id`);
+let openErr = null;
+try { run(`meatInventory.normal = 5; gameState = 'hub'; _doStartRestaurant();`); } catch (e) { openErr = e; }
+assert(!openErr, '_doStartRestaurant 在测试环境下可执行', openErr && openErr.stack);
+assert(run(`currentTrend.id`) === trendBefore, '晚上开张不重掷热搜', `before=${trendBefore} after=${run('currentTrend.id')}`);
 
 console.log(`\n========================================`);
 console.log(`FINAL RESULT: Passed: ${testsPassed}, Failed: ${testsFailed}`);

@@ -878,6 +878,7 @@ function collectLoot(item) {
     if(typeof addItemToBackpack === 'function'){
       addItemToBackpack(item.type, item.value, false);
     }
+    noteTrendMeat(k, item.value);  // 今日热搜目标肉计数（战斗 HUD 显示）
     sndCoin();
     const lbl = k==='normal'?'鲜美肉':k==='fast'?'韧性瘦肉':k==='tank'?'霜降厚肉':'异化基因肉';
     const col = k==='normal'?'#c87862':k==='fast'?'#d89878':k==='tank'?'#a85838':'#aa44cc';

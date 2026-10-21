@@ -163,6 +163,9 @@ function startWaveContent(){
   addBanner(`⚡ 第 ${wave} 波开始！${dayHint?' · '+dayHint:''}`);sndWave();
   // ── v49批1：波次随机变异掷骰（W2起 20%，肉鸽局内随机性）──
   rollWaveMutation();
+  // ── 一天的开头：刷新今日热搜并告诉玩家"白天该打什么、今晚什么菜好卖"（晚上开张沿用，不再重掷）──
+  rollDailyTrend();
+  announceDailyGoal();
   // ── v49批4：波次对白复活（非模态，不阻塞操作）──
   if(typeof queueWaveDialogue === 'function') queueWaveDialogue(wave);
   // ── 行囊被动：温暖羊毛羽绒毯 开局附赠30点坚固护盾 ──

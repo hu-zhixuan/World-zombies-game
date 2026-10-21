@@ -146,6 +146,9 @@ function detectSynergy(usedTags){
 // ── 3. 每日热搜系统 ──
 // 每天刷新一条热搜，匹配标签的菜品售价+30%，且顾客更爱点
 const DAILY_TRENDS = [
+  // 普通肉热搜：开局只解锁烤肉串（普通肉）时，热搜也必须有得匹配，白天的"今日目标"才不落空
+  { id:'homestyle',  tag:'家常',  text:'🏠 #想念家的味道，来点家常的#', desc:'【家常】标签菜品售价+30%', mult:1.3 },
+  { id:'tender',     tag:'鲜嫩',  text:'🥩 #嫩一点，再嫩一点#', desc:'【鲜嫩】标签菜品售价+30%', mult:1.3 },
   { id:'hot_day',    tag:'冰爽',  text:'🌡️ #高温天气，快来一杯冰爽饮料！#', desc:'【冰爽】标签菜品售价+30%', mult:1.3 },
   { id:'spicy_night',tag:'辣',    text:'🌙 #深夜就想吃重口味#', desc:'【辣】标签菜品售价+30%', mult:1.3 },
   { id:'sweet_tooth',tag:'甜',    text:'🍰 #今天心情不好，想吃甜的#', desc:'【甜】标签菜品售价+30%', mult:1.3 },
@@ -159,10 +162,52 @@ const DAILY_TRENDS = [
 ];
 
 let currentTrend = null;  // 今日热搜
+let trendMeatToday = 0;   // 今天白天已收集的"热搜目标肉"数量（战斗 HUD 显示进度）
 
+// 这条热搜现在有没有菜能吃到加成（用已解锁菜谱的肉类标签判定）
+function trendMatchableNow(tr){
+  try{
+    return getUnlockedRecipes().some(r => getDishTags(r, null).includes(tr.tag));
+  }catch(e){ return true; }
+}
+
+// 热搜每天在白天第一波开始时刷新（nextWave→startWaveContent），晚上开张直接沿用，
+// 这样玩家打僵尸时就知道今晚什么菜好卖。只在"当前能做出匹配菜"的热搜里抽，且尽量不连续重复。
 function rollDailyTrend(){
-  currentTrend = DAILY_TRENDS[Math.floor(Math.random() * DAILY_TRENDS.length)];
+  let pool = DAILY_TRENDS.filter(trendMatchableNow);
+  if(pool.length === 0) pool = DAILY_TRENDS;
+  if(currentTrend && pool.length > 1) pool = pool.filter(t => t.id !== currentTrend.id);
+  currentTrend = pool[Math.floor(Math.random() * pool.length)];
+  trendMeatToday = 0;
   return currentTrend;
+}
+
+// 热搜标签 → 哪种肉带这个标签 → 哪些僵尸掉这种肉
+function getTrendHuntInfo(){
+  if(!currentTrend) return null;
+  const tag = currentTrend.tag;
+  const kinds = Object.keys(MEAT_TAGS).filter(k => MEAT_TAGS[k].tags.includes(tag));
+  const zombieNames = ZOMBIE_DEX
+    .filter(z => kinds.includes(z.meatKind) && z.firstWave <= wave)
+    .map(z => z.name);
+  return { tag, kinds, zombieNames };
+}
+
+// 战斗里每拾取一块肉调用一次：命中热搜目标肉就累计
+function noteTrendMeat(kind, n){
+  const info = getTrendHuntInfo();
+  if(info && info.kinds.includes(kind)) trendMeatToday += (n || 1);
+}
+
+// 白天第一波开始：公布今日热搜 + 今晚怎么赚、白天该打什么
+function announceDailyGoal(){
+  const info = getTrendHuntInfo();
+  if(!info) return;
+  const kindTxt = info.kinds.map(k => MEAT_TYPES[k].name).join('/');
+  const hunt = info.zombieNames.length > 0
+    ? '白天多打：' + info.zombieNames.slice(0, 3).join('、') + '（掉' + kindTxt + '）'
+    : '白天多打：精英僵尸（掉' + kindTxt + '）';
+  pushSideNotification('📱 今日热搜', currentTrend.text, currentTrend.desc + '｜' + hunt, '#ff8844', 'info');
 }
 
 // 检查菜品是否匹配今日热搜
