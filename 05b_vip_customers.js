@@ -1,0 +1,442 @@
+// ════════════════════════════════════════════════════════════════════════════
+//  【VIP 顾客图鉴与性格驱动剧情系统】Customer Compendium & Personality Narrative
+//  15 位 VIP 按 Wasteland-gram 粉丝数分 5 个阶级解锁，每位有独特性格 + 初遇剧情
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── VIP 阶级定义（粉丝门槛 + 颜色 + 标签）──
+const VIP_TIERS = {
+  bronze:   { name:'青铜级', color:'#cd7f32', minFans:0,     label:'废土底层的挣扎者', icon:'🟢' },
+  silver:   { name:'白银级', color:'#c0c0c0', minFans:500,   label:'各路有本事的怪人', icon:'⚪' },
+  gold:     { name:'黄金级', color:'#ffd700', minFans:2000,  label:'有头有脸的人物打卡', icon:'🟡' },
+  platinum: { name:'铂金级', color:'#e5e4e2', minFans:5000,  label:'废土各方势力的核心', icon:'🔴' },
+  diamond:  { name:'钻石级', color:'#b9f2ff', minFans:10000, label:'都市传说般的存在', icon:'💎' },
+};
+
+// ── 15 位 VIP 顾客完整定义 ──
+const VIP_CUSTOMERS = [
+  // ════════ 青铜级 (0-500 粉丝) ════════
+  {
+    id:'agou', name:'拾荒新丁·阿狗', tier:'bronze', unlockFans:0,
+    color:'#8b6914', accent:'#cdaa6a', icon:'🥺',
+    personality:'讨好与极度自卑',
+    personalityDesc:'习惯性驼背，眼神总是躲闪，说话唯唯诺诺。生怕自己做错一点小事就会被赶回外面的恐怖世界，别人稍微对他好一点就会感激涕零。',
+    bg:'被外头最低级的酸液史莱姆追了三条街，连滚带爬地摔进你的餐厅。',
+    patienceMul:1.4, tipBonus:1.0, weight:12,
+    preferredQuality:'any', preferredDishPref:'cheap',
+    firstMeet:[
+      {npc:'ming', text:'（门被撞开，一个瘦小的身影连滚带爬摔进来，裤腿还在冒酸烟）'},
+      {speaker:'??', text:'老…老板！求求你！给我一口剩饭就行！我…我扫地！我洗碗！我什么都干！'},
+      {npc:'ming', text:'……先起来。裤腿着火了，踩灭再说。'},
+      {speaker:'阿狗', text:'（哆哆嗦嗦爬起来，眼眶通红）谢…谢谢老板……外面那些东西追了我三条街……我以为我要死了……'},
+      {npc:'ming', text:'（端上一份烤肉）吃吧。算我请的。'},
+      {speaker:'阿狗', text:'（捧着碗，手抖得厉害，眼泪啪嗒啪嗒掉）这……这是我这个月吃过最好的东西……老板你是好人，你是大好人……'},
+      {npc:'ming', text:'（心想：……只是份普通烤肉而已。）行了，吃完赶紧走，天黑前回你的避难点。'},
+    ],
+    reactions:{
+      legendary:'跪地磕头，表示这是他这辈子吃过最好的东西，以后天天来',
+      perfect:'哽咽着道谢，眼眶湿润，小声说"老板真是个好人"',
+      good:'小心翼翼地说"挺好吃的……谢谢老板"',
+      poor:'慌张地道歉"是…是我自己嘴刁，不怪老板……"',
+      burned:'吓得脸色发白"对…对不起！是不是我运气不好……我不介意的！还能吃！"',
+    },
+    specialEffect:'humble', // 永远点最便宜的菜，但满意时不扣声望反而+1
+    spriteType:'hunched',
+  },
+  {
+    id:'laobao', name:'防线夜巡者·老包', tier:'bronze', unlockFans:100,
+    color:'#4a5a3a', accent:'#7a9a6a', icon:'😴',
+    personality:'外冷内热与神经衰弱',
+    personalityDesc:'长期夜班防守，精神处于极度疲惫的临界点。表面是个凶神恶煞的刀疤脸，口袋里却总藏着捡来的硬糖打算分给避难所的小孩。',
+    bg:'连续值了72小时高强度防线夜班，推门进来时连枪都快提不动了。',
+    patienceMul:0.7, tipBonus:1.8, weight:10,
+    preferredQuality:'spicy', preferredDishPref:'stimulating',
+    firstMeet:[
+      {npc:'ming', text:'（一个满脸刀疤、眼布血丝的大汉推门进来，枪都快提不动了）'},
+      {speaker:'老包', text:'……有能"把死人唤醒"的东西吗。今晚要再撑不过去，防线就崩了。'},
+      {npc:'ming', text:'你这状态……三天没睡了？'},
+      {speaker:'老包', text:'七十二小时。（顿了顿）小孩们还在避难所里等着呢。我不能睡。'},
+      {npc:'ming', text:'（端上一份地狱火辣烤肉）这个。保证你今晚精神得能打十个。'},
+      {speaker:'老包', text:'（大口吞下，辣得直冒汗，但眼睛终于亮了起来）……操。活了。（摸了摸口袋，掏出一颗皱巴巴的硬糖放在桌上）给小孩的。这颗……算你的。'},
+      {npc:'ming', text:'（收下硬糖）……常来。给你留座。'},
+    ],
+    reactions:{
+      legendary:'一拳砸在桌上"他妈的，这才是男人该吃的东西！"留下双倍小费',
+      perfect:'长舒一口气，血丝褪去大半"……活过来了。老板，你救了防线一整夜。"',
+      good:'闷头吃完"凑合。能顶用。"',
+      poor:'皱眉"不够劲……算了，不怪你。"',
+      burned:'苦笑"……看来今晚只能靠意志力了。"',
+    },
+    specialEffect:'stimulant', // 吃到辣味/刺激菜额外回血+5
+    spriteType:'scarred',
+  },
+  {
+    id:'qijie', name:'废品改造狂·七姐', tier:'bronze', unlockFans:300,
+    color:'#b85a3a', accent:'#ff8a5a', icon:'🔧',
+    personality:'暴躁话痨与机械保护欲',
+    personalityDesc:'永远在骂骂咧咧，三句话不离本行。对人类缺乏耐心，但看不得任何机械被粗暴对待——你如果在她面前踹发电机，她会暴跳如雷。',
+    bg:'背着一把比她人还高的大扳手进来，一屁股坐下就开始狂喷外面的废铁质量。',
+    patienceMul:0.85, tipBonus:1.5, weight:10,
+    preferredQuality:'heavy', preferredDishPref:'mechanical',
+    firstMeet:[
+      {npc:'ming', text:'（一个扛着巨型扳手的中年女人大步走进来，扳手比她还高）'},
+      {speaker:'七姐', text:'老板！有座没有？妈的，外面那帮孙子卖的废铁全是渣！老子昨天用一个破微波炉和半根弹簧炸飞了一窝变异鼠，他们居然嫌我要价高！'},
+      {npc:'ming', text:'……有座。先坐。吃什么？'},
+      {speaker:'七姐', text:'来最扎实的！能撑住干一天活的那种！——哎你别碰我扳手！（一把护住）这可是我用坦克炮管改的，碰坏了你赔不起！'},
+      {npc:'ming', text:'（端上一份巨兽厚排）这个，管饱。'},
+      {speaker:'七姐', text:'（大口撕咬）嚯！够劲！（抹嘴）行，老板你是实在人。以后我的活儿全在你这儿吃。对了——你那灶台的火头不对，排气管角度差了15度，回头我给你修。'},
+      {npc:'ming', text:'……那敢情好。'},
+    ],
+    reactions:{
+      legendary:'猛拍桌子"牛逼！这手艺能去开军工厂！"主动提出帮你升级灶台（下次烹饪速度+10%）',
+      perfect:'满意地点头"行，老板有两下子。这灶台回头我给你调调。"',
+      good:'边吃边念叨"凑合……火候差点意思，但肉不错。"',
+      poor:'啧嘴"这刀工不行啊老板。回头我教你磨刀。"',
+      burned:'黑脸"你这是糟蹋食材！跟那帮卖废铁的一个德行！"',
+    },
+    specialEffect:'mechanic', // 满意时下次烹饪速度+10%（一次性buff）
+    spriteType:'wrench',
+  },
+
+  // ════════ 白银级 (500-2000 粉丝) ════════
+  {
+    id:'niqiu', name:'黑市游商·泥鳅', tier:'silver', unlockFans:500,
+    color:'#3a5a3a', accent:'#6a9a6a', icon:'🐀',
+    personality:'狡黠滑头与唯利是图',
+    personalityDesc:'永远挂着笑眯眯的表情，眼神贼溜溜地转。说话喜欢兜圈子，绝不让自己吃半点亏。哪怕是点一碗汤，也要跟你讨价还价半天。',
+    bg:'裹着厚重的防风沙斗篷溜进来，正在躲避一帮穷凶极恶的债主。',
+    patienceMul:1.0, tipBonus:2.2, weight:8,
+    preferredQuality:'any', preferredDishPref:'any',
+    firstMeet:[
+      {npc:'ming', text:'（一个裹着斗篷、像耗子一样溜进门的人，压低帽檐四处张望）'},
+      {speaker:'泥鳅', text:'嘘——老板，别声张。让我在吧台下面躲一会儿……外面那帮孙子追了我三条街。'},
+      {npc:'ming', text:'……我这又不是客栈。'},
+      {speaker:'泥鳅', text:'嘿嘿，给顿热饭就行！（眨眼）我泥鳅从不让人吃亏——你帮我这一次，我记着。废土上，我这种人脉比金币好使。'},
+      {npc:'ming', text:'（端上一碗肉汤）躲着吧。吃完赶紧走。'},
+      {speaker:'泥鳅', text:'（狼吞虎咽）好汤！老板你这手艺，放黑市能卖三倍价！（掏出一个小布袋）这个抵饭钱——里面有几颗进口子弹，市面上买不到的。'},
+      {npc:'ming', text:'……行。下次别带债主来。'},
+      {speaker:'泥鳅', text:'嘿嘿嘿，哪能呢。咱是正经生意人。'},
+    ],
+    reactions:{
+      legendary:'眼睛放光"这菜放黑市能换把狙击枪！"额外送你一件稀有道具',
+      perfect:'笑眯眯"老板够意思！下回给你带点好货。"',
+      good:'点头"还行。不过咱商量商量，下次能不能多给块肉？"',
+      poor:'撇嘴"就这？老板你这价位偏高了啊……"',
+      burned:'嬉皮笑脸"哈哈，老板今天手滑了？没事没事，这次算我请——下次补回来。"',
+    },
+    specialEffect:'haggler', // 满意时额外给稀有道具/弹药，但偶尔会砍价
+    spriteType:'hooded',
+  },
+  {
+    id:'gaolaotou', name:'阴谋论者·高老头', tier:'silver', unlockFans:1000,
+    color:'#5a4a6a', accent:'#9a8aaa', icon:'🤔',
+    personality:'偏执狂与极度缺乏安全感',
+    personalityDesc:'怀疑一切，认为空气里的灰尘都是别人的微型监视器。吃饭前要反复检查餐具，别人多看他一眼他就觉得对方要暗杀自己。',
+    bg:'头上戴着自制的锡箔纸帽，进门先掏出破烂的盖革计数器把桌椅扫了一遍。',
+    patienceMul:0.9, tipBonus:1.3, weight:7,
+    preferredQuality:'safe', preferredDishPref:'plain',
+    firstMeet:[
+      {npc:'ming', text:'（一个戴着锡箔纸帽的老头鬼鬼祟祟进来，掏出盖革计数器对着桌椅滴滴滴扫了一圈）'},
+      {speaker:'高老头', text:'嗯……辐射正常。没有窃听器。（斜眼看你）老板，你这餐厅的点唱机……是不是在发射洗脑电波？'},
+      {npc:'ming', text:'那是坏掉的收音机。不吃别摸。'},
+      {speaker:'高老头', text:'（坐下，反复擦拭筷子）哼……僵尸病毒？那都是高维生物的阴谋！他们用病毒削弱人类意志，好方便殖民！（压低声音）我跟你说，你这餐厅也不安全，天花板上那个灯——肯定有摄像头。'},
+      {npc:'ming', text:'那是灯泡。（端上一份清炖肉汤）吃吧，没毒。'},
+      {speaker:'高老头', text:'（小心翼翼尝了一口，突然放松下来）……嗯。还行。（又吃一口）没毒。（吃完）老板，你这人……暂时还算可信。这顶锡箔帽的图纸我抄一份给你，防脑控。'},
+      {npc:'ming', text:'……不用了谢谢。'},
+    ],
+    reactions:{
+      legendary:'警惕地四下张望"这味道……不对劲。太好吃了。是不是下了什么药？"',
+      perfect:'满意地点头"嗯，没毒。老板你暂时还算靠谱。"',
+      good:'嘟囔"一般。不过至少没辐射。"',
+      poor:'皱眉"这肉……你确定不是变异的？我得再测测。"',
+      burned:'惊恐"焦的！焦的是致癌物！你是不是想毒死我灭口？！"',
+    },
+    specialEffect:'paranoid', // 吃前会"检查"餐具多花2秒，但满意时给情报（下次波次预警）
+    spriteType:'tinfoil',
+  },
+  {
+    id:'guying', name:'赏金猎人·孤影', tier:'silver', unlockFans:2000,
+    color:'#2a2a3a', accent:'#5a5a8a', icon:'🎯',
+    personality:'高冷孤傲与绝对自律',
+    personalityDesc:'像一台没有感情的机器。惜字如金，只讲效率，连吃饭的动作都像是在执行某种精确的战术动作，拒绝任何无意义的寒暄。',
+    bg:'带着一身浓烈的血腥味推开门，把一颗恐怖的精英变异体头颅直接砸在吧台上。',
+    patienceMul:1.2, tipBonus:3.0, weight:6,
+    preferredQuality:'caloric', preferredDishPref:'tactical',
+    firstMeet:[
+      {npc:'ming', text:'（门被推开，一个浑身黑衣、散发着血腥味的人走进来，把一颗变异体头颅"砰"地砸在吧台上）'},
+      {speaker:'孤影', text:'高热量。快。'},
+      {npc:'ming', text:'……那头颅放地上，别放吧台。'},
+      {speaker:'孤影', text:'（拎起头颅扔到门外，重新坐下）五分钟内上菜。超过就走。'},
+      {npc:'ming', text:'（端上一份高热量巨兽套餐）'},
+      {speaker:'孤影', text:'（以战术级的精准速度吃完，每一口间隔完全相同）……合格。（留下三倍饭钱）外面有一大波东西在集结。做好准备。（起身离开）'},
+      {npc:'ming', text:'……（看着桌上的钱）这人，话少，钱多，就是有点瘆人。'},
+    ],
+    reactions:{
+      legendary:'罕见地嘴角上扬一毫米"……合格。"留下五倍小费，并留下一个战术提示',
+      perfect:'点头"效率。合格。"留下双倍小费',
+      good:'面无表情吃完"……能吃。"',
+      poor:'皱眉"浪费时间。"只付原价',
+      burned:'起身就走"浪费时间。"不付钱直接离开',
+    },
+    specialEffect:'scout', // 满意时提供下一波僵尸情报（预警精英类型）
+    spriteType:'bounty',
+  },
+
+  // ════════ 黄金级 (2000-5000 粉丝) ════════
+  {
+    id:'huanyin', name:'废土电台主播·幻音', tier:'gold', unlockFans:2000,
+    color:'#ff44aa', accent:'#ff88cc', icon:'🎙️',
+    personality:'极度自恋与表演型人格',
+    personalityDesc:'永远保持着高昂的播音腔，时刻觉得有无数双眼睛在注视着自己。哪怕是坐在角落里啃窝头，也要摆出走红毯般的完美姿态。',
+    bg:'举着旧电瓶驱动的破烂麦克风冲进餐厅，大喊着"各位废土老铁，今天带大家探店传说中的避难所米其林！"',
+    patienceMul:0.8, tipBonus:2.5, weight:7,
+    preferredQuality:'visual', preferredDishPref:'dark',
+    firstMeet:[
+      {npc:'ming', text:'（一个举着麦克风的年轻女人冲进来，身后跟着一盏用电池驱动的补光灯）'},
+      {speaker:'幻音', text:'各位废土老铁！幻音今天带大家探店——传说中的避难所米其林！据说这里的厨子什么都敢做！（对着镜头摆pose）'},
+      {npc:'ming', text:'……你那灯快没电了。吃什么？'},
+      {speaker:'幻音', text:'（依然保持播音腔）老板！给我来一道视觉最具冲击力的黑暗料理！我要节目效果！要炸裂！要让粉丝尖叫！'},
+      {npc:'ming', text:'（端上一份发着诡异绿光的变异肉排）这个。够黑暗。'},
+      {speaker:'幻音', text:'（夸张地捂嘴）天呐家人们！看这色泽！看这质感！（大口吃下，表情管理差点崩了）嗯……嗯！！绝了！！家人们链接在下方——（凑近镜头小声）老板，下次能不能别真用变异肉，我差点吐了。'},
+      {npc:'ming', text:'……你点的黑暗料理。'},
+    ],
+    reactions:{
+      legendary:'对着镜头尖叫"家人们！！绝绝子！！这店必须冲！！"当晚Wastegram粉丝暴涨+15',
+      perfect:'摆出完美pose"嗯——绝了。家人们，这店我给五星。"',
+      good:'保持微笑"还行……（小声）老板下次注意摆盘。"',
+      poor:'表情僵硬"……嗯。今天状态不好。我们剪掉这段。"',
+      burned:'当场翻脸"这能吃？！家人们避雷！！"声望-3',
+    },
+    specialEffect:'broadcaster', // 满意时Wastegram粉丝+15，不满意时声望-3
+    spriteType:'streamer',
+  },
+  {
+    id:'tongshu', name:'义体化狂人·铜叔', tier:'gold', unlockFans:3000,
+    color:'#6a7a8a', accent:'#aaaacc', icon:'🦾',
+    personality:'肉体厌恶与绝对理性',
+    personalityDesc:'极其鄙视人类软弱的血肉之躯，坚信"血肉苦弱，机械飞升"。说话带有电子合成音的冰冷感，完全丧失了对人类共情的能力。',
+    bg:'半边身子都是粗糙的废土机械改造，"仿生胃"出了故障，急需特殊料理。',
+    patienceMul:1.1, tipBonus:2.0, weight:6,
+    preferredQuality:'industrial', preferredDishPref:'mechanical',
+    firstMeet:[
+      {npc:'ming', text:'（一个半边身子是机械的男人走进来，关节发出伺服电机的嗡嗡声）'},
+      {speaker:'铜叔', text:'（电子合成音）人类。我的仿生胃出现故障。常规有机食物无法消化。需要高纯度酒精与废机油混合物。能提供？'},
+      {npc:'ming', text:'……你是来吃饭的还是来加液的？'},
+      {speaker:'铜叔', text:'（冷漠）血肉进食是低效的能量获取方式。但仿生胃需要润滑。我计算过，酒精浓度75%以上+机油20%的混合物可恢复85%效能。'},
+      {npc:'ming', text:'（端上一份烈酒泡肉配机油蘸料）……这我真是第一次做。'},
+      {speaker:'铜叔', text:'（直接灌下）……仿生胃效能恢复至92%。（点头）你的料理符合技术规范。后续我会定期来维护。（转身离开，关节咔咔作响）'},
+      {npc:'ming', text:'……行吧。记得结账。'},
+    ],
+    reactions:{
+      legendary:'电子音微微波动"……检测到异常美味信号。仿生胃记录此配方。"额外支付3倍',
+      perfect:'点头"符合技术规范。效能恢复良好。"',
+      good:'面无表情"……勉强可用。下次调整酒精比例。"',
+      poor:'皱眉"配比错误。仿生胃效能仅恢复40%。"',
+      burned:'电子音变冷"废料。下次提供合格产品，否则终止合作。"',
+    },
+    specialEffect:'cyborg', // 满意时帮你升级一件装备（随机+1伤害）
+    spriteType:'cyborg',
+  },
+  {
+    id:'dashan', name:'半变异巨汉·大山', tier:'gold', unlockFans:5000,
+    color:'#8a6a4a', accent:'#ccaa88', icon:'🧗',
+    personality:'童真憨厚与巨物恐惧',
+    personalityDesc:'虽然拥有三米高变异体格，能徒手撕裂装甲，但心智退化到了八岁。极度害怕打雷和强光，心思极其单纯。',
+    bg:'庞大的身躯挤进门时全餐厅客人都拔出了枪，但他只是委屈地吸鼻子。',
+    patienceMul:1.5, tipBonus:1.0, weight:5,
+    preferredQuality:'sweet', preferredDishPref:'cookie',
+    firstMeet:[
+      {npc:'ming', text:'（门框被挤得嘎吱作响，一个三米高的巨汉弯腰钻进来，满餐厅客人瞬间拔枪）'},
+      {speaker:'大山', text:'（委屈地吸鼻子，眼泪汪汪）别……别打大山……大山不是坏人……'},
+      {npc:'ming', text:'（抬手示意其他人放下枪）都收着。他没攻击性。（转向大山）你想要什么？'},
+      {speaker:'大山', text:'（蹲下来，脑袋还是快顶到天花板）大山……大山想吃妈妈做的甜甜的脆饼干……妈妈不见了……大山好想妈妈……（眼泪吧嗒吧嗒）'},
+      {npc:'ming', text:'（……这体格。得用多少面粉。）（端上一盘特大号糖霜饼干）给。小心烫。'},
+      {speaker:'大山', text:'（眼睛瞬间亮了，小心翼翼捧起一块）呜……跟妈妈做的一样……（大口咬下，呜呜哭了起来，但是笑着哭的）谢谢老板……大山喜欢老板……'},
+      {npc:'ming', text:'……（这大汉哭起来，地板都在震。）行了，慢点吃。以后想吃就来。'},
+    ],
+    reactions:{
+      legendary:'开心得手舞足蹈（整餐厅都在震），主动提出"大山帮你打坏人！"',
+      perfect:'憨憨地笑"跟妈妈做的一样好吃！大山喜欢！"',
+      good:'点头"还行……但不够甜。能再加糖吗？"',
+      poor:'瘪嘴"这个……不好吃。大山不高兴了。"',
+      burned:'哇地哭出来"大山不要这个！黑黑的！害怕！"全场顾客满意度-10%',
+    },
+    specialEffect:'guardian', // 满意时下一波战斗开始时大山会来帮忙打一会儿僵尸
+    spriteType:'giant',
+  },
+
+  // ════════ 铂金级 (5000-10000 粉丝) ════════
+  {
+    id:'baishi', name:'疯批学者·怪医白石', tier:'platinum', unlockFans:5000,
+    color:'#3a8a5a', accent:'#88ffcc', icon:'🧪',
+    personality:'毫无道德底线的狂热',
+    personalityDesc:'为了所谓的"真理"可以牺牲一切（包括他自己）。对僵尸的"异化变异"有着近乎病态的痴迷和赞美，常把常人觉得恶心的东西当宝贝。',
+    bg:'穿着被酸液烧得千疮百孔的白大褂，掏出一管冒着绿泡的未知试剂非要混进菜里。',
+    patienceMul:1.0, tipBonus:3.5, weight:5,
+    preferredQuality:'experimental', preferredDishPref:'mutant',
+    firstMeet:[
+      {npc:'ming', text:'（一个白大褂烧得千疮百孔的男人兴奋地冲进来，手里举着一管冒绿泡的试剂）'},
+      {speaker:'白石', text:'太棒了！太棒了！听说你这厨子什么都敢做？（把试剂拍在桌上）把这管东西混进我的菜里！我要看看会发生什么！'},
+      {npc:'ming', text:'……那是什么？'},
+      {speaker:'白石', text:'（狂笑）不知道！这就是美妙之处！可能是催化剂，可能是腐蚀剂，也可能是……（压低声音）进化的钥匙！传统的动物实验太慢了——人体实验才有意义！'},
+      {npc:'ming', text:'（……这人是疯子。）（端上一份变异肉排，假装滴了一滴试剂）好了，"实验品"准备好了。'},
+      {speaker:'白石', text:'（迫不及待吃完，眼睛放光）有趣！有趣！胃部有轻微灼烧感，视觉出现轻微色偏……（掏出笔记本狂记）这数据太珍贵了！老板，你配合我的研究！下次我带更多试剂来！（留下大笔研究经费）'},
+      {npc:'ming', text:'……（那试剂我根本没放，滴到了地上。）行，下次再来。'},
+    ],
+    reactions:{
+      legendary:'狂喜"太美妙了！新的变异方向！我要发表论文！"额外支付5倍并给一瓶临时强化药剂',
+      perfect:'兴奋地记录数据"反应良好！有进一步研究的价值！"',
+      good:'点头"样本合格。继续观察。"',
+      poor:'皱眉"反应太弱。下次加大剂量。"',
+      burned:'狂笑"哈哈！焦化反应！这也是数据！不过……下次别焦了。"',
+    },
+    specialEffect:'alchemist', // 满意时给一瓶临时强化药剂（下波战斗伤害+20%）
+    spriteType:'doctor',
+  },
+  {
+    id:'jinlaoban', name:'净水财阀·金老板', tier:'platinum', unlockFans:7000,
+    color:'#daa520', accent:'#ffd700', icon:'💰',
+    personality:'极致的傲慢与重度洁癖',
+    personalityDesc:'永远用下巴看人，对废土上的一切穷人都充满毫不掩饰的嫌弃。极度挑剔，习惯用金钱和权力随意践踏别人的尊严。',
+    bg:'由两名全副武装的保镖护送进店，进门前保镖甚至要在地上铺一块破地毯。',
+    patienceMul:0.6, tipBonus:5.0, weight:4,
+    preferredQuality:'luxury', preferredDishPref:'premium',
+    firstMeet:[
+      {npc:'ming', text:'（两个全副武装的保镖先挤进来，在地上铺了块地毯，然后一个珠光宝气的女人踩着地毯走进来）'},
+      {speaker:'金老板', text:'（用手帕捂着鼻子）啧。这地方……勉强能坐人。（用下巴看你）你就是那个"废土米其林"的厨子？'},
+      {npc:'ming', text:'……我就是。坐。'},
+      {speaker:'金老板', text:'我垄断了方圆百里的净水贸易。你用的水，是我家的。（冷笑）如果你的手艺不能伺候好我尊贵的舌头——明天我就切断避难所的水管。明白？'},
+      {npc:'ming', text:'（……这女人。）（端上餐厅最贵的招牌菜）尝尝。不满意不收钱。'},
+      {speaker:'金老板', text:'（挑剔地尝了一小口，停顿，又吃了一口）……哼。马马虎虎。（其实吃得很快）水……暂时不断。但下次，我要更好的。价格不是问题。（甩下一袋金币）'},
+      {npc:'ming', text:'……（这袋钱够买半个避难所了。）下次给你留位。'},
+    ],
+    reactions:{
+      legendary:'罕见地放下手帕"……还行。"留下十倍小费，并承诺下波水源供应优先',
+      perfect:'矜持地点头"马马虎虎。水暂时不断。"',
+      good:'挑眉"……凑合。下次改进。"',
+      poor:'冷笑"就这？你避难所的水，我考虑断了。"',
+      burned:'当场掀桌"你敢用这种东西招待我？！明天断水！"声望-8',
+    },
+    specialEffect:'tycoon', // 满意时下波免费补给水源（木材+废料），不满意时声望大降
+    spriteType:'tycoon',
+  },
+  {
+    id:'wumingke', name:'传奇信使·无名客', tier:'platinum', unlockFans:10000,
+    color:'#4a4a5a', accent:'#8a8aaa', icon:'✉️',
+    personality:'深不可测与游离世外',
+    personalityDesc:'极其淡泊，对生死和钱财毫无执念。身上带着浓重的沧桑与史诗感，仿佛只是这个残酷世界的旁观者，永远在路上。',
+    bg:'穿着一件满是弹孔的旧防风衣，什么话也没说，默默在角落吃完一碗最普通的汤。',
+    patienceMul:1.5, tipBonus:1.0, weight:3,
+    preferredQuality:'simple', preferredDishPref:'soup',
+    firstMeet:[
+      {npc:'ming', text:'（一个穿着弹孔旧防风衣的男人静静走进来，在角落坐下，什么也没说）'},
+      {speaker:'ming', text:'……吃什么？（沉默）……行，给你来一碗最普通的兽肉汤。'},
+      {npc:'ming', text:'（他默默地吃完，眼神一直看着窗外发呆。碗底干净得像没用过。）'},
+      {speaker:'无名客', text:'（起身，没有付钱，只是在桌上放了一颗刻着黑桃图案的特殊子弹）……汤很好喝。很久没喝到这样的味道了。（转身走向门口）'},
+      {npc:'ming', text:'等等——这子弹……'},
+      {speaker:'无名客', text:'（没有回头）留着。会有用的时候。（推门离开，风沙卷起他的衣角）这个世界……还在有人好好做饭，就还没完。'},
+      {npc:'ming', text:'（看着桌上的黑桃子弹。这东西……好像在哪听过传说。）……传奇信使。原来真的存在。'},
+    ],
+    reactions:{
+      legendary:'微微一笑"……很久没尝到这样的味道了。"留下一件传说级道具',
+      perfect:'点头"……好汤。"留下黑桃子弹（可兑换稀有物资）',
+      good:'沉默吃完，留下正好饭钱',
+      poor:'沉默吃完，留下正好饭钱，没有表情',
+      burned:'沉默吃完，留下正好饭钱，临走前叹了口气',
+    },
+    specialEffect:'legend', // 无论品质都给特殊子弹，但传说品质给传说道具
+    spriteType:'wanderer',
+  },
+
+  // ════════ 钻石级 (10000+ 粉丝) ════════
+  {
+    id:'yanlao', name:'旧时代遗老·阎老', tier:'diamond', unlockFans:10000,
+    color:'#5a3a2a', accent:'#c8a878', icon:'🎩',
+    personality:'古板优雅与极致怀旧',
+    personalityDesc:'肉体早已在辐射中腐朽，但坚守着百年前旧世界的贵族礼仪。对现在粗鄙的废土文化感到悲哀，举手投足间带着夕阳般的凄美。',
+    bg:'穿着布满灰尘但依然笔挺的旧时代燕尾服，轻声感叹一百年前这里曾是他名下的大酒店。',
+    patienceMul:1.3, tipBonus:4.0, weight:3,
+    preferredQuality:'classic', preferredDishPref:'french',
+    firstMeet:[
+      {npc:'ming', text:'（一个身形干枯、皮肤灰败，却穿着笔挺燕尾服的老人缓步走进来，环顾四周）'},
+      {speaker:'阎老', text:'（轻声）一百年了……这里，曾是我名下的"中央大酒店"。水晶吊灯，丝绒窗帘，交响乐团在二楼演奏……（苦笑）如今只剩木板和油烟。'},
+      {npc:'ming', text:'……你是这地方原来的主人？'},
+      {speaker:'阎老', text:'是。也不是。这副身体早已死去，是执念支撑我走到今天。（缓缓坐下）孩子，能为我……还原一道战前的法式大餐吗？我想在彻底消散前，再尝一次那个味道。'},
+      {npc:'ming', text:'（……法式大餐。这年头上哪找松露。）（用现有食材尽力做了一份精致的炖肉配菜泥）献丑了。'},
+      {speaker:'阎老', text:'（颤抖着拿起叉子，尝了一口，浑浊的眼睛突然亮了起来）……是的。就是这个味道。（泪水从干枯的眼眶滑落）一百年了……我终于……可以安心了。'},
+      {npc:'ming', text:'（……）慢用。这顿算我的。'},
+      {speaker:'阎老', text:'（吃完，起身，整理燕尾服）谢谢你，孩子。这餐厅……配得上"大酒店"的名号。（化作点点光尘消散，只留下一枚旧时代的金币）'},
+      {npc:'ming', text:'……（捡起金币。这是真·旧金币，价值连城。）'},
+    ],
+    reactions:{
+      legendary:'含泪微笑"……我终于可以安息了。"留下一枚旧时代金币（价值500金）',
+      perfect:'点头"……像。很像。谢谢你，孩子。"',
+      good:'叹息"……差了些。但你的心意，我感受到了。"',
+      poor:'苦笑"……不是这个味道。但也不怪你，你没见过那个时代。"',
+      burned:'摇头"……可惜了。看来那个味道，终究是带走了。"叹气离开',
+    },
+    specialEffect:'ghost', // 满意时给旧金币（大量金币），传说品质给500金
+    spriteType:'ghost',
+  },
+  {
+    id:'kuangya', name:'异兽共生者·兽王狂牙', tier:'diamond', unlockFans:15000,
+    color:'#5a2a1a', accent:'#cc6633', icon:'🐺',
+    personality:'狂野暴戾与信奉丛林法则',
+    personalityDesc:'信奉绝对的弱肉强食，对人类社会的法律和道德嗤之以鼻，只尊重能打赢他，或者能喂饱他的野兽的人。',
+    bg:'直接骑着一头巨大的变异地狱犬撞开店门，震撼全场。',
+    patienceMul:0.5, tipBonus:4.5, weight:3,
+    preferredQuality:'raw', preferredDishPref:'meat',
+    firstMeet:[
+      {npc:'ming', text:'（"轰"的一声，店门被一头三米高的变异地狱犬撞碎，骑在上面的壮汉狂笑）'},
+      {speaker:'狂牙', text:'哈哈哈！闻到香味了！我的小狗狗饿了！（跳下地狱犬，拍拍它的脑袋）乖，爸爸给你加餐！'},
+      {npc:'ming', text:'……门你赔。'},
+      {speaker:'狂牙', text:'（扔下一袋野兽獠牙）够赔了吧？你们人类的规矩真多。（大马金刀坐下）来肉！最生的！我的小狗狗要吃带血的！'},
+      {npc:'ming', text:'（……这人和这狗，哪个更危险。）（端上一整只烤巨兽腿，三分熟）'},
+      {speaker:'狂牙', text:'（撕开肉腿，自己吃一半，喂狗一半）哈！够劲！你们人类虽然弱，但做饭还行！（拍桌）以后我常来！谁敢拦我的小狗狗，我撕了他！'},
+      {npc:'ming', text:'……（这狗口水都流我地上了。）行，常来。但狗在门外。'},
+    ],
+    reactions:{
+      legendary:'狂笑"够劲！"地狱犬留下帮你看门一整夜（下波防御+1塔）',
+      perfect:'满意"不错！小狗狗也喜欢！"留下野兽材料',
+      good:'点头"行，能吃。下次再生点。"',
+      poor:'黑脸"这叫肉？我喂狗的都比这强。"',
+      burned:'掀桌"你敢拿烧焦的东西喂我的小狗狗？！找死！"',
+    },
+    specialEffect:'beastlord', // 满意时地狱犬帮守下一波，传说品质额外送一座塔
+    spriteType:'beast',
+  },
+  {
+    id:'guancezhe', name:'破壁人·观测者', tier:'diamond', unlockFans:20000,
+    color:'#2a4a6a', accent:'#88ccff', icon:'👁️',
+    personality:'超脱现实与游戏人间的Geek',
+    personalityDesc:'说话总是夹杂着奇怪的"代码"和"开发术语"，看周围人的眼神像是在看自己养的电子宠物，充满恶趣味与上帝视角。',
+    bg:'一个穿着干净格子衬衫、戴黑框眼镜的普通青年，画风与废土完全不符。',
+    patienceMul:2.0, tipBonus:0.5, weight:2,
+    preferredQuality:'any', preferredDishPref:'any',
+    firstMeet:[
+      {npc:'ming', text:'（一个穿着干净格子衬衫、戴黑框眼镜的青年走进来——在这满是血污的废土里，干净得像个bug）'},
+      {speaker:'观测者', text:'（推推眼镜）哟，这渲染……不对，这装修不错嘛。15波围城，最后据点，经典设定。（坐下，翻菜单）嗯……"烤肉"、"炖肉"、"变异肉排"……这数据表有点单薄啊，策划偷懒了？'},
+      {npc:'ming', text:'……你说什么？'},
+      {speaker:'观测者', text:'（边吃边嘟囔）白天塔防的伤害阈值是不是填得太高了？第二波就出装甲尸是不是有点不讲武德？……哦这段对话居然没有爆出Bug，这引擎挺能扛的。'},
+      {npc:'ming', text:'（……这人脑子有问题？）你到底吃什么？'},
+      {speaker:'观测者', text:'都行，随便来一份。（吃完，神秘一笑）你这餐厅……经营得不错。粉丝数够高的话，我可以帮你解锁点"隐藏内容"。（打了个响指）成就，全开。'},
+      {npc:'ming', text:'……什么？（桌上的菜品突然全变成传说品质）？！'},
+      {speaker:'观测者', text:'（起身，整理衬衫）行了，这存档我玩得挺开心。下次有空再来看看你加了什么DLC。（推门离开，门外的风沙似乎绕着他走）'},
+      {npc:'ming', text:'……（这人……到底是什么？）'},
+    ],
+    reactions:{
+      legendary:'推推眼镜"嗯，这彩蛋触发条件设计得不错。"解锁全成就',
+      perfect:'点头"体验良好。这开发者有点东西。"',
+      good:'"中规中矩。后续版本可以优化。"',
+      poor:'"数值曲线有问题，建议回调。"',
+      burned:'"哦？这是彩蛋还是Bug？有意思。"',
+    },
+    specialEffect:'godmode', // 满意时解锁所有成就 + 当夜所有菜品自动变传说
+    spriteType:'meta',
+  },
+];
+
+// ── VIP 图鉴状态（跨夜保留，存档）──
+let vipCompendium = {};        // {vipId: {met:true, meetCount:N, bestQuality:'legendary', lastVisit:wave}}
+let vipUnlockedThisNight = []; // 本夜新解锁的VIP（用于弹窗）
+let vipActiveInRestaurant = null; // 当前在餐厅的VIP实例（一次只来一个VIP）
+
