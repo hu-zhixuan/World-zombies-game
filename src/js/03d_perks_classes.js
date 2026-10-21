@@ -305,7 +305,7 @@ function showClassChoice(onDone){
   START_CLASSES.forEach(c=>{
     const sk = CLASS_SKILLS[c.id];
     html += `<div class="perk-card" data-class="${c.id}" style="border-color:${c.color};width:160px;min-height:240px;background:#1a1b1e;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 18px rgba(0,0,0,0.6);">
-      <div class="perk-rarity" style="color:${c.color};background:${c.color}22;border:1px solid ${c.color}55;font-weight:600;border-radius:4px;padding:2px 6px;align-self:flex-start;font-size:0.6rem;">${c.title||'战术装扮'}</div>
+      <div class="perk-rarity" style="position:static;color:${c.color};background:${c.color}22;border:1px solid ${c.color}55;font-weight:600;border-radius:4px;padding:2px 6px;align-self:flex-start;font-size:0.6rem;">${c.title||'战术装扮'}</div>
       <div class="perk-icon" style="font-size:2.2rem;line-height:1;margin:4px 0;text-align:center;">${c.icon}</div>
       <div class="perk-name" style="color:#ffffff;font-size:0.96rem;font-weight:600;text-align:center;">${c.name}</div>
       <div class="perk-desc" style="font-size:0.68rem;color:#ced0d4;line-height:1.45;flex:1;">${c.desc}</div>

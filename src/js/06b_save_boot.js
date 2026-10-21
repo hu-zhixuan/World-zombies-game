@@ -659,7 +659,7 @@ function setupTutorialSteps(onComplete){
           <b>🎯 目标：</b>守住城堡15波尸潮，活到直升机撤离。
         </div>
         <div style="margin-bottom:6px;"><b>A/D 或 ←/→</b> 移动 · <b>鼠标</b> 瞄准射击 · <b>R</b> 换弹</div>
-        <div style="margin-bottom:6px;"><b>空格/Shift</b> 翻滚闪避（无敌帧）· <b>F</b> 近战 · <b>右键</b> 蓄力重击 · <b>X</b> 流派觉醒技</div>
+        <div style="margin-bottom:6px;"><b>空格/W</b> 跳跃 · <b>Shift/Ctrl</b> 翻滚闪避（无敌帧）· <b>F</b> 近战 · <b>右键</b> 蓄力重击 · <b>X</b> 流派觉醒技</div>
         <div style="margin-bottom:6px;"><b>TAB</b> 武器商店 · <b>E</b> 拾取/交互 · 靠近高地基座按 [E] 部署机枪塔</div>
         <div style="color:#ffcc66;margin-top:8px;">💡 教程期间不出僵尸，请熟悉操作。点击"下一步"继续。</div>
       </div>`
@@ -709,7 +709,7 @@ function setupTutorialSteps(onComplete){
         <div style="background:rgba(60,20,60,.4);padding:6px 10px;border-radius:4px;border-left:3px solid #cc66cc;margin-bottom:8px;">
           顶部 <b>🧟图鉴</b> 按钮可查看所有僵尸的特性。
         </div>
-        <div style="margin-bottom:6px;">📊 12种僵尸：普通/装甲/特殊/精英 4个层级。</div>
+        <div style="margin-bottom:6px;">📊 16种僵尸：普通/装甲/特殊/精英 4个层级。</div>
         <div style="margin-bottom:6px;">🔓 每首次击杀一种新僵尸，会<b>弹窗介绍</b>它的机制和弱点。</div>
         <div style="margin-bottom:6px;">🛡️ 装甲僵尸：先打掉护甲(路障/铁桶)才能有效伤害。</div>
         <div style="margin-bottom:6px;">🚪 特殊僵尸：弹跳狂尸会越墙、自爆者死亡爆炸、火焰投手远距火球。</div>
@@ -722,7 +722,7 @@ function setupTutorialSteps(onComplete){
         <div style="background:rgba(60,40,20,.4);padding:6px 10px;border-radius:4px;border-left:3px solid #ffee44;margin-bottom:8px;">
           <b>最后提醒：</b>
         </div>
-        <div style="margin-bottom:6px;">✅ 开局配备 <b>战术自卫手枪</b>（基础伤害14，弹夹10发），200金币，5块普通肉。</div>
+        <div style="margin-bottom:6px;">✅ 开局配备 <b>战术自卫手枪</b>（基础伤害14，弹夹10发），150金币，5块普通肉。</div>
         <div style="margin-bottom:6px;">✅ 第1波普通感染者（HP 80），爆头精准回弹，走位拉扯度过初期尸潮。</div>
         <div style="margin-bottom:6px;">✅ 每5波一个Boss（第5/10/15波），提前升级围墙和武器。</div>
         <div style="margin-bottom:6px;">✅ 升级会弹<b>三选一天赋</b>，肉鸽元素，每局不同。</div>
