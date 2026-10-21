@@ -163,6 +163,7 @@ function renderCookingStation(){
       <span class="rest-modal-info">
         <span class="rest-modal-name">${inMenuTag}${recipe.name} <span style="font-size:.6rem;color:#f0c060;">${recipe.price}金</span></span>
         <span class="rest-modal-desc" style="font-size:.68rem;">${Object.keys(recipe.cost).map(m=>`${MEAT_TYPES[m].icon}${recipe.cost[m]}`).join(' ')} · ${recipe.cookTime}秒</span>
+        ${recipeSignature(recipe) ? `<span class="rest-modal-desc" style="display:block;color:#ffd978;">🍱 留一份 → ${recipeSignature(recipe).badge}（${recipeSignature(recipe).effectDesc.split(' + ')[0]}）</span>` : ''}
       </span>
       <span class="rest-modal-cost">${canCook?'✓可做':'缺肉'}</span>
     `;
@@ -175,10 +176,10 @@ function renderCookingStation(){
       const sig = recipeSignature(recipe);
       const keepBtn = document.createElement('button');
       const keepOk = canPackFamilyMeal();
+      keepBtn.className = 'rest-keep-btn';
       keepBtn.textContent = keepOk ? '🍱 留一份' : '🍱 已留';
       keepBtn.disabled = !keepOk;
       keepBtn.title = (sig ? sig.icon + sig.name + '（' + sig.badge + '）：' + sig.effectDesc + '\n' : '') + '不卖给客人，明天出击前和队友一起吃。一晚只能留一份。';
-      keepBtn.style.cssText = 'margin-left:8px;padding:3px 8px;border-radius:6px;border:1px solid #ffd868;background:rgba(255,216,104,.15);color:#ffe9a8;font-size:.68rem;cursor:' + (keepOk ? 'pointer' : 'not-allowed') + ';opacity:' + (keepOk ? 1 : .5) + ';';
       keepBtn.onclick = (ev) => {
         ev.stopPropagation();
         closeRestModal();

@@ -575,30 +575,6 @@ function updateTowers(){
       if(frameT%40===0){wallHp=Math.max(0,wallHp-25);vfxHit(RIGHT_WALL_X,GROUND_Y-60,boss.x+40,GROUND_Y-80);addShake(3);}
     }
   }
-  // 更新家园血条UI
-  const hf=document.getElementById('home-hp-fill');
-  if(hf) hf.style.width=(homeHp/HOME_HP_MAX*100)+'%';
-  // 更新围墙血条UI
-  const wf=document.getElementById('wall-hp-fill');
-  if(wf){
-    const wallMax = WALL_HP_PER_LEVEL[wallLevel]||1;
-    wf.style.width=(wallHp/wallMax*100)+'%';
-    // 根据围墙等级改变颜色（木=棕/石=灰/铁=铁蓝）
-    const wallColors = [
-      'linear-gradient(90deg,#3a2a1a,#5a4a30)',
-      'linear-gradient(90deg,#5a4030,#b09060)',  // 木
-      'linear-gradient(90deg,#666666,#aaaaaa)',  // 石
-      'linear-gradient(90deg,#3a3a44,#6a6a74)',  // 铁
-    ];
-    wf.style.background = wallColors[wallLevel] || wallColors[1];
-    const wlEl=document.getElementById('wall-level-display');
-    if(wlEl){
-      const wallNames = ['无','木墙','石墙','铁墙'];
-      wlEl.textContent = wallLevel>0 ? '🧱 '+wallNames[wallLevel]+' Lv.'+wallLevel : '🧱 无围墙';
-      // 颜色随等级变化
-      wlEl.style.color = wallLevel>=3 ? '#aaaacc' : wallLevel===2 ? '#cccccc' : '#c8a060';
-    }
-  }
   // ── 围墙被攻破后：玩家持续受到伤害（僵尸涌入家园，角色被迫承受压力）──
   // 提升围墙重要性：墙破了角色每秒掉血，直到墙被修复
   if(wallHp <= 0 && wallLevel > 0 && gameRunning && !window._berserkActive){

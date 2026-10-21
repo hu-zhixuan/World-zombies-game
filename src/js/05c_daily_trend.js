@@ -157,7 +157,6 @@ const DAILY_TRENDS = [
   { id:'smoky',      tag:'烟熏',  text:'🔥 #烟熏风味，复古美食#', desc:'【烟熏】标签菜品售价+30%', mult:1.3 },
   { id:'sour',       tag:'酸',    text:'🍋 #酸爽开胃，夏日首选#', desc:'【酸】标签菜品售价+30%', mult:1.3 },
   { id:'heavy',      tag:'重口',  text:'🧄 #重口味爱好者集合#', desc:'【重口】标签菜品售价+30%', mult:1.3 },
-  { id:'crispy',     tag:'脆',    text:'🥨 #嘎嘣脆，卡兹卡兹#', desc:'【脆】标签菜品售价+30%', mult:1.3 },
   { id:'hearty',     tag:'饱腹',  text:'🍖 #大口吃肉，饱腹满足#', desc:'【饱腹】标签菜品售价+30%', mult:1.3 },
 ];
 
@@ -176,7 +175,7 @@ let nextTrendPreview = null;  // 梦境「预知之梦」提前抽好的明日�
 // 在"当前能做出匹配菜"的热搜里抽一条，尽量不和 exclude 重复
 function pickTrend(exclude){
   let pool = DAILY_TRENDS.filter(trendMatchableNow);
-  if(pool.length === 0) pool = DAILY_TRENDS;
+  if(pool.length === 0) pool = DAILY_TRENDS.filter(t => Object.keys(MEAT_TAGS).some(k => MEAT_TAGS[k].tags.includes(t.tag)));
   if(exclude && pool.length > 1) pool = pool.filter(t => t.id !== exclude.id);
   return pool[Math.floor(Math.random() * pool.length)];
 }

@@ -423,7 +423,6 @@ function restoreSaveState(state) {
   activeSignature = sigId ? (DISH_SIGNATURES.find(f => f.id === sigId) || null) : null;
   queuedFamilyMeal = state.queuedFamilyMeal ? { ...state.queuedFamilyMeal } : null;
   lastMealLog = Array.isArray(state.lastMealLog) ? state.lastMealLog.map(m => ({ ...m })) : [];
-  updateMealHUD();
   updateXpBar();  // v52：恢复等级后同步经验条UI
 
   zombies.forEach(z => { if (z.burnTimer) clearInterval(z.burnTimer); });
@@ -495,7 +494,6 @@ function startGame(){
   dreamPickedWave = 0;
   nextTrendPreview = null;
   wsActiveSlot = 0;
-  updateMealHUD();
   // 隐藏主菜单和其他界面
   document.getElementById('main-menu-scr').style.display='none';
   document.getElementById('start-scr').style.display='none';

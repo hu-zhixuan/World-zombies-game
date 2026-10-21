@@ -181,6 +181,7 @@ function playNextWaveDlg(){
   waveDlgCurrent = waveDlgQueue.shift();
   waveDlgCurIndex++;
   window._waveDlgActive = true;
+  gameWrap.querySelectorAll('.banner-msg').forEach(el => { el.style.top = '128px'; });
   const ch = NPC_CHARACTERS[waveDlgCurrent.npc] || {name:'据点通讯', color:'#f0c060', initial:'📻'};
   let bar = document.getElementById('wave-dlg-bar');
   if(!bar){
@@ -202,7 +203,7 @@ function playNextWaveDlg(){
     <div class="wd-top-bar">
       <span>📻 据点无线电通讯 · 频道 104.2</span>
       <span id="wd-page-indicator" style="color:#ffd875;font-weight:700;">[第 ${waveDlgCurIndex} / ${waveDlgTotalLines} 句]</span>
-      <span style="color:#5be4ff;">🟢 信号正常</span>
+      <span style="color:#9be89b;">🟢 信号正常</span>
     </div>
     <div class="wd-main">
       <div class="wd-avatar" style="color:${ch.color};border-color:${ch.color};box-shadow:0 0 10px ${ch.color};">

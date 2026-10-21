@@ -4,14 +4,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>十五波围城：最后据点 v55 (旧城区远征与双持生态版)</title>
+<title>十五波围城：最后据点 v56 (旧城区远征与双持生态版)</title>
 <style>
 /*@@STYLE1@@*/</style>
 </head>
 <body>
 
 <div id="header">
-  <div id="title">🏰 十五波围城 <span style="font-size:0.68rem;color:rgba(240,192,96,0.65);font-weight:normal;vertical-align:middle;margin-left:4px;">v55</span></div>
+  <div id="title">🏰 十五波围城 <span style="font-size:0.68rem;color:rgba(240,192,96,0.65);font-weight:normal;vertical-align:middle;margin-left:4px;">v56</span></div>
   <div id="stats">
     <div class="stat"><span class="sl">分数</span><span class="sv" id="sc">0</span></div>
     <div class="stat">
@@ -24,30 +24,27 @@
   <div style="display:flex;gap:8px;align-items:center">
     <!-- 等级 + 经验条（任务7） -->
     <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-      <span id="lv-display" style="font-family:var(--font-display);font-size:.95rem;color:#ffee44;text-shadow:0 0 8px rgba(255,238,68,.6);">Lv.1</span>
-      <div style="width:70px;height:5px;background:#1a1505;border-radius:3px;overflow:hidden;border:1px solid #4a4010;">
-        <div id="xp-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#ffaa00,#ffee44);transition:width .3s;box-shadow:0 0 6px rgba(255,238,68,.6);"></div>
+      <span id="lv-display" style="font-family:var(--font-display);font-size:.95rem;color:var(--amber);text-shadow:0 0 8px var(--amber-glow);">Lv.1</span>
+      <div style="width:70px;height:5px;background:var(--wood-950);border-radius:3px;overflow:hidden;border:1px solid var(--wood-600);">
+        <div id="xp-fill" style="height:100%;width:0%;background:linear-gradient(90deg,#c9741c,#f0b860);transition:width .3s;box-shadow:0 0 6px var(--amber-glow);"></div>
       </div>
     </div>
-    <div id="cabin-resources-hud" style="display:flex;gap:8px;font-family:var(--font-display);font-size:0.95rem;color:#f5deb3;align-items:center;background:rgba(0,0,0,0.55);padding:3px 8px;border-radius:4px;border:1px solid #6e473b;margin-right:4px;">
+    <div id="cabin-resources-hud" class="hdr-tag">
       <span id="hud-wood">🪵 0</span>
       <span id="hud-scrap">⚙️ 0</span>
     </div>
-    <div id="time-of-day-hud" style="display:flex;align-items:center;gap:4px;background:rgba(0,0,0,0.55);padding:3px 10px;border-radius:4px;border:1px solid #3a3a50;margin-right:4px;font-family:var(--font-display);font-size:.85rem;">
+    <div id="time-of-day-hud" class="hdr-tag">
       <span id="tod-icon" style="font-size: 1.1rem; color: rgb(255, 204, 102);">☀</span>
       <span id="tod-label" style="color:#ffcc66;">白天</span>
     </div>
     <div id="coin-display">💰 150</div>
-    <button id="codex-btn" class="hdr-btn" onclick="openCodex()" title="变异体机密图鉴" style="background:rgba(45,18,22,0.85);border:1.5px solid #ff4d6d;color:#ff99ab;box-shadow:0 0 10px rgba(255,77,109,0.25);">🧟图鉴</button>
-    <button id="backpack-btn" class="hdr-btn" onclick="toggleBackpack()" title="避难所战术行囊 [B / I]" style="background:rgba(38,28,16,0.85);border:1.5px solid #f0c060;color:#ffe6a0;box-shadow:0 0 10px rgba(240,192,96,0.25);">🎒行囊(B)</button>
-    <button id="expedition-btn" class="hdr-btn" onclick="openExpeditionModal()" title="旧城区远征探险看板 [E]" style="background:rgba(42,24,12,0.85);border:1.5px solid #ff922b;color:#ffd8a8;box-shadow:0 0 10px rgba(255,146,43,0.25);">🗺️远征</button>
-    <button id="workshop-btn" class="hdr-btn" onclick="openDuffWorkshop()" title="小胡军备改造台 [M]" style="background:rgba(18,32,54,0.85);border:1.5px solid #00d4ff;color:#a5f3fc;box-shadow:0 0 12px rgba(0,212,255,0.3);">🛠️改造(M)</button>
-    <button id="manage-btn" class="hdr-btn" onclick="openManageUI()" title="据点建设与经营管理" style="background:rgba(28,40,32,0.85);border:1.5px solid #2ecc71;color:#a3e635;box-shadow:0 0 10px rgba(46,204,113,0.3);">🏗️建设</button>
-    <div id="meal-hud" style="display:none;align-items:center;gap:5px;background:rgba(60,34,15,0.88);border:1.5px solid #f0b060;border-radius:14px;padding:2px 10px;font-family:var(--font-display);font-size:0.75rem;color:#ffe9c4;box-shadow:0 0 10px rgba(240,176,96,0.4);max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-      <span id="meal-hud-icon">🍽️</span> <span id="meal-hud-text">昨晚吃了…</span>
-    </div>
-    <button id="next-wave-btn" class="hdr-btn" onclick="skipToNextWave()" style="display: none;background:linear-gradient(180deg,#27ae60,#1e8449);border:1.5px solid #2ecc71;color:#fff;box-shadow:0 0 12px rgba(46,204,113,0.4);">▶ 下一波</button>
-    <button id="pause-btn" class="hdr-btn" onclick="togglePause()" style="background:rgba(22,26,38,0.85);border:1.5px solid rgba(148,163,184,0.4);color:#cbd5e1;box-shadow:0 0 8px rgba(0,0,0,0.4);">⏸ 暂停</button>
+    <button id="codex-btn" class="hdr-btn" onclick="openCodex()" title="变异体机密图鉴">🧟图鉴</button>
+    <button id="backpack-btn" class="hdr-btn" onclick="toggleBackpack()" title="避难所战术行囊 [B / I]">🎒行囊(B)</button>
+    <button id="expedition-btn" class="hdr-btn" onclick="openExpeditionModal()" title="旧城区远征探险看板 [E]">🗺️远征</button>
+    <button id="workshop-btn" class="hdr-btn" onclick="openDuffWorkshop()" title="小胡军备改造台 [M]">🛠️改造(M)</button>
+    <button id="manage-btn" class="hdr-btn" onclick="openManageUI()" title="据点建设与经营管理">🏗️建设</button>
+    <button id="next-wave-btn" class="hdr-btn" onclick="skipToNextWave()">▶ 下一波</button>
+    <button id="pause-btn" class="hdr-btn" onclick="togglePause()">⏸ 暂停</button>
   </div>
 </div>
 
@@ -70,18 +67,6 @@
     <span style="font-size:11px;color:#fca5a5;padding:2px 8px;background:rgba(255,50,50,0.22);border-radius:12px;border:1px solid rgba(255,80,80,0.35);white-space:nowrap;">
       门前长按E锁门
     </span>
-  </div>
-  <!-- 家园生命条（塔防模式）——布局修复：原 top:90px 与居中 banner 完全同位重叠，下移错层 -->
-  <div id="home-hp-hud" style="position:absolute;top:140px;left:12px;z-index:47;display:flex;flex-direction:column;gap:2px;pointer-events:none;">
-    <div style="font-family:var(--font-display);font-size:.75rem;color:#ff8866;letter-spacing:1px;text-shadow:0 0 6px rgba(255,100,50,.6);">🏠 家园</div>
-    <div style="width:90px;height:7px;background:#1a0808;border:1px solid #6a3010;border-radius:3px;overflow:hidden;">
-      <div id="home-hp-fill" style="height:100%;width:100%;background:linear-gradient(90deg,#8b0000,#ff6644);transition:width .3s;"></div>
-    </div>
-    <!-- 围墙血条 -->
-    <div id="wall-level-display" style="font-family:var(--font-display);font-size:.7rem;color:#c8a060;letter-spacing:1px;margin-top:2px;">🧱 Lv.1</div>
-    <div style="width:90px;height:6px;background:#1a1408;border:1px solid #6a5010;border-radius:3px;overflow:hidden;">
-      <div id="wall-hp-fill" style="height: 100%; width: 100%; background: linear-gradient(90deg, rgb(90, 64, 32), rgb(200, 160, 96)); transition: width 0.3s;"></div>
-    </div>
   </div>
   <!-- 休息期倒计时 -->
   
@@ -718,13 +703,6 @@
   <div id="ammo-wrap"><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div><div class="bi"></div></div>
   <div id="rldw" style="display: none;"><div id="rldf"></div></div>
   <div id="wave-txt">第 1 波 · 准备中...</div>
-  <div id="resource-bar" style="display:flex;gap:14px;align-items:center;font-size:.78rem;font-family:var(--font-display);background:rgba(12,14,20,0.75);padding:4px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.09);backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(0,0,0,0.35);">
-    <span style="display:none;"><span id="rb-wood">0</span><span id="rb-scrap">0</span></span>
-    <span title="生命值">❤️ <span id="rb-hp" style="color:#ff5555;font-weight:bold;">100</span></span>
-    <span title="防线围墙">🧱 <span id="rb-wall" style="color:#e0a060;font-weight:bold;">180</span></span>
-    <span title="核心据点">🏠 <span id="rb-home" style="color:#ff9944;font-weight:bold;">100</span></span>
-    <span title="拥有金币">💰 <span id="rb-coins" style="color:#f0c060;font-weight:bold;">150</span></span>
-  </div>
   <div style="display:flex;gap:5px;align-items:center">
     <button id="skill-hud-btn" onclick="tryClassSkill()" style="display:none;">[X] 技能</button>
     <button id="shop-btn" onclick="openShop()">[ TAB ] 商店</button>

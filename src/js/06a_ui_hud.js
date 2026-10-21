@@ -28,7 +28,8 @@ function addBanner(txt){
   const d=document.createElement('div');d.className='banner-msg';
   const isRest = document.body.classList.contains('rest-mode') || gameState==='restaurant';
   const hasDlg = (window._waveDlgActive || (document.getElementById('wave-dlg-bar') && document.getElementById('wave-dlg-bar').classList.contains('open')) || (document.getElementById('dialogue-box') && document.getElementById('dialogue-box').style.display !== 'none'));
-  const topPos = isRest ? 36 : (hasDlg ? 128 : 58);
+  const tutOpen = (document.getElementById('tutorial-scr') || {}).classList && document.getElementById('tutorial-scr').classList.contains('show');
+  const topPos = isRest ? 36 : tutOpen ? 10 : (hasDlg ? 128 : 58);
   d.style.cssText=`position:absolute;top:${topPos}px;left:50%;transform:translateX(-50%);font-family:var(--font-display);font-size:.88rem;font-weight:700;color:#fce4a6;background:rgba(18,16,24,0.94);padding:5px 18px;border:1.5px solid rgba(240,192,96,0.65);border-radius:20px;pointer-events:none;z-index:150;box-shadow:0 6px 20px rgba(0,0,0,0.7),0 0 12px rgba(240,192,96,0.25);backdrop-filter:blur(8px);white-space:nowrap;transition:opacity .25s ease, transform .25s ease;`;
   d.textContent=txt;gameWrap.appendChild(d);
   clearTimeout(bannerTimer);
@@ -165,6 +166,62 @@ function updateTodHUD(){
 
 //  WAVE HUD（画布上的波次HUD，始终可见）
 // ═══════════════════════════════════════════
+// ── 画布 HUD 的统一面板底（暖木深色 + 描边 + 顶部高光）──
+function hudPanel(x, y, w, h, accent){
+  ctx.fillStyle = 'rgba(27,17,10,.9)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = accent || '#8a5a2b';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x, y, w, h);
+  ctx.fillStyle = 'rgba(244,228,188,.08)';
+  ctx.fillRect(x + 1, y + 1, w - 2, 1);
+}
+// 文字超出宽度时用省略号截断
+function fitText(str, maxW){
+  if(ctx.measureText(str).width <= maxW) return str;
+  while(str.length > 1 && ctx.measureText(str + '…').width > maxW) str = str.slice(0, -1);
+  return str + '…';
+}
+// 右侧状态栈：「昨晚吃了什么」（食堂是唯一的备战饭来源）+ 今日热搜目标
+function drawFoodStatusStack(x, y, w){
+  if(gameState !== 'world') return;
+  ctx.textAlign = 'left';
+  const buffs = activeBattleBuffs.filter(b => BATTLE_BUFF_DEFS[b.id]);
+  if(lastMealLog.length > 0 || activeSignature || buffs.length > 0){
+    const rows = [];
+    buffs.forEach(b => {
+      const d = BATTLE_BUFF_DEFS[b.id];
+      rows.push({ txt: d.icon + ' ' + d.desc + (b.stacks > 1 ? ' ×' + b.stacks : '') + (b.boosted ? ' ✨' : ''), sub: Math.ceil(b.timeLeft/60) + 's', col: '#c8ecb0' });
+    });
+    if(activeSignature) rows.push({ txt: '🍱 ' + activeSignature.badge, sub: '本波', col: activeSignature.color || '#ffd978' });
+    const h = 24 + rows.length * 16;
+    hudPanel(x, y, w, h, activeSignature ? (activeSignature.color || '#f0b860') : '#f0b860');
+    ctx.font = 'bold 11px Microsoft YaHei UI,sans-serif';
+    ctx.fillStyle = '#f4e4bc';
+    const names = lastMealLog.map(m => m.name + (m.family ? '(留饭)' : '')).join('·') || '—';
+    ctx.fillText(fitText('🍽️ 昨晚吃了：' + names, w - 16), x + 8, y + 16);
+    ctx.font = '10px Microsoft YaHei UI,sans-serif';
+    rows.forEach((r, i) => {
+      ctx.fillStyle = r.col;
+      ctx.textAlign = 'left';
+      ctx.fillText(fitText(r.txt, w - 52), x + 8, y + 33 + i * 16);
+      ctx.fillStyle = '#bfa982';
+      ctx.textAlign = 'right';
+      ctx.fillText(r.sub, x + w - 8, y + 33 + i * 16);
+    });
+    ctx.textAlign = 'left';
+    y += h + 6;
+  }
+  if(currentTrend){
+    const info = getTrendHuntInfo();
+    const kindTxt = info && info.kinds.length ? info.kinds.map(k => MEAT_TYPES[k].name).join('/') : '';
+    hudPanel(x, y, w, 24, '#d9722f');
+    ctx.font = 'bold 11px Microsoft YaHei UI,sans-serif';
+    ctx.fillStyle = '#ffb27a';
+    ctx.fillText(fitText('📱 #' + currentTrend.tag + '#  ' + kindTxt + ' ×' + trendMeatToday, w - 16), x + 8, y + 16);
+  }
+}
+
 function drawWaveHUD(){
   ctx.save();
   // ── 小改：连杀狂热金光屏效（屏幕边缘金色渐晕+脉冲）──
@@ -186,53 +243,13 @@ function drawWaveHUD(){
     ctx.fillText('🔥 狂热 +20%射速 '+(Math.ceil(frenzyT/60)+'s'), 14, GH-14);
     ctx.globalAlpha=1;
   }
-  // ── 经营→战斗联动：菜品增益图标（右上波次面板下方，小图标行）──
-  if(activeBattleBuffs.length > 0 && gameState==='world'){
-    const bx = GW - 180, by = 62;
-    activeBattleBuffs.forEach((b, i) => {
-      const def = BATTLE_BUFF_DEFS[b.id];
-      if(!def) return;
-      const x = bx + i * 26;
-      ctx.globalAlpha = .92;
-      ctx.fillStyle = 'rgba(10,6,4,.85)';
-      ctx.fillRect(x, by, 24, 24);
-      ctx.strokeStyle = '#88ff88';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x, by, 24, 24);
-      ctx.font = '13px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(def.icon, x + 12, by + 16);
-      if(b.stacks > 1){
-        ctx.fillStyle = '#ffd840';
-        ctx.font = 'bold 9px sans-serif';
-        ctx.fillText('×' + b.stacks, x + 18, by + 22);
-      }
-      ctx.globalAlpha = 1;
-    });
-  }
-  // ── 今日热搜目标（白天打怪时的小目标：今晚什么菜好卖、已攒多少目标肉）──
-  if(currentTrend && gameState==='world'){
-    const tx = GW - 180, ty = 90;
-    const info = getTrendHuntInfo();
-    const kindTxt = info && info.kinds.length ? info.kinds.map(k => MEAT_TYPES[k].icon + MEAT_TYPES[k].name).join('/') : '';
-    ctx.globalAlpha = .92;
-    ctx.fillStyle = 'rgba(10,6,4,.85)';
-    ctx.fillRect(tx, ty, 170, 18);
-    ctx.strokeStyle = '#ff8844';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(tx, ty, 170, 18);
-    ctx.font = 'bold 10px Microsoft YaHei UI,sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#ffb070';
-    ctx.fillText('📱#' + currentTrend.tag + '# ' + kindTxt + ' ×' + trendMeatToday, tx + 6, ty + 13);
-    ctx.globalAlpha = 1;
-  }
   // 右上角波次信息面板
-  const px = GW - 180, py = 8, pw = 170, ph = 50;
-  ctx.fillStyle = 'rgba(10,6,4,.85)';
+  const px = GW - 198, py = 8, pw = 190, ph = 64;
+  ctx.fillStyle = 'rgba(27,17,10,.9)';
   ctx.fillRect(px, py, pw, ph);
   const isBuffer = window.__waveSpecial === 'buffer';
   const isHub = gameState === 'hub';
+  drawFoodStatusStack(px, py + ph + 6, pw);
   const isBufferWaiting = wavePhase === 'buffer' && !isBuffer;
   ctx.strokeStyle = (isBuffer || isBufferWaiting) ? '#ff4444' : (isHub ? '#5BBA6F' : '#FFC93C');
   ctx.lineWidth = 1.5;
@@ -243,7 +260,7 @@ function drawWaveHUD(){
   if(isHub){
     ctx.fillStyle = '#5BBA6F';
     ctx.fillText('🏠 据点整备期', px+8, py+15);
-    ctx.font = 'bold 9px Microsoft YaHei UI,sans-serif';
+    ctx.font = 'bold 10px Microsoft YaHei UI,sans-serif';
     ctx.fillStyle = '#F4E4BC';
     ctx.fillText('下一波: 第' + (wave+1) + '波 · 进餐厅[N]/出击[B]', px+8, py+30);
     ctx.fillText('升级围墙/买塔防/睡觉回血', px+8, py+42);
@@ -251,7 +268,7 @@ function drawWaveHUD(){
     // 缓冲期等待中（夜晚尸潮即将来袭）
     ctx.fillStyle = '#ff6644';
     ctx.fillText('🌙 夜晚超级尸潮即将来袭！', px+8, py+15);
-    ctx.font = 'bold 9px Microsoft YaHei UI,sans-serif';
+    ctx.font = 'bold 10px Microsoft YaHei UI,sans-serif';
     ctx.fillStyle = '#FF6B6B';
     ctx.fillText('2倍僵尸马上来袭！', px+8, py+30);
     ctx.fillStyle = '#FFC93C';
@@ -269,15 +286,15 @@ function drawWaveHUD(){
     const ratio = Math.max(0, 1 - remaining/total);
     ctx.fillStyle = '#ff4444';
     ctx.fillRect(barX, barY, barW * ratio, barH);
-    ctx.font = 'bold 9px Microsoft YaHei UI,sans-serif';
+    ctx.font = 'bold 10px Microsoft YaHei UI,sans-serif';
     ctx.fillStyle = '#F4E4BC';
-    ctx.fillText('剩余: ' + remaining + ' / ' + total, px+8, py+38);
+    ctx.fillText('剩余: ' + remaining + ' / ' + total, px+8, py+41);
     ctx.fillStyle = '#FFC93C';
-    ctx.fillText('🏃 进小屋按E或N避难！', px+8, py+48);
+    ctx.fillText('🏃 进小屋按E或N避难！', px+8, py+57);
   } else if(wavePhase === 'boss'){
     ctx.fillStyle = '#ff4444';
     ctx.fillText('☠ BOSS战 第'+wave+'波', px+8, py+15);
-    ctx.font = 'bold 9px Microsoft YaHei UI,sans-serif';
+    ctx.font = 'bold 10px Microsoft YaHei UI,sans-serif';
     ctx.fillStyle = '#F4E4BC';
     ctx.fillText('击败BOSS进入下一阶段', px+8, py+30);
   } else if(wavePhase === 'spawning'){
@@ -292,22 +309,22 @@ function drawWaveHUD(){
     const ratio = Math.max(0, 1 - remaining/total);
     ctx.fillStyle = ratio > 0.5 ? '#5BBA6F' : ratio > 0.25 ? '#FFC93C' : '#FF6B6B';
     ctx.fillRect(barX, barY, barW * ratio, barH);
-    ctx.font = 'bold 9px Microsoft YaHei UI,sans-serif';
+    ctx.font = 'bold 10px Microsoft YaHei UI,sans-serif';
     ctx.fillStyle = '#F4E4BC';
-    ctx.fillText('剩余: ' + remaining + ' / ' + total, px+8, py+38);
+    ctx.fillText('剩余: ' + remaining + ' / ' + total, px+8, py+41);
     ctx.fillStyle = '#b0a284';
-    ctx.fillText('清完进入夜晚尸潮缓冲期', px+8, py+48);
+    ctx.fillText('清完进入夜晚尸潮缓冲期', px+8, py+57);
   } else {
     ctx.fillStyle = '#FFC93C';
     ctx.fillText('第 ' + wave + ' 波 · ' + (wavePhase||'准备中'), px+8, py+15);
-    ctx.font = 'bold 9px Microsoft YaHei UI,sans-serif';
+    ctx.font = 'bold 10px Microsoft YaHei UI,sans-serif';
     ctx.fillStyle = '#F4E4BC';
     ctx.fillText('状态: ' + (wavePhase||'...'), px+8, py+30);
   }
   // ── 士气加成显示（战斗中有士气时显示在波次面板下方）──
   if(moraleBuff > 0 && (gameState === 'world' || gameState === 'hub') && !isHub){
     const mbY = py + ph + 4;
-    ctx.fillStyle = 'rgba(10,6,4,.85)';
+    ctx.fillStyle = 'rgba(27,17,10,.9)';
     ctx.fillRect(px, mbY, pw, 18);
     ctx.strokeStyle = '#ffcc44';
     ctx.lineWidth = 1;
@@ -317,33 +334,30 @@ function drawWaveHUD(){
     ctx.textAlign = 'left';
     ctx.fillText('⚔️ 士气+' + moraleBuff + ' 伤害+' + (moraleBuff*5) + '%', px+8, mbY+13);
   }
-  // ── 防御工事面板（左上角，显示围墙+塔防状态）──
+  // ── 防御工事面板（左上角：围墙 + 家园 + 塔防，全游戏只在这里显示一份）──
   if(gameState === 'world' && !isHub){
-    const dpX = 8, dpY = 60, dpW = 140, dpH = 48;
-    ctx.fillStyle = 'rgba(10,6,4,.85)';
-    ctx.fillRect(dpX, dpY, dpW, dpH);
-    ctx.strokeStyle = wallLevel>0 ? '#c8a060' : '#5a4030';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(dpX, dpY, dpW, dpH);
-    ctx.font = 'bold 10px Microsoft YaHei UI,sans-serif';
+    const dpX = 8, dpY = 60, dpW = 176, dpH = 66;
+    hudPanel(dpX, dpY, dpW, dpH, wallLevel>0 ? '#c8a060' : '#5a4030');
+    ctx.font = 'bold 11px Microsoft YaHei UI,sans-serif';
     ctx.textAlign = 'left';
-    // 围墙状态
     const wallNames = ['无','木墙','石墙','铁墙'];
     const wallMax = WALL_HP_PER_LEVEL[wallLevel]||1;
     const wallPct = Math.round(wallHp/wallMax*100);
-    ctx.fillStyle = wallLevel>0 ? '#c8a060' : '#5a4030';
-    ctx.fillText('🧱 ' + (wallNames[wallLevel]||'无') + ' ' + wallPct + '%', dpX+6, dpY+14);
-    // 围墙血条
+    ctx.fillStyle = wallLevel>0 ? '#e0b878' : '#8a6a50';
+    ctx.fillText('🧱 ' + (wallNames[wallLevel]||'无') + ' ' + wallPct + '%', dpX+8, dpY+15);
     ctx.fillStyle = 'rgba(0,0,0,.5)';
-    ctx.fillRect(dpX+6, dpY+18, dpW-12, 5);
-    ctx.fillStyle = wallLevel>=3 ? '#6a6a74' : wallLevel===2 ? '#aaa' : '#b09060';
-    ctx.fillRect(dpX+6, dpY+18, (dpW-12)*wallHp/wallMax, 5);
-    // 塔防状态
-    ctx.fillStyle = towers.length>0 ? '#88ccff' : '#4a4a50';
-    ctx.fillText('🗼 防御塔: ' + towers.length + '/' + getTowerMaxCount(), dpX+6, dpY+34);
-    // 家园血量
-    ctx.fillStyle = homeHp > HOME_HP_MAX*0.5 ? '#88ff88' : homeHp > HOME_HP_MAX*0.25 ? '#ffcc44' : '#ff6666';
-    ctx.fillText('🏠 家园: ' + Math.round(homeHp) + '/' + HOME_HP_MAX, dpX+6, dpY+44);
+    ctx.fillRect(dpX+8, dpY+19, dpW-16, 5);
+    ctx.fillStyle = wallLevel>=3 ? '#8a8a94' : wallLevel===2 ? '#bbb' : '#c8a060';
+    ctx.fillRect(dpX+8, dpY+19, (dpW-16)*Math.max(0,Math.min(1,wallHp/wallMax)), 5);
+    const homeRatio = Math.max(0, Math.min(1, homeHp/HOME_HP_MAX));
+    ctx.fillStyle = homeRatio > 0.5 ? '#9be89b' : homeRatio > 0.25 ? '#ffcc44' : '#ff7766';
+    ctx.fillText('🏠 家园 ' + Math.round(homeHp) + '/' + HOME_HP_MAX, dpX+8, dpY+39);
+    ctx.fillStyle = 'rgba(0,0,0,.5)';
+    ctx.fillRect(dpX+8, dpY+43, dpW-16, 5);
+    ctx.fillStyle = homeRatio > 0.5 ? '#5bba6f' : homeRatio > 0.25 ? '#e0a020' : '#d0483a';
+    ctx.fillRect(dpX+8, dpY+43, (dpW-16)*homeRatio, 5);
+    ctx.fillStyle = towers.length>0 ? '#9fd4ff' : '#7a7a80';
+    ctx.fillText('🗼 防御塔 ' + towers.length + '/' + getTowerMaxCount(), dpX+8, dpY+62);
   }
   ctx.restore();
 }
@@ -356,14 +370,6 @@ function updateCoinUI(){
   if (wEl) wEl.textContent = '🪵 ' + woodPlanks;
   if (sEl) sEl.textContent = '⚙️ ' + scrapMetal;
   updateTodHUD();
-  // 资源状态栏
-  const rb=document.getElementById('resource-bar');
-  if(rb){
-    const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
-    set('rb-wood',woodPlanks);set('rb-scrap',scrapMetal);set('rb-coins',coins);
-    set('rb-hp',Math.max(0,Math.round(health)));set('rb-home',Math.max(0,Math.round(homeHp)));
-    set('rb-wall',Math.max(0,Math.round(wallHp)));
-  }
 }
 
 // ═══════════════════════════════════════════
@@ -1216,6 +1222,7 @@ function showTutorial(key, title, lines){
   bodyEl.innerHTML = lines.map(l => `<div class="tutorial-line">${l}</div>`).join('');
   tutScr.style.display = 'flex';
   tutScr.classList.add('show');
+  gameWrap.querySelectorAll('.banner-msg').forEach(el => { el.style.top = '10px'; });  // 已显示的横幅挪到卡片上方，别盖住标题
   sndShopOpen();
 }
 

@@ -138,7 +138,6 @@ function applyOvernightMeals(){
     else addBanner('🍱 留饭「' + queuedFamilyMeal.name + '」：队友同享（满血·射速+25%）');
     queuedFamilyMeal = null;
   }
-  updateMealHUD();
 }
 
 // 一波结束（onWaveCleared 调用）：饭吃完了
@@ -149,33 +148,4 @@ function endOvernightMeals(){
   }
   hiredCompanions.forEach(c => { if(c) c.mealBoost = 1; });
   lastMealLog = [];
-  updateMealHUD();
-}
-
-// 战斗 HUD 顶栏：昨晚吃了什么
-function updateMealHUD(){
-  const hud = document.getElementById('meal-hud');
-  if(!hud) return;
-  const text = document.getElementById('meal-hud-text');
-  const icon = document.getElementById('meal-hud-icon');
-  if(lastMealLog.length === 0 && !activeSignature){
-    hud.style.display = 'none';
-    return;
-  }
-  const dishes = lastMealLog.map(m => m.name + (m.family ? '(留饭)' : '')).join('·');
-  let label = '昨晚吃了：' + (dishes || '—');
-  const tips = [];
-  activeBattleBuffs.forEach(b => {
-    const def = BATTLE_BUFF_DEFS[b.id];
-    if(def) tips.push(def.icon + def.name + (b.dishName ? '（' + b.dishName + '）' : '') + '：' + def.desc);
-  });
-  if(activeSignature){
-    label += ' ｜ ' + activeSignature.badge;
-    tips.push(activeSignature.icon + activeSignature.name + '：' + activeSignature.effectDesc);
-  }
-  hud.style.display = 'flex';
-  hud.style.borderColor = (activeSignature && activeSignature.color) || '#f0b060';
-  if(icon) icon.textContent = activeSignature ? '🍱' : '🍽️';
-  if(text) text.textContent = label;
-  hud.title = tips.join('\n');
 }
