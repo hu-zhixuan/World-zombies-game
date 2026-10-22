@@ -1310,47 +1310,15 @@ function recordCodexKill(z){
       const eid = parseInt(key.split('_')[2]);
       arch = getEliteDexData(eid);
     }
-    if(arch){
-      // 延迟弹窗，避免在战斗中打断
-      setTimeout(() => {
-        if(!gameRunning) return;
-        showNewZombieDiscovered(arch);
-      }, 300);
-    }
+    if(arch && gameRunning) showNewZombieDiscovered(arch);
   }
 }
 
-// 新僵尸发现弹窗
+// 新僵尸发现提示：只弹一条横幅，不挡操作（原来是全屏卡片，战斗中弹出来既不暂停又盖住攻击键，
+// 还沿用了开局教程残留的「跳过教程/下一步」按钮）。详细介绍在图鉴里。
 function showNewZombieDiscovered(arch){
-  const tutScr = document.getElementById('tutorial-scr');
-  if(!tutScr) return;
-  document.getElementById('tutorial-title').innerHTML = '🧟 <span style="color:#ff6644;">发现新僵尸！</span>';
-  const bodyEl = document.getElementById('tutorial-body');
-  bodyEl.innerHTML = `
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;">
-      <canvas id="new-zombie-portrait" width="60" height="70" style="background:rgba(40,20,10,.6);border-radius:6px;border:2px solid ${arch.color1||'#c8a878'};"></canvas>
-      <div style="text-align:left;">
-        <div style="font-family:var(--font-display);font-size:1.1rem;color:${arch.color1||'#c8a878'};letter-spacing:1px;">${arch.name}</div>
-        <div style="font-size:.7rem;color:#b0a284;">类型: ${arch.tier||'普通'} · 首次出现: 第${arch.firstWave||1}波</div>
-      </div>
-    </div>
-    <div style="background:rgba(60,63,70,.3);padding:6px 10px;border-radius:4px;border-left:3px solid #f2a65a;font-size:.72rem;color:#a4a8b0;margin-bottom:6px;text-align:left;">
-      <b>⚡ 机制：</b>${arch.mechanicDesc||'无特殊能力'}
-    </div>
-    <div style="font-size:.7rem;color:#c8c0a8;line-height:1.6;text-align:left;font-style:italic;">${arch.desc||''}</div>
-    <div style="font-size:.65rem;color:#b0a284;margin-top:6px;">已记录到僵尸图鉴（顶部 🧟图鉴 按钮可查看）</div>
-  `;
-  tutScr.style.display = 'flex';
-  tutScr.classList.add('show');
+  addBanner(`🧟 新僵尸：${arch.name} · ${arch.mechanicDesc||'无特殊能力'}（已记入图鉴）`);
   sndBossAppear();
-  // 绘制僵尸头像
-  setTimeout(() => {
-    const cv = document.getElementById('new-zombie-portrait');
-    if(cv){
-      const c = cv.getContext('2d');
-      drawCodexPortrait(c, arch, cv.width, cv.height);
-    }
-  }, 50);
 }
 
 // 获取旧精英数据（用于图鉴显示）

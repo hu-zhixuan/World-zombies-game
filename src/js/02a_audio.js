@@ -795,7 +795,10 @@ function showCinematic(lines, onDone){
     }
   }
   // 显示全屏覆盖层
+  // forceDismissAllOverlays（进出据点都会调）用行内样式 display:none/opacity:0 关它；只加 .open 盖不过行内样式，
+  // 剧情在看不见的层里跑（cinActive=true 吞掉所有操作）= 回小屋后卡死。先清掉行内样式。
   const scr = document.getElementById('cinematic-scr');
+  scr.style.display = ''; scr.style.opacity = ''; scr.style.pointerEvents = '';
   scr.classList.add('open');
   // 背景点击推进对话
   scr.onclick = (e) => {

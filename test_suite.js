@@ -543,13 +543,41 @@ idleWatchdog(200);
 assert(run(`wave`) === 1, '没有任何面板时卡在第 0 波：看门狗仍会兜底进第 1 波', run(`wave + '/' + wavePhase`));
 run(`gameRunning = false; document.getElementById('tutorial-scr').style.display = '';`);
 
-// ── 手机攻击键 = 瞄准摇杆：拖动后准星跟着手指方向、随角色移动；松手回到自动瞄准 ──
-run(`touchAim = { x: -1, y: 0 }; player.x = 600; player.y = 280; applyTouchAim();`);
-assert(run(`lastMX < player.x && Math.abs(lastMY - (player.y + CHAR_H / 2)) < 1e-6`), '手动瞄准：往左拖，准星在角色左边同一高度');
-run(`player.x = 900; applyTouchAim();`);
-assert(run(`lastMX === player.x + CHAR_W / 2 - AIM_REACH`), '手动瞄准：角色走动后准星跟着角色');
-run(`endFireAim();`);
-assert(run(`touchAim === null && applyTouchAim() === false`), '松手后回到自动瞄准');
+// ── 手机瞄准：自动锁屏幕内、面朝一侧优先、锁住不乱跳；没目标朝正前方；拖动吸附 ±30° ──
+const mkZ = (x) => `({ x: ${x}, alive: true })`;
+run(`gameState = 'world'; boss = null; cameraX = 0; touchAim = null; aimLock = null; keys.l = keys.r = false;
+     player.x = 300; player.y = 286; player.facingRight = true;
+     zombies = [${mkZ(560)}, ${mkZ(150)}, ${mkZ(1500)}]; updateAim();`);
+assert(run(`aimLock === zombies[0]`), '自动锁定：身前的僵尸优先于身后稍近的那只，屏幕外的不锁');
+assert(run(`lastMX === zombies[0].x + 22`), '自动锁定：枪口指向锁定目标');
+run(`zombies.push(${mkZ(530)}); updateAim();`);
+assert(run(`aimLock === zombies[0]`), '锁住后不乱跳：新目标只近一点不换');
+run(`zombies[0].alive = false; updateAim();`);
+assert(run(`aimLock === zombies[3]`), '目标死了自动换下一只');
+run(`zombies = []; updateAim();`);
+assert(run(`aimLock === null && lastMX > player.x && Math.abs(lastMY - (player.y + CHAR_H / 2)) < 1e-6`), '没有目标：朝正前方水平开火');
+run(`zombies = [${mkZ(600)}, ${mkZ(100)}]; touchAim = { x: -1, y: 0 }; updateAim();`);
+assert(run(`aimLock === zombies[1]`), '手动瞄准：往左拖吸附到左边那只');
+run(`touchAim = { x: 0, y: -1 }; updateAim();`);
+assert(run(`aimLock === null && lastMY < player.y`), '手动瞄准：方向上没有僵尸就照拖的方向打');
+run(`endFireAim(); updateAim();`);
+assert(run(`touchAim === null && aimLock === zombies[0]`), '松手后回到自动锁定');
+run(`zombies = []; aimLock = null;`);
+
+// ── 回小屋卡死：进出据点的强制清场用行内 display:none 关剧情层，之后的剧情必须还能显示出来 ──
+let cinErr = null;
+try {
+  run(`forceDismissAllOverlays(); document.getElementById('cinematic-scr').style.display = 'none';
+       showCinematic([{ npc: 'ming', text: '测试' }], null);`);
+} catch (e) { cinErr = e; }
+assert(!cinErr && run(`cinActive && document.getElementById('cinematic-scr').style.display !== 'none'`), '强制清场后再放剧情：剧情层可见（不会隐形吞掉操作）', cinErr && cinErr.stack);
+run(`forceDismissAllOverlays();`);
+// 清场后在选天赋：看门狗不能把人拽进据点
+run(`gameRunning = true; gameState = 'world'; wave = 1; wavePhase = 'cleared'; cinActive = false; shopOpen = false; cabinUIOpen = false;
+     gamePaused = true; document.getElementById('tutorial-scr').style.display = 'none'; stuckWatchdog = 0; lastGameState = '';`);
+run(`for (let i = 0; i < 600; i++) checkStuckWatchdog();`);
+assert(run(`gameState === 'world' && wavePhase === 'cleared'`), '选天赋时看门狗不强制进据点', run(`gameState + '/' + wavePhase`));
+run(`gameRunning = false; gamePaused = false; document.getElementById('tutorial-scr').style.display = '';`);
 
 console.log(`\n========================================`);
 console.log(`FINAL RESULT: Passed: ${testsPassed}, Failed: ${testsFailed}`);
