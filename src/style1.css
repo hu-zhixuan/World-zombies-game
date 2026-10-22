@@ -1,6 +1,10 @@
 /* 美术重构：去掉 Google Fonts 在线依赖（离线加载失败时全页字体回退闪动，
    且 Creepster/Baloo 2 均不含中文字形——中文标题一直在回退宋体造成混排割裂）。
    改为本地系统字体栈：中文统一 UI 黑体族，衬线感的西文标题用系统 serif 栈模拟。 */
+/* 安卓 WebView / 手机浏览器：点按可点击元素时系统会罩一层半透明高亮。画布铺满全屏，
+   不关掉的话每点一下屏幕整屏都闪一下；长按也别弹系统菜单 */
+*{-webkit-tap-highlight-color:transparent;}
+body{-webkit-touch-callout:none;}
 :root{
   /* ── 字体令牌（本地系统栈，零网络依赖）── */
   --font-display:'PingFang SC','Microsoft YaHei UI','Microsoft YaHei','Noto Sans SC','Segoe UI',system-ui,sans-serif;  /* 标题/强调 */
@@ -1143,6 +1147,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);
 .big-btn:active{background:var(--s2);}
 .big-btn.primary{background:var(--accent);border-color:var(--accent);color:#1a1205;font-weight:600;}
 .big-btn.primary:hover{background:#f6b472;border-color:#f6b472;}
+.big-btn.danger{color:#e5594f;border-color:rgba(229,89,79,.45);}
+.big-btn.danger:hover{background:rgba(229,89,79,.12);border-color:#e5594f;}
+/* 暂停 / 结算卡片：和其他弹层同一套扁平灰阶 */
+.sys-card{width:90%;max-width:340px;background:var(--s1);border:1px solid var(--line-hi);border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.6);padding:22px 20px;display:flex;flex-direction:column;align-items:center;}
+.overlay .sys-title{color:var(--text-1);font-size:1.5rem;font-weight:600;letter-spacing:1px;margin:0 0 14px;text-shadow:none;}
+.overlay .sys-title.danger{color:#e5594f;margin-bottom:6px;}
+.sys-sub{color:var(--text-2);font-size:.85rem;margin:0 0 16px;text-align:center;}
+.sys-btns{display:flex;flex-direction:column;gap:9px;width:100%;}
+.sys-btns .big-btn{margin:0;width:100%;}
+/* 剧情对话条层级比商店/指挥所/行囊高，面板开着时先收起来，别压在格子上 */
+body:has(#shop-scr.open, #cabin-scr.open, #backpack-modal.open, #pause-scr[style*="flex"]) #wave-dlg-bar{display:none !important;}
 .ctrl-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 14px;}
 .ctrl-row{font-size:.68rem;color:var(--dim);}
 .ctrl-row b{color:var(--yellow);}

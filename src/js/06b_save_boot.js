@@ -738,7 +738,7 @@ function setupTutorialSteps(onComplete){
       html: `<div style="text-align:left;line-height:1.6;">
         <div style="margin-bottom:6px;"><b>目标</b>：守住 15 波尸潮，活到直升机撤离。</div>
         <div style="margin-bottom:5px;"><b>左下摇杆</b>：左右拖动移动，向上推跳跃。</div>
-        <div style="margin-bottom:5px;"><b>右下红色按钮</b>：开火，会自动瞄准最近的僵尸。按住连射。</div>
+        <div style="margin-bottom:5px;"><b>右下橙色大键</b>：按住连射，自动瞄准最近的僵尸；<b>按住往某个方向拖</b>，枪口就跟着手指走，边调边打。</div>
         <div style="margin-bottom:5px;"><b>绿色 ↑ / 翻滚</b>：跳跃 / 闪避（闪避有无敌帧）。</div>
         <div style="margin-bottom:5px;"><b>装填 · 商店 · 行囊</b>：右侧小按钮。商店里买武器和升级。</div>
         <div style="margin-bottom:5px;"><b>E 键</b>：靠近可交互的东西（基座、门、求救的人）时亮起，点它。</div>

@@ -128,6 +128,11 @@ body.phone.rest-mode #mhud, body.phone.rest-mode #touch-overlay { display: none;
 #fire-ammo { font: 800 calc(3.9 * var(--u)) / 1 var(--font-num); letter-spacing: .02em; }
 #btn-fire.low #fire-ammo { color: #9d2218; }
 #btn-fire .fire-ring { position: absolute; inset: auto; left: -6px; top: -6px; width: calc(100% + 12px); height: calc(100% + 12px); transform: rotate(-90deg); }
+/* 按住拖动 = 调枪口：键里出现一个跟手的小圆点，图标让位 */
+#fire-nub { position: absolute; left: 50%; top: 50%; width: 34%; height: 34%; border-radius: 50%; pointer-events: none;
+  background: #fff; border: 2px solid rgba(27, 18, 8, .55); box-shadow: 0 1px 4px rgba(0, 0, 0, .35); transform: translate(-50%, -50%); opacity: 0; transition: opacity .08s; }
+#btn-fire.aiming #fire-nub { opacity: 1; }
+#btn-fire.aiming .ico, #btn-fire.aiming #fire-ammo { opacity: .35; }
 #btn-fire .fire-ring circle { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 295.3; stroke-dashoffset: 295.3; }
 
 #btn-jump   { width: calc(15 * var(--u)); height: calc(15 * var(--u)); right: calc(var(--ins-r) + 7.5 * var(--u));  bottom: calc(36.5 * var(--u)); }
@@ -159,7 +164,7 @@ body.phone.hub-mode #btn-fire, body.phone.hub-mode #btn-reload, body.phone.hub-m
 body.phone .banner-msg { top: calc(21 * var(--u)) !important; max-width: 46%; padding: 5px 14px !important; font-size: 12.5px !important; line-height: 1.35;
   white-space: normal !important; text-align: center; background: var(--glass) !important; border: 1px solid rgba(255, 255, 255, .12) !important; border-radius: 12px !important; box-shadow: none !important; }
 body.phone:has(#wave-dlg-bar.open) .banner-msg { top: calc(42 * var(--u)) !important; }
-body.phone #vehicle-prompt { bottom: calc(1.6 * var(--u)); max-width: 34%; padding: 4px 12px; font-size: 12px; white-space: normal; text-align: center; background: var(--glass); border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; }
+body.phone #vehicle-prompt { bottom: calc(1.6 * var(--u)); max-width: 40%; padding: 4px 12px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; background: var(--glass); border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; }
 body.phone #wave-dlg-bar { top: calc(21 * var(--u)); width: 46%; max-width: 440px; }
 body.phone .wd-top-bar { display: none; }
 body.phone .wd-main { padding: 8px 10px; gap: 8px; }

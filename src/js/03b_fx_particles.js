@@ -344,6 +344,8 @@ function vfxMuzzleLight(wpnId){
   const intensity={pistol:.18,shotgun:.32,smg:.14,smg_heavy:.18,crossbow:.10,sniper:.30,tesla:.24,railgun:.28,grenade:.16,ice:.20,poison:.16,flame:.22,minigun:.14,rocket:.38,plasma:.30}[wpnId]||.18;
   muzzleLightFlash=Math.min(1,muzzleLightFlash+intensity);
 }
+// 全屏泛光强度：手机上画面铺满整屏、离眼近，连射时整屏一明一暗像在闪，压到 1/3
+function muzzleLightAlpha(){ return isPhoneUI() ? 0.07 : 0.22; }
 // ── 暴击屏幕闪光 ─────────────────────────────────────────
 function vfxCritFlash(){critFlash=Math.min(0.08, critFlash+0.04);}
 // ── 烟雾累积（连射时生成烟雾粒子） ───────────────────────

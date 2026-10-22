@@ -991,7 +991,7 @@ function updateInteractionPrompt() {
   if (nearB) {
     if(nearB.id === 'cabin'){
       if(wavePhase === 'spawning'){
-        setInteractPrompt('小屋门锁着（波次进行中）· 清完这波等夜晚尸潮来时再进');
+        setInteractPrompt('🔒 小屋门锁着 · 清完这波再进');
       } else if(wavePhase === 'boss'){
         setInteractPrompt('🔒 小屋门锁着（Boss战中）');
       } else if(wavePhase === 'cleared'){
