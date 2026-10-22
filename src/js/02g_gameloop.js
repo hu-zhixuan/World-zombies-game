@@ -860,7 +860,7 @@ function gameLoop(){
   const pcv = getPvigCanvas();
   if(pcv) ctx.drawImage(pcv, 0, 0, GW, GH);
   drawCrosshair(lastMX-cameraX,lastMY);
-  drawTouchAimGuide();
+  drawAimMarker();
   // 侦察视角指示器：蓝色边框 + "侦察中"标签 + 玩家位置箭头
   if(scoutView){
     ctx.save();

@@ -543,13 +543,26 @@ idleWatchdog(200);
 assert(run(`wave`) === 1, '没有任何面板时卡在第 0 波：看门狗仍会兜底进第 1 波', run(`wave + '/' + wavePhase`));
 run(`gameRunning = false; document.getElementById('tutorial-scr').style.display = '';`);
 
-// ── 手机攻击键 = 瞄准摇杆：拖动后准星跟着手指方向、随角色移动；松手回到自动瞄准 ──
-run(`touchAim = { x: -1, y: 0 }; player.x = 600; player.y = 280; applyTouchAim();`);
-assert(run(`lastMX < player.x && Math.abs(lastMY - (player.y + CHAR_H / 2)) < 1e-6`), '手动瞄准：往左拖，准星在角色左边同一高度');
-run(`player.x = 900; applyTouchAim();`);
-assert(run(`lastMX === player.x + CHAR_W / 2 - AIM_REACH`), '手动瞄准：角色走动后准星跟着角色');
-run(`endFireAim();`);
-assert(run(`touchAim === null && applyTouchAim() === false`), '松手后回到自动瞄准');
+// ── 手机瞄准：自动锁屏幕内、面朝一侧优先、锁住不乱跳；没目标朝正前方；拖动吸附 ±30° ──
+const mkZ = (x) => `({ x: ${x}, alive: true })`;
+run(`gameState = 'world'; boss = null; cameraX = 0; touchAim = null; aimLock = null; keys.l = keys.r = false;
+     player.x = 300; player.y = 286; player.facingRight = true;
+     zombies = [${mkZ(560)}, ${mkZ(150)}, ${mkZ(1500)}]; updateAim();`);
+assert(run(`aimLock === zombies[0]`), '自动锁定：身前的僵尸优先于身后稍近的那只，屏幕外的不锁');
+assert(run(`lastMX === zombies[0].x + 22`), '自动锁定：枪口指向锁定目标');
+run(`zombies.push(${mkZ(530)}); updateAim();`);
+assert(run(`aimLock === zombies[0]`), '锁住后不乱跳：新目标只近一点不换');
+run(`zombies[0].alive = false; updateAim();`);
+assert(run(`aimLock === zombies[3]`), '目标死了自动换下一只');
+run(`zombies = []; updateAim();`);
+assert(run(`aimLock === null && lastMX > player.x && Math.abs(lastMY - (player.y + CHAR_H / 2)) < 1e-6`), '没有目标：朝正前方水平开火');
+run(`zombies = [${mkZ(600)}, ${mkZ(100)}]; touchAim = { x: -1, y: 0 }; updateAim();`);
+assert(run(`aimLock === zombies[1]`), '手动瞄准：往左拖吸附到左边那只');
+run(`touchAim = { x: 0, y: -1 }; updateAim();`);
+assert(run(`aimLock === null && lastMY < player.y`), '手动瞄准：方向上没有僵尸就照拖的方向打');
+run(`endFireAim(); updateAim();`);
+assert(run(`touchAim === null && aimLock === zombies[0]`), '松手后回到自动锁定');
+run(`zombies = []; aimLock = null;`);
 
 console.log(`\n========================================`);
 console.log(`FINAL RESULT: Passed: ${testsPassed}, Failed: ${testsFailed}`);

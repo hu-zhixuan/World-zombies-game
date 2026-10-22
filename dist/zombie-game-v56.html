@@ -2328,7 +2328,7 @@ body.phone.rest-mode #mhud, body.phone.rest-mode #touch-overlay { display: none;
 
 /* 攻击键：全屏最显眼的东西，也是唯一的实心强调色 */
 #btn-fire { width: calc(24 * var(--u)); height: calc(24 * var(--u)); right: calc(var(--ins-r) + 3 * var(--u)); bottom: calc(4 * var(--u));
-  background: var(--accent); border-color: rgba(255, 255, 255, .45); color: #1b1208;
+  background: rgba(242, 166, 90, .82); border-color: rgba(255, 255, 255, .45); color: #1b1208;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(.5 * var(--u)); }
 #btn-fire.pressed { background: #f6b472; }
 #btn-fire .ico { width: calc(9 * var(--u)); height: calc(9 * var(--u)); stroke-width: 2.2; }
@@ -5699,54 +5699,140 @@ if(joyZone){
   joyZone.addEventListener('lostpointercapture', joyEnd);
 }
 
-// ── 攻击键 = 瞄准摇杆 ─────────────────────────
-// 按住不动：自动瞄最近的僵尸连射；按住往某个方向拖：枪口跟着手指方向，边调边打；松手停火，下次按下回到自动瞄准。
+// ── 瞄准（手机）──────────────────────────────
+// 参考《元气骑士》《荒野乱斗》《弓箭传说》：
+// · 自动锁定：只锁屏幕里的僵尸，优先面朝/走动方向那一侧；锁住后不乱跳（别的目标要明显更近才换）
+// · 锁定目标脚下画红圈，枪口一直指着它——还没开火就知道要打谁；没目标时枪口朝正前方
+// · 按住攻击键拖动 = 手动瞄准，拖动方向 ±30° 内有僵尸就吸附过去；拖回中心 = 回到自动锁定
 const btnFire = document.getElementById('btn-fire');
 const fireNub = document.getElementById('fire-nub');
 let fireTouchInterval = null;
 let fireId = -1, fireOx = 0, fireOy = 0;
-let touchAim = null;           // 手动瞄准方向（单位向量，屏幕方向 = 世界方向）；null = 自动瞄准
-const AIM_REACH = 420;         // 手动瞄准时准星放在角色前方多远（世界坐标）
+let aimLock = null;            // 当前锁定的目标（僵尸对象或 boss）
+let touchAim = null;           // 手动瞄准方向（单位向量，屏幕方向 = 世界方向）；null = 自动锁定
+const AIM_REACH = 420;         // 没目标/手动瞄准时，准星放在角色前方多远（世界坐标）
+const AIM_SNAP_COS = Math.cos(30 * Math.PI / 180);  // 角色站在高台上、僵尸在地面，水平拖本来就有 20° 左右的俯角
 
-// 手动瞄准：准星跟着角色走（每帧和每次开火前都刷新，角色边走边打也不偏）
-function applyTouchAim() {
-  if (!touchAim) return false;
-  lastMX = player.x + CHAR_W / 2 + touchAim.x * AIM_REACH;
-  lastMY = player.y + CHAR_H / 2 + touchAim.y * AIM_REACH;
-  return true;
+// 目标的瞄准点（身体中心）和脚下红圈的位置/大小
+function aimPoint(t) {
+  if (t === boss) return { x: boss.x + 40, y: GROUND_Y - 80, fx: boss.x + 40, fy: GROUND_Y - 2, r: 46 };
+  return { x: t.x + 22, y: Z_TOP + 28, fx: t.x + 22, fy: GROUND_Y - 2, r: 24 };
+}
+// 能锁的目标：活着、在屏幕里（建筑内没有镜头，全算）
+function aimCandidates() {
+  const inBuilding = gameState === 'building';
+  const list = [];
+  (inBuilding ? buildingInteriorZombies : zombies).forEach(z => {
+    if (!z.alive) return;
+    if (!inBuilding && (z.x + 22 < cameraX - 10 || z.x + 22 > cameraX + GW + 10)) return;
+    list.push(z);
+  });
+  if (!inBuilding && boss && boss.alive && boss.x + 40 > cameraX - 20 && boss.x + 40 < cameraX + GW + 20) list.push(boss);
+  return list;
+}
+function pickAutoTarget(cands) {
+  const px = player.x + CHAR_W / 2, py = player.y + CHAR_H / 2;
+  const dir = keys.r ? 1 : keys.l ? -1 : (player.facingRight ? 1 : -1);
+  let best = null, bestScore = Infinity;
+  cands.forEach(c => {
+    const p = aimPoint(c), dx = p.x - px, dy = p.y - py;
+    let score = Math.sqrt(dx * dx + dy * dy);
+    if (Math.sign(dx) !== dir && Math.abs(dx) > 30) score *= 1.8;  // 身后的降权
+    if (c === aimLock) score *= 0.7;                                // 粘住当前目标
+    if (score < bestScore) { bestScore = score; best = c; }
+  });
+  return best;
+}
+// 手动瞄准时的吸附：拖动方向 ±30° 内最近的那只
+function snapTarget(cands, ax, ay) {
+  const px = player.x + CHAR_W / 2, py = player.y + CHAR_H / 2;
+  let best = null, bestD = Infinity;
+  cands.forEach(c => {
+    const p = aimPoint(c), dx = p.x - px, dy = p.y - py, d = Math.sqrt(dx * dx + dy * dy) || 1;
+    if ((dx * ax + dy * ay) / d >= AIM_SNAP_COS && d < bestD) { bestD = d; best = c; }
+  });
+  return best;
+}
+// 每帧刷新锁定目标，并把准星（lastMX/lastMY）放到该打的地方
+function updateAim() {
+  if (gameState !== 'world' && gameState !== 'building') { aimLock = null; return; }
+  const cands = aimCandidates();
+  aimLock = touchAim ? snapTarget(cands, touchAim.x, touchAim.y) : pickAutoTarget(cands);
+  if (aimLock) {
+    const p = aimPoint(aimLock);
+    lastMX = p.x; lastMY = p.y;
+    return;
+  }
+  const dx = touchAim ? touchAim.x : (player.facingRight ? 1 : -1), dy = touchAim ? touchAim.y : 0;
+  lastMX = player.x + CHAR_W / 2 + dx * AIM_REACH;
+  lastMY = player.y + CHAR_H / 2 + dy * AIM_REACH;
 }
 function fireAimMove(e) {
   const dx = e.clientX - fireOx, dy = e.clientY - fireOy;
   const dist = Math.sqrt(dx * dx + dy * dy);
   const R = (btnFire.offsetWidth || 96) / 2;
   const reach = Math.min(dist, R * 0.62);
-  // 死区：手指只是按着没怎么动 = 自动瞄准
+  // 死区：手指只是按着没怎么动 / 拖回了中心 = 自动锁定
   if (dist < R * 0.28) {
     touchAim = null;
     btnFire.classList.remove('aiming');
     if (fireNub) fireNub.style.transform = 'translate(-50%,-50%)';
-    return;
+  } else {
+    touchAim = { x: dx / dist, y: dy / dist };
+    btnFire.classList.add('aiming');
+    if (fireNub) fireNub.style.transform = `translate(calc(-50% + ${touchAim.x * reach}px), calc(-50% + ${touchAim.y * reach}px))`;
   }
-  touchAim = { x: dx / dist, y: dy / dist };
-  btnFire.classList.add('aiming');
-  if (fireNub) fireNub.style.transform = `translate(calc(-50% + ${touchAim.x * reach}px), calc(-50% + ${touchAim.y * reach}px))`;
-  applyTouchAim();
+  updateAim();
 }
 
-// 手动瞄准时从角色身上拉一条虚线（准星离得远，常在屏幕外）
-function drawTouchAimGuide() {
-  if (!touchAim || !isPhoneUI() || gameState !== 'world') return;
-  const sx = player.x + CHAR_W / 2 - cameraX, sy = player.y + CHAR_H / 2 - 4;
-  const ax = touchAim.x, ay = touchAim.y;
+// 右下操作键盖住的区域从画布的哪个 x 开始（画布坐标）。僵尸从屏幕右边进场，正好在攻击键底下
+let _coverX = GW, _coverAt = -999;
+function controlsCoverX() {
+  if (frameT - _coverAt < 30) return _coverX;
+  _coverAt = frameT;
+  const cv = canvas.getBoundingClientRect(), keys_ = ['btn-fire', 'btn-dodge', 'btn-reload'];
+  let left = Infinity;
+  keys_.forEach(id => { const el = document.getElementById(id); if (el && el.offsetParent !== null) left = Math.min(left, el.getBoundingClientRect().left); });
+  _coverX = (left === Infinity || !cv.width) ? GW : Math.max(GW * 0.5, (left - cv.left) * GW / cv.width);
+  return _coverX;
+}
+
+// 锁定标记（脚下红圈 + 头顶小箭头）和手动瞄准虚线；只在战场画（建筑内没有镜头偏移，不画）
+// 目标被右下操作键挡住时，在操作键左边缘画一个指向它的红箭头
+function drawAimMarker() {
+  if (!isPhoneUI() || gameState !== 'world') return;
   ctx.save();
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = 'rgba(255,255,255,.6)';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([6, 8]);
-  ctx.beginPath(); ctx.moveTo(sx + ax * 28, sy + ay * 28); ctx.lineTo(sx + ax * 190, sy + ay * 190); ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = 'rgba(242,166,90,.95)';
-  ctx.beginPath(); ctx.arc(sx + ax * 196, sy + ay * 196, 4, 0, Math.PI * 2); ctx.fill();
+  if (touchAim) {
+    const sx = player.x + CHAR_W / 2 - cameraX, sy = player.y + CHAR_H / 2 - 4;
+    const tx = lastMX - cameraX, ty = lastMY;
+    const len = Math.min(190, Math.sqrt((tx - sx) ** 2 + (ty - sy) ** 2));
+    const ang = Math.atan2(ty - sy, tx - sx), ax = Math.cos(ang), ay = Math.sin(ang);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,.6)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 8]);
+    ctx.beginPath(); ctx.moveTo(sx + ax * 28, sy + ay * 28); ctx.lineTo(sx + ax * len, sy + ay * len); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  if (aimLock) {
+    const p = aimPoint(aimLock), x = p.fx - cameraX, pulse = 1 + 0.08 * Math.sin(frameT * 0.25);
+    ctx.strokeStyle = 'rgba(255,72,60,.95)';
+    ctx.fillStyle = 'rgba(255,72,60,.18)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(x, p.fy, p.r * pulse, p.r * 0.32 * pulse, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // 头顶小箭头
+    const hy = p.y - (aimLock === boss ? 70 : 44);
+    ctx.fillStyle = 'rgba(255,72,60,.95)';
+    ctx.beginPath(); ctx.moveTo(x - 6, hy - 8); ctx.lineTo(x + 6, hy - 8); ctx.lineTo(x, hy); ctx.closePath(); ctx.fill();
+    const cover = controlsCoverX();
+    if (x > cover - 6) {
+      const ex = cover - 16 + 3 * Math.sin(frameT * 0.25), ey = p.y;
+      ctx.fillStyle = 'rgba(255,72,60,.95)';
+      ctx.strokeStyle = 'rgba(0,0,0,.45)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(ex + 11, ey); ctx.lineTo(ex - 5, ey - 10); ctx.lineTo(ex - 1, ey); ctx.lineTo(ex - 5, ey + 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+  }
   ctx.restore();
 }
 
@@ -5756,13 +5842,7 @@ function touchFire() {
   // 弹匣空了自动装填：手机上没有"按 R"的习惯，别让玩家对着空枪干按
   if (!isReloading && w0.id !== 'minigun' && !w0.noRefill && !w0.meleeWeapon && wAmmo[curWpnIdx] <= 0) { reloadWeapon(); return; }
   mouseHeld = true;
-  if (!applyTouchAim()) {
-    const near = findNearestEnemy(player.x + CHAR_W / 2, player.y + CHAR_H / 2, 9999);
-    if (near) {
-      lastMX = near.x;
-      lastMY = near.y;
-    }
-  }
+  updateAim();
   fireWeapon(lastMX, lastMY);
 }
 function stopFireLoop(){
@@ -5956,7 +6036,7 @@ function updateMobileStatus(){ updatePhoneHud(); }
 let mStatusTimer = 0;
 function mobileStatusTick() {
   if (!isPhoneUI()) return;
-  applyTouchAim();
+  updateAim();
   mStatusTimer++;
   if (mStatusTimer % 4 === 0) updatePhoneHud();
 }
@@ -6925,7 +7005,7 @@ function gameLoop(){
   const pcv = getPvigCanvas();
   if(pcv) ctx.drawImage(pcv, 0, 0, GW, GH);
   drawCrosshair(lastMX-cameraX,lastMY);
-  drawTouchAimGuide();
+  drawAimMarker();
   // 侦察视角指示器：蓝色边框 + "侦察中"标签 + 玩家位置箭头
   if(scoutView){
     ctx.save();
@@ -29387,47 +29467,15 @@ function recordCodexKill(z){
       const eid = parseInt(key.split('_')[2]);
       arch = getEliteDexData(eid);
     }
-    if(arch){
-      // 延迟弹窗，避免在战斗中打断
-      setTimeout(() => {
-        if(!gameRunning) return;
-        showNewZombieDiscovered(arch);
-      }, 300);
-    }
+    if(arch && gameRunning) showNewZombieDiscovered(arch);
   }
 }
 
-// 新僵尸发现弹窗
+// 新僵尸发现提示：只弹一条横幅，不挡操作（原来是全屏卡片，战斗中弹出来既不暂停又盖住攻击键，
+// 还沿用了开局教程残留的「跳过教程/下一步」按钮）。详细介绍在图鉴里。
 function showNewZombieDiscovered(arch){
-  const tutScr = document.getElementById('tutorial-scr');
-  if(!tutScr) return;
-  document.getElementById('tutorial-title').innerHTML = '🧟 <span style="color:#ff6644;">发现新僵尸！</span>';
-  const bodyEl = document.getElementById('tutorial-body');
-  bodyEl.innerHTML = `
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px;">
-      <canvas id="new-zombie-portrait" width="60" height="70" style="background:rgba(40,20,10,.6);border-radius:6px;border:2px solid ${arch.color1||'#c8a878'};"></canvas>
-      <div style="text-align:left;">
-        <div style="font-family:var(--font-display);font-size:1.1rem;color:${arch.color1||'#c8a878'};letter-spacing:1px;">${arch.name}</div>
-        <div style="font-size:.7rem;color:#b0a284;">类型: ${arch.tier||'普通'} · 首次出现: 第${arch.firstWave||1}波</div>
-      </div>
-    </div>
-    <div style="background:rgba(60,63,70,.3);padding:6px 10px;border-radius:4px;border-left:3px solid #f2a65a;font-size:.72rem;color:#a4a8b0;margin-bottom:6px;text-align:left;">
-      <b>⚡ 机制：</b>${arch.mechanicDesc||'无特殊能力'}
-    </div>
-    <div style="font-size:.7rem;color:#c8c0a8;line-height:1.6;text-align:left;font-style:italic;">${arch.desc||''}</div>
-    <div style="font-size:.65rem;color:#b0a284;margin-top:6px;">已记录到僵尸图鉴（顶部 🧟图鉴 按钮可查看）</div>
-  `;
-  tutScr.style.display = 'flex';
-  tutScr.classList.add('show');
+  addBanner(`🧟 新僵尸：${arch.name} · ${arch.mechanicDesc||'无特殊能力'}（已记入图鉴）`);
   sndBossAppear();
-  // 绘制僵尸头像
-  setTimeout(() => {
-    const cv = document.getElementById('new-zombie-portrait');
-    if(cv){
-      const c = cv.getContext('2d');
-      drawCodexPortrait(c, arch, cv.width, cv.height);
-    }
-  }, 50);
 }
 
 // 获取旧精英数据（用于图鉴显示）
