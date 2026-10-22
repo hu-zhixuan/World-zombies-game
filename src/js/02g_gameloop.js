@@ -176,7 +176,7 @@ function gameLoop(){
       const mlcv = getMuzzleLightCanvas();
       if(mlcv){
         ctx.save();
-        ctx.globalAlpha = muzzleLightFlash * 0.22;
+        ctx.globalAlpha = muzzleLightFlash * muzzleLightAlpha();
         ctx.drawImage(mlcv, 0, 0, GW, GH);
         ctx.restore();
       }
@@ -776,7 +776,7 @@ function gameLoop(){
     const mlcv = getMuzzleLightCanvas();
     if(mlcv){
       ctx.save();
-      ctx.globalAlpha = muzzleLightFlash * 0.22;
+      ctx.globalAlpha = muzzleLightFlash * muzzleLightAlpha();
       ctx.drawImage(mlcv, 0, 0, GW, GH);
       ctx.restore();
     }
@@ -860,6 +860,7 @@ function gameLoop(){
   const pcv = getPvigCanvas();
   if(pcv) ctx.drawImage(pcv, 0, 0, GW, GH);
   drawCrosshair(lastMX-cameraX,lastMY);
+  drawTouchAimGuide();
   // 侦察视角指示器：蓝色边框 + "侦察中"标签 + 玩家位置箭头
   if(scoutView){
     ctx.save();

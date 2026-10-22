@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════
 //  MOBILE TOUCH CONTROLS（手机操控层）
-//  布局：左下浮动摇杆；右下一个大攻击键 + 弧形副键；商店/行囊/侦察/菜单在右上角。
+//  布局：左下浮动摇杆；右下一个大攻击键（按住开火，按住拖动 = 调枪口）+ 弧形副键；商店/行囊/侦察/菜单在右上角。
 //  所有按键统一走 Pointer 事件：触屏、窄窗口里的鼠标都能点，也不会一次点击触发两次。
 // ═══════════════════════════════════════════
 // 与 CSS 里的手机媒体查询保持同一个条件：窄屏，或「粗指针(触屏)且宽度不超过 1100」
@@ -106,9 +106,56 @@ if(joyZone){
   joyZone.addEventListener('lostpointercapture', joyEnd);
 }
 
-// ── 攻击键 ────────────────────────────────
+// ── 攻击键 = 瞄准摇杆 ─────────────────────────
+// 按住不动：自动瞄最近的僵尸连射；按住往某个方向拖：枪口跟着手指方向，边调边打；松手停火，下次按下回到自动瞄准。
 const btnFire = document.getElementById('btn-fire');
+const fireNub = document.getElementById('fire-nub');
 let fireTouchInterval = null;
+let fireId = -1, fireOx = 0, fireOy = 0;
+let touchAim = null;           // 手动瞄准方向（单位向量，屏幕方向 = 世界方向）；null = 自动瞄准
+const AIM_REACH = 420;         // 手动瞄准时准星放在角色前方多远（世界坐标）
+
+// 手动瞄准：准星跟着角色走（每帧和每次开火前都刷新，角色边走边打也不偏）
+function applyTouchAim() {
+  if (!touchAim) return false;
+  lastMX = player.x + CHAR_W / 2 + touchAim.x * AIM_REACH;
+  lastMY = player.y + CHAR_H / 2 + touchAim.y * AIM_REACH;
+  return true;
+}
+function fireAimMove(e) {
+  const dx = e.clientX - fireOx, dy = e.clientY - fireOy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const R = (btnFire.offsetWidth || 96) / 2;
+  const reach = Math.min(dist, R * 0.62);
+  // 死区：手指只是按着没怎么动 = 自动瞄准
+  if (dist < R * 0.28) {
+    touchAim = null;
+    btnFire.classList.remove('aiming');
+    if (fireNub) fireNub.style.transform = 'translate(-50%,-50%)';
+    return;
+  }
+  touchAim = { x: dx / dist, y: dy / dist };
+  btnFire.classList.add('aiming');
+  if (fireNub) fireNub.style.transform = `translate(calc(-50% + ${touchAim.x * reach}px), calc(-50% + ${touchAim.y * reach}px))`;
+  applyTouchAim();
+}
+
+// 手动瞄准时从角色身上拉一条虚线（准星离得远，常在屏幕外）
+function drawTouchAimGuide() {
+  if (!touchAim || !isPhoneUI() || gameState !== 'world') return;
+  const sx = player.x + CHAR_W / 2 - cameraX, sy = player.y + CHAR_H / 2 - 4;
+  const ax = touchAim.x, ay = touchAim.y;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(255,255,255,.6)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 8]);
+  ctx.beginPath(); ctx.moveTo(sx + ax * 28, sy + ay * 28); ctx.lineTo(sx + ax * 190, sy + ay * 190); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(242,166,90,.95)';
+  ctx.beginPath(); ctx.arc(sx + ax * 196, sy + ay * 196, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
 
 function touchFire() {
   if (!gameRunning || shopOpen || cabinUIOpen) return;
@@ -116,10 +163,12 @@ function touchFire() {
   // 弹匣空了自动装填：手机上没有"按 R"的习惯，别让玩家对着空枪干按
   if (!isReloading && w0.id !== 'minigun' && !w0.noRefill && !w0.meleeWeapon && wAmmo[curWpnIdx] <= 0) { reloadWeapon(); return; }
   mouseHeld = true;
-  const near = findNearestEnemy(player.x + CHAR_W / 2, player.y + CHAR_H / 2, 9999);
-  if (near) {
-    lastMX = near.x;
-    lastMY = near.y;
+  if (!applyTouchAim()) {
+    const near = findNearestEnemy(player.x + CHAR_W / 2, player.y + CHAR_H / 2, 9999);
+    if (near) {
+      lastMX = near.x;
+      lastMY = near.y;
+    }
   }
   fireWeapon(lastMX, lastMY);
 }
@@ -128,7 +177,17 @@ function stopFireLoop(){
   if (fireTouchInterval) { clearInterval(fireTouchInterval); fireTouchInterval = null; }
   stopAuto();
 }
-bindPress(btnFire, () => {
+function endFireAim(){
+  fireId = -1;
+  touchAim = null;
+  if (btnFire) btnFire.classList.remove('aiming');
+  if (fireNub) fireNub.style.transform = 'translate(-50%,-50%)';
+}
+if (btnFire) btnFire.addEventListener('pointermove', e => { if (e.pointerId === fireId) { e.preventDefault(); fireAimMove(e); } });
+bindPress(btnFire, e => {
+  const r = btnFire.getBoundingClientRect();
+  fireId = e.pointerId; fireOx = r.left + r.width / 2; fireOy = r.top + r.height / 2;
+  fireAimMove(e);
   touchFire();
   // v52修：清旧间隔防堆叠；近战自动武器不建循环（同黑屏根因）
   if (fireTouchInterval) { clearInterval(fireTouchInterval); fireTouchInterval = null; }
@@ -139,7 +198,7 @@ bindPress(btnFire, () => {
     const iv = (w.autofire || w.id === 'minigun') ? getFireInterval() : Math.max(getFireInterval(), 280);
     fireTouchInterval = setInterval(() => { if (gameRunning && !shopOpen && !cabinUIOpen) touchFire(); }, iv);
   }
-}, stopFireLoop);
+}, () => { stopFireLoop(); endFireAim(); });
 
 // ── 跳 / 翻滚 / 装填 / 流派技能 / 换枪 ─────────
 bindPress(document.getElementById('btn-jump'), () => { keys.j = true; }, () => { keys.j = false; });
@@ -304,6 +363,7 @@ function updateMobileStatus(){ updatePhoneHud(); }
 let mStatusTimer = 0;
 function mobileStatusTick() {
   if (!isPhoneUI()) return;
+  applyTouchAim();
   mStatusTimer++;
   if (mStatusTimer % 4 === 0) updatePhoneHud();
 }

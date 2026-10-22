@@ -143,6 +143,7 @@
       <svg class="fire-ring" viewBox="0 0 100 100"><circle id="fire-ring-c" cx="50" cy="50" r="47"/></svg>
       <svg class="ico"><use href="#i-aim"/></svg>
       <span id="fire-ammo">--</span>
+      <i id="fire-nub"></i>
     </div>
     <div id="btn-jump" class="tb"><svg><use href="#i-jump"/></svg></div>
     <div id="btn-dodge" class="tb"><svg><use href="#i-dash"/></svg></div>
@@ -326,7 +327,7 @@
           <span id="bp-stat-wood">🪵 0</span>
           <span id="bp-stat-scrap">⚙️ 0</span>
           <span id="bp-stat-coins">💰 0</span>
-          <button id="bp-close-btn" onclick="closeBackpack()">✕ 关闭 (Esc)</button>
+          <button id="bp-close-btn" onclick="closeBackpack()">✕ 关闭<span class="kbd-only"> (Esc)</span></button>
         </div>
       </div>
       <div id="bp-nav">
@@ -385,7 +386,7 @@
             <div id="exp-subtitle">潜入旧城区废墟搜寻战略物资与随从 · 带回的战利品直接入库避难所行囊</div>
           </div>
         </div>
-        <button id="exp-close-btn" onclick="closeExpeditionModal()">✕ 关闭 (Esc)</button>
+        <button id="exp-close-btn" onclick="closeExpeditionModal()">✕ 关闭<span class="kbd-only"> (Esc)</span></button>
       </div>
       <div id="exp-grid">
         <!-- 动态生成 3 个远征副本卡片 -->
@@ -417,7 +418,7 @@
         <div style="display:flex;align-items:center;gap:14px;font-size:0.85rem;">
           <span id="ws-coins" style="color:#ffd700;font-weight:600;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:20px;border:1px solid rgba(255,215,0,0.3);">💰 0</span>
           <span id="ws-scrap" style="color:#f2a65a;font-weight:600;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:20px;border:1px solid rgba(242,166,90,0.3);">⚙️ 0</span>
-          <button style="background:rgba(180,40,40,0.25);border:1px solid #ff5555;color:#ff9999;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:700;transition:all .15s;" onmouseover="this.style.background='rgba(220,50,50,0.4)'" onmouseout="this.style.background='rgba(180,40,40,0.25)'" onclick="closeDuffWorkshop()">✕ 关闭 (Esc)</button>
+          <button style="background:rgba(180,40,40,0.25);border:1px solid #ff5555;color:#ff9999;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:700;transition:all .15s;" onmouseover="this.style.background='rgba(220,50,50,0.4)'" onmouseout="this.style.background='rgba(180,40,40,0.25)'" onclick="closeDuffWorkshop()">✕ 关闭<span class="kbd-only"> (Esc)</span></button>
         </div>
       </div>
       <div id="ws-body" style="display:flex;flex:1;overflow:hidden;min-height:400px;">
@@ -682,14 +683,14 @@
 
   <!-- PAUSE MENU SCREEN -->
   <div class="overlay" id="pause-scr" style="display: none; background: rgba(10,10,11, 0.94); backdrop-filter: blur(14px); z-index: 90;">
-    <div class="glass-tactical-card" style="width:90%;max-width:320px;background:rgba(26,27,30,0.88);border:1.5px solid rgba(242,166,90,0.3);border-radius:16px;box-shadow:0 12px 35px rgba(0,0,0,0.7);padding:24px 20px;display:flex;flex-direction:column;align-items:center;">
-      <h2 style="color:#ffd700;font-size:1.8rem;letter-spacing:1px;margin-bottom:16px;text-shadow:none;">⏸ 战局暂停</h2>
-      <div style="display:flex; flex-direction:column; gap:10px; width:100%;">
-        <button class="big-btn" onclick="togglePause()" style="border-color:#2ecc71; color:#55ff99; background:rgba(46,204,113,0.2);box-shadow:none;">▶ 继续坚守防线</button>
-        <button class="big-btn" onclick="saveGameToFile()" style="border-color:#f39c12; color:#ffd700; background:rgba(243,156,18,0.2);box-shadow:none;">💾 保存作战档案</button>
-        <button class="big-btn" onclick="triggerLoadFile()" style="border-color:#777d88; color:#f2a65a; background:rgba(119,125,136,0.2);box-shadow:none;">📂 载入作战档案</button>
-        <button class="big-btn" onclick="returnToMainMenu()" style="border-color:#a855f7; color:#e9d5ff; background:rgba(168,85,247,0.2);box-shadow:none;">🏰 返回要塞主菜单</button>
-        <button class="big-btn" onclick="togglePause(); endGame();" style="border-color:#ff4d6d; color:#ff99ab; background:rgba(255,77,109,0.2);box-shadow:none;">☠ 放弃据点撤退</button>
+    <div class="sys-card">
+      <h2 class="sys-title">战局暂停</h2>
+      <div class="sys-btns">
+        <button class="big-btn primary" onclick="togglePause()">继续坚守防线</button>
+        <button class="big-btn" onclick="saveGameToFile()">保存作战档案</button>
+        <button class="big-btn" onclick="triggerLoadFile()">载入作战档案</button>
+        <button class="big-btn" onclick="returnToMainMenu()">返回主菜单</button>
+        <button class="big-btn danger" onclick="togglePause(); endGame();">放弃据点撤退</button>
       </div>
       <input type="file" id="save-file-input" style="display:none" onchange="loadGameFromFile(event)">
     </div>
@@ -746,12 +747,12 @@
   </div>
 
   <div class="overlay" id="over-scr" style="display:none;background:rgba(10,10,11,0.95);backdrop-filter:blur(14px);">
-    <div class="glass-tactical-card" style="width:90%;max-width:360px;background:rgba(24,16,22,0.92);border:1.5px solid rgba(255,77,109,0.4);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.85);padding:24px 20px;display:flex;flex-direction:column;align-items:center;">
-      <h2 style="color:#ff4d6d;font-size:2rem;letter-spacing:1px;margin-bottom:8px;text-shadow:none;">☠ 防线沦陷</h2>
-      <p id="over-txt" style="color:#d3d5d9;font-size:0.85rem;margin-bottom:18px;"></p>
-      <div style="display:flex;flex-direction:column;gap:10px;width:100%;">
-        <button class="big-btn" onclick="startGame()" style="border-color:#2ecc71;color:#55ff99;background:rgba(46,204,113,0.25);box-shadow:none;">↺ 重新召集出击</button>
-        <button class="big-btn" onclick="showMainMenu()" style="border-color:#ffd700;color:#ffd700;background:rgba(255,215,0,0.2);box-shadow:none;">🏰 返回要塞大厅</button>
+    <div class="sys-card">
+      <h2 class="sys-title danger">防线沦陷</h2>
+      <p id="over-txt" class="sys-sub"></p>
+      <div class="sys-btns">
+        <button class="big-btn primary" onclick="startGame()">重新召集出击</button>
+        <button class="big-btn" onclick="showMainMenu()">返回主菜单</button>
       </div>
     </div>
   </div>

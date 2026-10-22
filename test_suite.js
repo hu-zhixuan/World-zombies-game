@@ -543,6 +543,14 @@ idleWatchdog(200);
 assert(run(`wave`) === 1, '没有任何面板时卡在第 0 波：看门狗仍会兜底进第 1 波', run(`wave + '/' + wavePhase`));
 run(`gameRunning = false; document.getElementById('tutorial-scr').style.display = '';`);
 
+// ── 手机攻击键 = 瞄准摇杆：拖动后准星跟着手指方向、随角色移动；松手回到自动瞄准 ──
+run(`touchAim = { x: -1, y: 0 }; player.x = 600; player.y = 280; applyTouchAim();`);
+assert(run(`lastMX < player.x && Math.abs(lastMY - (player.y + CHAR_H / 2)) < 1e-6`), '手动瞄准：往左拖，准星在角色左边同一高度');
+run(`player.x = 900; applyTouchAim();`);
+assert(run(`lastMX === player.x + CHAR_W / 2 - AIM_REACH`), '手动瞄准：角色走动后准星跟着角色');
+run(`endFireAim();`);
+assert(run(`touchAim === null && applyTouchAim() === false`), '松手后回到自动瞄准');
+
 console.log(`\n========================================`);
 console.log(`FINAL RESULT: Passed: ${testsPassed}, Failed: ${testsFailed}`);
 console.log(`========================================`);

@@ -9,6 +9,10 @@
 /* 美术重构：去掉 Google Fonts 在线依赖（离线加载失败时全页字体回退闪动，
    且 Creepster/Baloo 2 均不含中文字形——中文标题一直在回退宋体造成混排割裂）。
    改为本地系统字体栈：中文统一 UI 黑体族，衬线感的西文标题用系统 serif 栈模拟。 */
+/* 安卓 WebView / 手机浏览器：点按可点击元素时系统会罩一层半透明高亮。画布铺满全屏，
+   不关掉的话每点一下屏幕整屏都闪一下；长按也别弹系统菜单 */
+*{-webkit-tap-highlight-color:transparent;}
+body{-webkit-touch-callout:none;}
 :root{
   /* ── 字体令牌（本地系统栈，零网络依赖）── */
   --font-display:'PingFang SC','Microsoft YaHei UI','Microsoft YaHei','Noto Sans SC','Segoe UI',system-ui,sans-serif;  /* 标题/强调 */
@@ -1151,6 +1155,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-body);
 .big-btn:active{background:var(--s2);}
 .big-btn.primary{background:var(--accent);border-color:var(--accent);color:#1a1205;font-weight:600;}
 .big-btn.primary:hover{background:#f6b472;border-color:#f6b472;}
+.big-btn.danger{color:#e5594f;border-color:rgba(229,89,79,.45);}
+.big-btn.danger:hover{background:rgba(229,89,79,.12);border-color:#e5594f;}
+/* 暂停 / 结算卡片：和其他弹层同一套扁平灰阶 */
+.sys-card{width:90%;max-width:340px;background:var(--s1);border:1px solid var(--line-hi);border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.6);padding:22px 20px;display:flex;flex-direction:column;align-items:center;}
+.overlay .sys-title{color:var(--text-1);font-size:1.5rem;font-weight:600;letter-spacing:1px;margin:0 0 14px;text-shadow:none;}
+.overlay .sys-title.danger{color:#e5594f;margin-bottom:6px;}
+.sys-sub{color:var(--text-2);font-size:.85rem;margin:0 0 16px;text-align:center;}
+.sys-btns{display:flex;flex-direction:column;gap:9px;width:100%;}
+.sys-btns .big-btn{margin:0;width:100%;}
+/* 剧情对话条层级比商店/指挥所/行囊高，面板开着时先收起来，别压在格子上 */
+body:has(#shop-scr.open, #cabin-scr.open, #backpack-modal.open, #pause-scr[style*="flex"]) #wave-dlg-bar{display:none !important;}
 .ctrl-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 14px;}
 .ctrl-row{font-size:.68rem;color:var(--dim);}
 .ctrl-row b{color:var(--yellow);}
@@ -1559,6 +1574,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
       <svg class="fire-ring" viewBox="0 0 100 100"><circle id="fire-ring-c" cx="50" cy="50" r="47"/></svg>
       <svg class="ico"><use href="#i-aim"/></svg>
       <span id="fire-ammo">--</span>
+      <i id="fire-nub"></i>
     </div>
     <div id="btn-jump" class="tb"><svg><use href="#i-jump"/></svg></div>
     <div id="btn-dodge" class="tb"><svg><use href="#i-dash"/></svg></div>
@@ -1742,7 +1758,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
           <span id="bp-stat-wood">🪵 0</span>
           <span id="bp-stat-scrap">⚙️ 0</span>
           <span id="bp-stat-coins">💰 0</span>
-          <button id="bp-close-btn" onclick="closeBackpack()">✕ 关闭 (Esc)</button>
+          <button id="bp-close-btn" onclick="closeBackpack()">✕ 关闭<span class="kbd-only"> (Esc)</span></button>
         </div>
       </div>
       <div id="bp-nav">
@@ -1801,7 +1817,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
             <div id="exp-subtitle">潜入旧城区废墟搜寻战略物资与随从 · 带回的战利品直接入库避难所行囊</div>
           </div>
         </div>
-        <button id="exp-close-btn" onclick="closeExpeditionModal()">✕ 关闭 (Esc)</button>
+        <button id="exp-close-btn" onclick="closeExpeditionModal()">✕ 关闭<span class="kbd-only"> (Esc)</span></button>
       </div>
       <div id="exp-grid">
         <!-- 动态生成 3 个远征副本卡片 -->
@@ -1833,7 +1849,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
         <div style="display:flex;align-items:center;gap:14px;font-size:0.85rem;">
           <span id="ws-coins" style="color:#ffd700;font-weight:600;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:20px;border:1px solid rgba(255,215,0,0.3);">💰 0</span>
           <span id="ws-scrap" style="color:#f2a65a;font-weight:600;background:rgba(0,0,0,0.4);padding:4px 10px;border-radius:20px;border:1px solid rgba(242,166,90,0.3);">⚙️ 0</span>
-          <button style="background:rgba(180,40,40,0.25);border:1px solid #ff5555;color:#ff9999;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:700;transition:all .15s;" onmouseover="this.style.background='rgba(220,50,50,0.4)'" onmouseout="this.style.background='rgba(180,40,40,0.25)'" onclick="closeDuffWorkshop()">✕ 关闭 (Esc)</button>
+          <button style="background:rgba(180,40,40,0.25);border:1px solid #ff5555;color:#ff9999;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:0.75rem;font-weight:700;transition:all .15s;" onmouseover="this.style.background='rgba(220,50,50,0.4)'" onmouseout="this.style.background='rgba(180,40,40,0.25)'" onclick="closeDuffWorkshop()">✕ 关闭<span class="kbd-only"> (Esc)</span></button>
         </div>
       </div>
       <div id="ws-body" style="display:flex;flex:1;overflow:hidden;min-height:400px;">
@@ -2098,14 +2114,14 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
 
   <!-- PAUSE MENU SCREEN -->
   <div class="overlay" id="pause-scr" style="display: none; background: rgba(10,10,11, 0.94); backdrop-filter: blur(14px); z-index: 90;">
-    <div class="glass-tactical-card" style="width:90%;max-width:320px;background:rgba(26,27,30,0.88);border:1.5px solid rgba(242,166,90,0.3);border-radius:16px;box-shadow:0 12px 35px rgba(0,0,0,0.7);padding:24px 20px;display:flex;flex-direction:column;align-items:center;">
-      <h2 style="color:#ffd700;font-size:1.8rem;letter-spacing:1px;margin-bottom:16px;text-shadow:none;">⏸ 战局暂停</h2>
-      <div style="display:flex; flex-direction:column; gap:10px; width:100%;">
-        <button class="big-btn" onclick="togglePause()" style="border-color:#2ecc71; color:#55ff99; background:rgba(46,204,113,0.2);box-shadow:none;">▶ 继续坚守防线</button>
-        <button class="big-btn" onclick="saveGameToFile()" style="border-color:#f39c12; color:#ffd700; background:rgba(243,156,18,0.2);box-shadow:none;">💾 保存作战档案</button>
-        <button class="big-btn" onclick="triggerLoadFile()" style="border-color:#777d88; color:#f2a65a; background:rgba(119,125,136,0.2);box-shadow:none;">📂 载入作战档案</button>
-        <button class="big-btn" onclick="returnToMainMenu()" style="border-color:#a855f7; color:#e9d5ff; background:rgba(168,85,247,0.2);box-shadow:none;">🏰 返回要塞主菜单</button>
-        <button class="big-btn" onclick="togglePause(); endGame();" style="border-color:#ff4d6d; color:#ff99ab; background:rgba(255,77,109,0.2);box-shadow:none;">☠ 放弃据点撤退</button>
+    <div class="sys-card">
+      <h2 class="sys-title">战局暂停</h2>
+      <div class="sys-btns">
+        <button class="big-btn primary" onclick="togglePause()">继续坚守防线</button>
+        <button class="big-btn" onclick="saveGameToFile()">保存作战档案</button>
+        <button class="big-btn" onclick="triggerLoadFile()">载入作战档案</button>
+        <button class="big-btn" onclick="returnToMainMenu()">返回主菜单</button>
+        <button class="big-btn danger" onclick="togglePause(); endGame();">放弃据点撤退</button>
       </div>
       <input type="file" id="save-file-input" style="display:none" onchange="loadGameFromFile(event)">
     </div>
@@ -2162,12 +2178,12 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
   </div>
 
   <div class="overlay" id="over-scr" style="display:none;background:rgba(10,10,11,0.95);backdrop-filter:blur(14px);">
-    <div class="glass-tactical-card" style="width:90%;max-width:360px;background:rgba(24,16,22,0.92);border:1.5px solid rgba(255,77,109,0.4);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.85);padding:24px 20px;display:flex;flex-direction:column;align-items:center;">
-      <h2 style="color:#ff4d6d;font-size:2rem;letter-spacing:1px;margin-bottom:8px;text-shadow:none;">☠ 防线沦陷</h2>
-      <p id="over-txt" style="color:#d3d5d9;font-size:0.85rem;margin-bottom:18px;"></p>
-      <div style="display:flex;flex-direction:column;gap:10px;width:100%;">
-        <button class="big-btn" onclick="startGame()" style="border-color:#2ecc71;color:#55ff99;background:rgba(46,204,113,0.25);box-shadow:none;">↺ 重新召集出击</button>
-        <button class="big-btn" onclick="showMainMenu()" style="border-color:#ffd700;color:#ffd700;background:rgba(255,215,0,0.2);box-shadow:none;">🏰 返回要塞大厅</button>
+    <div class="sys-card">
+      <h2 class="sys-title danger">防线沦陷</h2>
+      <p id="over-txt" class="sys-sub"></p>
+      <div class="sys-btns">
+        <button class="big-btn primary" onclick="startGame()">重新召集出击</button>
+        <button class="big-btn" onclick="showMainMenu()">返回主菜单</button>
       </div>
     </div>
   </div>
@@ -2319,6 +2335,11 @@ body.phone.rest-mode #mhud, body.phone.rest-mode #touch-overlay { display: none;
 #fire-ammo { font: 800 calc(3.9 * var(--u)) / 1 var(--font-num); letter-spacing: .02em; }
 #btn-fire.low #fire-ammo { color: #9d2218; }
 #btn-fire .fire-ring { position: absolute; inset: auto; left: -6px; top: -6px; width: calc(100% + 12px); height: calc(100% + 12px); transform: rotate(-90deg); }
+/* 按住拖动 = 调枪口：键里出现一个跟手的小圆点，图标让位 */
+#fire-nub { position: absolute; left: 50%; top: 50%; width: 34%; height: 34%; border-radius: 50%; pointer-events: none;
+  background: #fff; border: 2px solid rgba(27, 18, 8, .55); box-shadow: 0 1px 4px rgba(0, 0, 0, .35); transform: translate(-50%, -50%); opacity: 0; transition: opacity .08s; }
+#btn-fire.aiming #fire-nub { opacity: 1; }
+#btn-fire.aiming .ico, #btn-fire.aiming #fire-ammo { opacity: .35; }
 #btn-fire .fire-ring circle { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 295.3; stroke-dashoffset: 295.3; }
 
 #btn-jump   { width: calc(15 * var(--u)); height: calc(15 * var(--u)); right: calc(var(--ins-r) + 7.5 * var(--u));  bottom: calc(36.5 * var(--u)); }
@@ -2350,7 +2371,7 @@ body.phone.hub-mode #btn-fire, body.phone.hub-mode #btn-reload, body.phone.hub-m
 body.phone .banner-msg { top: calc(21 * var(--u)) !important; max-width: 46%; padding: 5px 14px !important; font-size: 12.5px !important; line-height: 1.35;
   white-space: normal !important; text-align: center; background: var(--glass) !important; border: 1px solid rgba(255, 255, 255, .12) !important; border-radius: 12px !important; box-shadow: none !important; }
 body.phone:has(#wave-dlg-bar.open) .banner-msg { top: calc(42 * var(--u)) !important; }
-body.phone #vehicle-prompt { bottom: calc(1.6 * var(--u)); max-width: 34%; padding: 4px 12px; font-size: 12px; white-space: normal; text-align: center; background: var(--glass); border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; }
+body.phone #vehicle-prompt { bottom: calc(1.6 * var(--u)); max-width: 40%; padding: 4px 12px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; background: var(--glass); border: 1px solid rgba(255, 255, 255, .12); border-radius: 12px; }
 body.phone #wave-dlg-bar { top: calc(21 * var(--u)); width: 46%; max-width: 440px; }
 body.phone .wd-top-bar { display: none; }
 body.phone .wd-main { padding: 8px 10px; gap: 8px; }
@@ -5572,7 +5593,7 @@ function stopAuto(){if(autoInterval){clearInterval(autoInterval);autoInterval=nu
 
 // ═══════════════════════════════════════════
 //  MOBILE TOUCH CONTROLS（手机操控层）
-//  布局：左下浮动摇杆；右下一个大攻击键 + 弧形副键；商店/行囊/侦察/菜单在右上角。
+//  布局：左下浮动摇杆；右下一个大攻击键（按住开火，按住拖动 = 调枪口）+ 弧形副键；商店/行囊/侦察/菜单在右上角。
 //  所有按键统一走 Pointer 事件：触屏、窄窗口里的鼠标都能点，也不会一次点击触发两次。
 // ═══════════════════════════════════════════
 // 与 CSS 里的手机媒体查询保持同一个条件：窄屏，或「粗指针(触屏)且宽度不超过 1100」
@@ -5678,9 +5699,56 @@ if(joyZone){
   joyZone.addEventListener('lostpointercapture', joyEnd);
 }
 
-// ── 攻击键 ────────────────────────────────
+// ── 攻击键 = 瞄准摇杆 ─────────────────────────
+// 按住不动：自动瞄最近的僵尸连射；按住往某个方向拖：枪口跟着手指方向，边调边打；松手停火，下次按下回到自动瞄准。
 const btnFire = document.getElementById('btn-fire');
+const fireNub = document.getElementById('fire-nub');
 let fireTouchInterval = null;
+let fireId = -1, fireOx = 0, fireOy = 0;
+let touchAim = null;           // 手动瞄准方向（单位向量，屏幕方向 = 世界方向）；null = 自动瞄准
+const AIM_REACH = 420;         // 手动瞄准时准星放在角色前方多远（世界坐标）
+
+// 手动瞄准：准星跟着角色走（每帧和每次开火前都刷新，角色边走边打也不偏）
+function applyTouchAim() {
+  if (!touchAim) return false;
+  lastMX = player.x + CHAR_W / 2 + touchAim.x * AIM_REACH;
+  lastMY = player.y + CHAR_H / 2 + touchAim.y * AIM_REACH;
+  return true;
+}
+function fireAimMove(e) {
+  const dx = e.clientX - fireOx, dy = e.clientY - fireOy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const R = (btnFire.offsetWidth || 96) / 2;
+  const reach = Math.min(dist, R * 0.62);
+  // 死区：手指只是按着没怎么动 = 自动瞄准
+  if (dist < R * 0.28) {
+    touchAim = null;
+    btnFire.classList.remove('aiming');
+    if (fireNub) fireNub.style.transform = 'translate(-50%,-50%)';
+    return;
+  }
+  touchAim = { x: dx / dist, y: dy / dist };
+  btnFire.classList.add('aiming');
+  if (fireNub) fireNub.style.transform = `translate(calc(-50% + ${touchAim.x * reach}px), calc(-50% + ${touchAim.y * reach}px))`;
+  applyTouchAim();
+}
+
+// 手动瞄准时从角色身上拉一条虚线（准星离得远，常在屏幕外）
+function drawTouchAimGuide() {
+  if (!touchAim || !isPhoneUI() || gameState !== 'world') return;
+  const sx = player.x + CHAR_W / 2 - cameraX, sy = player.y + CHAR_H / 2 - 4;
+  const ax = touchAim.x, ay = touchAim.y;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(255,255,255,.6)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 8]);
+  ctx.beginPath(); ctx.moveTo(sx + ax * 28, sy + ay * 28); ctx.lineTo(sx + ax * 190, sy + ay * 190); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(242,166,90,.95)';
+  ctx.beginPath(); ctx.arc(sx + ax * 196, sy + ay * 196, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
 
 function touchFire() {
   if (!gameRunning || shopOpen || cabinUIOpen) return;
@@ -5688,10 +5756,12 @@ function touchFire() {
   // 弹匣空了自动装填：手机上没有"按 R"的习惯，别让玩家对着空枪干按
   if (!isReloading && w0.id !== 'minigun' && !w0.noRefill && !w0.meleeWeapon && wAmmo[curWpnIdx] <= 0) { reloadWeapon(); return; }
   mouseHeld = true;
-  const near = findNearestEnemy(player.x + CHAR_W / 2, player.y + CHAR_H / 2, 9999);
-  if (near) {
-    lastMX = near.x;
-    lastMY = near.y;
+  if (!applyTouchAim()) {
+    const near = findNearestEnemy(player.x + CHAR_W / 2, player.y + CHAR_H / 2, 9999);
+    if (near) {
+      lastMX = near.x;
+      lastMY = near.y;
+    }
   }
   fireWeapon(lastMX, lastMY);
 }
@@ -5700,7 +5770,17 @@ function stopFireLoop(){
   if (fireTouchInterval) { clearInterval(fireTouchInterval); fireTouchInterval = null; }
   stopAuto();
 }
-bindPress(btnFire, () => {
+function endFireAim(){
+  fireId = -1;
+  touchAim = null;
+  if (btnFire) btnFire.classList.remove('aiming');
+  if (fireNub) fireNub.style.transform = 'translate(-50%,-50%)';
+}
+if (btnFire) btnFire.addEventListener('pointermove', e => { if (e.pointerId === fireId) { e.preventDefault(); fireAimMove(e); } });
+bindPress(btnFire, e => {
+  const r = btnFire.getBoundingClientRect();
+  fireId = e.pointerId; fireOx = r.left + r.width / 2; fireOy = r.top + r.height / 2;
+  fireAimMove(e);
   touchFire();
   // v52修：清旧间隔防堆叠；近战自动武器不建循环（同黑屏根因）
   if (fireTouchInterval) { clearInterval(fireTouchInterval); fireTouchInterval = null; }
@@ -5711,7 +5791,7 @@ bindPress(btnFire, () => {
     const iv = (w.autofire || w.id === 'minigun') ? getFireInterval() : Math.max(getFireInterval(), 280);
     fireTouchInterval = setInterval(() => { if (gameRunning && !shopOpen && !cabinUIOpen) touchFire(); }, iv);
   }
-}, stopFireLoop);
+}, () => { stopFireLoop(); endFireAim(); });
 
 // ── 跳 / 翻滚 / 装填 / 流派技能 / 换枪 ─────────
 bindPress(document.getElementById('btn-jump'), () => { keys.j = true; }, () => { keys.j = false; });
@@ -5876,6 +5956,7 @@ function updateMobileStatus(){ updatePhoneHud(); }
 let mStatusTimer = 0;
 function mobileStatusTick() {
   if (!isPhoneUI()) return;
+  applyTouchAim();
   mStatusTimer++;
   if (mStatusTimer % 4 === 0) updatePhoneHud();
 }
@@ -6160,7 +6241,7 @@ function gameLoop(){
       const mlcv = getMuzzleLightCanvas();
       if(mlcv){
         ctx.save();
-        ctx.globalAlpha = muzzleLightFlash * 0.22;
+        ctx.globalAlpha = muzzleLightFlash * muzzleLightAlpha();
         ctx.drawImage(mlcv, 0, 0, GW, GH);
         ctx.restore();
       }
@@ -6760,7 +6841,7 @@ function gameLoop(){
     const mlcv = getMuzzleLightCanvas();
     if(mlcv){
       ctx.save();
-      ctx.globalAlpha = muzzleLightFlash * 0.22;
+      ctx.globalAlpha = muzzleLightFlash * muzzleLightAlpha();
       ctx.drawImage(mlcv, 0, 0, GW, GH);
       ctx.restore();
     }
@@ -6844,6 +6925,7 @@ function gameLoop(){
   const pcv = getPvigCanvas();
   if(pcv) ctx.drawImage(pcv, 0, 0, GW, GH);
   drawCrosshair(lastMX-cameraX,lastMY);
+  drawTouchAimGuide();
   // 侦察视角指示器：蓝色边框 + "侦察中"标签 + 玩家位置箭头
   if(scoutView){
     ctx.save();
@@ -10282,6 +10364,8 @@ function vfxMuzzleLight(wpnId){
   const intensity={pistol:.18,shotgun:.32,smg:.14,smg_heavy:.18,crossbow:.10,sniper:.30,tesla:.24,railgun:.28,grenade:.16,ice:.20,poison:.16,flame:.22,minigun:.14,rocket:.38,plasma:.30}[wpnId]||.18;
   muzzleLightFlash=Math.min(1,muzzleLightFlash+intensity);
 }
+// 全屏泛光强度：手机上画面铺满整屏、离眼近，连射时整屏一明一暗像在闪，压到 1/3
+function muzzleLightAlpha(){ return isPhoneUI() ? 0.07 : 0.22; }
 // ── 暴击屏幕闪光 ─────────────────────────────────────────
 function vfxCritFlash(){critFlash=Math.min(0.08, critFlash+0.04);}
 // ── 烟雾累积（连射时生成烟雾粒子） ───────────────────────
@@ -13548,7 +13632,7 @@ function updateInteractionPrompt() {
   if (nearB) {
     if(nearB.id === 'cabin'){
       if(wavePhase === 'spawning'){
-        setInteractPrompt('小屋门锁着（波次进行中）· 清完这波等夜晚尸潮来时再进');
+        setInteractPrompt('🔒 小屋门锁着 · 清完这波再进');
       } else if(wavePhase === 'boss'){
         setInteractPrompt('🔒 小屋门锁着（Boss战中）');
       } else if(wavePhase === 'cleared'){
@@ -18519,16 +18603,17 @@ function enterHub(){
   const totalMeat = meatInventory.normal + meatInventory.fast + meatInventory.tank + meatInventory.elite;
   addBanner('🏠 已安全撤回秘密小屋！可睡觉回血、升级工事，或前往[深夜食堂]推门营业');
   if(totalMeat > 0){
-    addBanner('💡 提示：已收集 ' + totalMeat + ' 块僵尸肉！走向[深夜秘密食堂]按E或按[N]即可开张营业');
+    addBanner('💡 提示：已收集 ' + totalMeat + ' 块僵尸肉！走向[深夜秘密食堂]' + (isPhoneUI() ? '点交互键' : '按E或按[N]') + '即可开张营业');
   }
-  // ── 首次进据点：显示据点教程 ──
+  // ── 首次进据点：显示据点教程（手机上没有键盘，按键说成"交互键"）──
+  const hubKey = isPhoneUI() ? '点<b>交互键</b>' : '按<b>E</b>';
   showTutorial('hub', '🏠 据点 · 整备期', [
     '<b>整备期</b>：波次清场后回到据点，这里是你的安全区。',
-    '<b>小屋=秘密餐厅</b>（中间带烟囱的房子）：走进门按<b>E</b>或按<b>N</b>进入。',
+    '<b>小屋=秘密餐厅</b>（中间带烟囱的房子）：走到门口' + (isPhoneUI() ? hubKey : '按<b>E</b>或按<b>N</b>') + '进入。',
     '小屋里用僵尸肉做菜赚金币+声望，经营90秒后自动结束。',
-    '<b>床铺</b>（左）：按E睡觉回满血。',
-    '<b>据点管理</b>（中右）：按E升级围墙、买塔防、买陷阱。',
-    '<b>出击门</b>（右）：按E或B出击下一波（白天战斗）。',
+    '<b>床铺</b>（左）：' + hubKey + '睡觉回满血。',
+    '<b>据点管理</b>（中右）：' + hubKey + '升级围墙、买塔防、买陷阱。',
+    '<b>出击门</b>（右）：' + (isPhoneUI() ? hubKey : '按E或B') + '出击下一波（白天战斗）。',
     '<b>循环</b>：出击→清场→回据点整备→进餐厅经营→出击下一波。',
   ]);
   // ── 首次进据点：触发"秘密餐厅"剧情 ──
@@ -30289,7 +30374,7 @@ function setupTutorialSteps(onComplete){
       html: `<div style="text-align:left;line-height:1.6;">
         <div style="margin-bottom:6px;"><b>目标</b>：守住 15 波尸潮，活到直升机撤离。</div>
         <div style="margin-bottom:5px;"><b>左下摇杆</b>：左右拖动移动，向上推跳跃。</div>
-        <div style="margin-bottom:5px;"><b>右下红色按钮</b>：开火，会自动瞄准最近的僵尸。按住连射。</div>
+        <div style="margin-bottom:5px;"><b>右下橙色大键</b>：按住连射，自动瞄准最近的僵尸；<b>按住往某个方向拖</b>，枪口就跟着手指走，边调边打。</div>
         <div style="margin-bottom:5px;"><b>绿色 ↑ / 翻滚</b>：跳跃 / 闪避（闪避有无敌帧）。</div>
         <div style="margin-bottom:5px;"><b>装填 · 商店 · 行囊</b>：右侧小按钮。商店里买武器和升级。</div>
         <div style="margin-bottom:5px;"><b>E 键</b>：靠近可交互的东西（基座、门、求救的人）时亮起，点它。</div>
