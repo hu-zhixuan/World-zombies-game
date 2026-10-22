@@ -10,7 +10,7 @@ const DISH_SIGNATURES = [
   {
     id: 'spicy', name: '麻辣爆烤', icon: '🌶️🍖', badge: '翻滚烈焰', color: '#ff4422',
     desc: '吃下去全身血液沸腾。闪避翻滚时在身后留下一道灼热烈焰火海，踏入的僵尸每秒受到持续灼烧。',
-    effectDesc: '空格翻滚留火海(4秒持续·每秒140点伤害) + 移速+15%',
+    effectDesc: '翻滚留火海(4秒持续·每秒140点伤害) + 移速+15%',
   },
   {
     id: 'frost', name: '极光霜冻排', icon: '❄️🥩', badge: '极寒剑气', color: '#55ccff',

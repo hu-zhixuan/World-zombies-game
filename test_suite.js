@@ -528,6 +528,21 @@ assert(run(`actLabelFrom('[ E ] 招募 狙击手阿强 (💰60)')`) === '招募'
 assert(run(`actLabelFrom('[ E ] 搜刮战地医疗箱 (急救包×2)')`) === '搜刮战地', '交互键标签：最多四个字');
 assert(run(`actLabelFrom('🚪 [ 长按 E ] 紧急闭锁入屋避难')`) === '紧急闭锁', '交互键标签：去掉 emoji 和按键说明');
 
+// ── 开局看门狗：选流派/读教程时不能替玩家开波（曾经：读 5 秒流派卡直接跳过第 1 波；读 8 秒教程在第 0 波触发 Boss）──
+function idleWatchdog(frames) { run(`for (let i = 0; i < ${frames}; i++) checkStuckWatchdog();`); }
+run(`gameRunning = true; gameState = 'world'; wave = 0; wavePhase = 'waiting'; cinActive = false; dlgActive = false;
+     shopOpen = false; cabinUIOpen = false; boss = null; bossActive = false; zombies = []; stuckWatchdog = 0; lastGameState = '';
+     document.getElementById('tutorial-scr').style.display = 'none'; gamePaused = true;`);
+idleWatchdog(600);
+assert(run(`wave === 0 && wavePhase === 'waiting'`), '选流派界面停留 10 秒：看门狗不开波', run(`wave + '/' + wavePhase`));
+run(`gamePaused = false; document.getElementById('tutorial-scr').style.display = 'flex';`);
+idleWatchdog(600);
+assert(run(`wave === 0 && wavePhase === 'waiting'`), '读教程 10 秒：看门狗不开波、不在第 0 波进 Boss', run(`wave + '/' + wavePhase`));
+run(`document.getElementById('tutorial-scr').style.display = 'none';`);
+idleWatchdog(200);
+assert(run(`wave`) === 1, '没有任何面板时卡在第 0 波：看门狗仍会兜底进第 1 波', run(`wave + '/' + wavePhase`));
+run(`gameRunning = false; document.getElementById('tutorial-scr').style.display = '';`);
+
 console.log(`\n========================================`);
 console.log(`FINAL RESULT: Passed: ${testsPassed}, Failed: ${testsFailed}`);
 console.log(`========================================`);
