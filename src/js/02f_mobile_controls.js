@@ -518,7 +518,7 @@ function checkStuckWatchdog(){
   // 'waiting' 阶段用于过场动画/章节卡/波间等待，不应判定为卡死
   const isStuckWorld = (gameState === 'world' && !cinActive && wavePhase !== 'spawning' && wavePhase !== 'boss' && wavePhase !== 'rest' && wavePhase !== 'cleared' && wavePhase !== 'waiting' && wavePhase !== 'hub' && wavePhase !== 'shop' && wavePhase !== 'buffer' && wavePhase !== 'horde');
   // cleard状态卡太久（说明onWaveCleared的setTimeout没触发）
-  const isStuckCleared = (gameState === 'world' && wavePhase === 'cleared' && stuckWatchdog > 300);  // 5秒
+  const isStuckCleared = (gameState === 'world' && wavePhase === 'cleared' && !panelOpen && stuckWatchdog > 300);  // 5秒；在选天赋时不算
   // restaurant但restLoop没在跑（放宽到10秒，避免误触发）
   const isStuckRestaurant = (gameState === 'restaurant' && !restRafId && !restState && stuckWatchdog > 600);
   

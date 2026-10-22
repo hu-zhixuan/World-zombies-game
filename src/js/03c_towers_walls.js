@@ -1414,6 +1414,9 @@ function cancelCabinHold(){
   cabinHoldTimer = 0;
   if(wasActive && oldTimer > 15 && oldTimer < CABIN_HOLD_MAX){
     addBanner('❌ 破障闭锁中断！请持续按住大门闭锁');
+  } else if(wasActive && oldTimer <= 15 && Date.now() - (window._holdHintAt || 0) > 2500){
+    window._holdHintAt = Date.now();
+    addBanner('👆 按住不放约 1 秒，关门进屋');
   }
 }
 

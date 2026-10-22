@@ -1676,7 +1676,7 @@ body.hub-mode #weapon-bar, body.hub-mode #m-status { display:none !important; }
         <div id="rest-end-stats"></div>
         <div class="end-actions">
           <button class="big-btn" onclick="finishRestaurantToWorkshop()">军备改造台</button>
-          <button class="big-btn primary" onclick="closeRestaurant()">迎接黎明，出击</button>
+          <button class="big-btn primary" onclick="closeRestaurant()">回据点，准备出击</button>
         </div>
       </div>
     </div>
@@ -4402,7 +4402,10 @@ function showCinematic(lines, onDone){
     }
   }
   // 显示全屏覆盖层
+  // forceDismissAllOverlays（进出据点都会调）用行内样式 display:none/opacity:0 关它；只加 .open 盖不过行内样式，
+  // 剧情在看不见的层里跑（cinActive=true 吞掉所有操作）= 回小屋后卡死。先清掉行内样式。
   const scr = document.getElementById('cinematic-scr');
+  scr.style.display = ''; scr.style.opacity = ''; scr.style.pointerEvents = '';
   scr.classList.add('open');
   // 背景点击推进对话
   scr.onclick = (e) => {
@@ -6111,7 +6114,7 @@ function checkStuckWatchdog(){
   // 'waiting' 阶段用于过场动画/章节卡/波间等待，不应判定为卡死
   const isStuckWorld = (gameState === 'world' && !cinActive && wavePhase !== 'spawning' && wavePhase !== 'boss' && wavePhase !== 'rest' && wavePhase !== 'cleared' && wavePhase !== 'waiting' && wavePhase !== 'hub' && wavePhase !== 'shop' && wavePhase !== 'buffer' && wavePhase !== 'horde');
   // cleard状态卡太久（说明onWaveCleared的setTimeout没触发）
-  const isStuckCleared = (gameState === 'world' && wavePhase === 'cleared' && stuckWatchdog > 300);  // 5秒
+  const isStuckCleared = (gameState === 'world' && wavePhase === 'cleared' && !panelOpen && stuckWatchdog > 300);  // 5秒；在选天赋时不算
   // restaurant但restLoop没在跑（放宽到10秒，避免误触发）
   const isStuckRestaurant = (gameState === 'restaurant' && !restRafId && !restState && stuckWatchdog > 600);
   
@@ -11880,6 +11883,9 @@ function cancelCabinHold(){
   cabinHoldTimer = 0;
   if(wasActive && oldTimer > 15 && oldTimer < CABIN_HOLD_MAX){
     addBanner('❌ 破障闭锁中断！请持续按住大门闭锁');
+  } else if(wasActive && oldTimer <= 15 && Date.now() - (window._holdHintAt || 0) > 2500){
+    window._holdHintAt = Date.now();
+    addBanner('👆 按住不放约 1 秒，关门进屋');
   }
 }
 
@@ -12552,7 +12558,9 @@ function renderPerkChoiceUI(){
   list.innerHTML='';
   const rarityName={common:'普通',rare:'稀有',epic:'史诗',legendary:'传说',class:'流派'};
   const rarityColor={common:'#9a7ad8',rare:'#5be4ff',epic:'#ffd840',legendary:'#ff6644',class:'#88ffaa'};
-  document.getElementById('perk-choice-level').innerHTML='Lv.'+playerLevel+' 升级！选择一个天赋';
+  // 清波奖励（不是升级）用波次做标题；一次性标记，用完就清
+  const fromWave = window._perkFromWave; window._perkFromWave = 0;
+  document.getElementById('perk-choice-level').innerHTML = fromWave ? ('第 ' + fromWave + ' 波清场奖励！选择一个天赋') : ('Lv.' + playerLevel + ' 升级！选择一个天赋');
   perkChoices.forEach((p,idx)=>{
     const cnt=perkCount(p.id);
     const card=document.createElement('div');
@@ -18222,6 +18230,7 @@ function onWaveCleared(){
 
   // ── 肉鸽节奏核心：波清保底天赋三选一 ──
   perkPendingLevels++;
+  window._perkFromWave = wave;
   setTimeout(()=>{ if(gameRunning) triggerPerkChoice(); }, 1200);
 
   if(mingToughness < 15){
@@ -27385,6 +27394,7 @@ function playTransition(type, title, subtitle, icon, onMid, duration){
   }
 
   ov.classList.remove('fade-out');
+  ov.style.display = ''; ov.style.opacity = '';  // 上次收尾/强制清场留下的行内 display:none、opacity:0 会让这次过渡整个看不见
   ov.classList.add('fade-in');
   ov.style.pointerEvents = 'auto';
 

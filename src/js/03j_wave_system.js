@@ -300,6 +300,7 @@ function onWaveCleared(){
 
   // ── 肉鸽节奏核心：波清保底天赋三选一 ──
   perkPendingLevels++;
+  window._perkFromWave = wave;
   setTimeout(()=>{ if(gameRunning) triggerPerkChoice(); }, 1200);
 
   if(mingToughness < 15){

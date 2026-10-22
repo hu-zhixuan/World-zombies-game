@@ -119,6 +119,7 @@ function playTransition(type, title, subtitle, icon, onMid, duration){
   }
 
   ov.classList.remove('fade-out');
+  ov.style.display = ''; ov.style.opacity = '';  // 上次收尾/强制清场留下的行内 display:none、opacity:0 会让这次过渡整个看不见
   ov.classList.add('fade-in');
   ov.style.pointerEvents = 'auto';
 

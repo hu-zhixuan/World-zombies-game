@@ -564,6 +564,21 @@ run(`endFireAim(); updateAim();`);
 assert(run(`touchAim === null && aimLock === zombies[0]`), '松手后回到自动锁定');
 run(`zombies = []; aimLock = null;`);
 
+// ── 回小屋卡死：进出据点的强制清场用行内 display:none 关剧情层，之后的剧情必须还能显示出来 ──
+let cinErr = null;
+try {
+  run(`forceDismissAllOverlays(); document.getElementById('cinematic-scr').style.display = 'none';
+       showCinematic([{ npc: 'ming', text: '测试' }], null);`);
+} catch (e) { cinErr = e; }
+assert(!cinErr && run(`cinActive && document.getElementById('cinematic-scr').style.display !== 'none'`), '强制清场后再放剧情：剧情层可见（不会隐形吞掉操作）', cinErr && cinErr.stack);
+run(`forceDismissAllOverlays();`);
+// 清场后在选天赋：看门狗不能把人拽进据点
+run(`gameRunning = true; gameState = 'world'; wave = 1; wavePhase = 'cleared'; cinActive = false; shopOpen = false; cabinUIOpen = false;
+     gamePaused = true; document.getElementById('tutorial-scr').style.display = 'none'; stuckWatchdog = 0; lastGameState = '';`);
+run(`for (let i = 0; i < 600; i++) checkStuckWatchdog();`);
+assert(run(`gameState === 'world' && wavePhase === 'cleared'`), '选天赋时看门狗不强制进据点', run(`gameState + '/' + wavePhase`));
+run(`gameRunning = false; gamePaused = false; document.getElementById('tutorial-scr').style.display = '';`);
+
 console.log(`\n========================================`);
 console.log(`FINAL RESULT: Passed: ${testsPassed}, Failed: ${testsFailed}`);
 console.log(`========================================`);

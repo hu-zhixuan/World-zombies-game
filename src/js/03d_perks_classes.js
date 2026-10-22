@@ -457,7 +457,9 @@ function renderPerkChoiceUI(){
   list.innerHTML='';
   const rarityName={common:'普通',rare:'稀有',epic:'史诗',legendary:'传说',class:'流派'};
   const rarityColor={common:'#9a7ad8',rare:'#5be4ff',epic:'#ffd840',legendary:'#ff6644',class:'#88ffaa'};
-  document.getElementById('perk-choice-level').innerHTML='Lv.'+playerLevel+' 升级！选择一个天赋';
+  // 清波奖励（不是升级）用波次做标题；一次性标记，用完就清
+  const fromWave = window._perkFromWave; window._perkFromWave = 0;
+  document.getElementById('perk-choice-level').innerHTML = fromWave ? ('第 ' + fromWave + ' 波清场奖励！选择一个天赋') : ('Lv.' + playerLevel + ' 升级！选择一个天赋');
   perkChoices.forEach((p,idx)=>{
     const cnt=perkCount(p.id);
     const card=document.createElement('div');
