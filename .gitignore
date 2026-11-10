@@ -10,3 +10,6 @@ android/app/build/
 android/local.properties
 android/app/src/main/assets/index.html
 *.apk
+
+# 真机式回归脚本的截图
+tools/e2e/shots/
