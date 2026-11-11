@@ -1,0 +1,424 @@
+{
+ "PERKS": [
+  {
+   "id": "berserk",
+   "icon": "💢",
+   "name": "狂暴",
+   "desc": "伤害 +30%",
+   "max": 5,
+   "rarity": "common"
+  },
+  {
+   "id": "swift",
+   "icon": "🏃",
+   "name": "疾风",
+   "desc": "移速 +15% · 闪避冷却 -25%",
+   "max": 4,
+   "rarity": "common"
+  },
+  {
+   "id": "iron",
+   "icon": "🛡",
+   "name": "铁皮",
+   "desc": "最大生命 +20 · 减伤 +10%",
+   "max": 5,
+   "rarity": "common"
+  },
+  {
+   "id": "precision",
+   "icon": "🎯",
+   "name": "精准",
+   "desc": "暴击率 +10% · 暴击伤害 +50%",
+   "max": 4,
+   "rarity": "common"
+  },
+  {
+   "id": "incendiary",
+   "icon": "🔥",
+   "name": "燃烧弹",
+   "desc": "子弹 25% 几率点燃敌人",
+   "max": 3,
+   "rarity": "common"
+  },
+  {
+   "id": "rapidfire",
+   "icon": "⚡",
+   "name": "连发",
+   "desc": "射速 +25%",
+   "max": 4,
+   "rarity": "common"
+  },
+  {
+   "id": "greed",
+   "icon": "💰",
+   "name": "贪婪",
+   "desc": "金币掉落 +50%",
+   "max": 3,
+   "rarity": "common"
+  },
+  {
+   "id": "lifesteal",
+   "icon": "🩸",
+   "name": "吸血",
+   "desc": "造成伤害 8% 回血",
+   "max": 3,
+   "rarity": "common"
+  },
+  {
+   "id": "towermaster",
+   "icon": "🗼",
+   "name": "塔专家",
+   "desc": "所有塔伤害 +25%",
+   "max": 3,
+   "rarity": "common"
+  },
+  {
+   "id": "frostbite",
+   "icon": "🧊",
+   "name": "冰冷触感",
+   "desc": "子弹附带 30% 减速 2秒",
+   "max": 3,
+   "rarity": "common"
+  },
+  {
+   "id": "ammojack",
+   "icon": "📦",
+   "name": "弹药专家",
+   "desc": "弹匣 +30% · 换弹 -20%",
+   "max": 3,
+   "rarity": "common"
+  },
+  {
+   "id": "thorns",
+   "icon": "🌵",
+   "name": "荆棘",
+   "desc": "受击反弹 15 伤害",
+   "max": 3,
+   "rarity": "common"
+  },
+  {
+   "id": "ricochet",
+   "icon": "☄️",
+   "name": "跳弹",
+   "desc": "子弹命中后50%几率跳向附近敌人(最多3跳，每跳-30%伤害)",
+   "max": 3,
+   "rarity": "rare",
+   "isNew": true
+  },
+  {
+   "id": "headhunter",
+   "icon": "💀",
+   "name": "猎头者",
+   "desc": "击杀回复3弹药·精英击杀额外+15金币",
+   "max": 3,
+   "rarity": "rare",
+   "isNew": true
+  },
+  {
+   "id": "overkill",
+   "icon": "💥",
+   "name": "超额击杀",
+   "desc": "溢出伤害转化为范围爆炸(溢出值×2为爆炸伤害)",
+   "max": 2,
+   "rarity": "rare",
+   "isNew": true
+  },
+  {
+   "id": "scavenger",
+   "icon": "🔧",
+   "name": "拾荒者",
+   "desc": "僵尸掉落物翻倍·有几率额外掉落木材/废料",
+   "max": 3,
+   "rarity": "rare",
+   "isNew": true
+  },
+  {
+   "id": "vanguard",
+   "icon": "⚔️",
+   "name": "先锋",
+   "desc": "围墙被击时玩家获得+50%伤害5秒(守墙反击流)",
+   "max": 2,
+   "rarity": "rare",
+   "isNew": true
+  },
+  {
+   "id": "pierce",
+   "icon": "🏹",
+   "name": "贯穿",
+   "desc": "所有子弹改为穿透(不再消失)，但射速-25%",
+   "max": 1,
+   "rarity": "epic",
+   "isNew": true
+  },
+  {
+   "id": "bloodfrenzy",
+   "icon": "🩸",
+   "name": "血腥狂热",
+   "desc": "血量越低伤害越高(每损失10%血+8%伤害)，满血时无加成",
+   "max": 1,
+   "rarity": "epic",
+   "isNew": true
+  },
+  {
+   "id": "chainkill",
+   "icon": "🔗",
+   "name": "连锁处决",
+   "desc": "3秒内连续击杀，每杀+10%伤害(最高+80%)，中断清零",
+   "max": 1,
+   "rarity": "epic",
+   "isNew": true
+  },
+  {
+   "id": "titanfall",
+   "icon": "🏗️",
+   "name": "塔之共鸣",
+   "desc": "每座塔+5%所有塔伤害(线性叠加)，鼓励铺塔流",
+   "max": 1,
+   "rarity": "epic",
+   "isNew": true
+  },
+  {
+   "id": "glasscannon",
+   "icon": "🔮",
+   "name": "玻璃大炮",
+   "desc": "伤害×2.2，但最大生命-50%(破釜沉舟)",
+   "max": 1,
+   "rarity": "legendary",
+   "isNew": true
+  },
+  {
+   "id": "deathpact",
+   "icon": "⚰️",
+   "name": "死亡契约",
+   "desc": "围墙永不破损(无限血)，但每波结束扣10金币(金币<0则家园-20血)",
+   "max": 1,
+   "rarity": "legendary",
+   "isNew": true
+  },
+  {
+   "id": "berserkmode",
+   "icon": "🐺",
+   "name": "狼化",
+   "desc": "血量归零时不死，进入10秒狂化(攻速×2/移速×1.5/吸血20%)，结束后真死。每局1次",
+   "max": 1,
+   "rarity": "legendary",
+   "isNew": true
+  },
+  {
+   "id": "towerguard",
+   "icon": "🧱",
+   "name": "塔体加固",
+   "desc": "所有塔耐久 +40%/层（塔可被拆后站稳更久）",
+   "max": 3,
+   "rarity": "common",
+   "isNew": true
+  },
+  {
+   "id": "overclock",
+   "icon": "🔌",
+   "name": "塔超频",
+   "desc": "所有塔攻速 +20%",
+   "max": 3,
+   "rarity": "rare",
+   "isNew": true
+  },
+  {
+   "id": "towerregen",
+   "icon": "🩹",
+   "name": "自动保修",
+   "desc": "所有塔每秒自修1%耐久",
+   "max": 2,
+   "rarity": "rare",
+   "isNew": true
+  },
+  {
+   "id": "freezeray",
+   "icon": "❄️",
+   "name": "寒霜领域",
+   "desc": "塔命中附带15%减速1秒（塔控场流）",
+   "max": 1,
+   "rarity": "epic",
+   "isNew": true
+  },
+  {
+   "id": "laststand",
+   "icon": "🛡",
+   "name": "背水一战",
+   "desc": "塔耐久<30%时伤害+100%（残塔爆发）",
+   "max": 1,
+   "rarity": "epic",
+   "isNew": true
+  },
+  {
+   "id": "fireforce",
+   "icon": "🔥",
+   "name": "烈焰弹道",
+   "desc": "燃烧/火系武器伤害 +30%",
+   "max": 3,
+   "rarity": "common",
+   "isNew": true
+  },
+  {
+   "id": "fasthands",
+   "icon": "🤲",
+   "name": "快手",
+   "desc": "换弹速度 +30%",
+   "max": 3,
+   "rarity": "common",
+   "isNew": true
+  },
+  {
+   "id": "critflow",
+   "icon": "💫",
+   "name": "暴击节奏",
+   "desc": "暴击后2秒内攻速+25%",
+   "max": 2,
+   "rarity": "rare",
+   "isNew": true
+  },
+  {
+   "id": "bigmag",
+   "icon": "🗑",
+   "name": "扩容弹鼓",
+   "desc": "弹匣 +50%（再叠弹药专家）",
+   "max": 2,
+   "rarity": "rare",
+   "isNew": true
+  },
+  {
+   "id": "dualwield",
+   "icon": "⚔",
+   "name": "双持",
+   "desc": "切枪后3秒内伤害+40%（鼓励多武器循环）",
+   "max": 1,
+   "rarity": "epic",
+   "isNew": true
+  },
+  {
+   "id": "meatharvest",
+   "icon": "🍖",
+   "name": "屠宰好手",
+   "desc": "僵尸肉块掉落 +30%",
+   "max": 3,
+   "rarity": "common",
+   "isNew": true
+  },
+  {
+   "id": "flavorguru",
+   "icon": "👨‍🍳",
+   "name": "风味大师",
+   "desc": "菜品品质概率提升（更容易出完美/传说）",
+   "max": 2,
+   "rarity": "rare",
+   "isNew": true
+  },
+  {
+   "id": "moraleboost",
+   "icon": "🎺",
+   "name": "士气高昂",
+   "desc": "夜晚结算士气收益 ×1.5",
+   "max": 2,
+   "rarity": "rare",
+   "isNew": true
+  },
+  {
+   "id": "buffextend",
+   "icon": "⏳",
+   "name": "余味悠长",
+   "desc": "菜品战斗增益持续到下一波（不再单波清零）",
+   "max": 1,
+   "rarity": "epic",
+   "isNew": true
+  },
+  {
+   "id": "coinflow",
+   "icon": "🪙",
+   "name": "财源滚滚",
+   "desc": "餐厅收入 +25%（经营攒塔钱更快）",
+   "max": 3,
+   "rarity": "common",
+   "isNew": true
+  },
+  {
+   "id": "scraphoard",
+   "icon": "🔩",
+   "name": "废料囤积",
+   "desc": "战斗掉落的木材/废料 +50%（家园建设流）",
+   "max": 2,
+   "rarity": "common",
+   "isNew": true
+  },
+  {
+   "id": "secondwind",
+   "icon": "🌬",
+   "name": "回春之风",
+   "desc": "波次开始时回复25%生命",
+   "max": 2,
+   "rarity": "rare",
+   "isNew": true
+  },
+  {
+   "id": "siegebreed",
+   "icon": "👑",
+   "name": "围城大师",
+   "desc": "每波开始时：随机1座塔回满耐久并+10%伤害(本波)",
+   "max": 1,
+   "rarity": "legendary",
+   "isNew": true
+  },
+  {
+   "id": "weakspot",
+   "icon": "👁",
+   "name": "弱点洞察",
+   "desc": "爆头伤害倍率 ×2.5（神射手流派）",
+   "max": 1,
+   "rarity": "class",
+   "classOnly": "marksman"
+  },
+  {
+   "id": "chainblast",
+   "icon": "🔗",
+   "name": "连锁殉爆",
+   "desc": "爆炸击杀敌人时引发二次爆炸（爆破流派）",
+   "max": 1,
+   "rarity": "class",
+   "classOnly": "demolition"
+  },
+  {
+   "id": "warmblood",
+   "icon": "❤️",
+   "name": "战意共鸣",
+   "desc": "伙伴击杀敌人时你回复2%生命（驭兽师流派）",
+   "max": 1,
+   "rarity": "class",
+   "classOnly": "beastmaster"
+  },
+  {
+   "id": "fieldration",
+   "icon": "🍲",
+   "name": "军粮秘方",
+   "desc": "菜品战斗增益时长×2（厨神流派）",
+   "max": 1,
+   "rarity": "class",
+   "classOnly": "chef"
+  },
+  {
+   "id": "bloodfeast",
+   "icon": "🩸",
+   "name": "嗜血盛宴",
+   "desc": "近战击杀回复8%生命（狂战士流派）",
+   "max": 1,
+   "rarity": "class",
+   "classOnly": "berserker"
+  },
+  {
+   "id": "fortify2",
+   "icon": "🏰",
+   "name": "铁壁领域",
+   "desc": "围墙HP+100% · 塔射程+15%（铁壁守卫流派）",
+   "max": 1,
+   "rarity": "class",
+   "classOnly": "warden"
+  }
+ ]
+}

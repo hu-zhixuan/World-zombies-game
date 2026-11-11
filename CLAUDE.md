@@ -4,7 +4,7 @@
 
 ## 现在在做什么
 
-**正在把游戏从头重做成 v57（像素风）。** 作者的结论是旧版全面太丑，只保留玩法、思路、剧情。
+**正在把游戏从头重做成 v57（像素风）。** 作者的结论是旧版全面太丑，只保留玩法、思路、剧情。M0（搭架子）和 M1（一屏白天战斗的试玩）已经做出来，等作者看过画面和手感再往下做。
 
 开工前按顺序读：
 
@@ -18,22 +18,25 @@
 - **剧情和文案原样搬，一个字不改写。** 那是作者认可的部分。
 - **规则和画面分开。** 规则层不碰浏览器，能自己跑完一整局，这样数值能测、画面能整套换。
 
-## 仓库现状（重做开始前）
+## 仓库现状
 
-旧版（v56.4）还在仓库根目录，M0 会把它搬进 `legacy/`。在那之前：
+新版在根目录，旧版 v56.4 在 `legacy/`（只当参考，`node legacy/build.js` 仍可构建）。
 
 ```
-npm test                       # 旧版：先构建再跑 test_suite.js（node vm + 假 DOM）
-npm run build                  # 旧版：拼出 dist/zombie-game-v56.html
-node tools/e2e/cabin_walk.js   # 旧版：真实触摸走一整轮据点，卡住则退出码 1
-node tools/e2e/aim_lock.js     # 旧版：手机瞄准回归
+npm ci            # 装依赖
+npm test          # 规则、数值、界面规矩的自动测试（不开浏览器）
+npm run build     # 类型检查 + 打包成 dist/index.html 一个文件
+npm run e2e       # 手机尺寸下用真实触摸走完一轮，截图在 tools/e2e/shots/
+npm run dev       # 本地开发
 ```
 
-旧代码只当参考读，几个容易找错的位置：
-
-- `build.js` 按 `src/js/_order.json` 把所有 JS 拼进一个 `<script>`，全在同一个全局作用域。
-- 文件名只是大概分区：伤害公式 `getDamage` 在 `05i_rest_transitions.js`，鼠标开火和射速在 `02e_dreamland.js`，僵尸血量在 `03h_zombies_and_firing.js`，手机瞄准在 `02f_mobile_controls.js`。
-- `docs/code_architecture_index.md` 是更早的单文件时代写的，行号全部过期。
+- `src/sim/`：规则。纯 TypeScript，不碰浏览器。一局的全部状态是 `RunState` 一个对象。
+- `src/view/scene.ts`：Phaser 画面，只读状态、听事件播特效。
+- `src/ui/`：Preact 界面。颜色、间距、字号只能取自 `tokens.css`；不许行内样式、不许 emoji（`tests/ui_rules.test.ts` 会查）。
+- `src/app/game.ts`：全游戏唯一的状态和面板栈。游戏是否暂停只看 `game.panel()`。
+- `src/content/legacy/*.json`：从旧版原样抽出的剧情和内容表（`node tools/extract_content.cjs` 重新生成）。
+- `src/assets/`：整理好的素材（`tools/assets/prepare.py` 生成）。**美术素材只用人画的开源素材，不要自己画**；出处和许可记在 `assets/CREDITS.md`。
+- 改了触屏或面板，必须跑 `npm run e2e`；改了画面，必须看 `tools/e2e/shots/` 里的截图。
 
 ## 旧版踩过的坑（新版要从结构上避免）
 

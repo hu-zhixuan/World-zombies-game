@@ -1,0 +1,95 @@
+@import './tokens.css';
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night); font-family: var(--font); color: var(--paper);
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; overscroll-behavior: none; }
+#stage { position: fixed; inset: 0; }
+#stage canvas { image-rendering: pixelated; }
+#ui, #floaters { position: fixed; inset: 0; pointer-events: none; }
+#ui > * { pointer-events: auto; }
+.icon { width: 16px; height: 16px; image-rendering: pixelated; object-fit: contain; flex: none; }
+.icon.x2 { width: 32px; height: 32px; }
+.icon.x3 { width: 48px; height: 48px; }
+.stars { color: var(--gold); letter-spacing: 1px; text-shadow: 0 1px 0 var(--ink); }
+.stars i { color: var(--grey); font-style: normal; }
+
+/* ── 顶栏 ── */
+.hud { position: absolute; top: 0; left: 0; right: 0; z-index: var(--z-hud); display: flex; justify-content: space-between; align-items: flex-start;
+  padding: var(--s2) max(var(--s3), env(safe-area-inset-right)) 0 max(var(--s3), env(safe-area-inset-left)); pointer-events: none; }
+.hud > * { pointer-events: auto; }
+.chip { display: flex; align-items: center; gap: var(--s1); padding: var(--s1) var(--s2); background: var(--ink); border: 2px solid var(--wood-dark);
+  border-radius: var(--r1); font-size: var(--f2); font-weight: 700; }
+.hud-left { display: flex; flex-direction: column; gap: var(--s1); }
+.hud-mid { display: flex; gap: var(--s2); }
+.hud-right { display: flex; gap: var(--s2); }
+.bar { position: relative; width: 120px; height: 12px; background: var(--night); border: 2px solid var(--ink); border-radius: var(--r1); overflow: hidden; }
+.bar > b { position: absolute; inset: 0; transform-origin: left; transform: scaleX(var(--v, 1)); background: var(--red); transition: transform .12s; }
+.bar.wall > b { background: var(--green); }
+.bar.ammo { width: 64px; height: 8px; }
+.bar.ammo > b { background: var(--gold); transition: none; }
+.btn-icon { min-width: 48px; height: 30px; padding: 0 var(--s2); white-space: nowrap; display: grid; place-items: center; background: var(--ink); border: 2px solid var(--wood-dark); border-radius: var(--r1);
+  color: var(--paper); font-size: var(--f2); font-weight: 800; }
+
+/* ── 触屏按键：全部压在画面下方的地面上，不挡战场 ── */
+.pad { position: absolute; z-index: var(--z-hud); left: max(26px, env(safe-area-inset-left)); bottom: 10px; width: 112px; height: 112px; border-radius: 50%;
+  background: url('../assets/ui_round.png') center / 100% 100% no-repeat; image-rendering: pixelated; opacity: .78; }
+.pad > i { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px; border-radius: 50%;
+  background: url('../assets/ui_round_lit.png') center / 100% 100% no-repeat; transform: translate(calc(var(--x, 0) * 34px), calc(var(--y, 0) * 34px)); }
+.keys { position: absolute; z-index: var(--z-hud); right: max(20px, env(safe-area-inset-right)); bottom: 12px; display: flex; align-items: flex-end; gap: 10px; }
+.key { width: 56px; height: 56px; display: grid; place-items: center; border: 0; padding: 0; border-radius: 50%; color: var(--paper); font: 800 var(--f3) var(--font);
+  background: url('../assets/ui_round.png') center / 100% 100% no-repeat; image-rendering: pixelated; opacity: .82; text-shadow: 0 2px 0 var(--ink); }
+.key.small { width: 46px; height: 46px; font-size: var(--f2); }
+.key.fire { width: 86px; height: 86px; opacity: .9; }
+.key.fire .icon { width: 45px; height: 30px; filter: drop-shadow(0 2px 0 var(--ink)); }
+.key.down { opacity: 1; transform: scale(.94); }
+.key.cooling { filter: grayscale(.8); }
+.weapon { position: absolute; z-index: var(--z-hud); left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; align-items: center; gap: var(--s2);
+  padding: var(--s1) var(--s3); background: var(--ink); border: 2px solid var(--wood-dark); border-radius: var(--r2); color: var(--paper); font: 700 var(--f2) var(--font); }
+.weapon .icon { width: 39px; height: 26px; }
+.weapon .col { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
+.weapon small { font-size: var(--f1); color: var(--gold); }
+
+/* ── 面板 ── */
+.veil { position: absolute; inset: 0; z-index: var(--z-panel); display: grid; place-items: center; background: color-mix(in srgb, var(--night) 72%, transparent); }
+.panel { min-width: 320px; max-width: min(94vw, 700px); max-height: 96vh; overflow: auto; padding: var(--s2) var(--s3) var(--s3); color: var(--paper);
+  border: 16px solid transparent; border-image: url('../assets/ui_panel.png') 8 fill / 16px stretch; image-rendering: pixelated; text-align: center; }
+.panel.wide { width: min(94vw, 700px); }
+.panel-head { display: flex; align-items: center; justify-content: center; gap: var(--s3); margin-bottom: var(--s2); }
+.panel-head.split { justify-content: space-between; }
+.panel-head .purse { margin: 0; }
+.panel h2 { margin: 0; font-size: var(--f4); letter-spacing: 2px; text-shadow: 0 2px 0 var(--wood-dark); }
+.panel p { margin: 0 0 var(--s3); font-size: var(--f2); color: var(--paper); opacity: .9; }
+.row { display: flex; gap: var(--s3); justify-content: center; align-items: stretch; }
+.btn { min-width: 96px; padding: var(--s2) var(--s4); border: 3px solid var(--wood-dark); border-radius: var(--r1); background: var(--paper); color: var(--ink);
+  font: 800 var(--f3) var(--font); box-shadow: 0 3px 0 var(--wood-dark); }
+.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--wood-dark); }
+.btn.primary { background: var(--gold); }
+.btn.danger { background: var(--rose); color: var(--paper); }
+.btn.small { min-width: 0; padding: var(--s1) var(--s3); font-size: var(--f2); }
+.btn:disabled { background: var(--grey); color: var(--night); box-shadow: none; }
+.card { flex: 1; min-width: 150px; max-width: 190px; padding: var(--s2) var(--s2) var(--s3); display: flex; flex-direction: column; align-items: center; gap: var(--s1);
+  color: var(--ink); border: 12px solid transparent; border-image: url('../assets/ui_card.png') 8 fill / 12px stretch; background: none; font: inherit; }
+.card:active { transform: translateY(2px); }
+.card strong { font-size: var(--f3); }
+.card span { font-size: var(--f1); line-height: 1.45; }
+.list { display: flex; flex-direction: column; gap: var(--s2); text-align: left; }
+.list.grid2 { display: grid; grid-template-columns: 1fr 1fr; }
+.item { display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3); background: var(--wood-dark); border-radius: var(--r1); font-size: var(--f2); }
+.item .grow { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.item small { font-size: var(--f1); opacity: .85; }
+.item .icon.gun { width: 45px; height: 30px; }
+.purse { display: flex; gap: var(--s3); justify-content: center; margin-bottom: var(--s3); }
+.title h1 { margin: 0; font-size: 40px; letter-spacing: 6px; text-shadow: 0 3px 0 var(--wood-dark), 0 6px 0 var(--ink); }
+
+/* ── 提示和飘字 ── */
+.toasts { position: absolute; top: 46px; left: 0; right: 0; z-index: var(--z-toast); display: flex; flex-direction: column; align-items: center; gap: var(--s1); pointer-events: none; }
+.toast { padding: var(--s1) var(--s4); background: var(--ink); border: 2px solid var(--gold); border-radius: var(--r2); font-size: var(--f2); font-weight: 800;
+  animation: toast 2.4s forwards; }
+.toast.big { font-size: var(--f3); color: var(--gold); }
+@keyframes toast { 0% { opacity: 0; transform: translateY(-8px) scale(.9); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-6px); } }
+.hurt-flash { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 80px 20px var(--red); opacity: 0; animation: hurt .35s; }
+@keyframes hurt { 0% { opacity: .7; } 100% { opacity: 0; } }
+.fl { position: absolute; left: 0; top: 0; transform: translate(calc(var(--x) * 1px), calc(var(--y) * 1px)) translate(-50%, -50%); font: 800 var(--f2) var(--font);
+  color: var(--paper); text-shadow: 0 1px 0 var(--ink), 0 0 3px var(--ink); animation: fl .6s ease-out forwards; }
+.fl.coin { color: var(--gold); } .fl.hurt { color: var(--red); font-size: var(--f3); } .fl.burn { color: var(--rose); }
+@keyframes fl { 0% { opacity: 1; margin-top: 0; } 100% { opacity: 0; margin-top: -26px; } }
