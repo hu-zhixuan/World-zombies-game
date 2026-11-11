@@ -28,6 +28,9 @@ jobs:
         with:
           node-version: 20
 
+      - name: 安装依赖
+        run: npm ci
+
       - name: 回归测试
         run: npm test
 
@@ -46,7 +49,7 @@ jobs:
           VERSION="${TAG#v}"
           echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=$((1000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
-          node tools/copy_to_android.js
+          node tools/copy_to_android.cjs
           # 配了 KEYSTORE_BASE64 等 secrets 就用正式密钥签名；没配就用仓库里的 debug 密钥（签名固定，可覆盖升级）
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/release.keystore"
@@ -64,7 +67,7 @@ jobs:
         run: |
           mkdir -p out
           cp android/app/build/outputs/apk/release/app-release.apk "out/wave15-${TAG}.apk"
-          cp dist/zombie-game-v56.html "out/zombie-game-${TAG}.html"
+          cp dist/index.html "out/zombie-game-${TAG}.html"
           ls -la out
 
       - name: 创建 Release
@@ -73,6 +76,7 @@ jobs:
           tag_name: ${{ env.TAG }}
           name: 十五波围城 ${{ env.TAG }}
           generate_release_notes: true
+          prerelease: ${{ contains(env.TAG, 'preview') }}
           body: |
             ## 下载
             - **安卓**：`wave15-${{ env.TAG }}.apk`（Android 8.0 及以上，横屏；首次安装需允许「安装未知来源应用」）

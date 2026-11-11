@@ -1,0 +1,317 @@
+{
+ "barrel": {
+  "fh": 30,
+  "frames": 1,
+  "fw": 24
+ },
+ "bg_sky": {
+  "fh": 288,
+  "frames": 1,
+  "fw": 384
+ },
+ "bg_town": {
+  "fh": 288,
+  "frames": 1,
+  "fw": 384
+ },
+ "crate": {
+  "fh": 35,
+  "frames": 1,
+  "fw": 39
+ },
+ "crate_stack": {
+  "fh": 68,
+  "frames": 1,
+  "fw": 73
+ },
+ "ground": {
+  "fh": 48,
+  "frames": 1,
+  "fw": 16
+ },
+ "ground_b": {
+  "fh": 48,
+  "frames": 1,
+  "fw": 16
+ },
+ "ground_wall": {
+  "fh": 32,
+  "frames": 1,
+  "fw": 32
+ },
+ "hero_crouch": {
+  "fh": 54,
+  "frames": 3,
+  "fw": 62
+ },
+ "hero_fall": {
+  "fh": 54,
+  "frames": 2,
+  "fw": 62
+ },
+ "hero_hurt": {
+  "fh": 54,
+  "frames": 2,
+  "fw": 62
+ },
+ "hero_idle": {
+  "fh": 54,
+  "frames": 6,
+  "fw": 62
+ },
+ "hero_jump": {
+  "fh": 54,
+  "frames": 2,
+  "fw": 62
+ },
+ "hero_run": {
+  "fh": 54,
+  "frames": 14,
+  "fw": 62
+ },
+ "hero_shoot": {
+  "fh": 54,
+  "frames": 3,
+  "fw": 62
+ },
+ "house_a": {
+  "fh": 183,
+  "frames": 1,
+  "fw": 168
+ },
+ "house_b": {
+  "fh": 244,
+  "frames": 1,
+  "fw": 210
+ },
+ "house_c": {
+  "fh": 183,
+  "frames": 1,
+  "fw": 221
+ },
+ "ic_bloodfrenzy": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_chainkill": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_coin": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_crate": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_frostbite": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_glasscannon": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_hp": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_incendiary": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_lifesteal": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_overclock": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_overkill": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_pierce": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_ricochet": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_scrap": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_secondwind": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_star": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_turret": {
+  "fh": 23,
+  "frames": 1,
+  "fw": 25
+ },
+ "ic_vanguard": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_wall": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_zombie": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "lamp": {
+  "fh": 108,
+  "frames": 1,
+  "fw": 35
+ },
+ "shot": {
+  "fh": 11,
+  "frames": 3,
+  "fw": 15
+ },
+ "shot_hit": {
+  "fh": 11,
+  "frames": 3,
+  "fw": 15
+ },
+ "sign": {
+  "fh": 45,
+  "frames": 1,
+  "fw": 37
+ },
+ "turret": {
+  "fh": 23,
+  "frames": 6,
+  "fw": 25
+ },
+ "ui_banner": {
+  "fh": 32,
+  "frames": 1,
+  "fw": 96
+ },
+ "ui_btn": {
+  "fh": 32,
+  "frames": 1,
+  "fw": 32
+ },
+ "ui_card": {
+  "fh": 32,
+  "frames": 1,
+  "fw": 32
+ },
+ "ui_panel": {
+  "fh": 32,
+  "frames": 1,
+  "fw": 32
+ },
+ "ui_round": {
+  "fh": 32,
+  "frames": 1,
+  "fw": 32
+ },
+ "ui_round_lit": {
+  "fh": 32,
+  "frames": 1,
+  "fw": 32
+ },
+ "ui_slot": {
+  "fh": 32,
+  "frames": 1,
+  "fw": 32
+ },
+ "wagon": {
+  "fh": 75,
+  "frames": 1,
+  "fw": 93
+ },
+ "wall": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "well": {
+  "fh": 65,
+  "frames": 1,
+  "fw": 65
+ },
+ "wp_pistol": {
+  "fh": 10,
+  "frames": 1,
+  "fw": 13
+ },
+ "wp_rifle": {
+  "fh": 5,
+  "frames": 1,
+  "fw": 17
+ },
+ "wp_shotgun": {
+  "fh": 5,
+  "frames": 1,
+  "fw": 16
+ },
+ "wp_smg": {
+  "fh": 8,
+  "frames": 1,
+  "fw": 15
+ },
+ "z_bearded": {
+  "fh": 47,
+  "frames": 6,
+  "fw": 40
+ },
+ "z_death": {
+  "fh": 52,
+  "frames": 5,
+  "fw": 44
+ },
+ "z_hat": {
+  "fh": 52,
+  "frames": 6,
+  "fw": 39
+ },
+ "z_oldman": {
+  "fh": 42,
+  "frames": 12,
+  "fw": 34
+ },
+ "z_roamer": {
+  "fh": 45,
+  "frames": 4,
+  "fw": 33
+ },
+ "z_woman": {
+  "fh": 46,
+  "frames": 6,
+  "fw": 37
+ }
+}

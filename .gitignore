@@ -1,7 +1,8 @@
 node_modules/
 .DS_Store
 Thumbs.db
-dist/_verify_tmp.html
+/dist/
+legacy/dist/_verify_tmp.html
 
 # Android
 android/.gradle/
@@ -10,3 +11,10 @@ android/app/build/
 android/local.properties
 android/app/src/main/assets/index.html
 *.apk
+
+# 真机式回归脚本的截图
+tools/e2e/shots/
+legacy/tools/e2e/shots/
+
+# 素材下载缓存（tools/assets/prepare.py）
+.asset_cache/
