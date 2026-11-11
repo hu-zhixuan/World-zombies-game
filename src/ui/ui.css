@@ -17,17 +17,20 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .hud { position: absolute; top: 0; left: 0; right: 0; z-index: var(--z-hud); display: flex; justify-content: space-between; align-items: flex-start;
   padding: var(--s2) max(var(--s3), env(safe-area-inset-right)) 0 max(var(--s3), env(safe-area-inset-left)); pointer-events: none; }
 .hud > * { pointer-events: auto; }
-.chip { display: flex; align-items: center; gap: var(--s1); padding: var(--s1) var(--s2); background: var(--ink); border: 2px solid var(--wood-dark);
+.chip { display: flex; align-items: center; gap: var(--s1); padding: var(--s1) var(--s2); background: var(--wood-dark); border: 2px solid var(--wood); color: var(--paper);
+  box-shadow: 0 2px 0 var(--ink);
   border-radius: var(--r1); font-size: var(--f2); font-weight: 700; }
-.hud-left { display: flex; flex-direction: column; gap: var(--s1); }
+.hud-left { display: flex; flex-direction: column; gap: var(--s1); align-items: flex-start; }
+.perks { display: flex; gap: 2px; padding: 2px var(--s1); background: var(--wood-dark); border: 2px solid var(--wood); border-radius: var(--r1); }
+.perks .icon { width: 20px; height: 20px; }
 .hud-mid { display: flex; gap: var(--s2); }
 .hud-right { display: flex; gap: var(--s2); }
-.bar { position: relative; width: 120px; height: 12px; background: var(--night); border: 2px solid var(--ink); border-radius: var(--r1); overflow: hidden; }
+.bar { position: relative; width: 120px; height: 12px; background: var(--ink); border: 2px solid var(--ink); border-radius: var(--r1); overflow: hidden; }
 .bar > b { position: absolute; inset: 0; transform-origin: left; transform: scaleX(var(--v, 1)); background: var(--red); transition: transform .12s; }
 .bar.wall > b { background: var(--green); }
 .bar.ammo { width: 64px; height: 8px; }
 .bar.ammo > b { background: var(--gold); transition: none; }
-.btn-icon { min-width: 48px; height: 30px; padding: 0 var(--s2); white-space: nowrap; display: grid; place-items: center; background: var(--ink); border: 2px solid var(--wood-dark); border-radius: var(--r1);
+.btn-icon { min-width: 48px; height: 30px; padding: 0 var(--s2); white-space: nowrap; display: grid; place-items: center; background: var(--wood-dark); border: 2px solid var(--wood); box-shadow: 0 2px 0 var(--ink); border-radius: var(--r1);
   color: var(--paper); font-size: var(--f2); font-weight: 800; }
 
 /* ── 触屏按键：全部压在画面下方的地面上，不挡战场 ── */
@@ -44,13 +47,14 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .key.down { opacity: 1; transform: scale(.94); }
 .key.cooling { filter: grayscale(.8); }
 .weapon { position: absolute; z-index: var(--z-hud); left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; align-items: center; gap: var(--s2);
-  padding: var(--s1) var(--s3); background: var(--ink); border: 2px solid var(--wood-dark); border-radius: var(--r2); color: var(--paper); font: 700 var(--f2) var(--font); }
+  padding: var(--s1) var(--s3); background: var(--wood-dark); border: 2px solid var(--wood); border-radius: var(--r2); color: var(--paper); font: 700 var(--f2) var(--font);
+  box-shadow: 0 2px 0 var(--ink); }
 .weapon .icon { width: 39px; height: 26px; }
 .weapon .col { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
 .weapon small { font-size: var(--f1); color: var(--gold); }
 
 /* ── 面板 ── */
-.veil { position: absolute; inset: 0; z-index: var(--z-panel); display: grid; place-items: center; background: color-mix(in srgb, var(--night) 72%, transparent); }
+.veil { position: absolute; inset: 0; z-index: var(--z-panel); display: grid; place-items: center; background: color-mix(in srgb, var(--wood-dark) 42%, transparent); }
 .panel { min-width: 320px; max-width: min(94vw, 700px); max-height: 96vh; overflow: auto; padding: var(--s2) var(--s3) var(--s3); color: var(--paper);
   border: 16px solid transparent; border-image: url('../assets/ui_panel.png') 8 fill / 16px stretch; image-rendering: pixelated; text-align: center; }
 .panel.wide { width: min(94vw, 700px); }
@@ -71,6 +75,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
   color: var(--ink); border: 12px solid transparent; border-image: url('../assets/ui_card.png') 8 fill / 12px stretch; background: none; font: inherit; }
 .card:active { transform: translateY(2px); }
 .card strong { font-size: var(--f3); }
+.card em { font-style: normal; font-size: var(--f1); font-weight: 800; padding: 0 var(--s2); border-radius: var(--r2); background: var(--grey); color: var(--paper); }
+.card[data-rarity='rare'] em { background: var(--frost); color: var(--ink); }
+.card[data-rarity='epic'] em { background: var(--rose); }
+.card[data-rarity='legendary'] em { background: var(--gold); color: var(--ink); }
 .card span { font-size: var(--f1); line-height: 1.45; }
 .list { display: flex; flex-direction: column; gap: var(--s2); text-align: left; }
 .list.grid2 { display: grid; grid-template-columns: 1fr 1fr; }
@@ -79,13 +87,16 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .item small { font-size: var(--f1); opacity: .85; }
 .item .icon.gun { width: 45px; height: 30px; }
 .purse { display: flex; gap: var(--s3); justify-content: center; margin-bottom: var(--s3); }
-.title h1 { margin: 0; font-size: 40px; letter-spacing: 6px; text-shadow: 0 3px 0 var(--wood-dark), 0 6px 0 var(--ink); }
+.title h1 { margin: var(--s1) 0; font-size: 40px; letter-spacing: 6px; color: var(--gold); text-shadow: 0 3px 0 var(--wood-dark), 0 6px 0 var(--ink); }
+.note { display: inline-flex; align-items: center; gap: var(--s1); margin: 0 0 var(--s3); padding: var(--s1) var(--s3); background: var(--wood-dark); border-radius: var(--r2); font-size: var(--f2); font-weight: 700; }
+.note b { color: var(--gold); }
 
 /* ── 提示和飘字 ── */
 .toasts { position: absolute; top: 46px; left: 0; right: 0; z-index: var(--z-toast); display: flex; flex-direction: column; align-items: center; gap: var(--s1); pointer-events: none; }
-.toast { padding: var(--s1) var(--s4); background: var(--ink); border: 2px solid var(--gold); border-radius: var(--r2); font-size: var(--f2); font-weight: 800;
+.toast { padding: var(--s1) var(--s4); background: var(--paper); color: var(--ink); border: 2px solid var(--wood-dark); border-radius: var(--r2); font-size: var(--f2); font-weight: 800;
+  box-shadow: 0 2px 0 var(--wood-dark);
   animation: toast 2.4s forwards; }
-.toast.big { font-size: var(--f3); color: var(--gold); }
+.toast.big { font-size: var(--f3); border-color: var(--gold); box-shadow: 0 2px 0 var(--gold); }
 @keyframes toast { 0% { opacity: 0; transform: translateY(-8px) scale(.9); } 10%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-6px); } }
 .hurt-flash { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 80px 20px var(--red); opacity: 0; animation: hurt .35s; }
 @keyframes hurt { 0% { opacity: .7; } 100% { opacity: 0; } }

@@ -22,7 +22,7 @@ export interface Player {
 }
 export interface Zombie {
   id: number; kind: ZombieKind; x: number; hp: number; maxHp: number;
-  atkCd: number; kb: number; burnT: number; carriesCrate: boolean;
+  atkCd: number; kb: number; burnT: number; slowT: number; carriesCrate: boolean;
 }
 export interface Bullet {
   x: number; y: number; vx: number; vy: number; dmg: number; life: number;
@@ -40,6 +40,10 @@ export interface RunState {
   spawn: { left: number; timer: number; total: number; killed: number; crateAt: number };
   coins: number; scrap: number; kills: number;
   perks: PerkId[]; perkChoices: PerkId[];
+  /** 这一局能掉落的武器（由局外解锁决定） */
+  pool: WeaponId[];
+  /** 连锁处决的连杀计数、先锋的增伤倒计时 */
+  chain: { n: number; t: number }; vanguardT: number;
   targetId: number | null;
 }
 

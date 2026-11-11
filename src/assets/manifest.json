@@ -89,12 +89,32 @@
   "frames": 1,
   "fw": 221
  },
+ "ic_bloodfrenzy": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_chainkill": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
  "ic_coin": {
   "fh": 16,
   "frames": 1,
   "fw": 16
  },
  "ic_crate": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_frostbite": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_glasscannon": {
   "fh": 16,
   "frames": 1,
   "fw": 16
@@ -139,10 +159,25 @@
   "frames": 1,
   "fw": 16
  },
+ "ic_secondwind": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_star": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
  "ic_turret": {
   "fh": 23,
   "frames": 1,
   "fw": 25
+ },
+ "ic_vanguard": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
  },
  "ic_wall": {
   "fh": 16,
@@ -234,24 +269,49 @@
   "frames": 1,
   "fw": 13
  },
+ "wp_rifle": {
+  "fh": 5,
+  "frames": 1,
+  "fw": 17
+ },
+ "wp_shotgun": {
+  "fh": 5,
+  "frames": 1,
+  "fw": 16
+ },
  "wp_smg": {
   "fh": 8,
   "frames": 1,
   "fw": 15
+ },
+ "z_bearded": {
+  "fh": 47,
+  "frames": 6,
+  "fw": 40
  },
  "z_death": {
   "fh": 52,
   "frames": 5,
   "fw": 44
  },
+ "z_hat": {
+  "fh": 52,
+  "frames": 6,
+  "fw": 39
+ },
+ "z_oldman": {
+  "fh": 42,
+  "frames": 12,
+  "fw": 34
+ },
  "z_roamer": {
   "fh": 45,
   "frames": 4,
   "fw": 33
  },
- "z_sprinter": {
-  "fh": 52,
-  "frames": 8,
-  "fw": 44
+ "z_woman": {
+  "fh": 46,
+  "frames": 6,
+  "fw": 37
  }
 }

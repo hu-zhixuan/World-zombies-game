@@ -1,7 +1,7 @@
 // 触屏按键和键盘。只负责把「按了什么」告诉游戏，不直接改状态。
 import { useRef } from 'preact/hooks';
 import { game } from '../app/game';
-import { WEAPONS } from '../content/data';
+import { WEAPONS, magSize } from '../content/data';
 import { curWeapon } from '../sim/sim';
 import { Bar, Icon, Stars } from './parts';
 
@@ -57,15 +57,15 @@ export function Keys() {
 /** 底部中间：当前武器、星级、弹药。点一下换枪 */
 export function WeaponChip() {
   const run = game.run, w = curWeapon(run), def = WEAPONS[w.id];
-  const reloading = run.player.reloadT > 0;
+  const reloading = run.player.reloadT > 0, mag = magSize(w.id, w.star);
   return (
     <button class="weapon" id="weapon-chip" onPointerDown={() => game.press('swap')}>
       <Icon k={def.icon} />
       <span class="col">
         <Stars n={w.star} />
-        <Bar cls="ammo" v={reloading ? 1 - run.player.reloadT / def.reload : w.ammo / def.mag} />
+        <Bar cls="ammo" v={reloading ? 1 - run.player.reloadT / def.reload : w.ammo / mag} />
       </span>
-      <small>{reloading ? '换弹中' : `${w.ammo}/${def.mag}`}{run.player.weapons.length > 1 ? ' · 点击换枪' : ''}</small>
+      <small>{reloading ? '换弹中' : `${w.ammo}/${mag}`}{run.player.weapons.length > 1 ? ' · 点击换枪' : ''}</small>
     </button>
   );
 }

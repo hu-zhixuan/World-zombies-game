@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest';
-import { LAST_DAY, STAR_COST, WEAPONS, starMul, sustainedDps, zombieHp } from '../src/content/data';
+import { LAST_DAY, STAR_COST, WEAPONS, magSize, nextUnlock, starMul, sustainedDps, unlockedWeapons, zombieHp } from '../src/content/data';
 import { runBot } from '../src/sim/bot';
-import { command, newRun, step } from '../src/sim/sim';
+import { MAX_CARRY, command, damageMul, newRun, step } from '../src/sim/sim';
 import { NO_INPUT, type RunState } from '../src/sim/types';
 
 const clone = (r: RunState): RunState => JSON.parse(JSON.stringify(r));
 const zombie = (r: RunState, x: number, hp = 100000) => {
-  const z = { id: r.nextId++, kind: 'roamer' as const, x, hp, maxHp: hp, atkCd: 999, kb: 0, burnT: 0, carriesCrate: false };
+  const z = { id: r.nextId++, kind: 'roamer' as const, x, hp, maxHp: hp, atkCd: 999, kb: 0, burnT: 0, slowT: 0, carriesCrate: false };
   r.zombies.push(z); return z;
 };
 /** 一个没有刷怪的安静场地，方便单独测某条规则 */
@@ -17,7 +17,7 @@ describe('手感曲线', () => {
     expect(Math.ceil(zombieHp('roamer', 1) / WEAPONS.pistol.damage)).toBeLessThanOrEqual(4);
   });
   test('跟得上进度的武器，击杀时间全程在 0.5～1.5 秒', () => {
-    const expected: [number, keyof typeof WEAPONS, number][] = [[1, 'pistol', 1], [2, 'smg', 1], [3, 'smg', 1], [3, 'pistol', 2]];
+    const expected: [number, keyof typeof WEAPONS, number][] = [[1, 'pistol', 1], [2, 'smg', 1], [3, 'smg', 1], [3, 'shotgun', 1], [3, 'rifle', 1], [4, 'smg', 2], [5, 'smg', 3], [5, 'shotgun', 2]];
     for (const [day, w, star] of expected) {
       const ttk = zombieHp('roamer', day) / sustainedDps(WEAPONS[w], star);
       expect(ttk, `第 ${day} 天 ${w} ★${star}`).toBeGreaterThan(0.5);
@@ -88,7 +88,63 @@ describe('武器升星', () => {
   });
 });
 
+describe('成长', () => {
+  test('★3 弹匣 +50%，★5 每次多打出子弹', () => {
+    expect(magSize('pistol', 2)).toBe(12);
+    expect(magSize('pistol', 3)).toBe(18);
+    const r = quiet(); r.player.x = 300; r.player.weapons[0].star = 5; r.player.weapons[0].ammo = magSize('pistol', 5); zombie(r, 400);
+    step(r, { ...NO_INPUT, fire: true });
+    expect(r.bullets.filter((b) => b.from === 'player').length).toBe(2);
+    expect(r.player.weapons[0].ammo).toBe(magSize('pistol', 5) - 1); // 多打的那颗不多耗子弹
+  });
+  test('随身最多两把：满了捡到新武器会换掉手里这把', () => {
+    const r = quiet(); r.player.x = 200; r.player.weapons.push({ id: 'smg', star: 2, ammo: 5 }); r.player.cur = 1;
+    r.crates.push({ id: 900, x: 200, weapon: 'shotgun' }); step(r, NO_INPUT);
+    expect(r.player.weapons.map((w) => w.id)).toEqual(['pistol', 'shotgun']);
+    expect(r.player.weapons.length).toBe(MAX_CARRY);
+  });
+  test('只会掉出已经解锁的武器', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const r = newRun(seed, ['smg']); runBot(r);
+      expect(r.player.weapons.every((w) => w.id === 'pistol' || w.id === 'smg'), `种子 ${seed}`).toBe(true);
+    }
+  });
+  test('受的伤会带到明天：休息一晚只回 30%', () => {
+    const r = quiet(); r.phase = 'camp'; r.player.hp = 20;
+    command(r, { t: 'nextDay' });
+    expect(r.player.hp).toBe(50);
+  });
+  test('星星解锁新武器进掉落池', () => {
+    expect(unlockedWeapons(0)).toEqual(['smg']);
+    expect(unlockedWeapons(3)).toEqual(['smg', 'shotgun']);
+    expect(nextUnlock(3)!.weapon).toBe('rifle');
+    expect(nextUnlock(99)).toBeUndefined();
+  });
+});
+
 describe('天赋', () => {
+  test('三选一给出 3 个不重复、还没拿过的天赋', () => {
+    const r = newRun(9); r.perks.push('lifesteal');
+    r.spawn.left = 0; r.zombies = []; r.phase = 'clear'; r.phaseT = 9999;
+    step(r, NO_INPUT);
+    expect(r.phase).toBe('perk');
+    expect(new Set(r.perkChoices).size).toBe(3);
+    expect(r.perkChoices).not.toContain('lifesteal');
+  });
+  test('玻璃大炮：伤害 ×2.2，最大生命减半', () => {
+    const r = quiet(); r.phase = 'perk'; r.perkChoices = ['glasscannon'];
+    command(r, { t: 'pickPerk', id: 'glasscannon' });
+    expect(r.player.maxHp).toBe(50);
+    expect(damageMul(r)).toBeCloseTo(2.2);
+  });
+  test('连锁处决：连杀叠伤害，断了清零', () => {
+    const r = quiet(); r.perks.push('chainkill'); r.player.x = 300;
+    zombie(r, 380, 10); zombie(r, 400, 10); zombie(r, 890); // 远处留一只，让这一天不结束
+    for (let i = 0; i < 60; i++) step(r, { ...NO_INPUT, fire: true });
+    expect(damageMul(r)).toBeCloseTo(1.2);
+    for (let i = 0; i < 200; i++) step(r, NO_INPUT);
+    expect(damageMul(r)).toBe(1);
+  });
   test('贯穿：一发子弹能打到一条线上的两只', () => {
     const r = quiet(); r.perks.push('pierce'); r.player.x = 300;
     const a = zombie(r, 380), b = zombie(r, 420);

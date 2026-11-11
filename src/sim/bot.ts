@@ -20,6 +20,7 @@ export function runBot(run: RunState, maxTicks = 60 * 60 * 10): BotReport {
     if (run.phase === 'perk') { command(run, { t: 'pickPerk', id: run.perkChoices[0] }); continue; }
     if (run.phase === 'camp') {
       const w = run.player.weapons[run.player.weapons.length - 1];
+      command(run, { t: 'repairWall' });
       command(run, { t: 'buyStar', weapon: w.id });
       command(run, { t: 'upgradeTurret' });
       command(run, { t: 'nextDay' });

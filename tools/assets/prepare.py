@@ -63,8 +63,10 @@ def main():
                           ('fall', 'fall', 2), ('hurt', 'Hurt', 2), ('crouch', 'crouch', 3)]:
         strip('hero_' + anim, [img('gotthicvania-swamp', 'Player', anim, f'{stem}{i}.png') for i in range(1, n + 1)])
     # 僵尸
+    # 感染的镇民（Gothicvania Town 的镇民，游戏里染成绿色）。原图朝右，游戏里翻转
+    for key, d, n in [('z_hat', 'hat-man-walk', 6), ('z_bearded', 'bearded-walk', 6), ('z_oldman', 'oldman-walk', 12), ('z_woman', 'woman-walk', 6)]:
+        strip(key, [img('gothicvania-town', 'sprites', d, f'{d}-{i}.png') for i in range(1, n + 1)])
     strip('z_roamer', [img('gotthicvania-swamp', 'walk thing', f'thing{i}.png') for i in range(1, 5)])
-    strip('z_sprinter', [img('cemetery', 'Sprites', 'skeleton-clothed', f'skeleton-clothed-{i}.png') for i in range(1, 9)])
     strip('z_death', [img('cemetery', 'Sprites', 'enemy-death', f'enemy-death-{i}.png') for i in range(1, 6)])
     # 塔、子弹、命中
     strip('turret', [img('warped-city', 'misc', 'turret', f'turret-{i}.png') for i in range(1, 7)])
@@ -89,10 +91,14 @@ def main():
     ic = img('kyrise', 'spritesheet', 'spritesheet_16x16.png')
     for key, c, r in [('ic_coin', 8, 6), ('ic_scrap', 0, 10), ('ic_hp', 1, 13), ('ic_wall', 6, 15), ('ic_zombie', 8, 9),
                       ('ic_crate', 14, 8), ('ic_pierce', 8, 0), ('ic_ricochet', 13, 11), ('ic_overkill', 1, 8),
-                      ('ic_lifesteal', 9, 12), ('ic_incendiary', 4, 8), ('ic_overclock', 0, 12)]:
+                      ('ic_lifesteal', 9, 12), ('ic_incendiary', 4, 8), ('ic_overclock', 0, 12),
+                      ('ic_frostbite', 0, 8), ('ic_chainkill', 1, 11), ('ic_vanguard', 9, 15), ('ic_bloodfrenzy', 8, 12),
+                      ('ic_glasscannon', 1, 7), ('ic_secondwind', 11, 12), ('ic_star', 15, 7)]:
         save(key, ic.crop((c * 16, r * 16, c * 16 + 16, r * 16 + 16)))
     save('wp_pistol', img('guns', 'desert_hawk.png'))
     save('wp_smg', img('guns', GUN_SMG))
+    save('wp_shotgun', img('guns', 'sg1.png'))
+    save('wp_rifle', img('guns', 'hitpro.png'))
     json.dump(manifest, open(os.path.join(OUT, 'manifest.json'), 'w'), indent=1, sort_keys=True)
     print('wrote', len(manifest), 'images to', os.path.relpath(OUT, ROOT))
 

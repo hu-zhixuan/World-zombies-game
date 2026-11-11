@@ -36,12 +36,13 @@ export class GameScene extends Phaser.Scene {
   create() {
     const anim = (key: string, fps: number, repeat = -1) => this.anims.create({ key, frames: this.anims.generateFrameNumbers(key), frameRate: fps, repeat });
     anim('hero_idle', 7); anim('hero_run', 18); anim('hero_shoot', 16); anim('hero_jump', 8); anim('hero_fall', 8); anim('hero_hurt', 10); anim('hero_crouch', 14, 0);
-    for (const z of Object.values(ZOMBIES)) anim(z.sprite, z.fps);
+    for (const z of Object.values(ZOMBIES)) for (const key of z.sprites) anim(key, z.fps);
     anim('z_death', 14, 0); anim('shot', 18); anim('shot_hit', 22, 0); anim('turret', 16, 0);
 
     // 远景：天空和远处的城镇跟着镜头慢慢动，做出纵深
     this.sky = this.add.tileSprite(0, 0, 640, 288, 'bg_sky').setOrigin(0).setScrollFactor(0).setDepth(D.sky);
-    this.town = this.add.tileSprite(0, -44, 640, 288, 'bg_town').setOrigin(0).setScrollFactor(0).setDepth(D.town);
+    // 远处的城镇调淡，让晚霞透过来：远景亮了，整个画面就不闷
+    this.town = this.add.tileSprite(0, -44, 640, 288, 'bg_town').setOrigin(0).setScrollFactor(0).setDepth(D.town).setAlpha(0.5);
     // 街景：左边是据点（小屋），右边是僵尸来的方向
     const prop = (key: string, x: number, depth = D.back, tint?: number) => {
       const im = this.add.image(x, GROUND_Y, key).setOrigin(0.5, 1).setDepth(depth);
@@ -50,7 +51,10 @@ export class GameScene extends Phaser.Scene {
     };
     prop('house_c', 112);
     prop('house_a', 760, D.back, C.haze);
-    prop('sign', 232); prop('lamp', 262); prop('lamp', 560); prop('lamp', 850);
+    prop('sign', 232);
+    // 路灯和酒馆的窗户都亮着暖光：末日里还有人点灯、有人开店
+    for (const x of [262, 560, 850]) { prop('lamp', x); this.glow(x, GROUND_Y - 96, 62, 0.38); }
+    for (const [x, y, r] of [[62, 60, 46], [150, 60, 46], [66, 132, 58], [150, 136, 58]]) this.glow(x, GROUND_Y - y, r, 0.3);
     prop('well', 640, D.back, C.haze); prop('barrel', 30, D.prop); prop('barrel', 470, D.back);
     // 地面：石板路面，下面是石墙，一直铺到屏幕底（手指按键压在这一段上，不挡战场）
     this.add.tileSprite(0, GROUND_Y - 13, WORLD_W, 48, 'ground').setOrigin(0).setDepth(D.ground);
@@ -64,6 +68,9 @@ export class GameScene extends Phaser.Scene {
     this.hero.play('hero_idle');
     this.overlay = this.add.graphics().setDepth(D.mark);
     this.cameras.main.setBounds(0, 0, WORLD_W, VIEW_H).setRoundPixels(true);
+    // 整体调色：提亮、提一点饱和度。黄昏是暖的，不是阴的
+    const grade = this.cameras.main.postFX?.addColorMatrix();
+    if (grade) { grade.brightness(1.12).saturate(0.18, true); }
     game.onEvent((e) => this.onEvent(e));
     this.scale.on('resize', () => this.layout());
     this.layout();
@@ -102,13 +109,17 @@ export class GameScene extends Phaser.Scene {
       seen.add(z.id);
       let s = this.zombies.get(z.id);
       if (!s) {
-        s = this.add.sprite(z.x, GROUND_Y, ZOMBIES[z.kind].sprite).setOrigin(0.5, 1).setDepth(D.actor);
-        s.play({ key: ZOMBIES[z.kind].sprite, startFrame: z.id % 4 });
+        const def = ZOMBIES[z.kind], key = def.sprites[z.id % def.sprites.length];
+        // 镇民素材原图朝右，翻过来；染成绿色表示被感染
+        s = this.add.sprite(z.x, GROUND_Y, key).setOrigin(0.5, 1).setDepth(D.actor).setScale(def.scale).setFlipX(key !== 'z_roamer');
+        s.setData('base', key === 'z_roamer' ? null : C.infected);
+        s.play({ key, startFrame: z.id % 4 });
         this.zombies.set(z.id, s);
       }
       s.setPosition(z.x, GROUND_Y);
       if ((this.flashUntil.get(z.id) ?? 0) > now) s.setTintFill(C.paper);
-      else if (z.burnT > 0) s.setTint(C.ember); else s.clearTint();
+      else if (z.burnT > 0) s.setTint(C.ember); else if (z.slowT > 0) s.setTint(C.frost);
+      else if (s.getData('base')) s.setTint(s.getData('base')); else s.clearTint();
     }
     for (const [id, s] of this.zombies) if (!seen.has(id)) { s.destroy(); this.zombies.delete(id); this.flashUntil.delete(id); }
 
@@ -140,13 +151,20 @@ export class GameScene extends Phaser.Scene {
     if (target) {
       const pulse = 1 + Math.sin(now / 120) * 0.08;
       g.lineStyle(2, C.red, 0.95).strokeEllipse(target.x, GROUND_Y - 1, 30 * pulse, 9 * pulse);
-      g.fillStyle(C.red, 0.95).fillTriangle(target.x - 4, GROUND_Y - 54, target.x + 4, GROUND_Y - 54, target.x, GROUND_Y - 48);
+      const top = GROUND_Y - (this.zombies.get(target.id)?.displayHeight ?? 46) - 6;
+      g.fillStyle(C.red, 0.95).fillTriangle(target.x - 4, top - 6, target.x + 4, top - 6, target.x, top);
     }
     for (const z of run.zombies) {
       if (z.hp >= z.maxHp) continue;
-      g.fillStyle(C.ink, 0.85).fillRect(z.x - 11, GROUND_Y - 50, 22, 4);
-      g.fillStyle(C.red, 1).fillRect(z.x - 10, GROUND_Y - 49, 20 * Math.max(0, z.hp / z.maxHp), 2);
+      const y = GROUND_Y - (this.zombies.get(z.id)?.displayHeight ?? 46) - 4;
+      g.fillStyle(C.ink, 0.85).fillRect(z.x - 11, y, 22, 4);
+      g.fillStyle(C.red, 1).fillRect(z.x - 10, y + 1, 20 * Math.max(0, z.hp / z.maxHp), 2);
     }
+  }
+
+  /** 一团暖光（灯、窗户） */
+  private glow(x: number, y: number, radius: number, intensity: number) {
+    this.add.pointlight(x, y, C.lamp, radius, intensity, 0.06).setDepth(D.fx);
   }
 
   private burst(key: string, x: number, y: number, scale = 1) {

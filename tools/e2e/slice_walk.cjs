@@ -14,6 +14,7 @@ const L = require('./lib.cjs');
   const fits = async (sel) => { const r = await g.page.evaluate((s) => { const b = document.querySelector(s).getBoundingClientRect(); return b.top >= 0 && b.left >= 0 && b.bottom <= innerHeight && b.right <= innerWidth && document.querySelector(s).scrollHeight <= document.querySelector(s).clientHeight + 1; }, sel); check(r, sel + ' 整个面板都在屏幕里'); };
   await g.shot('01-title');
   await fits('#panel-title');
+  check(await g.page.evaluate(() => /星星/.test(document.querySelector('#meta-progress').innerText)), '标题页显示星星和下一个解锁');
   check((await g.state()).panel === 'title', '打开是标题页');
   const fill = await g.page.evaluate(() => { const r = document.querySelector('#stage canvas').getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), vw: innerWidth, vh: innerHeight }; });
   check(fill.w === fill.vw && fill.h === fill.vh, `画面铺满屏幕，没有黑边 (${fill.w}x${fill.h} / ${fill.vw}x${fill.vh})`);
@@ -53,6 +54,7 @@ const L = require('./lib.cjs');
   check((await g.state()).panel === 'workshop', '营地能打开工坊');
   await g.shot('06-workshop');
   await fits('#panel-workshop');
+  await g.page.evaluate(() => { window.__game.run.coins = 200; window.__game.notify(); }); // 直接给够金币，只为验证升星按钮能点
   const before = (await g.state()).weapons;
   await g.tap('#btn-star-pistol');
   check((await g.state()).weapons !== before, '工坊能花金币升星 (' + before + ' → ' + (await g.state()).weapons + ')');
@@ -85,6 +87,7 @@ const L = require('./lib.cjs');
   await g.tap('#btn-again');
   s = await g.state();
   check(s.panel === null && s.day === 1 && s.hp === 100 && s.kills === 0, '再来一局是全新的一局');
+  check(await g.page.evaluate(() => window.__game.meta.stars >= 1 && JSON.parse(localStorage.getItem('wz57.meta')).stars === window.__game.meta.stars), '死了也有收获：星星已经存下来');
 
   const text = await g.page.evaluate(() => document.body.innerText);
   check(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(text.replace(/★/g, '')), '界面里没有 emoji');
