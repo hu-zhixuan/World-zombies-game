@@ -38,7 +38,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
   background: url('../assets/ui_round.png') center / 100% 100% no-repeat; image-rendering: pixelated; opacity: .78; }
 .pad > i { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px; border-radius: 50%;
   background: url('../assets/ui_round_lit.png') center / 100% 100% no-repeat; transform: translate(calc(var(--x, 0) * 34px), calc(var(--y, 0) * 34px)); }
-.keys { position: absolute; z-index: var(--z-hud); right: max(20px, env(safe-area-inset-right)); bottom: 12px; display: flex; align-items: flex-end; gap: 10px; }
+.keys { position: absolute; z-index: var(--z-hud); right: max(20px, env(safe-area-inset-right)); bottom: 12px; display: flex; align-items: flex-end; gap: 8px; }
 .key { width: 56px; height: 56px; display: grid; place-items: center; border: 0; padding: 0; border-radius: 50%; color: var(--paper); font: 800 var(--f3) var(--font);
   background: url('../assets/ui_round.png') center / 100% 100% no-repeat; image-rendering: pixelated; opacity: .82; text-shadow: 0 2px 0 var(--ink); }
 .key.small { width: 46px; height: 46px; font-size: var(--f2); }
@@ -46,7 +46,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .key.fire .icon { width: 45px; height: 30px; filter: drop-shadow(0 2px 0 var(--ink)); }
 .key.down { opacity: 1; transform: scale(.94); }
 .key.cooling { filter: grayscale(.8); }
-.weapon { position: absolute; z-index: var(--z-hud); left: 50%; bottom: 12px; transform: translateX(-50%); display: flex; align-items: center; gap: var(--s2);
+.key.lit { opacity: 1; background-image: url('../assets/ui_round_lit.png'); color: var(--ink); text-shadow: none; }
+.weapon { position: absolute; z-index: var(--z-hud); left: 44%; bottom: 12px; transform: translateX(-50%); display: flex; align-items: center; gap: var(--s2);
   padding: var(--s1) var(--s3); background: var(--wood-dark); border: 2px solid var(--wood); border-radius: var(--r2); color: var(--paper); font: 700 var(--f2) var(--font);
   box-shadow: 0 2px 0 var(--ink); }
 .weapon .icon { width: 39px; height: 26px; }
@@ -75,6 +76,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
   color: var(--ink); border: 12px solid transparent; border-image: url('../assets/ui_card.png') 8 fill / 12px stretch; background: none; font: inherit; }
 .card:active { transform: translateY(2px); }
 .card strong { font-size: var(--f3); }
+.card small { font-size: var(--f1); font-weight: 800; }
+.card:disabled { filter: grayscale(.9); opacity: .75; }
+.card u { text-decoration: none; font-size: var(--f1); font-weight: 800; padding: 0 var(--s2); border-radius: var(--r2); background: var(--wood-dark); color: var(--paper); }
 .card em { font-style: normal; font-size: var(--f1); font-weight: 800; padding: 0 var(--s2); border-radius: var(--r2); background: var(--grey); color: var(--paper); }
 .card[data-rarity='rare'] em { background: var(--frost); color: var(--ink); }
 .card[data-rarity='epic'] em { background: var(--rose); }
@@ -102,5 +106,5 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 @keyframes hurt { 0% { opacity: .7; } 100% { opacity: 0; } }
 .fl { position: absolute; left: 0; top: 0; transform: translate(calc(var(--x) * 1px), calc(var(--y) * 1px)) translate(-50%, -50%); font: 800 var(--f2) var(--font);
   color: var(--paper); text-shadow: 0 1px 0 var(--ink), 0 0 3px var(--ink); animation: fl .6s ease-out forwards; }
-.fl.coin { color: var(--gold); } .fl.hurt { color: var(--red); font-size: var(--f3); } .fl.burn { color: var(--rose); }
+.fl.coin { color: var(--gold); } .fl.crit { color: var(--gold); font-size: var(--f3); } .fl.hurt { color: var(--red); font-size: var(--f3); } .fl.burn { color: var(--rose); }
 @keyframes fl { 0% { opacity: 1; margin-top: 0; } 100% { opacity: 0; margin-top: -26px; } }

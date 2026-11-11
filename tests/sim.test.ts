@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { LAST_DAY, STAR_COST, WEAPONS, magSize, nextUnlock, starMul, sustainedDps, unlockedWeapons, zombieHp } from '../src/content/data';
+import { CLASSES, CRIT_MUL, LAST_DAY, STAR_COST, TURRET, WEAPONS, magSize, nextUnlock, starMul, sustainedDps, unlockedClasses, unlockedWeapons, zombieHp } from '../src/content/data';
 import { runBot } from '../src/sim/bot';
-import { MAX_CARRY, command, damageMul, newRun, step } from '../src/sim/sim';
+import { MAX_CARRY, command, damageMul, newRun, step, turretUpgradeCost } from '../src/sim/sim';
 import { NO_INPUT, type RunState } from '../src/sim/types';
 
 const clone = (r: RunState): RunState => JSON.parse(JSON.stringify(r));
@@ -117,8 +117,42 @@ describe('成长', () => {
   test('星星解锁新武器进掉落池', () => {
     expect(unlockedWeapons(0)).toEqual(['smg']);
     expect(unlockedWeapons(3)).toEqual(['smg', 'shotgun']);
-    expect(nextUnlock(3)!.weapon).toBe('rifle');
+    expect(nextUnlock(3)!.id).toBe('rifle');
     expect(nextUnlock(99)).toBeUndefined();
+    // 职业也靠星星解锁：一开始只有枪手，2 颗星解锁工程师；主厨要等食堂做出来
+    expect(unlockedClasses(0)).toEqual(['gunner']);
+    expect(nextUnlock(0)!.id).toBe('engineer');
+    expect(unlockedClasses(99)).toEqual(['gunner', 'engineer']);
+    expect(CLASSES.chef.comingSoon).toBeTruthy();
+  });
+});
+
+describe('职业', () => {
+  test('枪手「鹰眼」：持续时间内必暴、全穿透，之后进冷却', () => {
+    const r = newRun(7, ['smg'], 'gunner'); r.spawn.left = 0; r.spawn.timer = 1e9; r.player.x = 300;
+    const a = zombie(r, 380), b = zombie(r, 420);
+    expect(step(r, { ...NO_INPUT, skill: true }).some((e) => e.t === 'skill')).toBe(true);
+    const hits: { id: number; dmg: number; crit?: boolean }[] = [];
+    for (let i = 0; i < 20; i++) for (const e of step(r, { ...NO_INPUT, fire: i === 0 })) if (e.t === 'hit' && e.dmg > 15) hits.push(e);
+    expect(new Set(hits.map((h) => h.id))).toEqual(new Set([a.id, b.id]));
+    expect(hits.every((h) => h.crit && h.dmg === WEAPONS.pistol.damage * CRIT_MUL)).toBe(true);
+    expect(r.skill.cd).toBeGreaterThan(0);
+    expect(step(r, { ...NO_INPUT, skill: true }).some((e) => e.t === 'skill')).toBe(false);
+  });
+  test('工程师：升塔便宜 25%，塔伤害 +20%，「过载」时塔攻速翻倍', () => {
+    const count = (cls: 'gunner' | 'engineer', skill: boolean) => {
+      const r = newRun(7, ['smg'], cls); r.spawn.left = 0; r.spawn.timer = 1e9; r.player.x = 60; zombie(r, 400);
+      let shots = 0, dmg = 0;
+      for (let i = 0; i < 300; i++) for (const e of step(r, { ...NO_INPUT, skill: skill && i === 0 })) { if (e.t === 'shot' && e.from === 'turret') shots++; if (e.t === 'hit') dmg = e.dmg; }
+      return { shots, dmg, cost: turretUpgradeCost(r) };
+    };
+    const base = count('gunner', false), eng = count('engineer', false), over = count('engineer', true);
+    expect(eng.dmg).toBe(Math.round(TURRET.levels[0].damage * 1.2));
+    expect(eng.cost).toBeLessThan(base.cost);
+    expect(over.shots).toBeGreaterThan(eng.shots * 1.8);
+  });
+  test('两个能选的职业机器人都能打完', () => {
+    for (const cls of ['gunner', 'engineer'] as const) expect(runBot(newRun(11, ['smg'], cls)).won, cls).toBe(true);
   });
 });
 

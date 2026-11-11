@@ -20,7 +20,11 @@ const L = require('./lib.cjs');
   check(fill.w === fill.vw && fill.h === fill.vh, `画面铺满屏幕，没有黑边 (${fill.w}x${fill.h} / ${fill.vw}x${fill.vh})`);
 
   await g.tap('#btn-start');
-  check((await g.state()).panel === null, '点「开始」进入战斗');
+  check((await g.state()).panel === 'class', '点「开始」先选职业');
+  await g.shot('01b-class'); await fits('#panel-class');
+  check(await g.page.evaluate(() => document.querySelector('#panel-class [data-class=engineer]').disabled && document.querySelector('#panel-class [data-class=chef]').disabled), '没解锁的职业点不了');
+  await g.tap('#panel-class [data-class=gunner]');
+  check((await g.state()).panel === null, '选了职业进入战斗');
 
   // 摇杆：往右推，角色要往右走
   const pad = await g.center('#pad');
@@ -34,6 +38,12 @@ const L = require('./lib.cjs');
   check(await until((s) => s.zombies >= 3 && s.target !== null, 30000, '等僵尸进射程'), '按住开火后自动锁定目标');
   await g.shot('02-fight');
   check(await until((s) => s.kills >= 3, 30000, '等击杀'), '按住开火能打死僵尸');
+  // 主动技能：松开开火，点一下技能键，再按回开火
+  await g.touch('touchEnd');
+  await g.tap('#key-skill');
+  check(await g.page.evaluate(() => window.__game.run.skill.cd > 0), '技能键能放技能');
+  await g.shot('02b-skill');
+  await g.touch('touchStart', fire.x, fire.y);
   check(await until((s) => s.phase !== 'fight', 120000, '等第 1 天清场'), '第 1 天能清场');
   await g.touch('touchEnd');
   await g.shot('03-clear');
@@ -85,6 +95,8 @@ const L = require('./lib.cjs');
   check(await until((st) => st.panel === 'dead', 3000, '等死亡面板'), '血量归零弹出结算');
   await g.shot('09-dead'); await fits('#panel-dead');
   await g.tap('#btn-again');
+  check((await g.state()).panel === 'class', '再来一局先选职业');
+  await g.tap('#panel-class [data-class=gunner]');
   s = await g.state();
   check(s.panel === null && s.day === 1 && s.hp === 100 && s.kills === 0, '再来一局是全新的一局');
   check(await g.page.evaluate(() => window.__game.meta.stars >= 1 && JSON.parse(localStorage.getItem('wz57.meta')).stars === window.__game.meta.stars), '死了也有收获：星星已经存下来');

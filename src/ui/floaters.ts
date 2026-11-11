@@ -3,7 +3,7 @@ import { getScene } from '../view/scene';
 
 const MAX = 28;
 export const floaters = {
-  add(worldX: number, worldY: number, text: string, kind: 'dmg' | 'coin' | 'hurt' | 'burn') {
+  add(worldX: number, worldY: number, text: string, kind: 'dmg' | 'coin' | 'hurt' | 'burn' | 'crit') {
     const layer = document.getElementById('floaters'), scene = getScene();
     if (!layer || !scene) return;
     if (layer.childElementCount >= MAX) layer.firstElementChild!.remove();

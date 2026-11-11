@@ -1,7 +1,7 @@
 // 规则层：纯计算，不碰浏览器。固定每秒 60 步；随机数带种子；同样的种子和输入一定得到同样的结果。
 import {
-  DAY_HEAL, LAST_DAY, MAX_STAR, PERKS, RARITY_WEIGHT, STAR_COST, TURRET, WALL_REPAIR_COST, WEAPONS, ZOMBIES,
-  dayZombieCount, extraBullets, magSize, starMul, zombieHp, type PerkId, type WeaponId, type ZombieKind,
+  CLASSES, CRIT_CHANCE, CRIT_MUL, DAY_HEAL, LAST_DAY, MAX_STAR, PERKS, RARITY_WEIGHT, STAR_COST, TURRET, WALL_REPAIR_COST, WEAPONS, ZOMBIES,
+  dayZombieCount, extraBullets, magSize, starMul, zombieHp, type ClassId, type PerkId, type WeaponId, type ZombieKind,
 } from '../content/data';
 import {
   GROUND_Y, HOME_X, PLAYER_MAX_X, PLAYER_MIN_X, SPAWN_X, TURRET_X, WALL_X,
@@ -28,7 +28,7 @@ function rand(run: RunState): number { // mulberry32
 }
 
 /** 开一局。pool 是这一局能掉落的武器（局外解锁的那些）。 */
-export function newRun(seed = 1, pool: WeaponId[] = ['smg']): RunState {
+export function newRun(seed = 1, pool: WeaponId[] = ['smg'], cls: ClassId = 'gunner'): RunState {
   const run: RunState = {
     seed, rng: seed >>> 0, tick: 0, nextId: 1, day: 0, phase: 'camp', phaseT: 0,
     player: {
@@ -40,7 +40,7 @@ export function newRun(seed = 1, pool: WeaponId[] = ['smg']): RunState {
     wall: { hp: 220, maxHp: 220 }, home: { hp: 100, maxHp: 100 },
     spawn: { left: 0, timer: 0, total: 0, killed: 0, crateAt: 0 },
     coins: 0, scrap: 0, kills: 0, perks: [], perkChoices: [], targetId: null,
-    pool: [...pool], chain: { n: 0, t: 0 }, vanguardT: 0,
+    pool: [...pool], chain: { n: 0, t: 0 }, vanguardT: 0, cls, skill: { t: 0, cd: 0 },
   };
   startDay(run, []);
   return run;
@@ -48,6 +48,9 @@ export function newRun(seed = 1, pool: WeaponId[] = ['smg']): RunState {
 
 const has = (run: RunState, id: PerkId) => run.perks.includes(id);
 export const curWeapon = (run: RunState) => run.player.weapons[run.player.cur];
+const skillActive = (run: RunState, cls: ClassId) => run.cls === cls && run.skill.t > 0;
+/** 升塔要多少废铁（工程师便宜 25%） */
+export const turretUpgradeCost = (run: RunState) => Math.ceil((TURRET.upgradeScrap[run.turret.level] ?? 0) * (run.cls === 'engineer' ? 0.75 : 1));
 export const weaponDamage = (id: WeaponId, star: number) => WEAPONS[id].damage * starMul(star);
 /** 伤害的唯一入口：武器基础 × 星级 × 天赋带来的临时倍率。别处不许再乘。 */
 export function damageMul(run: RunState): number {
@@ -69,7 +72,7 @@ function startDay(run: RunState, ev: GameEvent[]) {
   // 武器箱：第一天必出，之后一半的天数会出
   const crateAt = run.day === 1 || rand(run) < 0.35 ? Math.floor(total / 2) : -1;
   run.spawn = { left: total, timer: 90, total, killed: 0, crateAt };
-  run.bullets = []; run.chain = { n: 0, t: 0 }; run.vanguardT = 0;
+  run.bullets = []; run.chain = { n: 0, t: 0 }; run.vanguardT = 0; run.skill = { t: 0, cd: 0 };
   if (has(run, 'secondwind')) run.player.hp = Math.min(run.player.maxHp, run.player.hp + run.player.maxHp * 0.25);
   ev.push({ t: 'dayStart', day: run.day });
 }
@@ -100,12 +103,12 @@ function pickTarget(run: RunState): Zombie | null {
   return best;
 }
 
-function damageZombie(run: RunState, z: Zombie, dmg: number, ev: GameEvent[], opts: { byPlayer: boolean; burn?: boolean; kb?: number }) {
+function damageZombie(run: RunState, z: Zombie, dmg: number, ev: GameEvent[], opts: { byPlayer: boolean; burn?: boolean; kb?: number; crit?: boolean }) {
   if (z.hp <= 0) return;
   const before = z.hp;
   z.hp -= dmg;
   if (opts.kb) z.kb = Math.max(z.kb, opts.kb);
-  ev.push({ t: 'hit', id: z.id, x: z.x, y: BODY_Y, dmg: Math.round(dmg), burn: opts.burn });
+  ev.push({ t: 'hit', id: z.id, x: z.x, y: BODY_Y, dmg: Math.round(dmg), burn: opts.burn, crit: opts.crit });
   if (opts.byPlayer && has(run, 'lifesteal')) {
     const p = run.player;
     p.healCarry += Math.min(dmg, before) * 0.08;
@@ -141,7 +144,10 @@ function fire(run: RunState, target: Zombie, ev: GameEvent[]) {
   const mx = p.x + p.facing * 26, my = MUZZLE_Y + p.y;
   const tx = target.x - mx, ty = BODY_Y - my, len = Math.hypot(tx, ty) || 1;
   const dx = tx / len, dy = ty / len;
-  const dmg = weaponDamage(ow.id, ow.star) * damageMul(run);
+  // 枪手：15% 暴击；开着「鹰眼」时必暴、全穿透
+  const hawkeye = skillActive(run, 'gunner');
+  const crit = run.cls === 'gunner' && (hawkeye || rand(run) < CRIT_CHANCE);
+  const dmg = weaponDamage(ow.id, ow.star) * damageMul(run) * (crit ? CRIT_MUL : 1);
   const count = (def.pellets ?? 1) + extraBullets(ow.id, ow.star);
   for (let i = 0; i < count; i++) {
     // 霰弹每颗随机散开；单发武器多打出的那颗稍微错开一点
@@ -149,7 +155,7 @@ function fire(run: RunState, target: Zombie, ev: GameEvent[]) {
     const c = Math.cos(a), s = Math.sin(a);
     run.bullets.push({
       x: mx, y: my, vx: (dx * c - dy * s) * def.speed, vy: (dx * s + dy * c) * def.speed, dmg,
-      life: Math.ceil((def.range + 60) / def.speed), from: 'player', pierce: !!def.pierce || has(run, 'pierce'), bounces: 0, hit: [],
+      life: Math.ceil((def.range + 60) / def.speed), from: 'player', pierce: !!def.pierce || has(run, 'pierce') || hawkeye, crit, bounces: 0, hit: [],
     });
   }
   ev.push({ t: 'shot', x: mx, y: my, from: 'player' });
@@ -169,6 +175,12 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
   if (p.dodgeCd > 0) p.dodgeCd--;
   if (p.fireCd > 0) p.fireCd--;
   if (p.shootT > 0) p.shootT--;
+  if (run.skill.t > 0) run.skill.t--;
+  if (run.skill.cd > 0) run.skill.cd--;
+  if (input.skill && run.skill.cd === 0 && !CLASSES[run.cls].comingSoon) {
+    run.skill = { t: CLASSES[run.cls].dur, cd: CLASSES[run.cls].cd };
+    ev.push({ t: 'skill', cls: run.cls });
+  }
   if (p.reloadT > 0 && --p.reloadT === 0) curWeapon(run).ammo = magSize(curWeapon(run).id, curWeapon(run).star);
   if (run.vanguardT > 0) run.vanguardT--;
   if (run.chain.t > 0 && --run.chain.t === 0) run.chain.n = 0;
@@ -248,10 +260,12 @@ function stepTurret(run: RunState, ev: GameEvent[]) {
   let best: Zombie | null = null, bd = TURRET.range;
   for (const z of run.zombies) { const d = Math.abs(z.x - t.x); if (z.x > t.x && d <= bd) { bd = d; best = z; } }
   if (!best) return;
-  t.cd = Math.round(lv.cooldown * (has(run, 'overclock') ? 1 / 1.2 : 1));
+  // 工程师：塔伤害 +20%；开着「过载」时攻速 ×2
+  const eng = run.cls === 'engineer';
+  t.cd = Math.max(1, Math.round(lv.cooldown * (has(run, 'overclock') ? 1 / 1.2 : 1) * (skillActive(run, 'engineer') ? 0.5 : 1)));
   const dx = best.x - t.x, dy = BODY_Y - TURRET_Y, len = Math.hypot(dx, dy);
   t.aim = Math.atan2(dy, dx);
-  run.bullets.push({ x: t.x + 10, y: TURRET_Y, vx: (dx / len) * 9, vy: (dy / len) * 9, dmg: lv.damage, life: 40, from: 'turret', pierce: false, bounces: 0, hit: [] });
+  run.bullets.push({ x: t.x + 10, y: TURRET_Y, vx: (dx / len) * 9, vy: (dy / len) * 9, dmg: lv.damage * (eng ? 1.2 : 1), life: 40, from: 'turret', pierce: false, crit: false, bounces: 0, hit: [] });
   ev.push({ t: 'shot', x: t.x + 10, y: TURRET_Y, from: 'turret' });
 }
 
@@ -266,7 +280,7 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
       if (Math.abs(b.x - z.x) > 11 || b.y < GROUND_Y - 44 || b.y > GROUND_Y) continue;
       b.hit.push(z.id);
       const byPlayer = b.from === 'player';
-      damageZombie(run, z, b.dmg, ev, { byPlayer, kb: byPlayer ? 1.6 : 0.6 });
+      damageZombie(run, z, b.dmg, ev, { byPlayer, kb: byPlayer ? 1.6 : 0.6, crit: b.crit });
       if (byPlayer && has(run, 'incendiary') && z.hp > 0 && rand(run) < 0.25) z.burnT = 180;
       if (byPlayer && has(run, 'frostbite')) z.slowT = 120;
       if (byPlayer && has(run, 'ricochet') && b.bounces < 3 && rand(run) < 0.5) {
@@ -347,8 +361,8 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
     }
     case 'upgradeTurret': {
       const t = run.turret;
-      if (t.level >= TURRET.levels.length || run.scrap < TURRET.upgradeScrap[t.level]) return null;
-      run.scrap -= TURRET.upgradeScrap[t.level]; t.level++;
+      if (t.level >= TURRET.levels.length || run.scrap < turretUpgradeCost(run)) return null;
+      run.scrap -= turretUpgradeCost(run); t.level++;
       return ev;
     }
     case 'repairWall':

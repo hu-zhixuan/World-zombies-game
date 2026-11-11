@@ -99,6 +99,11 @@
   "frames": 1,
   "fw": 16
  },
+ "ic_chef": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
  "ic_coin": {
   "fh": 16,
   "frames": 1,
