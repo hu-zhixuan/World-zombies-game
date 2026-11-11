@@ -93,7 +93,7 @@ def main():
                       ('ic_crate', 14, 8), ('ic_pierce', 8, 0), ('ic_ricochet', 13, 11), ('ic_overkill', 1, 8),
                       ('ic_lifesteal', 9, 12), ('ic_incendiary', 4, 8), ('ic_overclock', 0, 12),
                       ('ic_frostbite', 0, 8), ('ic_chainkill', 1, 11), ('ic_vanguard', 9, 15), ('ic_bloodfrenzy', 8, 12),
-                      ('ic_glasscannon', 1, 7), ('ic_secondwind', 11, 12), ('ic_star', 15, 7)]:
+                      ('ic_glasscannon', 1, 7), ('ic_secondwind', 11, 12), ('ic_star', 15, 7), ('ic_chef', 9, 7)]:
         save(key, ic.crop((c * 16, r * 16, c * 16 + 16, r * 16 + 16)))
     save('wp_pistol', img('guns', 'desert_hawk.png'))
     save('wp_smg', img('guns', GUN_SMG))

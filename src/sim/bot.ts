@@ -7,7 +7,7 @@ export function botInput(run: RunState): Input {
   const crate = run.crates[0];
   const goal = run.phase === 'clear' && crate ? crate.x : crate && run.zombies.every((z) => z.x > crate.x + 60) ? crate.x : WALL_X - 60;
   const dx = goal - p.x;
-  return { move: Math.abs(dx) < 3 ? 0 : Math.sign(dx), fire: run.zombies.length > 0, jump: false, dodge: false, reload: false, swap: false };
+  return { move: Math.abs(dx) < 3 ? 0 : Math.sign(dx), fire: run.zombies.length > 0, jump: false, dodge: false, reload: false, swap: false, skill: run.zombies.length >= 4 };
 }
 
 export interface BotReport { won: boolean; ticks: number; days: { day: number; seconds: number; hpLost: number; wallLost: number }[]; events: GameEvent[] }

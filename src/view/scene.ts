@@ -183,7 +183,7 @@ export class GameScene extends Phaser.Scene {
       case 'hit':
         this.flashUntil.set(e.id, now + 70);
         this.burst('shot_hit', e.x + Phaser.Math.Between(-4, 4), e.y + Phaser.Math.Between(-6, 6));
-        floaters.add(e.x, e.y - 22, String(e.dmg), e.burn ? 'burn' : 'dmg');
+        floaters.add(e.x, e.y - 22, String(e.dmg), e.burn ? 'burn' : e.crit ? 'crit' : 'dmg');
         break;
       case 'kill':
         this.burst('z_death', e.x, GROUND_Y - 26);
@@ -198,6 +198,7 @@ export class GameScene extends Phaser.Scene {
       case 'hurt': this.cameras.main.shake(140, 0.006); floaters.add(game.run.player.x, MUZZLE_Y - 34, '-' + e.dmg, 'hurt'); break;
       case 'wallHit': this.tweens.add({ targets: this.wallParts, x: '+=2', duration: 40, yoyo: true }); break;
       case 'dayStart': this.camX = this.targetCamX(); break;
+      case 'skill': this.cameras.main.flash(180, (C.lamp >> 16) & 255, (C.lamp >> 8) & 255, C.lamp & 255); break;
     }
   }
 

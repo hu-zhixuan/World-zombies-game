@@ -72,13 +72,36 @@ export const perkDef = (id: PerkId) => PERKS.find((p) => p.id === id)!;
 /** 三选一时的出现权重：越稀有越少见 */
 export const RARITY_WEIGHT: Record<Rarity, number> = { common: 10, rare: 6, epic: 3, legendary: 1 };
 
+// ── 职业：一个被动 + 一个主动技能，决定这一局怎么打 ──
+export type ClassId = 'gunner' | 'engineer' | 'chef';
+export interface ClassDef {
+  id: ClassId; name: string; role: string; icon: string; passive: string; skill: string; skillDesc: string;
+  /** 主动技能的持续时间和冷却（步） */
+  dur: number; cd: number;
+  /** 还没做完的职业先摆出来，但不能选 */
+  comingSoon?: string;
+}
+export const CLASSES: Record<ClassId, ClassDef> = {
+  gunner: { id: 'gunner', name: '枪手', role: '主角输出', icon: 'wp_rifle', passive: '暴击率 +15%', skill: '鹰眼', skillDesc: '5 秒全穿透 + 必暴', dur: 300, cd: 1200 },
+  engineer: { id: 'engineer', name: '工程师', role: '塔防', icon: 'ic_turret', passive: '塔造价 -25%，塔伤害 +20%', skill: '过载', skillDesc: '所有塔 6 秒攻速 ×2', dur: 360, cd: 1200 },
+  chef: { id: 'chef', name: '主厨', role: '经营', icon: 'ic_chef', passive: '每只僵尸多掉 1 块肉，菜的 buff +50%', skill: '战地大餐', skillDesc: '回 40% 血 + 8 秒攻速', dur: 480, cd: 1200, comingSoon: '食堂开张后开放' },
+};
+export const CRIT_CHANCE = 0.15;
+export const CRIT_MUL = 2;
+
 // ── 一局的长度 ──
 export const LAST_DAY = 5; // 试玩版先做前 5 天
 export const WALL_REPAIR_COST = 10;
 export const DAY_HEAL = 0.3; // 每天出发前回 30% 血：受的伤会带到明天
 
 // ── 局外成长：每撑过一天得一颗星，星星永久保留，用来解锁新武器进掉落池 ──
-export interface Unlock { stars: number; weapon: WeaponId }
-export const UNLOCKS: Unlock[] = [{ stars: 0, weapon: 'smg' }, { stars: 3, weapon: 'shotgun' }, { stars: 8, weapon: 'rifle' }];
-export const unlockedWeapons = (stars: number) => UNLOCKS.filter((u) => stars >= u.stars).map((u) => u.weapon);
+export type Unlock = { stars: number; kind: 'weapon'; id: WeaponId } | { stars: number; kind: 'class'; id: ClassId };
+export const UNLOCKS: Unlock[] = [
+  { stars: 0, kind: 'weapon', id: 'smg' }, { stars: 0, kind: 'class', id: 'gunner' },
+  { stars: 2, kind: 'class', id: 'engineer' }, { stars: 3, kind: 'weapon', id: 'shotgun' }, { stars: 8, kind: 'weapon', id: 'rifle' },
+];
+export const unlockedWeapons = (stars: number) => UNLOCKS.flatMap((u) => (u.kind === 'weapon' && stars >= u.stars ? [u.id] : []));
+export const unlockedClasses = (stars: number) => UNLOCKS.flatMap((u) => (u.kind === 'class' && stars >= u.stars ? [u.id] : []));
+export const classUnlockStars = (id: ClassId) => UNLOCKS.find((u) => u.kind === 'class' && u.id === id)?.stars;
 export const nextUnlock = (stars: number) => UNLOCKS.find((u) => stars < u.stars);
+export const unlockName = (u: Unlock) => (u.kind === 'weapon' ? WEAPONS[u.id].name : `职业「${CLASSES[u.id].name}」`);

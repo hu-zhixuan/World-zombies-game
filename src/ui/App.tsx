@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useState } from 'preact/hooks';
 import { game } from '../app/game';
-import { DAY_HEAL, LAST_DAY, MAX_STAR, RARITY_NAME, STAR_COST, STAR_PERKS, TURRET, WALL_REPAIR_COST, WEAPONS, newZombieOn, nextUnlock, perkDef } from '../content/data';
-import { dayRemaining } from '../sim/sim';
+import { CLASSES, DAY_HEAL, LAST_DAY, MAX_STAR, RARITY_NAME, STAR_COST, STAR_PERKS, TURRET, WALL_REPAIR_COST, WEAPONS, classUnlockStars, newZombieOn, nextUnlock, perkDef, unlockName } from '../content/data';
+import { dayRemaining, turretUpgradeCost } from '../sim/sim';
 import type { GameEvent } from '../sim/types';
 import { Keys, Pad, WeaponChip } from './controls';
 import { Bar, Btn, Chip, Icon, Panel, Stars } from './parts';
@@ -34,7 +34,7 @@ function Progress(p: { gain?: number }) {
   return (
     <div class="note" id="meta-progress">
       <Icon k="ic_star" />{p.gain !== undefined && <>这一局 <b>+{p.gain}</b> · </>}星星 <b>{stars}</b>
-      {next ? <> · 再攒 <b>{next.stars - stars}</b> 颗解锁「{WEAPONS[next.weapon].name}」</> : <> · 武器已全部解锁</>}
+      {next ? <> · 再攒 <b>{next.stars - stars}</b> 颗解锁 {unlockName(next)}</> : <> · 已全部解锁</>}
     </div>
   );
 }
@@ -51,6 +51,28 @@ function PerkPanel() {
           return (
             <button class="card" key={id} data-perk={id} data-rarity={perk.rarity} onClick={() => game.send({ t: 'pickPerk', id })}>
               <Icon k={perk.icon} cls="x3" /><strong>{perk.name}</strong><em>{RARITY_NAME[perk.rarity]}</em><span>{perk.desc}</span>
+            </button>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+/** 开局选职业：决定这一局怎么打 */
+function ClassPanel() {
+  const stars = game.meta.stars;
+  return (
+    <Panel id="panel-class" title="选一个职业" sub="一个被动加一个主动技能，决定这一局怎么打">
+      <div class="row">
+        {Object.values(CLASSES).map((c) => {
+          const need = classUnlockStars(c.id) ?? 0;
+          const lock = c.comingSoon ?? (stars < need ? `再攒 ${need - stars} 颗星解锁` : '');
+          return (
+            <button class="card" key={c.id} data-class={c.id} disabled={!!lock} onClick={() => game.restart(c.id)}>
+              <Icon k={c.icon} cls="x3" /><strong>{c.name}</strong><em>{c.role}</em>
+              <span>{c.passive}</span><small>{c.skill}：{c.skillDesc}</small>
+              {lock && <u>{lock}</u>}
             </button>
           );
         })}
@@ -95,8 +117,8 @@ function WorkshopPanel() {
         <div class="item">
           <Icon k="ic_turret" cls="x2" />
           <span class="grow"><b>{TURRET.name}</b><small>{t.level} 级</small></span>
-          <Btn kind="small" id="btn-turret" disabled={turretMax || run.scrap < TURRET.upgradeScrap[t.level]} onClick={() => game.send({ t: 'upgradeTurret' })}>
-            {turretMax ? '已满级' : <>升级 <Icon k="ic_scrap" />{TURRET.upgradeScrap[t.level]}</>}
+          <Btn kind="small" id="btn-turret" disabled={turretMax || run.scrap < turretUpgradeCost(run)} onClick={() => game.send({ t: 'upgradeTurret' })}>
+            {turretMax ? '已满级' : <>升级 <Icon k="ic_scrap" />{turretUpgradeCost(run)}</>}
           </Btn>
         </div>
         <div class="item">
@@ -120,6 +142,7 @@ function Toasts() {
     else if (e.t === 'dayClear') text = game.run.crates.length ? '清场！去把地上的箱子捡了' : '清场！';
     else if (e.t === 'pickup' && e.isNew) { text = `新武器：${WEAPONS[e.weapon].name}`; big = true; }
     else if (e.t === 'star') { text = `${WEAPONS[e.weapon].name} 升到 ${'★'.repeat(e.star)}${STAR_PERKS[e.star] ? ' · ' + STAR_PERKS[e.star] : ''}`; big = true; }
+    else if (e.t === 'skill') { text = `${CLASSES[e.cls].skill}！${CLASSES[e.cls].skillDesc}`; big = true; }
     else if (e.t === 'hurt') setHurt((n) => n + 1);
     if (!text) return;
     const id = Math.random();
@@ -140,7 +163,7 @@ export function App() {
   const panel = game.panel(), run = game.run;
   return (
     <>
-      {panel !== 'title' && <Hud />}
+      {panel !== 'title' && panel !== 'class' && <Hud />}
       {panel === null && <><Pad /><WeaponChip /><Keys /></>}
       <Toasts />
       {panel === 'title' && (
@@ -148,9 +171,10 @@ export function App() {
           <h1>十五波围城</h1>
           <p>黄昏了，僵尸要来了。守住路障，活过每一天。（试玩版 · 前 {LAST_DAY} 天）</p>
           <Progress />
-          <Btn id="btn-start" kind="primary" onClick={() => game.restart()}>开始</Btn>
+          <Btn id="btn-start" kind="primary" onClick={() => game.chooseClass()}>开始</Btn>
         </Panel>
       )}
+      {panel === 'class' && <ClassPanel />}
       {panel === 'perk' && <PerkPanel />}
       {panel === 'camp' && <CampPanel />}
       {panel === 'workshop' && <WorkshopPanel />}
@@ -165,13 +189,13 @@ export function App() {
       {panel === 'dead' && (
         <Panel id="panel-dead" title="据点失守" sub={`撑到了第 ${run.day} 天，击杀 ${run.kills} 只`}>
           <Progress gain={game.lastGain} />
-          <Btn id="btn-again" kind="primary" onClick={() => game.restart()}>再来一局</Btn>
+          <Btn id="btn-again" kind="primary" onClick={() => game.chooseClass()}>再来一局</Btn>
         </Panel>
       )}
       {panel === 'won' && (
         <Panel id="panel-won" title="守住了！" sub={`试玩版到此为止。${LAST_DAY} 天里击杀 ${run.kills} 只。`}>
           <Progress gain={game.lastGain} />
-          <Btn id="btn-again" kind="primary" onClick={() => game.restart()}>再来一局</Btn>
+          <Btn id="btn-again" kind="primary" onClick={() => game.chooseClass()}>再来一局</Btn>
         </Panel>
       )}
     </>

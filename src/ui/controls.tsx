@@ -1,7 +1,7 @@
 // 触屏按键和键盘。只负责把「按了什么」告诉游戏，不直接改状态。
 import { useRef } from 'preact/hooks';
 import { game } from '../app/game';
-import { WEAPONS, magSize } from '../content/data';
+import { CLASSES, WEAPONS, magSize } from '../content/data';
 import { curWeapon } from '../sim/sim';
 import { Bar, Icon, Stars } from './parts';
 
@@ -29,11 +29,11 @@ export function Pad() {
   );
 }
 
-function Key(props: { id: string; cls?: string; label?: string; onDown: () => void; onUp?: () => void; cooling?: boolean; children?: preact.ComponentChildren }) {
+function Key(props: { id: string; cls?: string; label?: string; onDown: () => void; onUp?: () => void; cooling?: boolean; lit?: boolean; children?: preact.ComponentChildren }) {
   const down = (e: PointerEvent) => { const el = e.currentTarget as HTMLElement; el.setPointerCapture(e.pointerId); el.classList.add('down'); props.onDown(); };
   const up = (e: PointerEvent) => { (e.currentTarget as HTMLElement).classList.remove('down'); props.onUp?.(); };
   return (
-    <button id={props.id} class={`key ${props.cls ?? ''} ${props.cooling ? 'cooling' : ''}`} onPointerDown={down} onPointerUp={up} onPointerCancel={up}>
+    <button id={props.id} class={`key ${props.cls ?? ''} ${props.lit ? 'lit' : props.cooling ? 'cooling' : ''}`} onPointerDown={down} onPointerUp={up} onPointerCancel={up}>
       {props.children ?? props.label}
     </button>
   );
@@ -45,6 +45,7 @@ export function Keys() {
   return (
     <div class="keys">
       <Key id="key-reload" cls="small" label="换弹" onDown={() => game.press('reload')} cooling={run.player.reloadT > 0} />
+      <Key id="key-skill" label={CLASSES[run.cls].skill.slice(0, 1)} onDown={() => game.press('skill')} cooling={run.skill.cd > 0} lit={run.skill.t > 0} />
       <Key id="key-jump" label="跳" onDown={() => game.press('jump')} />
       <Key id="key-dodge" label="闪" onDown={() => game.press('dodge')} cooling={run.player.dodgeCd > 0} />
       <Key id="key-fire" cls="fire" onDown={() => { game.held.fire = true; }} onUp={() => { game.held.fire = false; }}>
