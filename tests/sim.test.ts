@@ -5,9 +5,9 @@ import {
 } from '../src/content/data';
 import { runBot } from '../src/sim/bot';
 import {
-  BODY_Y, MAX_CARRY, command, damageMul, effectiveRange, isOnRoof, meatPrice, newRun, step, turretBuildCost, turretUpgradeCost,
+  BODY_Y, MAX_CARRY, command, damageMul, effectiveRange, isOnPorch, isOnRoof, meatPrice, newRun, step, turretBuildCost, turretUpgradeCost,
 } from '../src/sim/sim';
-import { DOOR_X, IN_STATIONS, LADDER_X, NO_INPUT, ROOF_MAX_X, ROOF_Y, WALL_X, type RunState } from '../src/sim/types';
+import { DOOR_X, HOUSE_WALL_X, IN_STATIONS, NO_INPUT, PORCH_MAX_X, PORCH_Y, ROOF_Y, WALL_X, type RunState } from '../src/sim/types';
 
 const clone = (r: RunState): RunState => JSON.parse(JSON.stringify(r));
 const zombie = (r: RunState, x: number, hp = 100000, kind: 'roamer' | 'ghoul' | 'boss_beast' = 'roamer') => {
@@ -22,41 +22,83 @@ const quiet = (keepTurret = false) => {
   return r;
 };
 
-describe('手感曲线', () => {
+describe('手感曲线与枪械特色', () => {
   test('开局手枪打第 1 天的普通僵尸不超过 4 枪', () => {
     expect(Math.ceil(zombieHp('roamer', 1) / WEAPONS.pistol.damage)).toBeLessThanOrEqual(4);
   });
-  test('不同定位武器：突击步枪高于自卫手枪', () => {
+  test('不同定位武器：突击步枪高于自卫手枪，且每把武器皆有鲜明特色标签与说明', () => {
     expect(sustainedDps(WEAPONS.assault)).toBeGreaterThan(sustainedDps(WEAPONS.pistol) * 1.4);
-  });
-  test('主武器 8 把均可正常算出持续 DPS', () => {
     for (const id of Object.keys(WEAPONS) as (keyof typeof WEAPONS)[]) {
       expect(sustainedDps(WEAPONS[id], 1)).toBeGreaterThan(30);
+      expect(WEAPONS[id].trait.length).toBeGreaterThanOrEqual(4);
+      expect(WEAPONS[id].desc.length).toBeGreaterThanOrEqual(10);
     }
+  });
+  test('左轮穿甲 2 人、霰弹近身 1.4x 增伤、急冻步枪碎冰溅射、狙击枪磁轨光束', () => {
+    // 左轮穿甲 2 名僵尸
+    const rRev = quiet(); rRev.player.x = 300; rRev.player.y = 0; rRev.autoFire = false;
+    rRev.player.weapons = [{ id: 'revolver', star: 1, ammo: 6 }];
+    const z1 = zombie(rRev, 360, 500), z2 = zombie(rRev, 390, 500), z3 = zombie(rRev, 420, 500);
+    for (let i = 0; i < 18; i++) step(rRev, { ...NO_INPUT, fire: i === 0 });
+    expect(z1.hp).toBeLessThan(500);
+    expect(z2.hp).toBeLessThan(500);
+    expect(z3.hp).toBe(500);
+
+    // 急冻步枪命中已减速目标触发碎冰范围伤害
+    const rIce = quiet(); rIce.player.x = 300; rIce.player.y = 0; rIce.autoFire = false;
+    rIce.player.weapons = [{ id: 'assault', star: 1, ammo: 32 }];
+    const zSlow = zombie(rIce, 360, 500); zSlow.slowT = 60;
+    const zNear = zombie(rIce, 385, 500);
+    let frostEv = false;
+    for (let i = 0; i < 15; i++) {
+      for (const e of step(rIce, { ...NO_INPUT, fire: i === 0 })) if (e.t === 'frost') frostEv = true;
+    }
+    expect(frostEv).toBe(true);
+    expect(zNear.hp).toBeLessThan(500);
+
+    // 精锐反器材狙发射全屏磁轨光束事件
+    const rRifle = quiet(); rRifle.player.x = 300; rRifle.player.y = 0; rRifle.autoFire = false;
+    rRifle.player.weapons = [{ id: 'rifle', star: 1, ammo: 6 }];
+    zombie(rRifle, 450, 500);
+    const evs = step(rRifle, { ...NO_INPUT, fire: true });
+    expect(evs.some((e) => e.t === 'railbeam')).toBe(true);
   });
 });
 
-describe('房顶走位与纯自动瞄准', () => {
-  test('开局站在房顶防御，越过右缘走下庭院，靠近木梯按跳可爬回房顶', () => {
-    const r = quiet();
+describe('2D 小屋实体碰撞、阶梯跳台与自动瞄准', () => {
+  test('一楼有实体砖墙阻挡不穿模，玩家可通过门廊阶梯二次跳跃亲自跳上二楼房顶', () => {
+    const r = quiet(); r.spawn.left = 99;
     expect(isOnRoof(r)).toBe(true);
     expect(r.player.y).toBe(ROOF_Y);
-    // 向右走过 ROOF_MAX_X 落到庭院地面
-    while (r.player.x <= ROOF_MAX_X + 6) step(r, { ...NO_INPUT, move: 1 });
+    // 向右走过二楼房顶与中层门廊，落到庭院地面
+    while (r.player.x <= PORCH_MAX_X + 8) step(r, { ...NO_INPUT, move: 1 });
     for (let i = 0; i < 45; i++) step(r, NO_INPUT);
     expect(isOnRoof(r)).toBe(false);
     expect(r.player.y).toBe(0);
-    // 走到梯子附近点跳 / 交互回到房顶
-    r.player.x = LADDER_X;
+
+    // 在地面一直往左走，会被小屋一楼右侧实体砖墙 (HOUSE_WALL_X) 挡住，绝不穿进屋内
+    for (let i = 0; i < 80; i++) step(r, { ...NO_INPUT, move: -1 });
+    expect(r.player.x).toBe(HOUSE_WALL_X);
+    expect(r.player.y).toBe(0);
+
+    // 第一跳：从门廊地面跳上中层木挑台 (PORCH_Y = -48)
     step(r, { ...NO_INPUT, jump: true });
+    for (let i = 0; i < 38; i++) step(r, NO_INPUT);
+    expect(isOnPorch(r)).toBe(true);
+    expect(r.player.y).toBe(PORCH_Y);
+
+    // 第二跳：从中层木挑台跳上二层屋顶防守平台 (ROOF_Y = -92)
+    step(r, { ...NO_INPUT, jump: true, move: -1 });
+    for (let i = 0; i < 40; i++) step(r, { ...NO_INPUT, move: -1 });
     expect(isOnRoof(r)).toBe(true);
     expect(r.player.y).toBe(ROOF_Y);
+    expect(r.player.x).toBeLessThan(HOUSE_WALL_X); // 在二楼房顶可以自由走到小屋正上方
   });
 
-  test('纯自动开火不需要按开火键：进入射程自动转身并击杀背后僵尸', () => {
+  test('自动瞄准开火：进入射程自动转身并击杀背后僵尸', () => {
     const r = quiet(); r.player.x = 400; r.player.y = 0; r.player.facing = 1;
     const behind = zombie(r, 300, 60); zombie(r, 850);
-    for (let i = 0; i < 90; i++) step(r, NO_INPUT);
+    for (let i = 0; i < 90; i++) step(r, { ...NO_INPUT, fire: true });
     expect(r.player.facing).toBe(-1);
     expect(r.zombies.find((z) => z.id === behind.id)).toBeUndefined();
   });
@@ -80,7 +122,7 @@ describe('房顶走位与纯自动瞄准', () => {
   });
 
   test('射程外不锁、不乱转身、不白打空弹匣', () => {
-    const r = quiet(); r.player.x = 100; r.player.y = 0; zombie(r, 800);
+    const r = quiet(); r.player.x = 300; r.player.y = 0; zombie(r, 850);
     const ev = step(r, NO_INPUT);
     expect(r.targetId).toBeNull();
     expect(r.player.facing).toBe(1);
@@ -91,7 +133,7 @@ describe('房顶走位与纯自动瞄准', () => {
   test('打空自动换弹，换完接着打', () => {
     const r = quiet(); r.player.x = 300; r.player.y = 0; zombie(r, 420);
     let reloads = 0, shots = 0;
-    for (let i = 0; i < 600; i++) for (const e of step(r, NO_INPUT)) { if (e.t === 'reload') reloads++; if (e.t === 'shot' && e.from === 'player') shots++; }
+    for (let i = 0; i < 600; i++) for (const e of step(r, { ...NO_INPUT, fire: true })) { if (e.t === 'reload') reloads++; if (e.t === 'shot' && e.from === 'player') shots++; }
     expect(reloads).toBeGreaterThanOrEqual(2);
     expect(shots).toBeGreaterThan(WEAPONS.pistol.mag * 2);
   });
@@ -99,22 +141,22 @@ describe('房顶走位与纯自动瞄准', () => {
 
 describe('武器升星、手雷、护甲与商店', () => {
   test('捡到新武器进武器栏，捡到已有的升星，满星转废铁', () => {
-    const r = quiet(); r.player.x = 200; r.player.y = 0;
-    r.crates.push({ id: 900, x: 200, weapon: 'smg' });
+    const r = quiet(); r.player.x = 280; r.player.y = 0;
+    r.crates.push({ id: 900, x: 280, weapon: 'smg' });
     expect(step(r, NO_INPUT).some((e) => e.t === 'pickup' && e.isNew)).toBe(true);
     expect(r.player.weapons.map((w) => w.id)).toEqual(['pistol', 'smg']);
-    r.crates.push({ id: 901, x: 200, weapon: 'smg' });
+    r.crates.push({ id: 901, x: 280, weapon: 'smg' });
     expect(step(r, NO_INPUT).some((e) => e.t === 'star' && e.star === 2)).toBe(true);
     r.player.weapons[0].star = 5;
-    r.crates.push({ id: 902, x: 200, weapon: 'pistol' }); step(r, NO_INPUT);
+    r.crates.push({ id: 902, x: 280, weapon: 'pistol' }); step(r, NO_INPUT);
     expect(r.scrap).toBe(4);
   });
 
   test('随身最多 3 把武器：超出时替换手中武器', () => {
-    const r = quiet(); r.player.x = 200; r.player.y = 0;
+    const r = quiet(); r.player.x = 280; r.player.y = 0;
     r.player.weapons.push({ id: 'smg', star: 1, ammo: 10 }, { id: 'revolver', star: 1, ammo: 6 });
     r.player.cur = 1;
-    r.crates.push({ id: 900, x: 200, weapon: 'shotgun' }); step(r, NO_INPUT);
+    r.crates.push({ id: 900, x: 280, weapon: 'shotgun' }); step(r, NO_INPUT);
     expect(r.player.weapons.map((w) => w.id)).toEqual(['pistol', 'shotgun', 'revolver']);
     expect(r.player.weapons.length).toBe(MAX_CARRY);
   });
@@ -153,18 +195,26 @@ describe('武器升星、手雷、护甲与商店', () => {
   });
 });
 
-describe('酒馆室内、小厨房、4 炮塔与堡垒路障升级', () => {
-  test('选完天赋自动进酒馆屋内，可步行去厨房/商店/出门并炒肉做特餐', () => {
+describe('酒馆室内、深夜小食堂食客招待、4 炮塔与堡垒路障升级', () => {
+  test('选完天赋自动进酒馆屋内，可招待 3 位堂食熟客赢取满堂打赏、留私房特餐并现炒鲜肉', () => {
     const r = quiet(); r.phase = 'perk'; r.perkChoices = ['rooftop'];
     command(r, { t: 'pickPerk', id: 'rooftop' });
     expect(r.phase).toBe('camp');
     expect(r.inside).toBe(true);
-    r.meat = 5;
+    expect(r.guests.length).toBe(3);
+
+    r.meat = 10;
+    for (const g of r.guests) {
+      const ev = command(r, { t: 'serveGuest', guestId: g.id });
+      expect(ev).not.toBeNull();
+    }
+    expect(r.guests.every((g) => g.served)).toBe(true);
+    expect(r.coins).toBeGreaterThan(60);
+
     command(r, { t: 'pickMeal', id: 'spicy_skewer' });
     expect(r.meal).toBe('spicy_skewer');
-    command(r, { t: 'cookSell', count: 3 });
+    if (r.meat > 0) command(r, { t: 'cookSell', count: r.meat });
     expect(r.meat).toBe(0);
-    expect(r.coins).toBe(3 * meatPrice('gunner'));
     // 出门与进门
     r.player.x = IN_STATIONS.door;
     step(r, { ...NO_INPUT, interact: true });

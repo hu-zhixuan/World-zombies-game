@@ -5,7 +5,7 @@
 来源全部是 OpenGameArt 上的公开素材包，出处和许可见 assets/CREDITS.md。
 这个脚本只做裁切和拼条，不改像素。
 """
-import io, json, os, re, shutil, sys, urllib.request, zipfile
+import io, json, os, re, sys, urllib.request, zipfile
 from PIL import Image
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
@@ -20,7 +20,6 @@ ZIP_PACKS = {  # 缓存子目录 -> OpenGameArt 页面
     'kenneyui': 'ui-pack-pixel-adventure',
     'kyrise': 'kyrises-free-16x16-rpg-icon-pack',
     'guns': 'tiny-gun-icons-16x16',
-    'zombies': 'animated-pixel-zombie-characters',
     'bridge': 'gothicvania-bridge-expansion-pack-1',
     'church': 'gothicvania-church-pack',
     'patreons': 'gothicvania-patreons-collection',
@@ -101,115 +100,151 @@ def slice_grid(im, count, fw, offset_x=0, out_w=None, flip=False):
         frames.append(canvas)
     return frames
 
-def build_tavern_interior(mi):
-    """用 Medieval Tileset（CC-BY 3.0, Ataos）拼出一张 528x240 的酒馆内景。
-    只做图块拼接与裁切，不改像素。左灶台、中吧台商店、右防线工坊铁砧、最右出击木门。"""
-    W, H = 528, 240
+def build_roof_deck(top_l, top_m, top_r):
+    """用 Gothicvania Town 原生木栈台图块拼出 216x32 的二楼屋顶平台。"""
+    roof_deck = Image.new('RGBA', (216, 32))
+    roof_deck.paste(top_l, (0, 0), top_l)
+    for i in range(10):
+        roof_deck.paste(top_m, (32 + i * 16, 0), top_m)
+    roof_deck.paste(top_r, (184, 0), top_r)
+    return roof_deck
+
+def build_porch_deck(top_l, top_r, legs, g_legs):
+    """用 Gothicvania Town 原生木栈桥与立柱拼出 64x48 的院子跳台台阶。"""
+    porch = Image.new('RGBA', (64, 48))
+    porch.paste(top_l, (0, 0), top_l)
+    porch.paste(top_r, (32, 0), top_r)
+    porch.paste(legs, (0, 24), legs)
+    porch.paste(legs, (32, 24), legs)
+    porch.paste(g_legs, (0, 32), g_legs)
+    porch.paste(g_legs, (32, 32), g_legs)
+    return porch
+
+def build_tavern_interior(house, house_b, wall_a, wall_b, left_roof, roof_t, right_roof,
+                          top_l, top_m, top_r, g_legs, barrel, sign, lamp, mi):
+    """用 Gothicvania Town + Bridge 原版建筑图块拼出温馨统一的剖面深夜小食堂（560x220）。
+    左区：砖砌烟囱与铁板烧灶台；中区：暖窗与双人堂食木桌；右区：整备柜台与出击木门。"""
+    W, H = 560, 220
     FLOOR_Y = 196
-    room = Image.new('RGBA', (W, H), (28, 19, 24, 255))
+    room = Image.new('RGBA', (W, H), (0, 0, 0, 0))
 
-    def paste(box, dx, dy, rep_x=1, flip=False):
-        tile = mi.crop(box)
-        if flip: tile = tile.transpose(Image.FLIP_LEFT_RIGHT)
-        for i in range(rep_x):
-            room.paste(tile, (dx + i * tile.width, dy), tile)
+    # 1. 哥特瓦片屋顶与左侧厨房砖烟囱
+    room.paste(left_roof, (16, 4), left_roof)
+    for x in range(80, 512, 16):
+        room.paste(roof_t, (x, 4), roof_t)
+    room.paste(right_roof, (512, 4), right_roof)
+    chimney = house_b.crop((56, 0, 82, 54))
+    room.paste(chimney, (68, 0), chimney)
 
-    # 墙体（用暖木板铺满 FLOOR_Y 以上，避免黑带断层）
-    wall_strip = mi.crop((0, 128, 64, 176))
-    for x in range(0, W, 64):
-        room.paste(wall_strip, (x, FLOOR_Y - 144), wall_strip)
-        room.paste(wall_strip, (x, FLOOR_Y - 96), wall_strip)
-        room.paste(wall_strip, (x, FLOOR_Y - 48), wall_strip)
-    # 顶层暗色横梁
-    for x in range(0, W, 16):
-        paste((0, 112, 16, 128), x, 0)
-        paste((16, 112, 32, 128), x, 16)
-        paste((0, 112, 16, 128), x, 32)
-    # 地板（橡木地板 + 地底基座）
-    floor_tile = mi.crop((0, 176, 48, 224))
-    for x in range(0, W, 48):
-        room.paste(floor_tile, (x, FLOOR_Y), floor_tile)
+    # 2. 暖色砖木内墙与横竖橡木梁
+    for y in range(76, FLOOR_Y, 16):
+        for x in range(32, 528, 16):
+            tile = wall_b if ((x * 3 + y) // 16) % 7 == 0 else wall_a
+            room.paste(tile, (x, y), tile)
 
-    # 亮暖木窗户
-    win_lg = (128, 136, 160, 164)
-    paste(win_lg, 122, FLOOR_Y - 82)
-    paste(win_lg, 246, FLOOR_Y - 82)
-    paste(win_lg, 392, FLOOR_Y - 82)
+    h_beam = house.crop((24, 144, 216, 154))
+    for x in range(28, 532, 192):
+        w = min(192, 532 - x)
+        b = h_beam.crop((0, 0, w, 10))
+        room.paste(b, (x, 74), b)
 
-    # ── 1. 左区（x ~ 24..168）：小厨房灶台与木桌 ──
-    paste((240, 0, 256, 64), 42, FLOOR_Y - 92)    # 烟囱壁炉管
-    paste((48, 288, 96, 320), 26, FLOOR_Y - 32)   # 燃烧烤炉
-    paste((16, 256, 40, 288), 78, FLOOR_Y - 32)   # 明火小灶台
-    paste((224, 192, 240, 224), 108, FLOOR_Y - 32)  # 储酒木桶
-    paste((96, 184, 144, 224), 128, FLOOR_Y - 36)   # 长餐桌
-    paste((192, 208, 208, 224), 134, FLOOR_Y - 40)  # 桌上烤肉盘
-    paste((208, 208, 224, 224), 152, FLOOR_Y - 40)  # 桌上佳肴盘
-    paste((176, 208, 192, 224), 124, FLOOR_Y - 14)  # 小圆凳
+    v_pillar = house.crop((33, 82, 43, 144))
+    for px in [32, 188, 396, 518]:
+        room.paste(v_pillar, (px, 82), v_pillar)
+        room.paste(v_pillar, (px, 134), v_pillar)
 
-    # ── 2. 中区（x ~ 188..316）：金币商店吧台与货架 ──
-    shelf_bg = mi.crop((160, 128, 192, 176))
-    for sx in (192, 224, 256): room.paste(shelf_bg, (sx, FLOOR_Y - 80), shelf_bg)
-    paste((192, 128, 288, 176), 192, FLOOR_Y - 80)  # 货架上的药水与瓶罐
-    paste((48, 224, 144, 256), 192, FLOOR_Y - 32)   # 吧台柜台
-    paste((176, 288, 192, 304), 214, FLOOR_Y - 42)  # 账簿
-    paste((256, 192, 272, 208), 264, FLOOR_Y - 40)  # 金币宝箱
-    paste((192, 288, 240, 320), 296, FLOOR_Y - 32)  # 补给箱
+    # 3. 暖光拱窗与吊灯
+    warm_win = house.crop((134, 86, 178, 134))
+    for wx in [124, 220, 320]:
+        room.paste(warm_win, (wx, 106), warm_win)
 
-    # ── 3. 右区（x ~ 344..436）：防线工坊铁砧 ──
-    paste((192, 240, 208, 256), 360, FLOOR_Y - 30)  # 锻造铁砧
-    paste((208, 256, 224, 272), 360, FLOOR_Y - 16)  # 铁砧木桩底座
-    paste((224, 240, 256, 256), 382, FLOOR_Y - 16)  # 煤炭堆
-    paste((240, 272, 256, 304), 412, FLOOR_Y - 32)  # 零件堆叠箱
-    paste((224, 256, 240, 272), 346, FLOOR_Y - 52)  # 墙挂锻锤
+    lamp_head = lamp.crop((0, 0, lamp.width, 32))
+    for lx in [88, 250, 348, 452]:
+        room.paste(lamp_head, (lx, 78), lamp_head)
 
-    # ── 4. 最右（x ~ 448..516）：离开小屋木门 + 通往屋顶木梯 ──
-    paste((208, 0, 224, 64), 444, FLOOR_Y - 112)   # 阁楼木梯
-    paste((208, 0, 224, 64), 444, FLOOR_Y - 64)    # 梯子下段
-    paste((64, 128, 96, 176), 472, FLOOR_Y - 48)    # 暖木出口大门
+    def draw_oak_table(x, w_mid_count):
+        y_top = FLOOR_Y - 34
+        room.paste(top_l, (x, y_top), top_l)
+        room.paste(g_legs, (x, FLOOR_Y - 16), g_legs)
+        cx = x + 32
+        for _ in range(w_mid_count):
+            room.paste(top_m, (cx, y_top), top_m)
+            cx += 16
+        room.paste(top_r, (cx, y_top), top_r)
+        room.paste(g_legs, (cx, FLOOR_Y - 16), g_legs)
+
+    # ── 左区（x = 44..184）：深夜食堂红砖灶台与料理长案 ──
+    brick_col = house_b.crop((56, 6, 82, 54))
+    room.paste(brick_col, (56, 84), brick_col)
+    room.paste(brick_col, (56, 130), brick_col)
+    draw_oak_table(48, 2)  # 96px 料理灶台
+    platter = mi.crop((192, 208, 208, 224))
+    steak = mi.crop((208, 208, 224, 224))
+    mug = mi.crop((176, 224, 192, 240))
+    room.paste(platter, (94, FLOOR_Y - 44), platter)
+    room.paste(steak, (116, FLOOR_Y - 44), steak)
+    room.paste(barrel, (152, FLOOR_Y - barrel.height), barrel)
+
+    # ── 中区（x = 200..392）：两张堂食木桌，供夜晚幸存者食客落座点餐 ──
+    draw_oak_table(204, 1)  # 1号餐桌
+    draw_oak_table(304, 1)  # 2号餐桌
+    room.paste(platter, (224, FLOOR_Y - 44), platter)
+    room.paste(mug, (248, FLOOR_Y - 46), mug)
+    room.paste(steak, (324, FLOOR_Y - 44), steak)
+    room.paste(mug, (348, FLOOR_Y - 46), mug)
+
+    # ── 右区（x = 404..518）：整备工坊吧台与出击木门 ──
+    room.paste(sign, (412, 96), sign)
+    draw_oak_table(406, 0)
+    room.paste(mug, (428, FLOOR_Y - 46), mug)
+    door = house_b.crop((66, 178, 104, 244))
+    room.paste(door, (476, FLOOR_Y - door.height), door)
+
+    # 底部整条厚橡木地板横梁
+    for x in range(20, 540, 192):
+        w = min(192, 540 - x)
+        room.paste(h_beam.crop((0, 0, w, 10)), (x, FLOOR_Y - 2), h_beam.crop((0, 0, w, 10)))
     return room
-
-def build_roof_deck(mi):
-    """用 Medieval Tileset 的木桥栅栏图块拼出一整条平坦的屋顶防御平台。"""
-    seg = mi.crop((256, 0, 304, 32))
-    w = seg.width * 5  # 240px 宽
-    deck = Image.new('RGBA', (w, seg.height))
-    for i in range(5):
-        deck.paste(seg, (i * seg.width, 0), seg)
-    return deck
 
 def main():
     for pack, slug in ZIP_PACKS.items(): fetch_zip(pack, slug)
     for fname, slug in FILE_PACKS.items(): fetch_file(fname, slug)
     os.makedirs(OUT, exist_ok=True)
-    # 清理不再使用的旧镇民僵尸贴图，以免打包进单个 HTML
-    for old in ['z_hat', 'z_bearded', 'z_oldman', 'z_woman', 'z_roamer']:
+
+    # 清理废弃的异风格僵尸贴图，确保包体干净且画风 100% 统一为 ansimuz 哥特像素风
+    for old in ['z_hat', 'z_bearded', 'z_oldman', 'z_woman', 'z_roamer',
+                'z_roamer_a', 'z_roamer_b', 'z_roamer_c', 'z_crawler', 'z_bruiser', 'z_collapse']:
         p = os.path.join(OUT, old + '.png')
         if os.path.exists(p): os.remove(p)
 
-    # ── 主角：持枪猎人（Gothicvania Swamp）──
+    # ── 主角：持枪猎人（Gothicvania Swamp, ansimuz）──
     for anim, stem, n in [('idle', 'idle', 6), ('run', 'run', 14), ('shoot', 'shoot', 3), ('jump', 'jump', 2),
                           ('fall', 'fall', 2), ('hurt', 'Hurt', 2), ('crouch', 'crouch', 3)]:
         strip('hero_' + anim, [img('gotthicvania-swamp', 'Player', anim, f'{stem}{i}.png') for i in range(1, n + 1)])
 
-    # ── 真正的小怪、地狱犬、燃烧食尸鬼、Boss（方案二 哥特堡垒风）──
-    # Animated Pixel Zombie Characters (Boom Shaka, CC-BY 3.0): 原图朝右，向左迎战需水平翻转并统一对齐到底部中心
-    strip('z_roamer_a', slice_grid(img('zombies', 'Green1_96x54', 'Zombie_Run.png'), 7, 96, 1, 56, flip=True))
-    strip('z_roamer_b', slice_grid(img('zombies', 'Green2_96x54', 'Zombie2_Run_2.png'), 7, 96, 1, 56, flip=True))
-    strip('z_roamer_c', slice_grid(img('zombies', 'Green3_96x54', 'Zombie3_Run_2.png'), 7, 96, 1, 56, flip=True))
-    strip('z_bruiser',  slice_grid(img('zombies', 'Green4_96x54', 'Zombie4_Run_2.png'), 7, 96, 1, 56, flip=True))
-    strip('z_crawler',  slice_grid(img('zombies', 'Green1_96x54', 'Zombie_crawl_2.png'), 7, 96, 1, 56, flip=True))
-    strip('z_collapse', slice_grid(img('zombies', 'Green1_96x54', 'Zombie_death.png'), 8, 96, 1, 64, flip=True))
-    strip('z_death', [img('cemetery', 'Sprites', 'enemy-death', f'enemy-death-{i}.png') for i in range(1, 6)])
-
-    # 地狱犬、燃烧食尸鬼、Boss 地狱兽 / 恶魔
+    # ── 统一画风的僵尸与魔物大军（全部出自 ansimuz 的 Gothicvania 系列，天然朝左迎战）──
+    strip('z_swamp', [img('gotthicvania-swamp', 'walk thing', f'thing{i}.png') for i in range(1, 5)])
+    strip('z_clothed', [img('cemetery', 'Sprites', 'skeleton-clothed', f'skeleton-clothed-{i}.png') for i in range(1, 9)])
+    strip('z_skeleton', [img('cemetery', 'Sprites', 'skeleton', f'skeleton-{i}.png') for i in range(1, 9)])
+    strip('z_gato', [img('cemetery', 'Sprites', 'hell-gato', f'hell-gato-{i}.png') for i in range(1, 5)])
     strip('z_hound', slice_grid(img('patreons', 'Hell-Hound-Files', 'PNG', 'hell-hound-run.png'), 5, 67, 0, 56, flip=False))
     strip('z_ghoul', [img('church', 'burning-ghoul', 'sprites', 'v1', f'burning-ghoul-{i}.png') for i in range(1, 9)])
+    strip('z_wraith', [img('cemetery', 'Sprites', 'ghost-halo', f'ghost-halo-{i}.png') for i in range(1, 5)])
     strip('boss_beast', slice_grid(img('patreons', 'Hell-Beast-Files', 'PNG', 'with-stroke', 'hell-beast-idle.png'), 6, 55, 0, 58, flip=False))
     strip('boss_demon', slice_grid(img('patreons', 'demon-Files', 'PNG', 'demon-idle.png'), 6, 160, 0, 150, flip=False))
+    strip('z_death', [img('cemetery', 'Sprites', 'enemy-death', f'enemy-death-{i}.png') for i in range(1, 6)])
+
+    # ── 深夜小食堂的幸存者食客 NPC（Gothicvania Town, ansimuz）──
+    for key, d, n in [('npc_hat', 'hat-man-idle', 4), ('npc_woman', 'woman-idle', 7),
+                      ('npc_bearded', 'bearded-idle', 5), ('npc_oldman', 'oldman-idle', 8)]:
+        strip(key, [img('gothicvania-town', 'sprites', d, f'{d}-{i}.png') for i in range(1, n + 1)])
+
+    # ── 特效：火球、爆炸、灶台炉火 ──
     strip('fx_fireball', [img('church', 'fx', 'fireball', 'fireball-sprites', f'fireball{i}.png') for i in range(1, 4)])
     strip('fx_boom', [img('warped2', 'Sprites', 'explosion-a', f'explosion-a{i}.png') for i in range(1, 9)])
+    strip('fx_stove', [img('church', 'fx', 'fireball', 'fireball-sprites', f'fireball{i}.png').transpose(Image.ROTATE_270) for i in range(1, 4)])
 
-    # ── 塔、炮弹、铁丝网、子弹、命中 ──
+    # ── 炮塔、铁丝网、子弹、命中 ──
     strip('turret', [img('warped-city', 'misc', 'turret', f'turret-{i}.png') for i in range(1, 7)])
     save('ic_turret', img('warped-city', 'misc', 'turret', 'turret-1.png'))
     tb = img('extras', 'turret_body.png')
@@ -226,7 +261,7 @@ def main():
     strip('shot', [img('warped-city', 'misc', 'shot', f'shot-{i}.png') for i in range(1, 4)])
     strip('shot_hit', [img('warped-city', 'misc', 'shot-hit', f'shot-hit-{i}.png') for i in range(1, 4)])
 
-    # ── 场景与堡垒酒馆（Gothicvania Town + Bridge Expansion + Medieval Tileset）──
+    # ── 场景与立体堡垒酒馆（Gothicvania Town + Bridge Expansion）──
     save('bg_sky', img('gothicvania-town', 'PNG', 'environment', 'layers', 'background.png'))
     save('bg_town', img('gothicvania-town', 'PNG', 'environment', 'layers', 'middleground.png'))
     for key, f in [('house_a', 'house-a'), ('house_b', 'house-b'), ('house_c', 'house-c'), ('crate_stack', 'crate-stack'),
@@ -235,16 +270,35 @@ def main():
     for key, f in [('ground', 'ground'), ('ground_b', 'ground-b'), ('ground_wall', 'ground-wall'), ('wall', 'wall')]:
         save(key, img('gothicvania-town', 'sliced-tileset', f + '.png'))
 
-    house_full = img('bridge', 'Props', 'house.png')
-    save('fort_house', house_full.crop((0, 0, house_full.width, 203)))  # 裁掉底部桥面，让屋柱立在街道地面上
+    house_full = img('bridge', 'Props', 'house.png').crop((0, 0, 256, 203))
+    save('fort_house', house_full)
     castle_full = img('bridge', 'Props', 'castle.png')
-    save('fort_keep', castle_full.crop((176, 60, 272, 266)))           # 城堡石堡墙体（含亮灯圆窗）
+    save('fort_keep', castle_full.crop((176, 60, 272, 266)))
     save('castle_banner', castle_full.crop((386, 12, 434, 82)))
 
+    top_l = img('gothicvania-town', 'sliced-tileset', 'top-left-wood.png')
+    top_m = img('gothicvania-town', 'sliced-tileset', 'top-wood.png')
+    top_r = img('gothicvania-town', 'sliced-tileset', 'top-right-wood.png')
+    legs = img('gothicvania-town', 'sliced-tileset', 'wood-legs.png')
+    g_legs = img('gothicvania-town', 'sliced-tileset', 'ground-wood-legs.png')
+    wall_a = img('gothicvania-town', 'sliced-tileset', 'wall.png')
+    wall_b = img('gothicvania-town', 'sliced-tileset', 'wall-b.png')
+    left_roof = img('gothicvania-town', 'sliced-tileset', 'left-roof.png')
+    roof_t = img('gothicvania-town', 'sliced-tileset', 'roof.png')
+    right_roof = img('gothicvania-town', 'sliced-tileset', 'right-roof.png')
+    house_b = img('gothicvania-town', 'props-sliced', 'house-b.png')
+    barrel = img('gothicvania-town', 'props-sliced', 'barrel.png')
+    sign = img('gothicvania-town', 'props-sliced', 'sign.png')
+    lamp = img('gothicvania-town', 'props-sliced', 'street-lamp.png')
     mi = img('extras', 'medieval_interior.png')
-    save('roof_deck', build_roof_deck(mi))
+
+    save('roof_deck', build_roof_deck(top_l, top_m, top_r))
+    save('porch_deck', build_porch_deck(top_l, top_r, legs, g_legs))
     save('prop_ladder', mi.crop((208, 0, 224, 64)))
-    save('tavern_interior', build_tavern_interior(mi))
+    save('tavern_interior', build_tavern_interior(
+        house_full, house_b, wall_a, wall_b, left_roof, roof_t, right_roof,
+        top_l, top_m, top_r, g_legs, barrel, sign, lamp, mi
+    ))
 
     # ── 界面：Kenney UI Pack - Pixel Adventure ──
     ui = img('kenneyui', 'Large tiles', 'Thick outline', 'tilemap_packed.png')
@@ -253,18 +307,22 @@ def main():
                          ('ui_round', 1, 3, 1), ('ui_round_lit', 0, 3, 1), ('ui_banner', 4, 3, 3)]:
         save(key, cell(c, r, w))
 
-    # ── 图标：Kyrise V1.2 16x16 + Medieval Tileset 小图块 ──
+    # ── 图标：Kyrise V1.2 16x16 + 食堂菜品小图标 ──
     ic = img('kyrise', 'spritesheet', 'spritesheet_16x16.png')
     for key, c, r in [('ic_coin', 8, 6), ('ic_scrap', 0, 10), ('ic_hp', 1, 13), ('ic_wall', 6, 15), ('ic_zombie', 8, 9),
                       ('ic_crate', 14, 8), ('ic_pierce', 8, 0), ('ic_ricochet', 13, 11), ('ic_overkill', 1, 8),
                       ('ic_lifesteal', 9, 12), ('ic_incendiary', 4, 8), ('ic_overclock', 0, 12),
                       ('ic_frostbite', 0, 8), ('ic_chainkill', 1, 11), ('ic_vanguard', 9, 15), ('ic_bloodfrenzy', 8, 12),
                       ('ic_glasscannon', 1, 7), ('ic_secondwind', 11, 12), ('ic_star', 15, 7), ('ic_chef', 9, 7),
-                      ('ic_armor', 7, 15), ('ic_fort', 10, 15), ('ic_grenade', 14, 11), ('ic_meat', 10, 7),
+                      ('ic_armor', 7, 15), ('ic_fort', 10, 15), ('ic_grenade', 14, 11),
                       ('ic_rooftop', 11, 0), ('ic_shrapnel', 12, 11), ('ic_fortify', 13, 15), ('ic_shock', 2, 7)]:
         save(key, ic.crop((c * 16, r * 16, c * 16 + 16, r * 16 + 16)))
 
-    save('ic_kitchen', mi.crop((208, 208, 224, 224)))
+    save('ic_meat', mi.crop((224, 224, 240, 240)))
+    save('ic_kitchen', mi.crop((192, 208, 208, 224)))
+    save('ic_dish_skewer', mi.crop((192, 208, 208, 224)))
+    save('ic_dish_stew', mi.crop((176, 224, 192, 240)))
+    save('ic_dish_steak', mi.crop((208, 208, 224, 224)))
     save('ic_shop', mi.crop((176, 288, 192, 304)))
     save('ic_anvil', mi.crop((192, 240, 208, 256)))
 

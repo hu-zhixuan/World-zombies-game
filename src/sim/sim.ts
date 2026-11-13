@@ -1,26 +1,27 @@
 // 规则层：纯计算，不碰浏览器。固定每秒 60 步；随机数带种子；同样的种子和输入一定得到同样的结果。
 import {
-  CLASSES, CRIT_CHANCE, CRIT_MUL, DAY_HEAL, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
+  CLASSES, CRIT_CHANCE, CRIT_MUL, DAY_HEAL, DINER_GUESTS, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
   MEALS, MEAT_SELL_PRICE, PERKS, RARITY_WEIGHT, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST, STAR_COST, TURRETS,
   WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES, bossForDay, dayZombieCount, extraBullets, magSize, starMul, zombieHp,
   type ClassId, type PerkId, type TurretType, type WeaponId, type ZombieKind,
 } from '../content/data';
 import {
-  DOOR_X, GROUND_Y, HOME_X, IN_MAX_X, IN_MIN_X, IN_STATIONS, LADDER_X, PLAYER_MAX_X, PLAYER_MIN_X, ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, SPAWN_X,
-  TURRET_SLOTS, WALL_X, type Bullet, type Command, type GameEvent, type Input, type RunState, type StationId, type Zombie,
+  DINER_SEAT_X, DOOR_X, GROUND_Y, HOME_X, HOUSE_WALL_X, IN_MAX_X, IN_MIN_X, IN_STATIONS, LADDER_X, PLAYER_MAX_X, PLAYER_MIN_X,
+  PORCH_MAX_X, PORCH_MIN_X, PORCH_Y, ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, SPAWN_X,
+  TURRET_SLOTS, WALL_X, type Bullet, type Command, type DinerGuest, type GameEvent, type Input, type RunState, type StationId, type Zombie,
 } from './types';
 
 export const MAX_CARRY = 3;
 const GRAVITY = 0.32;
-const JUMP_V = -5.4;
-const MOVE_SPEED = 2.15;
+const JUMP_V = -6.5;
+const MOVE_SPEED = 2.2;
 const DODGE_TICKS = 14;
 const DODGE_SPEED = 4.4;
 const DODGE_CD = 60;
 const ZOMBIE_REACH = 18;
 export const BODY_Y = GROUND_Y - 22; // 僵尸身体中心的高度
 export const MUZZLE_Y = GROUND_Y - 31;
-export const FORT_GUN_X = 174;
+export const FORT_GUN_X = 166;
 export const FORT_GUN_Y = GROUND_Y + ROOF_Y - 18;
 
 function rand(run: RunState): number { // mulberry32
@@ -41,6 +42,7 @@ const has = (run: RunState, id: PerkId) => run.perks.includes(id);
 export const curWeapon = (run: RunState) => run.player.weapons[run.player.cur];
 const skillActive = (run: RunState, cls: ClassId) => run.cls === cls && run.skill.t > 0;
 export const isOnRoof = (run: RunState) => !run.inside && run.player.y <= ROOF_Y + 2 && run.player.x >= ROOF_MIN_X && run.player.x <= ROOF_MAX_X;
+export const isOnPorch = (run: RunState) => !run.inside && Math.abs(run.player.y - PORCH_Y) <= 2 && run.player.x >= PORCH_MIN_X && run.player.x <= PORCH_MAX_X;
 
 export const turretBuildCost = (kind: TurretType, cls: ClassId) => Math.ceil(TURRETS[kind].buildScrap * (cls === 'engineer' ? 0.75 : 1));
 export const turretUpgradeCost = (kind: TurretType, level: number, cls: ClassId) =>
@@ -93,11 +95,11 @@ export function nearbyStation(run: RunState): StationId | null {
   return best;
 }
 
-/** 室外靠近的交互点（房门 / 房顶梯子） */
+/** 室外靠近的交互点（房门 / 门廊阶梯） */
 export function nearbyExterior(run: RunState): 'door' | 'ladder' | null {
   if (run.inside) return null;
   const p = run.player;
-  if (Math.abs(p.x - DOOR_X) <= 36 && p.y > -24) return 'door';
+  if (Math.abs(p.x - DOOR_X) <= 32 && p.y > -24) return 'door';
   if (Math.abs(p.x - LADDER_X) <= 36) return 'ladder';
   return null;
 }
@@ -106,7 +108,6 @@ function rollShopOffers(run: RunState) {
   const all = Array.from(new Set<WeaponId>(['revolver', 'smg', ...run.pool, 'pistol']));
   const unowned = all.filter((id) => !run.player.weapons.some((w) => w.id === id));
   const picks: WeaponId[] = [];
-  // 优先放进玩家还没拿到的新武器，再补强已有武器用于升星
   const source = [...unowned];
   while (picks.length < 3 && source.length > 0) {
     const idx = Math.floor(rand(run) * source.length);
@@ -118,6 +119,24 @@ function rollShopOffers(run: RunState) {
     picks.push(rest.splice(idx, 1)[0]);
   }
   run.shop = picks;
+}
+
+function rollDinerGuests(run: RunState) {
+  const pool = [...DINER_GUESTS];
+  const picked: DinerGuest[] = [];
+  const chefMul = run.cls === 'chef' ? 1.35 : 1;
+  for (let i = 0; i < 3 && pool.length > 0; i++) {
+    const idx = Math.floor(rand(run) * pool.length);
+    const g = pool.splice(idx, 1)[0];
+    const pay = Math.round((g.basePay + run.day * 2) * chefMul);
+    picked.push({
+      id: g.id, name: g.name, role: g.role, sprite: g.sprite,
+      x: DINER_SEAT_X[i] ?? 300,
+      dish: g.dish, dishName: g.dishName, meatCost: g.meatCost, pay,
+      orderQuote: g.orderQuote, thanksQuote: g.thanksQuote, served: false,
+    });
+  }
+  run.guests = picked;
 }
 
 /** 开一局。pool 是这一局能掉落/进货的武器（局外解锁的那些）。 */
@@ -137,11 +156,12 @@ export function newRun(seed = 1, pool: WeaponId[] = ['revolver', 'smg'], cls: Cl
     fort: { level: 1, cd: 0, aim: 0 },
     spawn: { left: 0, timer: 0, total: 0, killed: 0, crateAt: 0, bossKind: null, bossSpawned: false },
     coins: 0, scrap: 0, meat: 0, kills: 0,
-    meal: null, buff: { dmgMul: 0, haste: 0 }, shop: [],
+    meal: null, guests: [], buff: { dmgMul: 0, haste: 0 }, shop: [],
     perks: [], perkChoices: [], targetId: null, priorityId: null,
     pool: [...pool], chain: { n: 0, t: 0 }, vanguardT: 0, cls, skill: { t: 0, cd: 0 },
   };
   rollShopOffers(run);
+  rollDinerGuests(run);
   startDay(run, []);
   return run;
 }
@@ -220,7 +240,13 @@ function applyPlayerDamage(run: RunState, rawDmg: number, ev: GameEvent[]) {
   ev.push({ t: 'hurt', dmg: rawDmg, blocked });
 }
 
-function damageZombie(run: RunState, z: Zombie, dmg: number, ev: GameEvent[], opts: { byPlayer: boolean; burn?: boolean; kb?: number; crit?: boolean; slow?: number }) {
+function damageZombie(
+  run: RunState,
+  z: Zombie,
+  dmg: number,
+  ev: GameEvent[],
+  opts: { byPlayer: boolean; burn?: boolean; kb?: number; crit?: boolean; slow?: number; weaponId?: WeaponId },
+) {
   if (z.hp <= 0) return;
   const before = z.hp;
   z.hp -= dmg;
@@ -235,12 +261,20 @@ function damageZombie(run: RunState, z: Zombie, dmg: number, ev: GameEvent[], op
   }
   if (z.hp > 0) return;
 
+  // 战术自卫手枪特色：击杀立即回膛 2 发子弹
+  if (opts.byPlayer && (opts.weaponId === 'pistol' || curWeapon(run).id === 'pistol')) {
+    const cw = curWeapon(run);
+    if (cw.id === 'pistol') {
+      cw.ammo = Math.min(magSize('pistol', cw.star), cw.ammo + 2);
+    }
+  }
+
   const def = ZOMBIES[z.kind];
   run.coins += def.coins; run.kills++; run.spawn.killed++;
   const scrapChance = def.boss ? 1 : 0.34;
   if (rand(run) < scrapChance) run.scrap += def.boss ? 5 : 1;
   const chef = run.cls === 'chef';
-  const meatDrop = def.meat > 1 ? def.meat + (chef ? 1 : 0) : (rand(run) < (chef ? 0.85 : 0.45) ? 1 : 0);
+  const meatDrop = def.meat > 1 ? def.meat + (chef ? 1 : 0) : (rand(run) < (chef ? 0.85 : 0.5) ? 1 : 0);
   run.meat += meatDrop;
 
   if (has(run, 'chainkill')) run.chain = { n: Math.min(8, run.chain.n + 1), t: 180 };
@@ -328,7 +362,8 @@ function fire(run: RunState, target: Zombie, ev: GameEvent[]) {
   const tx = target.x - mx, ty = BODY_Y - my, len = Math.hypot(tx, ty) || 1;
   const dx = tx / len, dy = ty / len;
   const hawkeye = skillActive(run, 'gunner');
-  const crit = run.cls === 'gunner' && (hawkeye || rand(run) < CRIT_CHANCE);
+  const baseCrit = (run.cls === 'gunner' ? CRIT_CHANCE : 0) + (ow.id === 'pistol' ? 0.2 : 0);
+  const crit = hawkeye || (baseCrit > 0 && rand(run) < baseCrit);
   const dmg = weaponDamage(ow.id, ow.star) * damageMul(run) * (crit ? CRIT_MUL : 1);
 
   if (def.chain) {
@@ -339,15 +374,26 @@ function fire(run: RunState, target: Zombie, ev: GameEvent[]) {
     return;
   }
 
+  const fullPierce = !!def.pierce || has(run, 'pierce') || hawkeye;
+  const range = effectiveRange(run, ow.id);
+  if (ow.id === 'rifle') {
+    ev.push({ t: 'railbeam', x1: mx, y1: my, x2: mx + dx * range, y2: my + dy * range });
+  }
+
   const count = (def.pellets ?? 1) + extraBullets(ow.id, ow.star);
   for (let i = 0; i < count; i++) {
     const a = def.spread ? (rand(run) - 0.5) * 2 * def.spread : i === 0 ? 0 : (i % 2 ? 0.05 : -0.05) * Math.ceil(i / 2);
     const c = Math.cos(a), s = Math.sin(a);
     run.bullets.push({
       x: mx, y: my, vx: (dx * c - dy * s) * def.speed, vy: (dx * s + dy * c) * def.speed, dmg,
-      life: Math.ceil((effectiveRange(run, ow.id) + 70) / def.speed), from: 'player',
-      pierce: !!def.pierce || has(run, 'pierce') || hawkeye, crit, bounces: 0, hit: [],
+      life: Math.ceil((range + 70) / def.speed), from: 'player',
+      pierce: fullPierce || (def.pierceCount ?? 1) > 1,
+      pierceLeft: fullPierce ? 99 : (def.pierceCount ?? 1),
+      crit, bounces: 0, hit: [],
       aoe: def.aoe, slow: def.slow, kind: def.aoe ? 'rocket' : 'normal',
+      weaponId: ow.id, startX: mx,
+      closeBoost: ow.id === 'shotgun',
+      shatter: ow.id === 'assault',
     });
   }
   ev.push({ t: 'shot', x: mx, y: my, from: 'player', weapon: ow.id });
@@ -409,7 +455,7 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
   else p.vx = move * MOVE_SPEED;
 
   if (run.inside) {
-    if (input.jump && p.y === 0) p.vy = JUMP_V * 0.75;
+    if (input.jump && p.y === 0) p.vy = JUMP_V * 0.72;
     p.vy += GRAVITY; p.y += p.vy;
     if (p.y >= 0) { p.y = 0; p.vy = 0; }
     p.x = Math.max(IN_MIN_X, Math.min(IN_MAX_X, p.x + p.vx));
@@ -418,28 +464,46 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
     return;
   }
 
-  // 室外与房顶立体动线
-  let prevY = p.y;
-  const nearLad = Math.abs(p.x - LADDER_X) <= 36;
-  let justClimbed = false;
-  if ((input.jump || input.interact) && p.y > ROOF_Y + 6 && nearLad) {
-    p.y = ROOF_Y; prevY = ROOF_Y; p.vy = 0; p.x = Math.min(p.x, ROOF_MAX_X - 8);
-    justClimbed = true;
-    ev.push({ t: 'roof', onRoof: true });
-  } else if (input.jump && (p.y === 0 || (p.y <= ROOF_Y + 2 && p.y >= ROOF_Y - 2))) {
+  // 室外与房顶 2D 实体碰撞 + 阶梯跳跃动线（一楼砖墙 -> 中层木制挑台 -> 二层屋顶平台）
+  const prevY = p.y;
+  const onGround = Math.abs(p.y) <= 0.5;
+  const onPorch = p.x >= PORCH_MIN_X && p.x <= PORCH_MAX_X && Math.abs(p.y - PORCH_Y) <= 2;
+  const onRoof = p.x >= ROOF_MIN_X && p.x <= ROOF_MAX_X && Math.abs(p.y - ROOF_Y) <= 2;
+  if (input.jump && (onGround || onPorch || onRoof) && p.vy >= 0) {
     p.vy = JUMP_V;
   }
 
-  p.x = Math.max(PLAYER_MIN_X, Math.min(PLAYER_MAX_X, p.x + p.vx));
-  const inRoofSpan = p.x >= ROOF_MIN_X && p.x <= ROOF_MAX_X;
-  const standingOnRoof = inRoofSpan && Math.abs(p.y - ROOF_Y) < 0.01 && p.vy === 0;
-  if (!justClimbed && !standingOnRoof && (p.y < 0 || p.vy < 0)) {
-    p.vy += GRAVITY; p.y += p.vy;
+  // 水平移动：按角色当前高度判定一楼实体砖墙 / 中层挑台边界，绝不穿模进屋体内部
+  let minX = HOUSE_WALL_X;
+  if (p.y <= ROOF_Y + 4) {
+    minX = PLAYER_MIN_X;
+  } else if (p.y <= PORCH_Y + 4) {
+    minX = PORCH_MIN_X;
   }
-  if (inRoofSpan && prevY <= ROOF_Y + 4 && p.y >= ROOF_Y && p.vy >= 0) {
-    p.y = ROOF_Y; p.vy = 0;
+  p.x = Math.max(minX, Math.min(PLAYER_MAX_X, p.x + p.vx));
+
+  const nowInRoof = p.x >= ROOF_MIN_X && p.x <= ROOF_MAX_X;
+  const nowInPorch = p.x >= PORCH_MIN_X && p.x <= PORCH_MAX_X;
+  const standingRoof = nowInRoof && Math.abs(p.y - ROOF_Y) < 0.01 && p.vy === 0;
+  const standingPorch = !standingRoof && nowInPorch && Math.abs(p.y - PORCH_Y) < 0.01 && p.vy === 0;
+
+  if (!standingRoof && !standingPorch && (p.y < 0 || p.vy < 0)) {
+    p.vy += GRAVITY;
+    p.y += p.vy;
   }
-  if (p.y >= 0) { p.y = 0; p.vy = 0; }
+  if (nowInRoof && prevY <= ROOF_Y + 6 && p.y >= ROOF_Y && p.vy >= 0) {
+    p.y = ROOF_Y;
+    p.vy = 0;
+    if (prevY < ROOF_Y - 1 || prevY > ROOF_Y + 1) ev.push({ t: 'roof', onRoof: true });
+  } else if (nowInPorch && prevY <= PORCH_Y + 6 && p.y >= PORCH_Y && p.vy >= 0) {
+    p.y = PORCH_Y;
+    p.vy = 0;
+  }
+  if (p.y >= 0) {
+    if (prevY < -10) ev.push({ t: 'roof', onRoof: false });
+    p.y = 0;
+    p.vy = 0;
+  }
 
   if (input.interact && nearbyExterior(run) === 'door' && run.phase === 'camp') {
     command(run, { t: 'enterHouse' });
@@ -616,11 +680,25 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
           break;
         }
         if ((b.kind === 'rocket' || b.kind === 'cannon') && b.aoe) {
-          explodeAt(run, b.x, Math.min(BODY_Y, b.y), b.aoe, b.dmg, ev, byPlayer, false);
+          explodeAt(run, b.x, Math.min(BODY_Y, b.y), b.aoe, b.dmg, ev, byPlayer, b.kind === 'rocket');
           alive = false;
           break;
         }
-        damageZombie(run, z, b.dmg, ev, { byPlayer, kb: byPlayer ? 1.6 : 0.6, crit: b.crit, slow: b.slow });
+        const wasSlowed = z.slowT > 0;
+        const closeHit = b.closeBoost && b.startX !== undefined && Math.abs(z.x - b.startX) <= 135;
+        const hitDmg = b.dmg * (closeHit ? 1.4 : 1);
+        const kb = closeHit ? 4.4 : b.weaponId === 'revolver' ? 3.6 : byPlayer ? 1.6 : 0.6;
+        damageZombie(run, z, hitDmg, ev, { byPlayer, kb, crit: b.crit || closeHit, slow: b.slow, weaponId: b.weaponId });
+
+        // 极地急冻步枪特色：命中已冰冻减速的目标触发碎冰范围溅射
+        if (byPlayer && b.shatter && wasSlowed) {
+          ev.push({ t: 'frost', x: z.x, y: BODY_Y, r: 44 });
+          for (const o of run.zombies) {
+            if (o.id !== z.id && o.hp > 0 && Math.abs(o.x - z.x) <= 44) {
+              damageZombie(run, o, b.dmg * 0.48, ev, { byPlayer: true, slow: 90, weaponId: b.weaponId });
+            }
+          }
+        }
         if (byPlayer && has(run, 'incendiary') && z.hp > 0 && rand(run) < 0.25) z.burnT = 180;
         if (byPlayer && has(run, 'frostbite')) z.slowT = 135;
         if (byPlayer && has(run, 'shock') && z.hp > 0 && rand(run) < 0.25) {
@@ -635,12 +713,18 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
             spawned.push({ ...b, x: z.x, y: BODY_Y, vx: (nx / nlen) * sp, vy: (ny / nlen) * sp, dmg: b.dmg * 0.72, life: 22, bounces: b.bounces + 1, hit: [...b.hit] });
           }
         }
-        if (!b.pierce) { alive = false; break; }
+        if (b.pierceLeft !== undefined) {
+          b.pierceLeft--;
+          if (b.pierceLeft <= 0) { alive = false; break; }
+        } else if (!b.pierce) {
+          alive = false;
+          break;
+        }
       }
     }
     // 火箭弹/重炮落到地面直接炸
     if (!alive && b.life > 0 && b.y >= GROUND_Y + 2 && (b.kind === 'rocket' || b.kind === 'cannon') && b.aoe && b.hit.length === 0) {
-      explodeAt(run, b.x, GROUND_Y - 12, b.aoe, b.dmg, ev, b.from === 'player', false);
+      explodeAt(run, b.x, GROUND_Y - 12, b.aoe, b.dmg, ev, b.from === 'player', b.kind === 'rocket');
     }
     if (alive) out.push(b);
   }
@@ -766,9 +850,10 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
         run.home.hp += nextHomeMax - run.home.maxHp; run.home.maxHp = nextHomeMax;
         run.player.armor = Math.min(run.player.maxArmor, run.player.armor + 25);
       }
-      // 晚上自动回到酒馆屋里整备、做饭、逛商店
-      run.inside = true; run.player.x = IN_STATIONS.shop; run.player.y = 0; run.player.vy = 0;
+      // 晚上自动回到酒馆屋里招待食客、做饭、逛工坊
+      run.inside = true; run.player.x = IN_STATIONS.kitchen + 40; run.player.y = 0; run.player.vy = 0;
       rollShopOffers(run);
+      rollDinerGuests(run);
       ev.push({ t: 'inside', inside: true });
       return ev;
     }
@@ -788,16 +873,6 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       if (run.phase !== 'camp' || !run.inside) return null;
       run.inside = false; run.player.x = DOOR_X; run.player.y = 0; run.player.vy = 0; run.player.facing = 1;
       ev.push({ t: 'inside', inside: false });
-      return ev;
-    case 'toggleRoof':
-      if (run.inside || (run.phase !== 'fight' && run.phase !== 'clear' && run.phase !== 'camp')) return null;
-      if (isOnRoof(run)) {
-        run.player.x = LADDER_X + 6; run.player.y = 0; run.player.vy = 0;
-        ev.push({ t: 'roof', onRoof: false });
-      } else {
-        run.player.x = 225; run.player.y = ROOF_Y; run.player.vy = 0;
-        ev.push({ t: 'roof', onRoof: true });
-      }
       return ev;
     case 'focusTarget': {
       let best: Zombie | null = null, bd = 72;
@@ -927,6 +1002,24 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       const [removed] = list.splice(cmd.index, 1);
       run.player.cur = Math.min(run.player.cur, list.length - 1);
       run.coins += 25 + removed.star * 15; run.scrap += 3;
+      return ev;
+    }
+    case 'serveGuest': {
+      if (run.phase !== 'camp') return null;
+      const g = run.guests.find((o) => o.id === cmd.guestId && !o.served);
+      if (!g || run.meat < g.meatCost) return null;
+      run.meat -= g.meatCost;
+      g.served = true;
+      run.coins += g.pay;
+      const allServed = run.guests.length > 0 && run.guests.every((o) => o.served);
+      let totalCoins = g.pay;
+      if (allServed) {
+        const tip = run.cls === 'chef' ? 24 : 16;
+        run.coins += tip;
+        totalCoins += tip;
+        run.player.hp = Math.min(run.player.maxHp, run.player.hp + 15);
+      }
+      ev.push({ t: 'serve', guestId: g.id, name: g.name, dishName: g.dishName, coins: totalCoins, quote: g.thanksQuote, allServed });
       return ev;
     }
     case 'cookSell': {

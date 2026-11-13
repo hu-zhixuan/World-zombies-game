@@ -2,9 +2,9 @@ import { useEffect, useReducer, useState } from 'preact/hooks';
 import { audio } from '../app/audio';
 import { game } from '../app/game';
 import {
-  CLASSES, DAY_HEAL, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
+  CLASSES, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
   MEALS, RARITY_NAME, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST, STAR_COST, STAR_PERKS,
-  TURRETS, WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES, classUnlockStars, newZombieOn, nextUnlock, perkDef, unlockName,
+  TURRETS, WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES, classUnlockStars, newZombieOn, nextUnlock, perkDef, sustainedDps, unlockName,
   type MealId, type TurretType,
 } from '../content/data';
 import { MAX_CARRY, dayRemaining, meatPrice, turretBuildCost, turretRefundScrap, turretUpgradeCost } from '../sim/sim';
@@ -16,19 +16,20 @@ function Hud() {
   const run = game.run, p = run.player;
   const boss = run.zombies.find((z) => ZOMBIES[z.kind].boss);
   const fresh = run.phase === 'camp' ? newZombieOn(run.day + 1) : null;
+  const wallUp = run.wall.hp > 0;
+  const defRatio = wallUp ? run.wall.hp / run.wall.maxHp : run.home.hp / run.home.maxHp;
+  const defLabel = wallUp ? `防线 ${run.wall.hp}` : `大屋 ${run.home.hp}`;
 
   return (
     <header class="hud">
       <div class="hud-left">
-        <div class="hud-row">
-          <Chip icon="ic_hp" id="hud-hp"><Bar v={p.hp / p.maxHp} />{Math.ceil(p.hp)}</Chip>
-          <Chip icon="ic_armor" id="hud-armor"><Bar cls="armor" v={p.armor / p.maxArmor} />{p.armor}</Chip>
-        </div>
-        <div class="hud-row">
-          <Chip icon="ic_wall" id="hud-wall"><Bar cls="wall" v={run.wall.hp / run.wall.maxHp} />壁垒{run.wall.level}</Chip>
-          <Chip icon="ic_fort" id="hud-fort"><Bar cls="fort" v={run.home.hp / run.home.maxHp} />堡垒{run.fort.level}</Chip>
-          {run.perks.length > 0 && <div class="perks" id="hud-perks">{run.perks.map((id) => <Icon key={id} k={perkDef(id).icon} />)}</div>}
-        </div>
+        <Chip icon="ic_hp" id="hud-hp">
+          <Bar v={p.hp / p.maxHp} />{Math.ceil(p.hp)}{p.armor > 0 ? ` +${Math.ceil(p.armor)}甲` : ''}
+        </Chip>
+        <Chip icon={wallUp ? 'ic_wall' : 'ic_fort'} id="hud-wall">
+          <Bar cls={wallUp ? 'wall' : 'fort'} v={defRatio} />{defLabel}
+        </Chip>
+        {run.perks.length > 0 && <div class="perks" id="hud-perks">{run.perks.map((id) => <Icon key={id} k={perkDef(id).icon} />)}</div>}
       </div>
 
       <div class="hud-mid">
@@ -38,7 +39,7 @@ function Hud() {
             {ZOMBIES[boss.kind].name.split('·')[0]} <Bar cls="boss" v={boss.hp / boss.maxHp} />
           </Chip>
         ) : run.phase === 'camp' ? (
-          <Chip cls="tag" id="hud-left">{fresh ? `明晚:${fresh.name}` : '自由整备'}</Chip>
+          <Chip cls="tag" id="hud-left">{fresh ? `明晚:${fresh.name}` : '休整之夜'}</Chip>
         ) : (
           <Chip icon="ic_zombie" id="hud-left">{run.phase === 'clear' ? '清场！' : `剩 ${dayRemaining(run)}`}</Chip>
         )}
@@ -77,7 +78,7 @@ const Purse = () => (
 function PerkPanel() {
   const run = game.run;
   return (
-    <Panel id="panel-perk" title={`第 ${run.day} 天清场`} sub="选一个天赋，随后回酒馆小屋休息整备">
+    <Panel id="panel-perk" title={`第 ${run.day} 天清场`} sub="选一个天赋，随后回酒馆小屋招待食客与整备">
       <div class="row">
         {run.perkChoices.map((id) => {
           const perk = perkDef(id);
@@ -114,48 +115,67 @@ function ClassPanel() {
   );
 }
 
-/** 深夜小厨房：僵尸肉爆炒变现 + 烹饪明晚战前特餐 */
+/** 深夜小食堂：招待幸存者熟客点单赚赏金 + 留一份明早私房特餐 + 富余鲜肉现炒 */
 function KitchenPanel() {
   const run = game.run, price = meatPrice(run.cls);
-  const rested = Math.min(run.player.maxHp, Math.round(run.player.hp + run.player.maxHp * DAY_HEAL));
+  const allServed = run.guests.length > 0 && run.guests.every((g) => g.served);
   return (
-    <Panel id="panel-kitchen" cls="wide" title="酒馆小厨房" head={<><Purse /><Btn id="btn-close" kind="primary" onClick={() => game.close()}>回屋里</Btn></>}>
-      <div class="item">
-        <Icon k="ic_kitchen" cls="x2" />
-        <span class="grow">
-          <b>深夜爆炒僵尸鲜肉 · 当前库存 {run.meat} 块（明早醒来回血至 {rested}/{run.player.maxHp}）</b>
-          <small>每份炒肉卖 {price} 金币{run.cls === 'chef' ? '（主厨卖价 +35% 且特餐效果 +50%）' : ''}</small>
-        </span>
-        <Btn kind="small" id="btn-cook-one" disabled={run.meat < 1} onClick={() => game.send({ t: 'cookSell', count: 1 })}>炒 1 份 (+{price})</Btn>
-        <Btn kind="small" id="btn-cook-all" disabled={run.meat < 1} onClick={() => game.send({ t: 'cookSell', count: run.meat })}>全部下锅 (+{run.meat * price})</Btn>
+    <Panel id="panel-kitchen" cls="wide" title="深夜小食堂" head={<><Purse /><Btn id="btn-close" kind="primary" onClick={() => game.close()}>回堂内</Btn></>}>
+      <p class="section-title">
+        <span>今晚堂食熟客（招待满 3 位额外赠 +{run.cls === 'chef' ? 24 : 16} 金币与 +15 生命）</span>
+        <span>{allServed ? '满堂食客皆已尽兴！' : `库存鲜肉 ${run.meat} 块`}</span>
+      </p>
+      <div class="cols3">
+        {run.guests.map((g, i) => (
+          <div class={`item diner-card ${g.served ? 'served' : ''}`} key={g.id}>
+            <Icon k={MEALS[g.dish].icon} cls="x2" />
+            <span class="grow">
+              <b>{g.name} · {g.role}</b>
+              <small class="quote">「{g.served ? g.thanksQuote : g.orderQuote}」</small>
+              <Btn kind="small" id={`btn-serve-${i}`} disabled={g.served || run.meat < g.meatCost}
+                onClick={() => game.send({ t: 'serveGuest', guestId: g.id })}>
+                {g.served ? `已招待 (+${g.pay}金)` : `上菜：${g.dishName} (${g.meatCost}肉→+${g.pay}金)`}
+              </Btn>
+            </span>
+          </div>
+        ))}
       </div>
 
       <p class="section-title">
-        <span>明晚战前特餐（每晚选 1 道）</span>
-        <span>{run.meal ? `已做好：${MEALS[run.meal].name}` : '待下锅'}</span>
+        <span>留一份明日战前私房特餐（每晚选 1 道，天亮开战生效）</span>
+        <span>{run.meal ? `已备好：${MEALS[run.meal].name}` : '待下锅'}</span>
       </p>
       <div class="cols3">
         {(Object.keys(MEALS) as MealId[]).map((id) => {
           const m = MEALS[id], picked = run.meal === id;
           return (
             <div class="item" key={id}>
-              <Icon k="ic_meat" cls="x2" />
+              <Icon k={m.icon} cls="x2" />
               <span class="grow">
                 <b>{m.name}</b>
                 <small>{m.desc}</small>
                 <Btn kind="small" id={`btn-meal-${id}`} disabled={picked || run.meal !== null || run.meat < m.meatCost} onClick={() => game.send({ t: 'pickMeal', id })}>
-                  {picked ? '已备好' : <>下锅 ({m.meatCost} 肉)</>}
+                  {picked ? '已备好' : <>留餐 ({m.meatCost} 肉)</>}
                 </Btn>
               </span>
             </div>
           );
         })}
       </div>
+
+      <div class="item kitchen-footer">
+        <Icon k="ic_meat" />
+        <span class="grow">
+          <b>富余鲜肉现炒外卖（每块肉 +{price} 金币{run.cls === 'chef' ? ' · 主厨加成' : ''}）</b>
+        </span>
+        <Btn kind="small" id="btn-cook-one" disabled={run.meat < 1} onClick={() => game.send({ t: 'cookSell', count: 1 })}>现炒 1 份 (+{price}金)</Btn>
+        <Btn kind="small" id="btn-cook-all" disabled={run.meat < 1} onClick={() => game.send({ t: 'cookSell', count: run.meat })}>全部现炒 (+{run.meat * price}金)</Btn>
+      </div>
     </Panel>
   );
 }
 
-/** 酒馆军火商店：购买新枪 / 升星 / 购买手雷护甲医疗包 / 刷货 / 拆解旧枪 */
+/** 酒馆军火商店：购买特色新枪 / 升星 / 购买手雷护甲医疗包 / 刷货 / 拆解旧枪 */
 function ShopPanel() {
   const run = game.run, p = run.player;
   return (
@@ -166,14 +186,16 @@ function ShopPanel() {
           const def = WEAPONS[id], owned = p.weapons.find((w) => w.id === id);
           const isMax = !!owned && owned.star >= MAX_STAR;
           const cost = owned ? STAR_COST[owned.star] : def.price;
-          const spec = def.chain ? `电弧弹跳×${def.chain}` : def.aoe ? `爆炸半径${def.aoe}` : def.pierce ? '全穿高爆' : def.pellets ? `${def.pellets}发散射` : def.slow ? '减速压制' : '稳定点射';
+          const nextStar = owned ? Math.min(MAX_STAR, owned.star + 1) : 1;
+          const dps = Math.round(sustainedDps(def, nextStar));
           return (
             <button class="card" key={id} id={`btn-shop-${id}`} data-rarity={def.rarity} disabled={isMax || run.coins < cost} onClick={() => game.send({ t: 'buyWeapon', weapon: id })}>
               <Icon k={def.icon} cls="x2" />
               <strong>{def.name}</strong>
-              <em>{RARITY_NAME[def.rarity]} · {spec}</em>
-              <span>单发 {def.damage} · 射程 {def.range}</span>
-              <u>{isMax ? '已满星' : owned ? `升 ★${owned.star + 1} (${cost}金)` : p.weapons.length >= MAX_CARRY ? `换手中 (${cost}金)` : `购入 (${cost}金)`}</u>
+              <em>{RARITY_NAME[def.rarity]} · {def.trait}</em>
+              <span>{def.desc}</span>
+              <small>持续秒伤 {dps} · 射程 {def.range}</small>
+              <u>{isMax ? '已满星' : owned ? `升 ★${owned.star + 1} (${cost}金)` : p.weapons.length >= MAX_CARRY ? `替换手中 (${cost}金)` : `购入 (${cost}金)`}</u>
             </button>
           );
         })}
@@ -215,13 +237,13 @@ function BuildPanel() {
     <Panel id="panel-build" cls="wide" title="防线工坊" head={<><Purse /><Btn id="btn-close" kind="primary" onClick={() => game.close()}>好了</Btn></>}>
       <div class="cols2">
         <div class="box">
-          <div class="section-title"><span>4 处炮塔防线（屋顶 2 + 庭院 2）</span></div>
+          <div class="section-title"><span>4 处自动炮塔（屋顶 2 + 庭院 2，用废铁建造）</span></div>
           {run.turrets.map((sl, i) => {
             const slotMeta = TURRET_SLOTS[i];
             if (!sl.type) {
               return (
                 <div class="item" key={i}>
-                  <span class="grow"><b>{slotMeta.name}</b><small>空塔位</small></span>
+                  <span class="grow"><b>{slotMeta.name}</b><small>选择塔种安装</small></span>
                   <div class="mini-btns">
                     {(['mg', 'frost', 'tesla', 'cannon'] as TurretType[]).map((kind) => {
                       const c = turretBuildCost(kind, run.cls);
@@ -242,7 +264,7 @@ function BuildPanel() {
             return (
               <div class="item" key={i}>
                 <Icon k={tDef.icon} cls="x2" />
-                <span class="grow"><b>{slotMeta.name} · {tDef.name} Lv.{sl.level}</b><small>伤 {tDef.levels[sl.level - 1].damage} · 射程 {tDef.range}</small></span>
+                <span class="grow"><b>{slotMeta.name} · {tDef.name} Lv.{sl.level}</b><small>{tDef.desc}（伤 {tDef.levels[sl.level - 1].damage}）</small></span>
                 <Btn kind="small" id={`btn-turret-up-${i}`} disabled={isMax || run.scrap < upCost} onClick={() => game.send({ t: 'upgradeTurret', slot: i })}>
                   {isMax ? '满级' : `升 ${upCost}铁`}
                 </Btn>
@@ -253,12 +275,12 @@ function BuildPanel() {
         </div>
 
         <div class="box">
-          <div class="section-title"><span>路障 · 堡垒 · 武器升星</span></div>
+          <div class="section-title"><span>前线路障 · 屋顶守炮 · 随身武器升星</span></div>
           <div class="item">
             <Icon k="ic_wall" cls="x2" />
             <span class="grow">
               <b>{WALL_LEVELS[run.wall.level - 1].name} Lv.{run.wall.level}</b>
-              <small>耐久 {run.wall.hp}/{run.wall.maxHp}{nextWall ? ` · 下级 ${nextWall.coins}金${nextWall.scrap}铁` : ' · 已最高级'}</small>
+              <small>耐久 {run.wall.hp}/{run.wall.maxHp}{nextWall ? ` · 升下级(${nextWall.name}+反伤)：${nextWall.coins}金${nextWall.scrap}铁` : ' · 高压电网反伤生效中'}</small>
             </span>
             <Btn kind="small" id="btn-repair" disabled={run.wall.hp >= run.wall.maxHp || run.coins < WALL_REPAIR_COST} onClick={() => game.send({ t: 'repairWall' })}>修 {WALL_REPAIR_COST}金</Btn>
             <Btn kind="small" id="btn-wall-up" disabled={!nextWall || run.coins < nextWall.coins || run.scrap < nextWall.scrap} onClick={() => game.send({ t: 'upgradeWall' })}>{nextWall ? '升级' : '满级'}</Btn>
@@ -268,7 +290,7 @@ function BuildPanel() {
             <Icon k="ic_fort" cls="x2" />
             <span class="grow">
               <b>{FORT_LEVELS[run.fort.level - 1].name} Lv.{run.fort.level}</b>
-              <small>耐久 {run.home.hp}/{run.home.maxHp}{nextFort ? ` · 下级 ${nextFort.coins}金${nextFort.scrap}铁(守炮/夜修)` : ' · 屋顶双炮+夜修'}</small>
+              <small>耐久 {run.home.hp}/{run.home.maxHp}{nextFort ? ` · 升下级(${nextFort.desc.split(' · ')[0]})：${nextFort.coins}金${nextFort.scrap}铁` : ' · 屋顶双联火炮+每夜修墙'}</small>
             </span>
             <Btn kind="small" id="btn-fort-repair" disabled={run.home.hp >= run.home.maxHp || run.coins < FORT_REPAIR_COST} onClick={() => game.send({ t: 'repairFort' })}>修 {FORT_REPAIR_COST}金</Btn>
             <Btn kind="small" id="btn-fort-up" disabled={!nextFort || run.coins < nextFort.coins || run.scrap < nextFort.scrap} onClick={() => game.send({ t: 'upgradeFort' })}>{nextFort ? '加固' : '满级'}</Btn>
@@ -279,7 +301,7 @@ function BuildPanel() {
             return (
               <div class="item" key={w.id}>
                 <Icon k={def.icon} cls="gun" />
-                <span class="grow"><b>{def.name}</b><Stars n={w.star} /></span>
+                <span class="grow"><b>{def.name} · {def.trait}</b><Stars n={w.star} /></span>
                 <Btn kind="small" id={`btn-star-${w.id}`} disabled={max || run.coins < cost} onClick={() => game.send({ t: 'buyStar', weapon: w.id })}>
                   {max ? '已满星' : <>升星 <Icon k="ic_coin" />{cost}</>}
                 </Btn>
@@ -297,19 +319,20 @@ function Toasts() {
   const [hurt, setHurt] = useState(0);
   useEffect(() => game.onEvent((e: GameEvent) => {
     let text = '', big = false;
-    if (e.t === 'dayStart') { text = `第 ${e.day} 天 · 站上屋顶迎战尸潮！`; big = true; }
+    if (e.t === 'dayStart') { text = `第 ${e.day} 天 · 跃上屋顶迎战尸潮！`; big = true; }
     else if (e.t === 'bossAppear') { text = `警报！Boss ${ZOMBIES[e.kind].name} 现身！`; big = true; }
     else if (e.t === 'dayClear') text = '本波清场！战利品已清点';
-    else if (e.t === 'pickup' && e.isNew) { text = `获得新武器：${WEAPONS[e.weapon].name}`; big = true; }
+    else if (e.t === 'pickup' && e.isNew) { text = `获得新武器：${WEAPONS[e.weapon].name}（${WEAPONS[e.weapon].trait}）`; big = true; }
     else if (e.t === 'star') { text = `${WEAPONS[e.weapon].name} 升至 ${'★'.repeat(e.star)}${STAR_PERKS[e.star] ? ' · ' + STAR_PERKS[e.star] : ''}`; big = true; }
     else if (e.t === 'skill') { text = `${CLASSES[e.cls].skill}发动！${CLASSES[e.cls].skillDesc}`; big = true; }
-    else if (e.t === 'cook') text = `炒肉出摊 ×${e.meat}，入账 +${e.coins} 金币`;
-    else if (e.t === 'meal') text = `明晚特餐「${MEALS[e.id].name}」已就绪`;
+    else if (e.t === 'serve') { text = `${e.name}：「${e.quote}」（+${e.coins}金${e.allServed ? ' · 满堂打赏！' : ''}）`; big = !!e.allServed; }
+    else if (e.t === 'cook') text = `鲜肉现炒出锅 ×${e.meat}，入账 +${e.coins} 金币`;
+    else if (e.t === 'meal') text = `明日私房特餐「${MEALS[e.id].name}」已备妥`;
     else if (e.t === 'hurt') setHurt((n) => n + 1);
     if (!text) return;
     const id = Math.random();
     setItems((list) => [...list.slice(-2), { id, text, big }]);
-    setTimeout(() => setItems((list) => list.filter((t) => t.id !== id)), 2200);
+    setTimeout(() => setItems((list) => list.filter((t) => t.id !== id)), 2400);
   }), []);
   return (
     <>
@@ -340,7 +363,7 @@ export function App() {
       {panel === 'title' && (
         <Panel id="panel-title" cls="title" title="">
           <h1>十五波围城</h1>
-          <p>立于黄昏酒馆屋顶全自动索敌歼敌，夜归屋内小厨房炒肉赚金、扩建 4 座炮塔与 3 级铁壁！（完整 {LAST_DAY} 天 + Boss 战）</p>
+          <p>跃上黄昏酒馆二层屋顶自动索敌狙击尸潮，夜归温馨食堂招待幸存者熟客、打造四座防线炮塔！（完整 {LAST_DAY} 天 + Boss 战）</p>
           <Progress />
           <Btn id="btn-start" kind="primary" onClick={() => game.chooseClass()}>开始守城</Btn>
         </Panel>

@@ -1,11 +1,11 @@
-// 触屏按键与键盘：纯自动锁定开火，右侧为扇形战术键弧（技能、手雷、跳跃、闪避）与酒馆交互按钮。
+// 触屏按键与键盘：左下摇杆走位，右下主攻击键（按住/点击自动瞄准锁定最近敌人开火）与扇形战术键（跳跃、闪避、手雷、技能）。
 import { useRef } from 'preact/hooks';
 import { game } from '../app/game';
 import { CLASSES, WEAPONS, magSize } from '../content/data';
-import { curWeapon, isOnRoof, nearbyExterior, nearbyStation } from '../sim/sim';
+import { curWeapon, nearbyExterior, nearbyStation } from '../sim/sim';
 import { Bar, Icon, Stars } from './parts';
 
-/** 左下角摇杆：控制左右走位（房内巡街与室外闪避） */
+/** 左下角摇杆：控制左右走位（房内走动、室外跳跃登顶与闪避） */
 export function Pad() {
   const ref = useRef<HTMLDivElement>(null);
   const set = (e: PointerEvent | null) => {
@@ -31,10 +31,19 @@ export function Pad() {
 }
 
 function FanKey(props: {
-  id: string; cls: string; onDown: () => void; cooling?: boolean; lit?: boolean; empty?: boolean; progress?: number; children: preact.ComponentChildren;
+  id: string; cls: string; onDown: () => void; onUp?: () => void;
+  cooling?: boolean; lit?: boolean; empty?: boolean; progress?: number; children: preact.ComponentChildren;
 }) {
-  const down = (e: PointerEvent) => { const el = e.currentTarget as HTMLElement; el.setPointerCapture(e.pointerId); el.classList.add('down'); props.onDown(); };
-  const up = (e: PointerEvent) => { (e.currentTarget as HTMLElement).classList.remove('down'); };
+  const down = (e: PointerEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    el.classList.add('down');
+    props.onDown();
+  };
+  const up = (e: PointerEvent) => {
+    (e.currentTarget as HTMLElement).classList.remove('down');
+    props.onUp?.();
+  };
   return (
     <button id={props.id}
       ref={(el) => { if (el && props.progress !== undefined) el.style.setProperty('--p', String(Math.max(0, Math.min(1, props.progress)))); }}
@@ -45,20 +54,19 @@ function FanKey(props: {
   );
 }
 
-/** 靠近酒馆功能区 / 房门 / 木梯时弹出的情景交互按钮 */
+/** 靠近酒馆功能区或大门时弹出的情景交互按钮（上下房顶由玩家自己按跳跃键跳上阶梯） */
 export function InteractHint() {
   const run = game.run;
   let label = '';
   if (run.inside) {
     const st = nearbyStation(run);
-    if (st === 'kitchen') label = '打开小厨房';
-    else if (st === 'shop') label = '打开商店';
+    if (st === 'kitchen') label = '深夜食堂';
+    else if (st === 'shop') label = '军火商店';
     else if (st === 'workshop') label = '防线工坊';
     else if (st === 'door') label = '走出木门';
   } else {
     const ext = nearbyExterior(run);
     if (ext === 'door' && run.phase === 'camp') label = '进入酒馆';
-    else if (ext === 'ladder') label = isOnRoof(run) ? '下到院子' : '爬上房顶';
   }
   if (!label) return null;
   return (
@@ -66,22 +74,27 @@ export function InteractHint() {
   );
 }
 
-/** 右下角扇形战术键（无开火键：全自动索敌开火；玩家专注走位、跳上房顶、闪火球、扔手雷与开大招） */
+/** 右下角主攻击键（按住/点击自动瞄准索敌开火）+ 扇形战术键（跳跃、闪避、手雷、职业大招） */
 export function Keys() {
   const run = game.run, p = run.player, clsDef = CLASSES[run.cls];
-  const ext = nearbyExterior(run);
+  const w = curWeapon(run), def = WEAPONS[w.id];
   const cdTotal = clsDef.cd || 1;
   const cdLeft = run.skill.cd;
   const skillProgress = run.skill.t > 0 ? 1 : cdLeft > 0 ? 1 - cdLeft / cdTotal : 1;
-  const jumpNearLadder = ext === 'ladder' && !isOnRoof(run);
 
   return (
     <div class="keys-fan">
+      <FanKey id="key-fire" cls="fkey-fire" lit={game.held.fire || run.autoFire}
+        onDown={() => { game.held.fire = true; }}
+        onUp={() => { game.held.fire = false; }}>
+        <Icon k={def.icon} />
+        <span>攻击</span>
+      </FanKey>
+      <FanKey id="key-jump" cls="fkey-jump" onDown={() => game.press('jump')}>
+        <span>跳跃</span>
+      </FanKey>
       <FanKey id="key-dodge" cls="fkey-dodge" onDown={() => game.press('dodge')} cooling={p.dodgeCd > 0}>
         <span>{p.dodgeCd > 0 ? `${Math.ceil(p.dodgeCd / 60)}s` : '闪避'}</span>
-      </FanKey>
-      <FanKey id="key-jump" cls="fkey-jump" lit={jumpNearLadder} onDown={() => game.press('jump')}>
-        <span>{jumpNearLadder ? '上房' : '跳跃'}</span>
       </FanKey>
       <FanKey id="key-grenade" cls="fkey-nade" empty={p.grenades <= 0} onDown={() => game.press('grenade')}>
         <Icon k="ic_grenade" />
@@ -107,23 +120,24 @@ export function WeaponChip() {
           <Stars n={w.star} />
           <Bar cls="ammo" v={reloading ? 1 - run.player.reloadT / def.reload : w.ammo / mag} />
         </span>
-        <small>{reloading ? '换弹中' : `${w.ammo}/${mag}`}{run.player.weapons.length > 1 ? ` · 切枪(${run.player.cur + 1}/${run.player.weapons.length})` : ''}</small>
+        <small>{reloading ? '换弹中' : `${w.ammo}/${mag}`}{run.player.weapons.length > 1 ? ` · 切枪(${run.player.cur + 1}/${run.player.weapons.length})` : ` · ${def.trait}`}</small>
       </button>
       <button id="key-reload" class={`btn-reload ${reloading ? 'cooling' : ''}`} onPointerDown={() => game.press('reload')}>换弹</button>
     </div>
   );
 }
 
-/** 营地夜晚底栏：可一边走动，一边直接点开厨房/商店/工坊/出门或迎战下一天 */
+/** 营地夜晚底栏：可一边走动，一边直接点开深夜食堂/商店/工坊/出门或迎战下一天 */
 export function CampDock() {
   const run = game.run;
+  const unserved = run.guests.filter((g) => !g.served).length;
   return (
     <div class="camp-dock" id="camp-dock">
       <button id="btn-kitchen" class="camp-btn" onClick={() => game.open('kitchen')}>
-        <Icon k="ic_kitchen" />小厨房{run.meat > 0 ? `(${run.meat})` : ''}
+        <Icon k="ic_kitchen" />深夜食堂{unserved > 0 ? `(${unserved}客)` : run.meat > 0 ? `(${run.meat}肉)` : ''}
       </button>
       <button id="btn-shop" class="camp-btn" onClick={() => game.open('shop')}>
-        <Icon k="ic_shop" />商店
+        <Icon k="ic_shop" />军火商店
       </button>
       <button id="btn-build" class="camp-btn" onClick={() => game.open('build')}>
         <Icon k="ic_anvil" />防线工坊
@@ -145,13 +159,14 @@ export function bindKeyboard() {
     const k = e.key.toLowerCase();
     if (k === 'a' || k === 'arrowleft') { dirs.left = down; sync(); }
     else if (k === 'd' || k === 'arrowright') { dirs.right = down; sync(); }
+    else if (k === 'j') { game.held.fire = down; }
     else if (down && !e.repeat) {
       if (k === 'w' || k === 'arrowup' || k === ' ') game.press('jump');
       else if (k === 'k' || k === 'shift') game.press('dodge');
       else if (k === 'r') game.press('reload');
       else if (k === 'q') game.press('swap');
       else if (k === 'e') game.press('grenade');
-      else if (k === 'j') game.press('skill');
+      else if (k === 'u') game.press('skill');
       else if (k === 'f' || k === 'enter') game.press('interact');
       else if (k === 'escape') {
         const p = game.panel();

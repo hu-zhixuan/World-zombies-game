@@ -10,46 +10,55 @@ const zombieText = (key: string) => legacyZombies.ZOMBIE_DEX.find((z) => z.key =
 export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
 export const RARITY_NAME: Record<Rarity, string> = { common: '普通', rare: '稀有', epic: '史诗', legendary: '传说' };
 
-// ── 武器（8 把武器，含近中远与元素爆发）──
+// ── 武器（8 把武器，每把拥有鲜明机制标签与专属弹道手感）──
 export type WeaponId = 'pistol' | 'revolver' | 'smg' | 'shotgun' | 'assault' | 'rifle' | 'tesla' | 'rocket';
 export interface WeaponDef {
   id: WeaponId; name: string; rarity: Rarity; icon: string; price: number;
+  trait: string; desc: string;
   damage: number; interval: number; mag: number; reload: number; speed: number; range: number; spread: number;
-  pellets?: number; pierce?: boolean; chain?: number; aoe?: number; slow?: number;
+  pellets?: number; pierce?: boolean; pierceCount?: number; chain?: number; aoe?: number; slow?: number;
 }
 // interval / reload 单位：步（1 秒 = 60 步）
 export const WEAPONS: Record<WeaponId, WeaponDef> = {
   pistol: {
     id: 'pistol', name: weaponText('pistol')?.name ?? '战术自卫手枪', rarity: 'common', icon: 'wp_pistol', price: 0,
-    damage: 32, interval: 15, mag: 12, reload: 48, speed: 10, range: 260, spread: 0,
+    trait: '暴击回弹', desc: '额外 +20% 暴击率，击杀敌人立即回膛 2 发子弹',
+    damage: 34, interval: 14, mag: 12, reload: 46, speed: 10.5, range: 265, spread: 0,
   },
   revolver: {
     id: 'revolver', name: '左轮重炮手枪', rarity: 'common', icon: 'wp_revolver', price: 65,
-    damage: 64, interval: 22, mag: 6, reload: 56, speed: 12.5, range: 285, spread: 0,
+    trait: '重锤穿甲', desc: '大口径马格南重弹必贯穿 2 名敌人并强力击退',
+    damage: 68, interval: 22, mag: 6, reload: 54, speed: 13, range: 290, spread: 0, pierceCount: 2,
   },
   smg: {
-    id: 'smg', name: weaponText('smg')?.name ?? '战术冲锋枪', rarity: 'rare', icon: 'wp_smg', price: 95,
-    damage: 14, interval: 3, mag: 36, reload: 54, speed: 10.5, range: 240, spread: 0.035,
+    id: 'smg', name: weaponText('smg')?.name ?? '疾风冲锋枪', rarity: 'rare', icon: 'wp_smg', price: 95,
+    trait: '极速弹幕', desc: '超高射速密集泼水，弹幕压制减缓尸群移速',
+    damage: 14, interval: 3, mag: 36, reload: 52, speed: 11, range: 245, spread: 0.035, slow: 25,
   },
   shotgun: {
     id: 'shotgun', name: weaponText('shotgun')?.name ?? '防暴重型霰弹', rarity: 'rare', icon: 'wp_shotgun', price: 110,
-    damage: 22, interval: 38, mag: 6, reload: 64, speed: 9.5, range: 185, spread: 0.16, pellets: 7,
+    trait: '贴脸轰飞', desc: '7 发扇形铁砂，近距离造成 1.4 倍伤害并轰退尸群',
+    damage: 22, interval: 36, mag: 6, reload: 62, speed: 9.8, range: 190, spread: 0.16, pellets: 7,
   },
   assault: {
-    id: 'assault', name: weaponText('smg_heavy')?.name ?? '重装突击步枪', rarity: 'rare', icon: 'wp_assault', price: 145,
-    damage: 25, interval: 5, mag: 32, reload: 58, speed: 12, range: 315, spread: 0.02, slow: 45,
+    id: 'assault', name: '极地急冻步枪', rarity: 'rare', icon: 'wp_assault', price: 145,
+    trait: '极寒碎冰', desc: '发射寒冰弹减速 50%，命中冰冻目标触发碎冰范围溅射',
+    damage: 26, interval: 5, mag: 32, reload: 56, speed: 12.2, range: 320, spread: 0.018, slow: 90,
   },
   rifle: {
     id: 'rifle', name: weaponText('sniper')?.name ?? '精锐反器材狙', rarity: 'epic', icon: 'wp_rifle', price: 180,
-    damage: 175, interval: 40, mag: 6, reload: 68, speed: 15, range: 440, spread: 0, pierce: true,
+    trait: '磁轨全穿', desc: '激光制导，发射全屏直线贯穿的赤红磁轨高能光束',
+    damage: 185, interval: 38, mag: 6, reload: 66, speed: 16, range: 460, spread: 0, pierce: true,
   },
   tesla: {
     id: 'tesla', name: '特斯拉电弧枪', rarity: 'epic', icon: 'wp_tesla', price: 210,
-    damage: 56, interval: 18, mag: 16, reload: 60, speed: 14, range: 300, spread: 0, chain: 3,
+    trait: '连环雷暴', desc: '释放高压闪电链在 3~5 只僵尸间连续弹跳电击',
+    damage: 58, interval: 18, mag: 16, reload: 58, speed: 14, range: 310, spread: 0, chain: 3,
   },
   rocket: {
     id: 'rocket', name: weaponText('rocket')?.name ?? '战术重装火箭筒', rarity: 'legendary', icon: 'wp_rocket', price: 260,
-    damage: 195, interval: 46, mag: 4, reload: 74, speed: 9.5, range: 390, spread: 0, aoe: 68,
+    trait: '焦土高爆', desc: '发射重型高爆火箭，大范围轰炸并点燃整片尸群',
+    damage: 210, interval: 45, mag: 4, reload: 72, speed: 9.8, range: 400, spread: 0, aoe: 72,
   },
 };
 export const WEAPON_ORDER: WeaponId[] = ['pistol', 'revolver', 'smg', 'shotgun', 'assault', 'rifle', 'tesla', 'rocket'];
@@ -64,7 +73,7 @@ export function sustainedDps(w: WeaponDef, star = 1): number {
   return (w.damage * starMul(star) * shots * mag) / ((mag * w.interval + w.reload) / 60);
 }
 
-// ── 僵尸与 Boss（方案二 哥特暗黑像素风）──
+// ── 僵尸与 Boss（100% 统一哥特暗黑像素风）──
 export type ZombieKind = 'roamer' | 'crawler' | 'sprinter' | 'bruiser' | 'ghoul' | 'boss_beast' | 'boss_demon';
 export interface ZombieDef {
   kind: ZombieKind; name: string; sprites: string[]; baseHp: number; speed: number; damage: number; attackEvery: number;
@@ -73,32 +82,32 @@ export interface ZombieDef {
 }
 export const ZOMBIES: Record<ZombieKind, ZombieDef> = {
   roamer: {
-    kind: 'roamer', name: zombieText('roamer')?.name ?? '游荡感染者', sprites: ['z_roamer_a', 'z_roamer_b', 'z_roamer_c'],
-    baseHp: 80, speed: 0.84, damage: 8, attackEvery: 50, coins: 4, meat: 1, firstDay: 1, fps: 10, weight: 8, scale: 0.95,
+    kind: 'roamer', name: zombieText('roamer')?.name ?? '游荡腐尸', sprites: ['z_swamp', 'z_clothed', 'z_skeleton'],
+    baseHp: 78, speed: 0.82, damage: 8, attackEvery: 50, coins: 4, meat: 1, firstDay: 1, fps: 9, weight: 8, scale: 1.0,
   },
   crawler: {
-    kind: 'crawler', name: '爬行潜伏者', sprites: ['z_crawler'],
-    baseHp: 62, speed: 1.24, damage: 7, attackEvery: 42, coins: 5, meat: 1, firstDay: 2, fps: 11, weight: 4, scale: 0.95,
+    kind: 'crawler', name: '噬魂黑猫', sprites: ['z_gato'],
+    baseHp: 60, speed: 1.32, damage: 7, attackEvery: 40, coins: 5, meat: 1, firstDay: 2, fps: 11, weight: 4, scale: 1.0,
   },
   sprinter: {
     kind: 'sprinter', name: '地狱猎犬', sprites: ['z_hound'],
-    baseHp: 58, speed: 1.72, damage: 8, attackEvery: 34, coins: 6, meat: 1, firstDay: 3, fps: 14, weight: 4, scale: 1.05,
+    baseHp: 62, speed: 1.68, damage: 8, attackEvery: 34, coins: 6, meat: 1, firstDay: 3, fps: 13, weight: 4, scale: 1.05,
   },
   bruiser: {
-    kind: 'bruiser', name: zombieText('bruiser')?.name ?? '壮汉感染者', sprites: ['z_bruiser'],
-    baseHp: 280, speed: 0.58, damage: 16, attackEvery: 60, coins: 10, meat: 2, firstDay: 4, fps: 8, weight: 3, scale: 1.22,
+    kind: 'bruiser', name: '焦骨巨尸', sprites: ['z_ghoul'],
+    baseHp: 265, speed: 0.62, damage: 15, attackEvery: 58, coins: 10, meat: 2, firstDay: 4, fps: 9, weight: 3, scale: 1.15,
   },
   ghoul: {
-    kind: 'ghoul', name: '燃烧食尸鬼', sprites: ['z_ghoul'],
-    baseHp: 145, speed: 0.86, damage: 12, attackEvery: 78, coins: 13, meat: 2, firstDay: 6, fps: 11, weight: 3, scale: 1.02, ranged: true,
+    kind: 'ghoul', name: '提灯怨灵', sprites: ['z_wraith'],
+    baseHp: 140, speed: 0.85, damage: 12, attackEvery: 76, coins: 13, meat: 2, firstDay: 6, fps: 9, weight: 3, scale: 1.05, ranged: true,
   },
   boss_beast: {
     kind: 'boss_beast', name: '地狱巨兽·暴君', sprites: ['boss_beast'],
-    baseHp: 1150, speed: 0.44, damage: 24, attackEvery: 64, coins: 80, meat: 6, firstDay: 5, fps: 9, weight: 0, scale: 1.55, boss: true, ranged: true,
+    baseHp: 1100, speed: 0.44, damage: 24, attackEvery: 64, coins: 85, meat: 6, firstDay: 5, fps: 9, weight: 0, scale: 1.5, boss: true, ranged: true,
   },
   boss_demon: {
     kind: 'boss_demon', name: '深渊魔王·尸皇', sprites: ['boss_demon'],
-    baseHp: 2150, speed: 0.38, damage: 32, attackEvery: 58, coins: 180, meat: 10, firstDay: 15, fps: 8, weight: 0, scale: 0.96, boss: true, ranged: true,
+    baseHp: 2100, speed: 0.38, damage: 32, attackEvery: 58, coins: 180, meat: 10, firstDay: 15, fps: 8, weight: 0, scale: 0.96, boss: true, ranged: true,
   },
 };
 
@@ -154,7 +163,7 @@ export const WALL_LEVELS = [
 
 export const MAX_FORT_LEVEL = 3;
 export const FORT_LEVELS = [
-  { level: 1, name: '木石酒馆', maxHp: 120, coins: 0, scrap: 0, desc: '屋顶2个塔位，庇护所门廊' },
+  { level: 1, name: '木石酒馆', maxHp: 120, coins: 0, scrap: 0, desc: '屋顶2个塔位，二层木台视野' },
   { level: 2, name: '石堡要塞', maxHp: 240, coins: 60, scrap: 6, desc: '屋顶守卫轻炮自动开火 · 大屋耐久翻倍' },
   { level: 3, name: '哥特铁堡', maxHp: 420, coins: 120, scrap: 12, desc: '屋顶双联火炮 · 屋顶射程+15% · 每夜自动修墙' },
 ];
@@ -168,15 +177,50 @@ export const SHOP_MEDKIT_COST = 30;
 export const SHOP_REROLL_COST = 15;
 export const MAX_GRENADES = 5;
 
-// ── 深夜小厨房：鲜肉翻炒 & 战前特餐 ──
+// ── 深夜小食堂：幸存者食客点单 & 明日私房特餐 ──
 export type MealId = 'spicy_skewer' | 'hearty_stew' | 'iron_steak';
-export interface MealDef { id: MealId; name: string; desc: string; meatCost: number; dmgMul: number; armor: number; haste: number }
+export interface MealDef {
+  id: MealId; name: string; icon: string; desc: string;
+  meatCost: number; dmgMul: number; armor: number; haste: number;
+}
 export const MEALS: Record<MealId, MealDef> = {
-  spicy_skewer: { id: 'spicy_skewer', name: '香辣僵尸肉串', desc: '明天所有武器伤害 +22%', meatCost: 2, dmgMul: 0.22, armor: 0, haste: 0 },
-  hearty_stew:  { id: 'hearty_stew',  name: '浓汤热炖',     desc: '立即回复 40 血 + 明天开局 +35 护甲', meatCost: 2, dmgMul: 0, armor: 35, haste: 0 },
-  iron_steak:   { id: 'iron_steak',   name: '秘制铁板厚肉', desc: '明天角色与炮塔攻速 +20%', meatCost: 3, dmgMul: 0.1, armor: 15, haste: 0.2 },
+  spicy_skewer: { id: 'spicy_skewer', name: '炭烤香辣肉串', icon: 'ic_dish_skewer', desc: '明天所有武器伤害 +22%', meatCost: 2, dmgMul: 0.22, armor: 0, haste: 0 },
+  hearty_stew:  { id: 'hearty_stew',  name: '浓汤热炖肉锅', icon: 'ic_dish_stew',   desc: '立即回 40 血 + 明天开局 +35 护甲', meatCost: 2, dmgMul: 0, armor: 35, haste: 0 },
+  iron_steak:   { id: 'iron_steak',   name: '秘制铁板厚排', icon: 'ic_dish_steak',  desc: '明天角色与炮塔攻速 +20% 且伤害 +10%', meatCost: 3, dmgMul: 0.1, armor: 15, haste: 0.2 },
 };
-export const MEAT_SELL_PRICE = 12; // 每块肉清炒出摊售卖可得 12 金币（主厨翻倍倾向）
+export const MEAT_SELL_PRICE = 14; // 每块鲜肉现炒出锅可得 14 金币
+
+export interface DinerGuestDef {
+  id: string; name: string; role: string; sprite: string; fps: number;
+  dish: MealId; dishName: string; meatCost: number; basePay: number;
+  orderQuote: string; thanksQuote: string;
+}
+export const DINER_GUESTS: DinerGuestDef[] = [
+  {
+    id: 'agou', name: '阿狗', role: '拾荒新丁', sprite: 'npc_hat', fps: 6,
+    dish: 'spicy_skewer', dishName: '炭烤香辣肉串', meatCost: 1, basePay: 18,
+    orderQuote: '老板，刚从废墟摸回来，来串冒油的辣肉串暖暖身子！',
+    thanksQuote: '嘶哈——焦香麻辣，明天守城我帮你多盯紧东墙！',
+  },
+  {
+    id: 'qijie', name: '七姐', role: '夜巡猎手', sprite: 'npc_woman', fps: 7,
+    dish: 'hearty_stew', dishName: '浓汤热炖肉锅', meatCost: 1, basePay: 20,
+    orderQuote: '夜风太冷了，给我盛碗滚烫的肉汤，撒点黑胡椒。',
+    thanksQuote: '这口热汤下肚，浑身的寒气都散了，多谢掌柜！',
+  },
+  {
+    id: 'laobao', name: '老包', role: '焊枪老匠', sprite: 'npc_bearded', fps: 6,
+    dish: 'iron_steak', dishName: '铁板滋滋厚排', meatCost: 2, basePay: 36,
+    orderQuote: '修了一整天炮塔，切块最厚的铁板肉排，要七分熟！',
+    thanksQuote: '够劲！满口肉汁，待会儿我顺手给你把屋顶支架紧一紧！',
+  },
+  {
+    id: 'niqiu', name: '泥鳅', role: '黑市倒爷', sprite: 'npc_oldman', fps: 7,
+    dish: 'spicy_skewer', dishName: '秘制下酒双拼', meatCost: 2, basePay: 40,
+    orderQuote: '掌柜的，把你压箱底的招牌卤肉端上来，赏金少不了你的！',
+    thanksQuote: '绝了！全废土就数你这小酒馆最有人情味，赏金拿好！',
+  },
+];
 
 // ── 天赋 ──
 export type PerkId =
