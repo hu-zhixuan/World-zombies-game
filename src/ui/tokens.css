@@ -1,5 +1,5 @@
 /* 设计常量。界面里所有颜色、间距、字号、圆角、层级都只能从这里取。
-   颜色取自游戏素材本身（黄昏小镇的紫、玫瑰色，木质面板的棕、米色）。 */
+   颜色取自游戏素材本身（黄昏要塞的紫、玫瑰色，酒馆的木、革、金，及电弧与护甲）。 */
 :root {
   --ink: #1b1429;        /* 最深的紫：描边、面板上的深色字 */
   --night: #2d2140;      /* 深紫：遮罩、暗底 */
@@ -13,14 +13,18 @@
   --green: #7bc96f;      /* 绿：可以买、路障 */
   --grey: #8b8497;       /* 灰：不可用 */
   --haze: #b9a6c9;       /* 雾紫：远处景物的色调 */
-  --ember: #ff9a5c;      /* 橙：燃烧 */
-  --infected: #96e18c;   /* 感染绿：染在镇民身上 */
+  --ember: #ff9a5c;      /* 橙：燃烧、烤炉 */
+  --infected: #96e18c;   /* 感染绿 */
   --frost: #8fd3ff;      /* 冰蓝：减速、稀有 */
   --lamp: #ffd27a;       /* 灯光 */
+  --electric: #5ce1e6;   /* 电弧青 */
+  --armor: #7eb8f7;      /* 护甲蓝 */
+  --leather: #3a261e;    /* 暗革底色 */
+  --copper: #c98650;     /* 黄铜高光 */
 
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
-  --f1: 12px; --f2: 14px; --f3: 18px; --f4: 26px;
+  --f1: 12px; --f2: 14px; --f3: 18px; --f4: 24px;
   --r1: 4px; --r2: 10px;
-  --z-hud: 10; --z-toast: 15; --z-panel: 20; /* 提示压在面板下面，不盖住面板上的字 */
+  --z-hud: 10; --z-toast: 15; --z-panel: 20;
   --font: system-ui, -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
 }

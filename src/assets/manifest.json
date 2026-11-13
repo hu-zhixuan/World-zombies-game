@@ -1,4 +1,9 @@
 {
+ "barbed_wire": {
+  "fh": 34,
+  "frames": 1,
+  "fw": 50
+ },
  "barrel": {
   "fh": 30,
   "frames": 1,
@@ -14,6 +19,21 @@
   "frames": 1,
   "fw": 384
  },
+ "boss_beast": {
+  "fh": 67,
+  "frames": 6,
+  "fw": 58
+ },
+ "boss_demon": {
+  "fh": 144,
+  "frames": 6,
+  "fw": 150
+ },
+ "castle_banner": {
+  "fh": 70,
+  "frames": 1,
+  "fw": 48
+ },
  "crate": {
   "fh": 35,
   "frames": 1,
@@ -23,6 +43,26 @@
   "fh": 68,
   "frames": 1,
   "fw": 73
+ },
+ "fort_house": {
+  "fh": 203,
+  "frames": 1,
+  "fw": 256
+ },
+ "fort_keep": {
+  "fh": 206,
+  "frames": 1,
+  "fw": 96
+ },
+ "fx_boom": {
+  "fh": 48,
+  "frames": 8,
+  "fw": 48
+ },
+ "fx_fireball": {
+  "fh": 26,
+  "frames": 3,
+  "fw": 26
  },
  "ground": {
   "fh": 48,
@@ -89,6 +129,16 @@
   "frames": 1,
   "fw": 221
  },
+ "ic_anvil": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_armor": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
  "ic_bloodfrenzy": {
   "fh": 16,
   "frames": 1,
@@ -114,12 +164,27 @@
   "frames": 1,
   "fw": 16
  },
+ "ic_fort": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_fortify": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
  "ic_frostbite": {
   "fh": 16,
   "frames": 1,
   "fw": 16
  },
  "ic_glasscannon": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_grenade": {
   "fh": 16,
   "frames": 1,
   "fw": 16
@@ -134,7 +199,17 @@
   "frames": 1,
   "fw": 16
  },
+ "ic_kitchen": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
  "ic_lifesteal": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_meat": {
   "fh": 16,
   "frames": 1,
   "fw": 16
@@ -159,12 +234,32 @@
   "frames": 1,
   "fw": 16
  },
+ "ic_rooftop": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
  "ic_scrap": {
   "fh": 16,
   "frames": 1,
   "fw": 16
  },
  "ic_secondwind": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_shock": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_shop": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_shrapnel": {
   "fh": 16,
   "frames": 1,
   "fw": 16
@@ -178,6 +273,21 @@
   "fh": 23,
   "frames": 1,
   "fw": 25
+ },
+ "ic_turret_cannon": {
+  "fh": 28,
+  "frames": 1,
+  "fw": 34
+ },
+ "ic_turret_frost": {
+  "fh": 62,
+  "frames": 1,
+  "fw": 44
+ },
+ "ic_turret_tesla": {
+  "fh": 30,
+  "frames": 1,
+  "fw": 36
  },
  "ic_vanguard": {
   "fh": 16,
@@ -199,6 +309,16 @@
   "frames": 1,
   "fw": 35
  },
+ "prop_ladder": {
+  "fh": 64,
+  "frames": 1,
+  "fw": 16
+ },
+ "roof_deck": {
+  "fh": 32,
+  "frames": 1,
+  "fw": 240
+ },
  "shot": {
   "fh": 11,
   "frames": 3,
@@ -214,10 +334,30 @@
   "frames": 1,
   "fw": 37
  },
+ "tavern_interior": {
+  "fh": 240,
+  "frames": 1,
+  "fw": 528
+ },
  "turret": {
   "fh": 23,
   "frames": 6,
   "fw": 25
+ },
+ "turret_cannon": {
+  "fh": 28,
+  "frames": 1,
+  "fw": 34
+ },
+ "turret_frost": {
+  "fh": 62,
+  "frames": 4,
+  "fw": 44
+ },
+ "turret_tesla": {
+  "fh": 30,
+  "frames": 2,
+  "fw": 36
  },
  "ui_banner": {
   "fh": 32,
@@ -269,13 +409,28 @@
   "frames": 1,
   "fw": 65
  },
+ "wp_assault": {
+  "fh": 7,
+  "frames": 1,
+  "fw": 15
+ },
  "wp_pistol": {
   "fh": 10,
   "frames": 1,
   "fw": 13
  },
+ "wp_revolver": {
+  "fh": 9,
+  "frames": 1,
+  "fw": 13
+ },
  "wp_rifle": {
   "fh": 5,
+  "frames": 1,
+  "fw": 17
+ },
+ "wp_rocket": {
+  "fh": 8,
   "frames": 1,
   "fw": 17
  },
@@ -289,34 +444,54 @@
   "frames": 1,
   "fw": 15
  },
- "z_bearded": {
-  "fh": 47,
-  "frames": 6,
-  "fw": 40
+ "wp_tesla": {
+  "fh": 7,
+  "frames": 1,
+  "fw": 16
+ },
+ "z_bruiser": {
+  "fh": 54,
+  "frames": 7,
+  "fw": 56
+ },
+ "z_collapse": {
+  "fh": 54,
+  "frames": 8,
+  "fw": 64
+ },
+ "z_crawler": {
+  "fh": 54,
+  "frames": 7,
+  "fw": 56
  },
  "z_death": {
   "fh": 52,
   "frames": 5,
   "fw": 44
  },
- "z_hat": {
-  "fh": 52,
-  "frames": 6,
-  "fw": 39
+ "z_ghoul": {
+  "fh": 60,
+  "frames": 8,
+  "fw": 57
  },
- "z_oldman": {
-  "fh": 42,
-  "frames": 12,
-  "fw": 34
+ "z_hound": {
+  "fh": 32,
+  "frames": 5,
+  "fw": 56
  },
- "z_roamer": {
-  "fh": 45,
-  "frames": 4,
-  "fw": 33
+ "z_roamer_a": {
+  "fh": 54,
+  "frames": 7,
+  "fw": 56
  },
- "z_woman": {
-  "fh": 46,
-  "frames": 6,
-  "fw": 37
+ "z_roamer_b": {
+  "fh": 54,
+  "frames": 7,
+  "fw": 56
+ },
+ "z_roamer_c": {
+  "fh": 54,
+  "frames": 7,
+  "fw": 56
  }
 }
