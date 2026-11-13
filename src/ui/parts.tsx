@@ -14,11 +14,11 @@ export const Bar = (p: { v: number; cls?: string }) => (
   <span class={`bar ${p.cls ?? ''}`} ref={(el) => { el?.style.setProperty('--v', String(Math.max(0, Math.min(1, p.v)))); }}><b /></span>
 );
 
-export const Chip = (p: { icon?: string; children: ComponentChildren; id?: string }) => (
-  <span class="chip" id={p.id}>{p.icon && <Icon k={p.icon} />}{p.children}</span>
+export const Chip = (p: { icon?: string; children: ComponentChildren; id?: string; cls?: string }) => (
+  <span class={`chip ${p.cls ?? ''}`} id={p.id}>{p.icon && <Icon k={p.icon} />}{p.children}</span>
 );
 
-/** 面板。head 是放在标题右边的东西（钱包、关闭按钮），这样内容再多也不会把关闭按钮挤出屏幕 */
+/** 面板。head 是放在标题右边的东西（钱包、关闭按钮），内容再多也不会把关闭按钮挤出屏幕 */
 export const Panel = (p: { id: string; title: string; sub?: string; cls?: string; head?: ComponentChildren; children: ComponentChildren }) => (
   <div class="veil">
     <section class={`panel ${p.cls ?? ''}`} id={p.id}>
@@ -29,6 +29,6 @@ export const Panel = (p: { id: string; title: string; sub?: string; cls?: string
   </div>
 );
 
-export const Btn = (p: { id?: string; kind?: 'primary' | 'danger' | 'small'; disabled?: boolean; onClick: () => void; children: ComponentChildren }) => (
+export const Btn = (p: { id?: string; kind?: 'primary' | 'danger' | 'small' | 'ghost'; disabled?: boolean; onClick: () => void; children: ComponentChildren }) => (
   <button id={p.id} class={`btn ${p.kind ?? ''}`} disabled={p.disabled} onClick={p.onClick}>{p.children}</button>
 );
