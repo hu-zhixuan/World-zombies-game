@@ -32,7 +32,7 @@ const L = require('./lib.cjs');
   const fill = await g.page.evaluate(() => { const r = document.querySelector('#stage canvas').getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), vw: innerWidth, vh: innerHeight }; });
   check(fill.w === fill.vw && fill.h === fill.vh, `画面铺满屏幕，没有黑边 (${fill.w}x${fill.h} / ${fill.vw}x${fill.vh})`);
 
-  // 2. 选职业 & 确认主开火键 (#key-fire) 存在且站在二层房顶
+  // 2. 选职业 & 确认主开火键 (#key-fire) 及右侧扇形键互不重叠
   await g.tap('#btn-start');
   check((await g.state()).panel === 'class', '点「开始」先选职业');
   await g.shot('01b-class'); await fits('#panel-class');
@@ -41,26 +41,59 @@ const L = require('./lib.cjs');
   let s = await g.state();
   check(s.panel === null && s.y <= -90, `进入第 1 天且主角站在二楼房顶防御 (y=${s.y})`);
   check(await g.page.evaluate(() => !!document.querySelector('#key-fire')), '右下角主开火键 #key-fire 已就位');
+  const noOverlap = await g.page.evaluate(() => {
+    const ids = ['#key-fire', '#key-jump', '#key-dodge', '#key-grenade', '#key-skill', '#weapon-chip', '#key-reload'];
+    const rects = ids.map((id) => ({ id, r: document.querySelector(id).getBoundingClientRect() }));
+    for (let i = 0; i < rects.length; i++) {
+      for (let j = i + 1; j < rects.length; j++) {
+        const a = rects[i].r, b = rects[j].r;
+        const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (ox > 2 && oy > 2) return `${rects[i].id} 与 ${rects[j].id} 重叠`;
+      }
+    }
+    return 'ok';
+  });
+  check(noOverlap === 'ok', '右下角按钮与武器条互不重叠 (' + noOverlap + ')');
 
-  // 3. 按下开火键自动瞄准杀敌 + 扇形技能 / 手雷
-  check(await until((st) => st.zombies >= 2 && st.target !== null, 30000, '等僵尸进射程自动锁定'), '僵尸进入射程自动锁定');
-  await g.tap('#key-fire');
+  // 3. 元气骑士式手感：不按攻击键绝不乱开枪；按住攻击键才自动锁敌射杀 + 可拖拽控抛物线手雷
+  check(await until((st) => st.zombies >= 2 && st.target !== null, 30000, '等僵尸进射程出现锁定框'), '僵尸进入射程出现锁定准星');
+  const idleAmmo = await g.page.evaluate(() => ({ auto: window.__game.run.autoFire, ammo: window.__game.run.player.weapons[0].ammo }));
+  check(!idleAmmo.auto && idleAmmo.ammo === 12, `默认不自动开枪 (autoFire=${idleAmmo.auto}, ammo=${idleAmmo.ammo})`);
+
+  const fireBtn = await g.center('#key-fire');
+  await g.touch('touchStart', fireBtn.x, fireBtn.y);
+  await wait(240);
   await g.shot('02-rooftop-fight');
-  check(await until((st) => st.kills >= 2, 30000, '自动击杀僵尸'), '站房顶开火能稳定杀敌');
+  check(await until((st) => st.kills >= 2, 30000, '按住攻击键自动锁敌击杀僵尸'), '按住攻击键能稳定自动锁敌杀敌');
+  await g.touch('touchEnd');
+  await wait(120);
 
   await g.tap('#key-skill');
-  await g.tap('#key-grenade');
   check(await g.page.evaluate(() => window.__game.run.skill.cd > 0), '扇形技能键正常释放');
-  check((await g.state()).grenades === 1, '扇形手雷键正常投掷');
+
+  // 拖拽手雷轮盘向右上拉出高抛抛物线预览并投出
+  const nadeBtn = await g.center('#key-grenade');
+  await g.touch('touchStart', nadeBtn.x, nadeBtn.y);
+  await wait(60);
+  await g.touch('touchMove', nadeBtn.x + 36, nadeBtn.y - 34);
+  await wait(200);
+  check(await g.page.evaluate(() => !!window.__game.grenadeAim && window.__game.grenadeAim.dx > 0.5 && window.__game.grenadeAim.dy < -0.4), '按住手雷拖拽能实时调出抛物线方向与高低弧度');
+  await g.shot('02c-grenade-aim');
+  await g.touch('touchEnd');
+  await wait(260);
+  check((await g.state()).grenades === 1, '拖拽手雷松手后精准按设定抛物线投出');
   await g.shot('02b-skill-grenade');
 
-  // 4. 走下房顶落到庭院，一楼砖墙阻挡不穿模，再通过门廊阶梯二次跳跃跳回二楼房顶
+  // 4. 在左下半屏热区外围用浮动摇杆向右走下房顶，测一楼砖墙碰撞，再二段跳跳回二楼房顶
   const pad = await g.center('#pad');
-  await g.touch('touchStart', pad.x + 36, pad.y);
-  check(await until((st) => st.y === 0, 6000, '向右走下房顶'), '能走下房顶到庭院');
+  await g.touch('touchStart', pad.x + 88, pad.y - 26);
+  await wait(40);
+  await g.touch('touchMove', pad.x + 128, pad.y - 26);
+  check(await until((st) => st.y === 0, 6000, '浮动摇杆向右走下房顶'), '浮动摇杆抓边也能向右走下房顶到庭院');
   await g.touch('touchEnd');
   await g.touch('touchStart', pad.x - 36, pad.y);
-  await wait(900);
+  await wait(950);
   await g.touch('touchEnd');
   s = await g.state();
   check(s.x === 246 && s.y === 0, `一楼实体砖墙阻挡主角不穿模 (x=${s.x})`);
@@ -73,8 +106,11 @@ const L = require('./lib.cjs');
   await g.touch('touchEnd');
   check((await g.state()).y <= -90, '第二跳亲自跳回二楼屋顶平台');
 
-  // 5. 等待第 1 天清场与三选一
+  // 5. 等待第 1 天清场与三选一（手动按住攻击键帮忙收尾）
+  await g.touch('touchStart', fireBtn.x, fireBtn.y);
   check(await until((st) => st.phase !== 'fight', 120000, '第 1 天清场'), '第 1 天能清场');
+  await g.touch('touchEnd');
+  await wait(120);
   await g.shot('03-clear');
   check(await until((st) => st.panel === 'perk', 15000, '清场自动进入天赋三选一'), '清场后弹出三选一');
   await wait(250); await g.shot('04-perk');

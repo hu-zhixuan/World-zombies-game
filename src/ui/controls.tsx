@@ -1,31 +1,90 @@
-// 触屏按键与键盘：左下摇杆走位，右下主攻击键（按住/点击自动瞄准锁定最近敌人开火）与扇形战术键（跳跃、闪避、手雷、技能）。
+// 触屏按键与键盘：左下元气骑士式浮动摇杆，右下主攻击键（按住开火 + 自动锁敌）+ 弧形战术键（跳/闪/可拖拽控抛物线手雷/技能）。
 import { useRef } from 'preact/hooks';
+import { audio } from '../app/audio';
 import { game } from '../app/game';
 import { CLASSES, WEAPONS, magSize } from '../content/data';
 import { curWeapon, nearbyExterior, nearbyStation } from '../sim/sim';
 import { Bar, Icon, Stars } from './parts';
 
-/** 左下角摇杆：控制左右走位（房内走动、室外跳跃登顶与闪避） */
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/** 左下角浮动摇杆：点进热区任意位置都能抓到摇杆，7% 极小死区 + 随指微漂防换向卡顿 */
 export function Pad() {
-  const ref = useRef<HTMLDivElement>(null);
-  const set = (e: PointerEvent | null) => {
-    const el = ref.current!;
-    let x = 0, y = 0;
-    if (e) {
-      const r = el.getBoundingClientRect();
-      x = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / (r.width / 2)));
-      y = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / (r.height / 2)));
+  const padRef = useRef<HTMLDivElement>(null);
+  const originRef = useRef<{ x: number; y: number } | null>(null);
+  const restRef = useRef<{ x: number; y: number }>({ x: 74, y: 330 });
+
+  const reset = () => {
+    const el = padRef.current;
+    originRef.current = null;
+    if (el) {
+      el.classList.remove('active');
+      el.removeAttribute('data-dir');
+      el.style.setProperty('--bx', '0px');
+      el.style.setProperty('--by', '0px');
+      el.style.setProperty('--x', '0');
+      el.style.setProperty('--y', '0');
     }
-    el.style.setProperty('--x', String(x));
-    el.style.setProperty('--y', String(y * 0.4));
-    game.held.move = Math.abs(x) < 0.2 ? 0 : x > 0 ? 1 : -1;
+    game.held.move = 0;
   };
+
+  const apply = (cx: number, cy: number, isDown: boolean) => {
+    const el = padRef.current;
+    if (!el) return;
+    if (isDown || !originRef.current) {
+      el.style.setProperty('--bx', '0px');
+      el.style.setProperty('--by', '0px');
+      const r = el.getBoundingClientRect();
+      const restCX = r.left + r.width / 2, restCY = r.top + r.height / 2;
+      restRef.current = { x: restCX, y: restCY };
+      if (Math.hypot(cx - restCX, cy - restCY) <= r.width * 0.56) {
+        originRef.current = { x: restCX, y: restCY };
+      } else {
+        const ox = clamp(cx, 60, Math.max(120, window.innerWidth * 0.34));
+        const oy = clamp(cy, Math.max(140, window.innerHeight - 210), window.innerHeight - 62);
+        originRef.current = { x: ox, y: oy };
+        el.style.setProperty('--bx', `${Math.round(ox - restCX)}px`);
+        el.style.setProperty('--by', `${Math.round(oy - restCY)}px`);
+      }
+    }
+
+    const origin = originRef.current!;
+    let dx = cx - origin.x, dy = cy - origin.y;
+    const dist = Math.hypot(dx, dy);
+    const leash = 54;
+    if (!isDown && dist > leash) {
+      const nextOX = clamp(cx - (dx / dist) * leash, 56, Math.max(130, window.innerWidth * 0.36));
+      const nextOY = clamp(cy - (dy / dist) * leash, Math.max(140, window.innerHeight - 210), window.innerHeight - 58);
+      originRef.current = { x: nextOX, y: nextOY };
+      el.style.setProperty('--bx', `${Math.round(nextOX - restRef.current.x)}px`);
+      el.style.setProperty('--by', `${Math.round(nextOY - restRef.current.y)}px`);
+      dx = cx - nextOX; dy = cy - nextOY;
+    }
+
+    const R = 44;
+    let nx = clamp(dx / R, -1, 1), ny = clamp(dy / R, -1, 1);
+    const mag = Math.hypot(nx, ny);
+    const kx = mag > 1 ? nx / mag : nx;
+    const ky = mag > 1 ? ny / mag : ny;
+    el.classList.add('active');
+    el.style.setProperty('--x', kx.toFixed(3));
+    el.style.setProperty('--y', (ky * 0.55).toFixed(3));
+
+    const ax = Math.abs(nx);
+    const dead = 0.07;
+    const move = ax < dead ? 0 : Math.sign(nx) * Math.min(1, 0.38 + ((ax - dead) / 0.72) * 0.62);
+    game.held.move = move;
+    if (move > 0) el.setAttribute('data-dir', 'right');
+    else if (move < 0) el.setAttribute('data-dir', 'left');
+    else el.removeAttribute('data-dir');
+  };
+
   return (
-    <div class="pad" id="pad" ref={ref}
-      onPointerDown={(e) => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); set(e); }}
-      onPointerMove={(e) => { if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) set(e); }}
-      onPointerUp={() => set(null)} onPointerCancel={() => set(null)}>
-      <i />
+    <div class="pad-zone" id="pad-zone"
+      onPointerDown={(e) => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); apply(e.clientX, e.clientY, true); }}
+      onPointerMove={(e) => { if ((e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) apply(e.clientX, e.clientY, false); }}
+      onPointerUp={reset} onPointerCancel={reset}>
+      <div class="pad" id="pad" ref={padRef}><i /></div>
     </div>
   );
 }
@@ -54,6 +113,75 @@ function FanKey(props: {
   );
 }
 
+/** 可拖拽手榴弹轮盘键：按住拖动实时改变抛物线远近/高低弧度，松手投出（快点也能直接智能投向敌群） */
+function GrenadeKey(props: { count: number }) {
+  const centerRef = useRef<{ x: number; y: number } | null>(null);
+  const lastCellRef = useRef('');
+
+  const clearAim = (el: HTMLElement) => {
+    centerRef.current = null;
+    game.grenadeAim = null;
+    el.classList.remove('aiming', 'down');
+    el.style.setProperty('--gx', '0');
+    el.style.setProperty('--gy', '0');
+  };
+
+  const down = (e: PointerEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    if (props.count <= 0 || game.run.inside || game.run.phase !== 'fight') {
+      audio.onEvent({ t: 'empty' });
+      return;
+    }
+    el.setPointerCapture(e.pointerId);
+    const r = el.getBoundingClientRect();
+    centerRef.current = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    game.grenadeAim = { dx: 0, dy: 0 };
+    lastCellRef.current = '0,0';
+    el.classList.add('aiming', 'down');
+    audio.unlock();
+  };
+
+  const move = (e: PointerEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    if (!centerRef.current || !el.hasPointerCapture(e.pointerId)) return;
+    const maxDrag = 54;
+    const dx = clamp((e.clientX - centerRef.current.x) / maxDrag, -1, 1);
+    const dy = clamp((e.clientY - centerRef.current.y) / maxDrag, -1, 1);
+    const mag = Math.hypot(dx, dy);
+    el.style.setProperty('--gx', (mag > 1 ? dx / mag : dx).toFixed(3));
+    el.style.setProperty('--gy', (mag > 1 ? dy / mag : dy).toFixed(3));
+    game.grenadeAim = { dx, dy };
+    const cell = `${Math.round(dx * 4)},${Math.round(dy * 4)}`;
+    if (cell !== lastCellRef.current) {
+      lastCellRef.current = cell;
+      audio.aimTick();
+    }
+  };
+
+  const up = (e: PointerEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    if (!centerRef.current) return;
+    const aim = game.grenadeAim ? { ...game.grenadeAim } : null;
+    clearAim(el);
+    game.press('grenade', aim);
+  };
+
+  const cancel = (e: PointerEvent) => {
+    const el = e.currentTarget as HTMLElement;
+    if (centerRef.current) clearAim(el);
+  };
+
+  return (
+    <button id="key-grenade" class={`fkey fkey-nade ${props.count <= 0 ? 'empty' : ''}`}
+      onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel}>
+      <Icon k="ic_grenade" />
+      <span>手雷</span>
+      <b>{props.count}</b>
+      <i class="nade-knob" />
+    </button>
+  );
+}
+
 /** 靠近酒馆功能区或大门时弹出的情景交互按钮（上下房顶由玩家自己按跳跃键跳上阶梯） */
 export function InteractHint() {
   const run = game.run;
@@ -74,34 +202,39 @@ export function InteractHint() {
   );
 }
 
-/** 右下角主攻击键（按住/点击自动瞄准索敌开火）+ 扇形战术键（跳跃、闪避、手雷、职业大招） */
+/** 右下角元气骑士式弧形战术键区：大号主攻击键（按住自动锁敌开火，不按绝不乱打）+ 跳/闪/拖曳抛物线手雷/技能 */
 export function Keys() {
   const run = game.run, p = run.player, clsDef = CLASSES[run.cls];
   const w = curWeapon(run), def = WEAPONS[w.id];
   const cdTotal = clsDef.cd || 1;
   const cdLeft = run.skill.cd;
   const skillProgress = run.skill.t > 0 ? 1 : cdLeft > 0 ? 1 - cdLeft / cdTotal : 1;
+  const dodgeProgress = p.dodgeCd > 0 ? 1 - p.dodgeCd / 60 : 1;
 
   return (
     <div class="keys-fan">
-      <FanKey id="key-fire" cls="fkey-fire" lit={game.held.fire || run.autoFire}
-        onDown={() => { game.held.fire = true; }}
-        onUp={() => { game.held.fire = false; }}>
+      <FanKey id="key-fire" cls="fkey-fire" lit={game.held.fire}
+        onDown={() => {
+          game.held.fire = true;
+          game.press('fire');
+          if (w.ammo <= 0 && p.reloadT === 0) game.press('reload');
+          game.notify();
+        }}
+        onUp={() => { game.held.fire = false; game.notify(); }}>
         <Icon k={def.icon} />
         <span>攻击</span>
       </FanKey>
       <FanKey id="key-jump" cls="fkey-jump" onDown={() => game.press('jump')}>
+        <Icon k="ic_rooftop" />
         <span>跳跃</span>
       </FanKey>
-      <FanKey id="key-dodge" cls="fkey-dodge" onDown={() => game.press('dodge')} cooling={p.dodgeCd > 0}>
+      <FanKey id="key-dodge" cls="fkey-dodge" progress={dodgeProgress} cooling={p.dodgeCd > 0} onDown={() => game.press('dodge')}>
+        <Icon k="ic_secondwind" />
         <span>{p.dodgeCd > 0 ? `${Math.ceil(p.dodgeCd / 60)}s` : '闪避'}</span>
       </FanKey>
-      <FanKey id="key-grenade" cls="fkey-nade" empty={p.grenades <= 0} onDown={() => game.press('grenade')}>
-        <Icon k="ic_grenade" />
-        <span>手雷</span>
-        <b>{p.grenades}</b>
-      </FanKey>
+      <GrenadeKey count={p.grenades} />
       <FanKey id="key-skill" cls="fkey-skill" progress={skillProgress} cooling={cdLeft > 0 && run.skill.t === 0} lit={run.skill.t > 0} onDown={() => game.press('skill')}>
+        <Icon k={clsDef.icon} />
         <span>{run.skill.t > 0 ? `${Math.ceil(run.skill.t / 60)}s` : cdLeft > 0 ? `${Math.ceil(cdLeft / 60)}s` : clsDef.skill}</span>
       </FanKey>
     </div>
@@ -114,13 +247,13 @@ export function WeaponChip() {
   const reloading = run.player.reloadT > 0, mag = magSize(w.id, w.star);
   return (
     <div class="weapon-wrap">
-      <button class="weapon" id="weapon-chip" onPointerDown={() => game.press('swap')}>
+      <button class={`weapon ${reloading ? 'reloading' : ''}`} id="weapon-chip" onPointerDown={() => game.press('swap')}>
         <Icon k={def.icon} />
         <span class="col">
           <Stars n={w.star} />
           <Bar cls="ammo" v={reloading ? 1 - run.player.reloadT / def.reload : w.ammo / mag} />
         </span>
-        <small>{reloading ? '换弹中' : `${w.ammo}/${mag}`}{run.player.weapons.length > 1 ? ` · 切枪(${run.player.cur + 1}/${run.player.weapons.length})` : ` · ${def.trait}`}</small>
+        <small>{reloading ? '换弹中' : `${w.ammo}/${mag}`}{run.player.weapons.length > 1 ? ` · 切(${run.player.cur + 1}/${run.player.weapons.length})` : ` · ${def.trait}`}</small>
       </button>
       <button id="key-reload" class={`btn-reload ${reloading ? 'cooling' : ''}`} onPointerDown={() => game.press('reload')}>换弹</button>
     </div>

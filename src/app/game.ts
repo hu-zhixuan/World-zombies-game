@@ -22,10 +22,13 @@ class Game {
   private stack: UserPanel[] = [];
   private listeners = new Set<Listener>();
   private eventListeners = new Set<EventListener>();
-  /** 持续按住的输入（左摇杆） */
+  /** 持续按住的输入（左摇杆 / 攻击键） */
   held = { move: 0, fire: false };
+  /** 实时拖拽手榴弹瞄准向量（画面层据此画抛物线预览） */
+  grenadeAim: { dx: number; dy: number } | null = null;
   /** 这一步刚按下的输入，被规则层读走一次就清掉 */
-  private pressed = { jump: false, dodge: false, reload: false, swap: false, skill: false, grenade: false, interact: false };
+  private pressed = { fire: false, jump: false, dodge: false, reload: false, swap: false, skill: false, grenade: false, interact: false };
+  private grenadeAimPayload: { dx: number; dy: number } | null = null;
   private acc = 0;
 
   constructor() {
@@ -87,11 +90,12 @@ class Game {
     this.notify();
   }
 
-  press(k: keyof Game['pressed']) {
+  press(k: keyof Game['pressed'], aim?: { dx: number; dy: number } | null) {
     audio.unlock();
     if (k === 'interact') {
       if (this.handleInteract()) return;
     }
+    if (k === 'grenade') this.grenadeAimPayload = aim ?? null;
     this.pressed[k] = true;
   }
 
@@ -111,7 +115,7 @@ class Game {
     return false;
   }
 
-  releaseAll() { this.held.move = 0; this.held.fire = false; }
+  releaseAll() { this.held.move = 0; this.held.fire = false; this.grenadeAim = null; this.grenadeAimPayload = null; }
 
   send(cmd: Command): boolean {
     audio.unlock();
@@ -131,10 +135,17 @@ class Game {
     let urgent = false;
     while (this.acc >= 1000 / 60) {
       this.acc -= 1000 / 60;
-      const input: Input = { ...NO_INPUT, ...this.held, ...this.pressed };
-      this.pressed = { jump: false, dodge: false, reload: false, swap: false, skill: false, grenade: false, interact: false };
+      const input: Input = {
+        ...NO_INPUT,
+        ...this.held,
+        ...this.pressed,
+        fire: this.held.fire || this.pressed.fire,
+        grenadeAim: this.grenadeAimPayload,
+      };
+      this.pressed = { fire: false, jump: false, dodge: false, reload: false, swap: false, skill: false, grenade: false, interact: false };
+      this.grenadeAimPayload = null;
       for (const e of step(this.run, input)) {
-        if (e.t === 'bossAppear' || e.t === 'pickup' || e.t === 'star' || e.t === 'kill' || e.t === 'hurt') urgent = true;
+        if (e.t === 'bossAppear' || e.t === 'pickup' || e.t === 'star' || e.t === 'kill' || e.t === 'hurt' || e.t === 'swap') urgent = true;
         this.emit(e);
       }
     }

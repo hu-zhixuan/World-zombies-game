@@ -26,7 +26,7 @@ export function botInput(run: RunState): Input {
     ...NO_INPUT,
     move,
     jump,
-    fire: run.zombies.length > 0,
+    fire: run.targetId !== null,
     dodge: incomingFireball && p.dodgeCd === 0,
     skill: run.zombies.length >= 4 && run.skill.cd === 0,
     grenade: crowdNearWall && p.grenades > 0 && run.zombies.length >= 4,

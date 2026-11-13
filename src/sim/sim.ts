@@ -12,6 +12,7 @@ import {
 } from './types';
 
 export const MAX_CARRY = 3;
+export const GRENADE_G = 0.26;
 const GRAVITY = 0.32;
 const JUMP_V = -6.5;
 const MOVE_SPEED = 2.2;
@@ -144,7 +145,7 @@ export function newRun(seed = 1, pool: WeaponId[] = ['revolver', 'smg'], cls: Cl
   const turrets = TURRET_SLOTS.map((_, idx) => (idx === 1 ? { type: 'mg' as const, level: 1, cd: 0, aim: 0 } : { type: null, level: 0, cd: 0, aim: 0 }));
   const run: RunState = {
     seed, rng: seed >>> 0, tick: 0, nextId: 1, day: 0, phase: 'camp', phaseT: 0,
-    inside: false, autoFire: true,
+    inside: false, autoFire: false,
     player: {
       x: 215, y: ROOF_Y, vx: 0, vy: 0, facing: 1, hp: 100, maxHp: 100, armor: 0, maxArmor: 80, hurtT: 0, healCarry: 0,
       dodgeT: 0, dodgeCd: 0, dodgeDir: 1, fireCd: 0, reloadT: 0, shootT: 0, grenades: 2,
@@ -352,23 +353,30 @@ function explodeAt(run: RunState, x: number, y: number, r: number, dmg: number, 
   }
 }
 
-function fire(run: RunState, target: Zombie, ev: GameEvent[]) {
+function fire(run: RunState, target: Zombie | null, ev: GameEvent[]) {
   const p = run.player, ow = curWeapon(run), def = WEAPONS[ow.id];
   if (ow.ammo <= 0) { startReload(run, ev); return; }
   ow.ammo--;
   p.fireCd = Math.max(2, Math.round((def.interval * (has(run, 'pierce') ? 1.25 : 1)) / playerHaste(run)));
   p.shootT = 10;
   const mx = p.x + p.facing * 26, my = MUZZLE_Y + p.y;
-  const tx = target.x - mx, ty = BODY_Y - my, len = Math.hypot(tx, ty) || 1;
-  const dx = tx / len, dy = ty / len;
+  let dx: number = p.facing, dy = 0;
+  if (target) {
+    const tx = target.x - mx, ty = BODY_Y - my, len = Math.hypot(tx, ty) || 1;
+    dx = tx / len; dy = ty / len;
+  }
   const hawkeye = skillActive(run, 'gunner');
   const baseCrit = (run.cls === 'gunner' ? CRIT_CHANCE : 0) + (ow.id === 'pistol' ? 0.2 : 0);
   const crit = hawkeye || (baseCrit > 0 && rand(run) < baseCrit);
   const dmg = weaponDamage(ow.id, ow.star) * damageMul(run) * (crit ? CRIT_MUL : 1);
 
   if (def.chain) {
-    const jumps = def.chain + (has(run, 'shock') ? 2 : 0) + (ow.star >= 5 ? 1 : 0);
-    fireLightning(run, mx, my, target, dmg, jumps, ev, { byPlayer: true, crit, color: 'tesla' });
+    if (target) {
+      const jumps = def.chain + (has(run, 'shock') ? 2 : 0) + (ow.star >= 5 ? 1 : 0);
+      fireLightning(run, mx, my, target, dmg, jumps, ev, { byPlayer: true, crit, color: 'tesla' });
+    } else {
+      ev.push({ t: 'lightning', pts: [{ x: mx, y: my }, { x: mx + dx * 125, y: my + (rand(run) - 0.5) * 14 }], color: 'tesla' });
+    }
     ev.push({ t: 'shot', x: mx, y: my, from: 'player', weapon: ow.id });
     if (ow.ammo <= 0) startReload(run, ev);
     return;
@@ -407,22 +415,49 @@ function startReload(run: RunState, ev: GameEvent[]) {
   ev.push({ t: 'reload' });
 }
 
-function throwGrenade(run: RunState, ev: GameEvent[]) {
+/**
+ * 计算手榴弹投掷初速度与起点（支持拖拽控曲线，或未拖拽时智能抛向最近尸群）：
+ * - dx 控制投掷远近/正反方向；dy 上拉抬高高抛曲线、下拉压低快速平抛。
+ */
+export function computeGrenadeThrow(run: RunState, aim?: { dx: number; dy: number } | null) {
+  const p = run.player;
+  const sy = GROUND_Y + p.y - 26;
+  const target = pickTarget(run) ?? run.zombies[0];
+  const g = GRENADE_G;
+
+  let txOffset: number;
+  let frames: number;
+  const mag = aim ? Math.hypot(aim.dx, aim.dy) : 0;
+
+  if (aim && mag >= 0.14) {
+    const dx = Math.max(-1, Math.min(1, aim.dx));
+    const dy = Math.max(-1, Math.min(1, aim.dy));
+    txOffset = dx >= 0 ? 185 + dx * 255 : 185 + dx * 335;
+    const baseFrames = 24 + Math.abs(txOffset) * 0.048;
+    frames = Math.max(15, Math.min(68, Math.round(baseFrames - dy * 17)));
+  } else {
+    const dir = target ? (target.x >= p.x ? 1 : -1) : p.facing;
+    txOffset = target ? target.x - (p.x + dir * 14) : dir * 180;
+    frames = p.y <= ROOF_Y ? 30 : 34;
+  }
+
+  const dir = txOffset >= 0 ? 1 : -1;
+  const sx = p.x + dir * 14;
+  const tx = Math.max(30, Math.min(SPAWN_X - 10, sx + txOffset));
+  const dy = GROUND_Y - 10 - sy;
+  const vx = (tx - sx) / frames;
+  const vy = dy / frames - 0.5 * g * (frames - 1);
+  return { sx, sy, vx, vy, frames, g, dir };
+}
+
+function throwGrenade(run: RunState, aim: { dx: number; dy: number } | null | undefined, ev: GameEvent[]) {
   const p = run.player;
   if (p.grenades <= 0 || run.inside || run.phase !== 'fight') return;
   p.grenades--;
-  const target = pickTarget(run) ?? run.zombies[0];
-  const sy = GROUND_Y + p.y - 26;
-  const dir = target ? (target.x >= p.x ? 1 : -1) : p.facing;
-  const sx = p.x + dir * 16;
-  const tx = target ? target.x : sx + dir * 170;
-  const vy = p.y <= ROOF_Y ? -2.2 : -4.8;
-  const g = 0.26;
-  const dy = Math.max(10, GROUND_Y - 12 - sy);
-  const frames = (-vy + Math.sqrt(vy * vy + 2 * g * dy)) / g;
-  const vx = dir * Math.min(8.5, Math.max(2.2, Math.abs(tx - sx) / Math.max(12, frames)));
+  const traj = computeGrenadeThrow(run, aim);
+  p.facing = traj.dir as 1 | -1;
   run.grenades.push({
-    x: sx, y: sy, vx, vy,
+    x: traj.sx, y: traj.sy, vx: traj.vx, vy: traj.vy,
     dmg: 95 + run.day * 18, r: 66,
   });
   ev.push({ t: 'grenadeThrow' });
@@ -471,6 +506,7 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
   const onRoof = p.x >= ROOF_MIN_X && p.x <= ROOF_MAX_X && Math.abs(p.y - ROOF_Y) <= 2;
   if (input.jump && (onGround || onPorch || onRoof) && p.vy >= 0) {
     p.vy = JUMP_V;
+    ev.push({ t: 'jump', onRoof });
   }
 
   // 水平移动：按角色当前高度判定一楼实体砖墙 / 中层挑台边界，绝不穿模进屋体内部
@@ -510,16 +546,21 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
     return;
   }
 
-  if (input.swap && p.weapons.length > 1) { p.cur = (p.cur + 1) % p.weapons.length; p.reloadT = 0; p.fireCd = 8; }
+  if (input.swap && p.weapons.length > 1) {
+    p.cur = (p.cur + 1) % p.weapons.length; p.reloadT = 0; p.fireCd = 8;
+    ev.push({ t: 'swap', weapon: curWeapon(run).id });
+  }
   if (input.reload) startReload(run, ev);
-  if (input.grenade) throwGrenade(run, ev);
+  if (input.grenade) throwGrenade(run, input.grenadeAim, ev);
 
   const target = pickTarget(run);
   run.targetId = target ? target.id : null;
   const wantFire = run.autoFire || input.fire;
   if (wantFire && target) p.facing = target.x >= p.x ? 1 : -1;
   else if (move !== 0 && p.dodgeT === 0) p.facing = move > 0 ? 1 : -1;
-  if (wantFire && target && p.fireCd === 0 && p.reloadT === 0 && p.dodgeT === 0) fire(run, target, ev);
+  if (wantFire && (target || input.fire) && run.phase !== 'camp' && p.fireCd === 0 && p.reloadT === 0 && p.dodgeT === 0) {
+    fire(run, target, ev);
+  }
 
   for (let i = run.crates.length - 1; i >= 0; i--) {
     const c = run.crates[i];
@@ -734,7 +775,7 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
 function stepGrenades(run: RunState, ev: GameEvent[]) {
   const out: typeof run.grenades = [];
   for (const g of run.grenades) {
-    g.x += g.vx; g.y += g.vy; g.vy += 0.26;
+    g.x += g.vx; g.y += g.vy; g.vy += GRENADE_G;
     const hitZ = run.zombies.some((z) => z.hp > 0 && Math.abs(g.x - z.x) <= 18 && g.y >= GROUND_Y - 46);
     if (hitZ || g.y >= GROUND_Y - 4) {
       explodeAt(run, g.x, Math.min(GROUND_Y - 14, g.y), g.r, g.dmg, ev, true, true);
