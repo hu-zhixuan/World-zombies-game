@@ -32,20 +32,21 @@ const L = require('./lib.cjs');
   const fill = await g.page.evaluate(() => { const r = document.querySelector('#stage canvas').getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), vw: innerWidth, vh: innerHeight }; });
   check(fill.w === fill.vw && fill.h === fill.vh, `画面铺满屏幕，没有黑边 (${fill.w}x${fill.h} / ${fill.vw}x${fill.vh})`);
 
-  // 2. 选职业 & 确认纯自动开火（无 #key-fire）
+  // 2. 选职业 & 确认主开火键 (#key-fire) 存在且站在二层房顶
   await g.tap('#btn-start');
   check((await g.state()).panel === 'class', '点「开始」先选职业');
   await g.shot('01b-class'); await fits('#panel-class');
   check(await g.page.evaluate(() => document.querySelector('#panel-class [data-class=engineer]').disabled && document.querySelector('#panel-class [data-class=chef]').disabled), '0星时工程师/主厨正确锁定');
   await g.tap('#panel-class [data-class=gunner]');
   let s = await g.state();
-  check(s.panel === null && s.y < -100, `进入第 1 天且主角站在房顶防御 (y=${s.y})`);
-  check(await g.page.evaluate(() => !document.querySelector('#key-fire')), '界面已去掉开火按钮，使用纯自动锁定射击');
+  check(s.panel === null && s.y <= -90, `进入第 1 天且主角站在二楼房顶防御 (y=${s.y})`);
+  check(await g.page.evaluate(() => !!document.querySelector('#key-fire')), '右下角主开火键 #key-fire 已就位');
 
-  // 3. 纯自动瞄准开火 + 扇形技能 / 手雷 / 下房与爬梯
-  check(await until((st) => st.zombies >= 2 && st.target !== null, 30000, '等僵尸进射程自动锁定'), '不按开火键也能自动锁定僵尸');
+  // 3. 按下开火键自动瞄准杀敌 + 扇形技能 / 手雷
+  check(await until((st) => st.zombies >= 2 && st.target !== null, 30000, '等僵尸进射程自动锁定'), '僵尸进入射程自动锁定');
+  await g.tap('#key-fire');
   await g.shot('02-rooftop-fight');
-  check(await until((st) => st.kills >= 2, 30000, '自动击杀僵尸'), '站房顶自动开火能稳定杀敌');
+  check(await until((st) => st.kills >= 2, 30000, '自动击杀僵尸'), '站房顶开火能稳定杀敌');
 
   await g.tap('#key-skill');
   await g.tap('#key-grenade');
@@ -53,17 +54,24 @@ const L = require('./lib.cjs');
   check((await g.state()).grenades === 1, '扇形手雷键正常投掷');
   await g.shot('02b-skill-grenade');
 
-  // 4. 走下房顶落到庭院，走近梯子再用跳跃/交互键爬回房顶
+  // 4. 走下房顶落到庭院，一楼砖墙阻挡不穿模，再通过门廊阶梯二次跳跃跳回二楼房顶
   const pad = await g.center('#pad');
   await g.touch('touchStart', pad.x + 36, pad.y);
   check(await until((st) => st.y === 0, 6000, '向右走下房顶'), '能走下房顶到庭院');
   await g.touch('touchEnd');
   await g.touch('touchStart', pad.x - 36, pad.y);
-  await until((st) => Math.abs(st.x - 280) <= 28, 3000, '走回梯子旁');
+  await wait(900);
   await g.touch('touchEnd');
-  check(await g.page.evaluate(() => /爬上房顶/.test(document.querySelector('#btn-interact')?.innerText || '')), '靠近木梯弹出「爬上房顶」提示');
-  await g.tap('#key-jump'); // 在梯子旁按跳跃直接爬上房顶
-  check((await g.state()).y < -100, '靠近木梯点跳能爬回房顶');
+  s = await g.state();
+  check(s.x === 246 && s.y === 0, `一楼实体砖墙阻挡主角不穿模 (x=${s.x})`);
+  await g.tap('#key-jump'); // 第一跳：跳上门廊中层挑台 (PORCH_Y = -48)
+  await wait(650);
+  check((await g.state()).y === -48, '第一跳跳上门廊中层木挑台');
+  await g.tap('#key-jump'); // 第二跳：起跳后向左空中移动落上二楼屋顶平台 (ROOF_Y = -92)
+  await g.touch('touchStart', pad.x - 36, pad.y);
+  await wait(700);
+  await g.touch('touchEnd');
+  check((await g.state()).y <= -90, '第二跳亲自跳回二楼屋顶平台');
 
   // 5. 等待第 1 天清场与三选一
   check(await until((st) => st.phase !== 'fight', 120000, '第 1 天清场'), '第 1 天能清场');
@@ -73,7 +81,7 @@ const L = require('./lib.cjs');
   await fits('#panel-perk');
   await g.tap('#panel-perk .card');
 
-  // 6. 自动进酒馆室内（能自由在屋内走动）
+  // 6. 自动进酒馆室内（能自由在屋内走动，且有 3 位幸存者堂食食客）
   s = await g.state();
   check(s.panel === null && s.phase === 'camp' && s.inside === true, '选天赋后自动回到酒馆小屋内且可自由走动');
   await g.shot('05-tavern-camp');
@@ -81,14 +89,15 @@ const L = require('./lib.cjs');
   await g.touch('touchStart', pad.x - 36, pad.y); await wait(700); await g.touch('touchEnd');
   check((await g.state()).x < inX0 - 20, '推摇杆能在酒馆屋内向左走到小厨房');
 
-  // 7. 小厨房（炒肉 + 特餐）、商店（买枪 + 买补给）、工坊（4塔位 + 升墙 + 升堡垒）
-  await g.page.evaluate(() => { window.__game.run.meat = Math.max(4, window.__game.run.meat); window.__game.run.coins = 360; window.__game.run.scrap = 32; window.__game.notify(); });
+  // 7. 深夜小食堂（招待食客 + 特餐 + 炒肉）、商店（买枪 + 买补给）、工坊（4塔位 + 升墙 + 升堡垒）
+  await g.page.evaluate(() => { window.__game.run.meat = Math.max(8, window.__game.run.meat); window.__game.run.coins = 360; window.__game.run.scrap = 32; window.__game.notify(); });
   await g.tap('#btn-kitchen');
-  check((await g.state()).panel === 'kitchen', '能打开酒馆小厨房');
+  check((await g.state()).panel === 'kitchen', '能打开深夜小食堂');
   await g.shot('06-kitchen'); await fits('#panel-kitchen');
+  await g.tap('#btn-serve-0');
   await g.tap('#btn-meal-spicy_skewer');
   await g.tap('#btn-cook-all');
-  check((await g.state()).meat === 0 && (await g.state()).coins > 360, '小厨房能做特餐和炒肉卖钱');
+  check((await g.state()).meat === 0 && (await g.state()).coins > 380, '深夜小食堂能招待熟客、留特餐和炒肉卖钱');
   await g.tap('#btn-close');
 
   await g.tap('#btn-shop');
@@ -118,7 +127,7 @@ const L = require('./lib.cjs');
   await g.shot('08b-outside-upgraded');
   await g.tap('#btn-next');
   s = await g.state();
-  check(s.panel === null && s.day === 2 && s.phase === 'fight' && s.y < -100, '迎战第 2 天正常出发站回房顶');
+  check(s.panel === null && s.day === 2 && s.phase === 'fight' && s.y <= -90, '迎战第 2 天正常出发站回房顶');
   check(await until((st) => st.kills > s.kills, 30000, '第 2 天自动击杀'), '第 2 天房顶塔防联合击杀正常');
   await g.shot('09-day2');
 

@@ -1,21 +1,23 @@
 // 自动打的机器人：用来在测试里跑完整 15 天流程，检验难度曲线与各模块经济联动。
 import { WEAPONS, ZOMBIES, type TurretType } from '../content/data';
-import { command, isOnRoof, step } from './sim';
-import { NO_INPUT, ROOF_MAX_X, WALL_X, type GameEvent, type Input, type RunState } from './types';
+import { command, isOnPorch, isOnRoof, step } from './sim';
+import { NO_INPUT, PORCH_MAX_X, ROOF_MAX_X, WALL_X, type GameEvent, type Input, type RunState } from './types';
 
 export function botInput(run: RunState): Input {
   const p = run.player;
   const crate = run.crates[0];
   let move = 0;
-  // 清场时如果有箱子且怪较少，下楼去捡；平常守在房顶前缘附近，若敌方火球飞来就微调走位或闪避
+  let jump = false;
+  // 清场时如果有箱子且怪较少，下楼去捡；平常守在房顶前缘附近，若掉在地面则沿阶梯跳回房顶
   if (run.phase === 'clear' && crate) {
     const dx = crate.x - p.x;
     move = Math.abs(dx) < 4 ? 0 : Math.sign(dx);
   } else if (!isOnRoof(run)) {
-    const goal = WALL_X - 70;
-    move = Math.abs(goal - p.x) < 4 ? 0 : Math.sign(goal - p.x);
+    const stepTarget = isOnPorch(run) ? ROOF_MAX_X - 8 : PORCH_MAX_X - 20;
+    move = Math.abs(stepTarget - p.x) < 4 ? -1 : Math.sign(stepTarget - p.x);
+    if (p.x <= PORCH_MAX_X && p.vy === 0) jump = true;
   } else {
-    const spot = ROOF_MAX_X - 24; // 站房顶最右侧边缘获得最大向前射程
+    const spot = ROOF_MAX_X - 18; // 站房顶最右侧边缘获得最大向前射程
     move = Math.abs(spot - p.x) < 4 ? 0 : Math.sign(spot - p.x);
   }
   const incomingFireball = run.enemyProjs.some((ep) => Math.abs(ep.x - p.x) < 32 && Math.abs(ep.y - (222 + p.y - 20)) < 26);
@@ -23,6 +25,7 @@ export function botInput(run: RunState): Input {
   return {
     ...NO_INPUT,
     move,
+    jump,
     fire: run.zombies.length > 0,
     dodge: incomingFireball && p.dodgeCd === 0,
     skill: run.zombies.length >= 4 && run.skill.cd === 0,
@@ -33,9 +36,12 @@ export function botInput(run: RunState): Input {
 export interface BotReport { won: boolean; ticks: number; days: { day: number; seconds: number; hpLost: number; wallLost: number }[]; events: GameEvent[] }
 
 function manageCamp(run: RunState) {
-  // 1. 先做一顿明天的特餐，多余的肉全清炒卖成金币
+  // 1. 先留一份明天的特餐，再把店里等餐的幸存者食客依次招待上菜，最后将富余鲜肉现炒出锅
   if (run.meat >= 3 && !run.meal) command(run, { t: 'pickMeal', id: run.player.hp < run.player.maxHp * 0.7 ? 'hearty_stew' : 'iron_steak' });
   else if (run.meat >= 2 && !run.meal) command(run, { t: 'pickMeal', id: 'spicy_skewer' });
+  for (const g of run.guests) {
+    if (!g.served && run.meat >= g.meatCost) command(run, { t: 'serveGuest', guestId: g.id });
+  }
   if (run.meat > 0) command(run, { t: 'cookSell', count: run.meat });
 
   // 2. 修理和升级路障与堡垒

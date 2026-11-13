@@ -64,6 +64,11 @@
   "frames": 3,
   "fw": 26
  },
+ "fx_stove": {
+  "fh": 26,
+  "frames": 3,
+  "fw": 26
+ },
  "ground": {
   "fh": 48,
   "frames": 1,
@@ -160,6 +165,21 @@
   "fw": 16
  },
  "ic_crate": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_dish_skewer": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_dish_steak": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_dish_stew": {
   "fh": 16,
   "frames": 1,
   "fw": 16
@@ -309,6 +329,31 @@
   "frames": 1,
   "fw": 35
  },
+ "npc_bearded": {
+  "fh": 47,
+  "frames": 5,
+  "fw": 40
+ },
+ "npc_hat": {
+  "fh": 52,
+  "frames": 4,
+  "fw": 39
+ },
+ "npc_oldman": {
+  "fh": 42,
+  "frames": 8,
+  "fw": 34
+ },
+ "npc_woman": {
+  "fh": 46,
+  "frames": 7,
+  "fw": 37
+ },
+ "porch_deck": {
+  "fh": 48,
+  "frames": 1,
+  "fw": 64
+ },
  "prop_ladder": {
   "fh": 64,
   "frames": 1,
@@ -317,7 +362,7 @@
  "roof_deck": {
   "fh": 32,
   "frames": 1,
-  "fw": 240
+  "fw": 216
  },
  "shot": {
   "fh": 11,
@@ -335,9 +380,9 @@
   "fw": 37
  },
  "tavern_interior": {
-  "fh": 240,
+  "fh": 220,
   "frames": 1,
-  "fw": 528
+  "fw": 560
  },
  "turret": {
   "fh": 23,
@@ -449,25 +494,20 @@
   "frames": 1,
   "fw": 16
  },
- "z_bruiser": {
-  "fh": 54,
-  "frames": 7,
-  "fw": 56
- },
- "z_collapse": {
-  "fh": 54,
+ "z_clothed": {
+  "fh": 52,
   "frames": 8,
-  "fw": 64
- },
- "z_crawler": {
-  "fh": 54,
-  "frames": 7,
-  "fw": 56
+  "fw": 44
  },
  "z_death": {
   "fh": 52,
   "frames": 5,
   "fw": 44
+ },
+ "z_gato": {
+  "fh": 53,
+  "frames": 4,
+  "fw": 96
  },
  "z_ghoul": {
   "fh": 60,
@@ -479,19 +519,19 @@
   "frames": 5,
   "fw": 56
  },
- "z_roamer_a": {
-  "fh": 54,
-  "frames": 7,
-  "fw": 56
+ "z_skeleton": {
+  "fh": 52,
+  "frames": 8,
+  "fw": 44
  },
- "z_roamer_b": {
-  "fh": 54,
-  "frames": 7,
-  "fw": 56
+ "z_swamp": {
+  "fh": 45,
+  "frames": 4,
+  "fw": 33
  },
- "z_roamer_c": {
-  "fh": 54,
-  "frames": 7,
-  "fw": 56
+ "z_wraith": {
+  "fh": 65,
+  "frames": 4,
+  "fw": 37
  }
 }

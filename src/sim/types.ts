@@ -5,12 +5,22 @@ export const VIEW_H = 310;
 export const GROUND_Y = 222;
 export const WORLD_W = 960;
 
-export const DOOR_X = 148;       // 堡垒酒馆大门
-export const ROOF_Y = -116;      // 房顶平台相对地面的高度（worldY = GROUND_Y + ROOF_Y = 106）
-export const ROOF_MIN_X = 36;
-export const ROOF_MAX_X = 276;
-export const LADDER_X = 280;     // 上下房顶的木梯位置
-export const HOME_X = 264;       // 僵尸攻破路障后砸房屋东墙的位置
+/**
+ * 室外酒馆堡垒 2D 实体碰撞与阶梯跳台：
+ * - 地面一楼砖墙右边界在 HOUSE_WALL_X (246)，在地面走过去会被实体墙挡住，不会穿模进屋体
+ * - 中层木制门廊跳台 PORCH (x: 232..300, y: -48)，从地面起跳即可跃上
+ * - 二楼屋顶防守平台 ROOF (x: 38..252, y: -92)，从中层门廊再跳一下即可登上房顶
+ */
+export const HOUSE_WALL_X = 246; // 一楼房屋右侧实体砖墙碰撞线
+export const DOOR_X = 258;       // 堡垒门廊入口位置（地面靠近砖墙处）
+export const PORCH_Y = -48;      // 中层木制挑台高度（worldY = GROUND_Y - 48 = 174）
+export const PORCH_MIN_X = 232;
+export const PORCH_MAX_X = 300;
+export const ROOF_Y = -92;       // 二层房顶防守平台高度（worldY = GROUND_Y - 92 = 130）
+export const ROOF_MIN_X = 38;
+export const ROOF_MAX_X = 252;
+export const LADDER_X = 264;     // 门廊阶梯中心位
+export const HOME_X = 256;       // 僵尸攻破路障后砸房屋东墙的位置
 export const WALL_X = 392;       // 防御壁垒（路障）
 export const SPAWN_X = WORLD_W + 30;
 export const PLAYER_MIN_X = 38;
@@ -18,22 +28,25 @@ export const PLAYER_MAX_X = WORLD_W - 28;
 
 /** 4 个炮塔安装槽位：前 2 个在房顶，后 2 个在庭院与前线 */
 export const TURRET_SLOTS = [
-  { id: 0, x: 96,  y: ROOF_Y, roof: true,  name: '屋顶后哨' },
-  { id: 1, x: 242, y: ROOF_Y, roof: true,  name: '屋顶前哨' },
+  { id: 0, x: 88,  y: ROOF_Y, roof: true,  name: '屋顶后哨' },
+  { id: 1, x: 224, y: ROOF_Y, roof: true,  name: '屋顶前哨' },
   { id: 2, x: 320, y: 0,      roof: false, name: '庭院防线' },
   { id: 3, x: 364, y: 0,      roof: false, name: '前线堡垒' },
 ] as const;
 
-/** 酒馆室内动线（对应 528x240 原图 * 1.2 缩放后的世界坐标，地面均在 GROUND_Y） */
-export const IN_MIN_X = 56;
-export const IN_MAX_X = 616;
+/** 酒馆室内动线（对应 560x220 哥特木石酒馆剖面图 * 1.12 缩放后的世界坐标，地面均在 GROUND_Y） */
+export const IN_MIN_X = 76;
+export const IN_MAX_X = 626;
 export const IN_STATIONS = {
-  kitchen: 121,
-  shop: 308,
-  workshop: 483,
-  door: 606,
+  kitchen: 148,
+  shop: 354,
+  workshop: 515,
+  door: 610,
 } as const;
 export type StationId = keyof typeof IN_STATIONS;
+
+/** 酒馆餐桌食客座位世界 X 坐标 */
+export const DINER_SEAT_X = [282, 354, 423] as const;
 
 export type Phase = 'fight' | 'clear' | 'perk' | 'camp' | 'dead' | 'won';
 
@@ -54,6 +67,7 @@ export interface Bullet {
   x: number; y: number; vx: number; vy: number; dmg: number; life: number;
   from: 'player' | 'turret' | 'fort'; pierce: boolean; crit: boolean; bounces: number; hit: number[];
   aoe?: number; slow?: number; kind?: 'normal' | 'rocket' | 'frost' | 'cannon';
+  weaponId?: WeaponId; startX?: number; pierceLeft?: number; closeBoost?: boolean; shatter?: boolean;
 }
 export interface GrenadeProj {
   x: number; y: number; vx: number; vy: number; dmg: number; r: number;
@@ -63,6 +77,21 @@ export interface EnemyProj {
 }
 export interface Crate { id: number; x: number; weapon: WeaponId }
 export interface TurretSlotState { type: TurretType | null; level: number; cd: number; aim: number }
+
+export interface DinerGuest {
+  id: string;
+  name: string;
+  role: string;
+  sprite: string;
+  x: number;
+  dish: MealId;
+  dishName: string;
+  meatCost: number;
+  pay: number;
+  orderQuote: string;
+  thanksQuote: string;
+  served: boolean;
+}
 
 /** 一局的全部状态。能直接 JSON 序列化：存档就是存它。 */
 export interface RunState {
@@ -78,6 +107,7 @@ export interface RunState {
   spawn: { left: number; timer: number; total: number; killed: number; crateAt: number; bossKind: ZombieKind | null; bossSpawned: boolean };
   coins: number; scrap: number; meat: number; kills: number;
   meal: MealId | null;
+  guests: DinerGuest[];
   buff: { dmgMul: number; haste: number };
   shop: WeaponId[];
   perks: PerkId[]; perkChoices: PerkId[];
@@ -114,17 +144,18 @@ export type Command =
   | { t: 'buySupply'; item: 'grenade' | 'armor' | 'medkit' }
   | { t: 'rerollShop' }
   | { t: 'salvageWeapon'; index: number }
+  | { t: 'serveGuest'; guestId: string }
   | { t: 'cookSell'; count: number }
   | { t: 'pickMeal'; id: MealId }
   | { t: 'focusTarget'; x: number }
   | { t: 'enterHouse' }
   | { t: 'exitHouse' }
-  | { t: 'toggleRoof' }
   | { t: 'nextDay' };
 
 /** 这一步发生了什么，给画面层播特效和音效用。 */
 export type GameEvent =
   | { t: 'shot'; x: number; y: number; from: 'player' | 'turret' | 'fort'; weapon?: WeaponId; turret?: TurretType }
+  | { t: 'railbeam'; x1: number; y1: number; x2: number; y2: number }
   | { t: 'hit'; id: number; x: number; y: number; dmg: number; burn?: boolean; crit?: boolean; slow?: boolean }
   | { t: 'lightning'; pts: { x: number; y: number }[]; color?: 'tesla' | 'shock' }
   | { t: 'frost'; x: number; y: number; r: number }
@@ -140,6 +171,7 @@ export type GameEvent =
   | { t: 'star'; weapon: WeaponId; star: number }
   | { t: 'build'; kind: 'turret' | 'wall' | 'fort' }
   | { t: 'shop'; item: string }
+  | { t: 'serve'; guestId: string; name: string; dishName: string; coins: number; quote: string; allServed?: boolean }
   | { t: 'cook'; meat: number; coins: number }
   | { t: 'meal'; id: MealId }
   | { t: 'inside'; inside: boolean }

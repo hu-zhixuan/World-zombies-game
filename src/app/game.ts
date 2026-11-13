@@ -108,7 +108,6 @@ class Game {
     }
     const ext = nearbyExterior(r);
     if (ext === 'door' && r.phase === 'camp') return this.send({ t: 'enterHouse' });
-    if (ext === 'ladder') return this.send({ t: 'toggleRoof' });
     return false;
   }
 

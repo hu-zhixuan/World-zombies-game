@@ -2,9 +2,12 @@
 import Phaser from 'phaser';
 import { game } from '../app/game';
 import { ASSETS } from '../assets';
-import { ZOMBIES } from '../content/data';
+import { DINER_GUESTS, MEALS, ZOMBIES } from '../content/data';
 import { FORT_GUN_X, nearbyExterior, nearbyStation, turretWorldPos } from '../sim/sim';
-import { GROUND_Y, IN_STATIONS, LADDER_X, DOOR_X, ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, TURRET_SLOTS, VIEW_H, WALL_X, WORLD_W, type GameEvent } from '../sim/types';
+import {
+  DOOR_X, GROUND_Y, IN_STATIONS, LADDER_X, PORCH_MAX_X, PORCH_MIN_X, PORCH_Y,
+  ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, TURRET_SLOTS, VIEW_H, WALL_X, WORLD_W, type GameEvent,
+} from '../sim/types';
 import { floaters } from '../ui/floaters';
 import { PALETTE as C } from '../ui/palette';
 
@@ -12,7 +15,7 @@ export { VIEW_H };
 
 const D = { sky: 0, town: 1, back: 2, ground: 3, prop: 4, actor: 5, fx: 6, mark: 7 };
 
-interface BoltFx { pts: { x: number; y: number }[]; until: number; color: number }
+interface BoltFx { pts: { x: number; y: number }[]; until: number; color: number; straight?: boolean }
 
 export class GameScene extends Phaser.Scene {
   private sky!: Phaser.GameObjects.TileSprite;
@@ -29,6 +32,8 @@ export class GameScene extends Phaser.Scene {
   private wallTierObjs: { minLv: number; obj: Phaser.GameObjects.Image }[] = [];
 
   private zombies = new Map<number, Phaser.GameObjects.Sprite>();
+  private guestSprites = new Map<string, Phaser.GameObjects.Sprite>();
+  private guestDishSprites = new Map<string, Phaser.GameObjects.Image>();
   private crates = new Map<number, Phaser.GameObjects.Image>();
   private bullets: Phaser.GameObjects.Sprite[] = [];
   private grenadeSprites: Phaser.GameObjects.Image[] = [];
@@ -52,7 +57,9 @@ export class GameScene extends Phaser.Scene {
     const anim = (key: string, fps: number, repeat = -1) => this.anims.create({ key, frames: this.anims.generateFrameNumbers(key), frameRate: fps, repeat });
     anim('hero_idle', 7); anim('hero_run', 18); anim('hero_shoot', 16); anim('hero_jump', 8); anim('hero_fall', 8); anim('hero_hurt', 10); anim('hero_crouch', 14, 0);
     for (const z of Object.values(ZOMBIES)) for (const key of z.sprites) anim(key, z.fps);
-    anim('z_death', 14, 0); anim('z_collapse', 12, 0);
+    for (const g of DINER_GUESTS) anim(g.sprite, g.fps);
+    anim('z_death', 14, 0);
+    anim('fx_stove', 10);
     anim('fx_fireball', 14); anim('fx_boom', 20, 0);
     anim('shot', 18); anim('shot_hit', 22, 0);
     anim('turret', 18, 0); anim('turret_frost', 14, 0); anim('turret_tesla', 10);
@@ -68,7 +75,7 @@ export class GameScene extends Phaser.Scene {
       return im;
     };
 
-    // ── 室外：黄昏堡垒酒馆 + 房顶阵地 + 梯子 + 3 级路障 + 街道背景 ──
+    // ── 室外：黄昏堡垒酒馆 + 阶梯木跳台 + 二层房顶阵地 + 3 级路障 + 街道背景 ──
     ext(this.add.tileSprite(0, GROUND_Y - 13, WORLD_W, 48, 'ground').setOrigin(0).setDepth(D.ground));
     ext(this.add.tileSprite(0, GROUND_Y + 35, WORLD_W, VIEW_H - GROUND_Y - 35, 'ground_wall').setOrigin(0).setDepth(D.ground));
 
@@ -78,25 +85,24 @@ export class GameScene extends Phaser.Scene {
     const fortPlinth = ext(this.add.image(FORT_GUN_X, GROUND_Y + ROOF_Y + 2, 'crate').setOrigin(0.5, 1).setDepth(D.ground + 0.5).setScale(0.62));
     this.fortKeepObjs = [keepTower, keepBanner, fortPlinth];
 
-    // 核心据点大屋（放大并贴合屋顶防御平台）
-    prop('fort_house', 152, GROUND_Y + 4, D.back, undefined, 1.08);
-    // 房顶走道栏杆与木梯
-    ext(this.add.image((ROOF_MIN_X + ROOF_MAX_X) / 2, GROUND_Y + ROOF_Y + 22, 'roof_deck').setOrigin(0.5, 1).setDepth(D.prop));
-    prop('prop_ladder', LADDER_X, GROUND_Y, D.prop);
-    prop('prop_ladder', LADDER_X, GROUND_Y - 56, D.prop);
+    // 核心据点大屋（一楼门廊木地板与 GROUND_Y 齐平，底部石砌地窖嵌入地基，右侧实体砖墙在 HOUSE_WALL_X=246）
+    prop('fort_house', 142, GROUND_Y + 55, D.ground + 0.1, undefined, 1.1);
+    // 二层屋顶木栈道防守平台 (y = GROUND_Y + ROOF_Y) 与中层门廊起跳木台 (y = GROUND_Y + PORCH_Y)
+    ext(this.add.image((ROOF_MIN_X + ROOF_MAX_X) / 2, GROUND_Y + ROOF_Y + 26, 'roof_deck').setOrigin(0.5, 1).setDepth(D.prop));
+    ext(this.add.image((PORCH_MIN_X + PORCH_MAX_X) / 2, GROUND_Y + PORCH_Y + 48, 'porch_deck').setOrigin(0.5, 1).setDepth(D.prop));
     // 堡垒 Lv.2+ 自带屋顶守卫火炮（稳稳架在房顶木栈平台底座上）
     this.fortCannon = ext(this.add.image(FORT_GUN_X, GROUND_Y + ROOF_Y - 4, 'turret_cannon').setOrigin(0.5, 1).setDepth(D.prop + 0.2).setFlipX(true));
 
     // 大屋门廊灯、拱窗暖光、街头路灯
     for (const [lx, ly, r, it] of [
-      [106, GROUND_Y - 40, 48, 0.28], [178, GROUND_Y - 40, 48, 0.28],
-      [176, GROUND_Y - 88, 50, 0.24], [130, GROUND_Y - 148, 40, 0.2],
-      [294, GROUND_Y - 96, 52, 0.3], [540, GROUND_Y - 96, 52, 0.3], [830, GROUND_Y - 96, 52, 0.3],
+      [104, GROUND_Y - 38, 48, 0.28], [174, GROUND_Y - 38, 48, 0.28],
+      [168, GROUND_Y - 76, 52, 0.25], [266, GROUND_Y - 52, 46, 0.24],
+      [304, GROUND_Y - 96, 52, 0.3], [540, GROUND_Y - 96, 52, 0.3], [830, GROUND_Y - 96, 52, 0.3],
     ] as [number, number, number, number][]) {
       ext(this.add.pointlight(lx, ly, C.lamp, r, it, 0.06).setDepth(D.fx));
     }
-    prop('sign', 298, GROUND_Y, D.back);
-    for (const lx of [294, 540, 830]) prop('lamp', lx, GROUND_Y, D.back);
+    prop('sign', 306, GROUND_Y, D.back);
+    for (const lx of [304, 540, 830]) prop('lamp', lx, GROUND_Y, D.back);
     prop('house_a', 785, GROUND_Y, D.back, C.haze);
     prop('well', 625, GROUND_Y, D.back, C.haze);
     prop('barrel', 24, GROUND_Y, D.prop);
@@ -123,16 +129,17 @@ export class GameScene extends Phaser.Scene {
     wPush(3, 'crate_stack', WALL_X + 4, GROUND_Y, 0.72, D.back);
     wPush(3, 'barbed_wire', WALL_X + 16, GROUND_Y - 26, 1, D.prop);
 
-    // ── 室内：温馨酒馆营地（左侧小厨房 / 中间商店吧台 / 右侧工坊铁砧 / 最右木门） ──
+    // ── 室内：哥特木石酒馆温馨剖面（左侧炉火灶台 / 中间暖光木桌食客区 / 右侧军械工坊与木门） ──
     const intAdd = <T extends { setVisible(v: boolean): void }>(o: T) => { this.intObjs.push(o); return o; };
-    intAdd(this.add.image(20, GROUND_Y + 53, 'tavern_interior').setOrigin(0, 1).setScale(1.2).setDepth(D.ground));
+    intAdd(this.add.image(40, GROUND_Y + 26, 'tavern_interior').setOrigin(0, 1).setScale(1.12).setDepth(D.ground));
+    intAdd(this.add.sprite(118, GROUND_Y - 28, 'fx_stove').setOrigin(0.5, 1).setScale(1.05).setDepth(D.prop).play('fx_stove'));
     for (const [lx, ly, r, col] of [
-      [88, GROUND_Y - 22, 48, C.ember],   // 灶台暖光（柔和不刺眼）
-      [210, GROUND_Y - 62, 46, C.lamp],   // 餐桌窗光
-      [310, GROUND_Y - 56, 52, C.lamp],   // 商店酒架灯
-      [483, GROUND_Y - 24, 44, C.ember],  // 铁砧炭火
+      [118, GROUND_Y - 32, 62, C.ember],   // 灶台炉火暖光
+      [252, GROUND_Y - 68, 66, C.lamp],    // 左拱窗与吊灯暖光
+      [372, GROUND_Y - 68, 66, C.lamp],    // 右拱窗与餐桌暖光
+      [515, GROUND_Y - 46, 54, C.lamp],    // 军械工坊暖光
     ] as [number, number, number, number][]) {
-      intAdd(this.add.pointlight(lx, ly, col, r, 0.16, 0.08).setDepth(D.fx));
+      intAdd(this.add.pointlight(lx, ly, col, r, 0.22, 0.07).setDepth(D.fx));
     }
 
     // ── 角色、武器箱、特效与矢量层 ──
@@ -167,8 +174,8 @@ export class GameScene extends Phaser.Scene {
   private targetCamX() {
     const w = this.scale.gameSize.width, run = game.run, p = run.player;
     if (run.inside) {
-      // 室内宽 674：宽屏直接居中，窄屏平稳跟随主角
-      const roomSpan = 674;
+      // 室内宽 700：宽屏直接居中，窄屏平稳跟随主角
+      const roomSpan = 700;
       if (w >= roomSpan) return (roomSpan - w) / 2;
       return Phaser.Math.Clamp(p.x - w * 0.5, 0, roomSpan - w);
     }
@@ -201,6 +208,38 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private syncDinerGuests() {
+    const run = game.run, inside = run.inside;
+    const seen = new Set<string>();
+    if (inside) {
+      for (let i = 0; i < run.guests.length; i++) {
+        const g = run.guests[i];
+        seen.add(g.id);
+        let sp = this.guestSprites.get(g.id);
+        if (!sp) {
+          sp = this.add.sprite(g.x, GROUND_Y, g.sprite).setOrigin(0.5, 1).setDepth(D.prop + 0.3).setScale(0.92);
+          sp.play(g.sprite);
+          this.guestSprites.set(g.id, sp);
+        }
+        sp.setVisible(true).setPosition(g.x, GROUND_Y).setFlipX(i % 2 === 1);
+
+        let dishIm = this.guestDishSprites.get(g.id);
+        const dishIcon = MEALS[g.dish].icon;
+        if (!dishIm) {
+          dishIm = this.add.image(g.x + (i % 2 === 0 ? 14 : -14), GROUND_Y - 27, dishIcon).setOrigin(0.5, 1).setDepth(D.prop + 0.4).setScale(0.85);
+          this.guestDishSprites.set(g.id, dishIm);
+        }
+        dishIm.setTexture(dishIcon).setVisible(g.served).setPosition(g.x + (i % 2 === 0 ? 14 : -14), GROUND_Y - 27);
+      }
+    }
+    for (const [id, sp] of this.guestSprites) {
+      if (!seen.has(id)) {
+        sp.setVisible(false);
+        this.guestDishSprites.get(id)?.setVisible(false);
+      }
+    }
+  }
+
   update(_t: number, dt: number) {
     game.advance(dt);
     const run = game.run, p = run.player, now = this.time.now, inside = run.inside;
@@ -220,13 +259,14 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.syncTurretSprites();
+    this.syncDinerGuests();
 
     // 摄像机跟随（室内切出/入时快速贴近）
     const targetX = this.targetCamX();
     if (Math.abs(targetX - this.camX) > 220) this.camX = targetX;
     else this.camX += (targetX - this.camX) * 0.14;
     const cam = this.cameras.main;
-    if (inside && this.scale.gameSize.width >= 674) cam.setBounds(-120, 0, WORLD_W + 240, VIEW_H);
+    if (inside && this.scale.gameSize.width >= 700) cam.setBounds(-120, 0, WORLD_W + 240, VIEW_H);
     else cam.setBounds(0, 0, WORLD_W, VIEW_H);
     cam.scrollX = Math.round(this.camX);
     this.sky.tilePositionX = cam.scrollX * 0.08;
@@ -280,8 +320,10 @@ export class GameScene extends Phaser.Scene {
       s.setVisible(vis);
       if (vis && b) {
         s.setPosition(b.x, b.y).setRotation(Math.atan2(b.vy, b.vx));
-        if (b.kind === 'frost') s.setScale(1.15).setTint(C.frost);
+        if (b.kind === 'frost' || b.weaponId === 'assault') s.setScale(1.12).setTint(C.frost);
         else if (b.kind === 'rocket' || b.kind === 'cannon') s.setScale(1.45).setTint(C.ember);
+        else if (b.weaponId === 'rifle') s.setScale(1.35).setTint(C.red);
+        else if (b.weaponId === 'revolver') s.setScale(1.2).setTint(C.gold);
         else { s.clearTint(); s.setScale(b.from === 'turret' ? 0.72 : b.from === 'fort' ? 1.25 : 1); }
       }
     });
@@ -312,17 +354,35 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(col, active ? 0.98 : 0.68).fillTriangle(sx - 5, yOff - 8 + bob, sx + 5, yOff - 8 + bob, sx, yOff + bob);
         if (active) g.lineStyle(1.5, C.gold, 0.9).strokeCircle(sx, yOff - 5 + bob, 9);
       };
-      drawStationMark('kitchen', GROUND_Y - 78);
-      drawStationMark('shop', GROUND_Y - 96);
-      drawStationMark('workshop', GROUND_Y - 68);
-      drawStationMark('door', GROUND_Y - 66);
+      drawStationMark('kitchen', GROUND_Y - 76);
+      drawStationMark('workshop', GROUND_Y - 72);
+      drawStationMark('door', GROUND_Y - 68);
+
+      // 餐桌旁食客头顶的点单气泡提示（未上菜时显示暖金色点单呼吸气泡）
+      for (const guest of run.guests) {
+        const gy = GROUND_Y - 54 + bob * 0.7;
+        if (!guest.served) {
+          g.fillStyle(C.ink, 0.85).fillRoundedRect(guest.x - 9, gy - 12, 18, 12, 3);
+          g.lineStyle(1, C.gold, 0.95).strokeRoundedRect(guest.x - 9, gy - 12, 18, 12, 3);
+          g.fillStyle(C.gold, 0.95).fillCircle(guest.x - 4, gy - 6, 1.5).fillCircle(guest.x, gy - 6, 1.5).fillCircle(guest.x + 4, gy - 6, 1.5);
+        } else {
+          g.fillStyle(C.green, 0.85).fillCircle(guest.x, gy - 6, 3);
+        }
+      }
       return;
     }
 
-    // 室外电弧与 Lv.3 电网壁垒火花
+    // 室外电弧、狙击磁轨光束与 Lv.3 电网壁垒火花
     this.bolts = this.bolts.filter((bf) => bf.until > now);
     for (const bf of this.bolts) {
       const alpha = Math.min(1, (bf.until - now) / 140);
+      if (bf.straight && bf.pts.length >= 2) {
+        const a = bf.pts[0], b = bf.pts[1];
+        g.lineStyle(5, bf.color, alpha * 0.45).lineBetween(a.x, a.y, b.x, b.y);
+        g.lineStyle(2, C.gold, alpha * 0.9).lineBetween(a.x, a.y, b.x, b.y);
+        g.lineStyle(1, C.paper, alpha).lineBetween(a.x, a.y, b.x, b.y);
+        continue;
+      }
       g.lineStyle(3.2, bf.color, alpha * 0.45);
       for (let i = 0; i < bf.pts.length - 1; i++) {
         const a = bf.pts[i], b = bf.pts[i + 1];
@@ -343,7 +403,7 @@ export class GameScene extends Phaser.Scene {
       g.lineStyle(1.5, C.electric, flick ? 0.85 : 0.4).lineBetween(WALL_X - 4, GROUND_Y - 48, WALL_X + 26, GROUND_Y - 14);
     }
 
-    // 营地夜晚室外标识（房门进屋、木梯、4 处炮塔等级点）
+    // 营地夜晚室外标识（房门进屋、阶梯跳台、4 处炮塔等级点）
     for (let i = 0; i < run.turrets.length; i++) {
       const sl = run.turrets[i], pos = turretWorldPos(i);
       if (sl.type) {
@@ -355,8 +415,8 @@ export class GameScene extends Phaser.Scene {
     if (run.phase === 'camp') {
       const extNear = nearbyExterior(run);
       const bob = Math.sin(now / 180) * 3;
-      g.fillStyle(extNear === 'door' ? C.gold : C.lamp, 0.9).fillTriangle(DOOR_X - 5, GROUND_Y - 58 + bob, DOOR_X + 5, GROUND_Y - 58 + bob, DOOR_X, GROUND_Y - 50 + bob);
-      g.fillStyle(extNear === 'ladder' ? C.gold : C.lamp, 0.9).fillTriangle(LADDER_X - 5, GROUND_Y - 134 + bob, LADDER_X + 5, GROUND_Y - 134 + bob, LADDER_X, GROUND_Y - 126 + bob);
+      g.fillStyle(extNear === 'door' ? C.gold : C.lamp, 0.9).fillTriangle(DOOR_X - 5, GROUND_Y - 54 + bob, DOOR_X + 5, GROUND_Y - 54 + bob, DOOR_X, GROUND_Y - 46 + bob);
+      g.fillStyle(extNear === 'ladder' ? C.gold : C.lamp, 0.9).fillTriangle(LADDER_X - 5, GROUND_Y + PORCH_Y - 42 + bob, LADDER_X + 5, GROUND_Y + PORCH_Y - 42 + bob, LADDER_X, GROUND_Y + PORCH_Y - 34 + bob);
     }
 
     // 锁定目标标记与僵尸血条
@@ -398,6 +458,10 @@ export class GameScene extends Phaser.Scene {
           }
         }
         break;
+      case 'railbeam':
+        if (game.run.inside) return;
+        this.bolts.push({ pts: [{ x: e.x1, y: e.y1 }, { x: e.x2, y: e.y2 }], until: now + 180, color: C.red, straight: true });
+        break;
       case 'hit':
         if (game.run.inside) return;
         this.flashUntil.set(e.id, now + 70);
@@ -414,8 +478,21 @@ export class GameScene extends Phaser.Scene {
       }
       case 'kill':
         if (game.run.inside) return;
-        this.burst(e.kind === 'roamer' || e.kind === 'crawler' || e.kind === 'bruiser' ? 'z_collapse' : 'z_death', e.x, GROUND_Y - 26);
+        this.burst('z_death', e.x, GROUND_Y - 26);
         floaters.add(e.x, GROUND_Y - 58, '+' + e.coins + (e.meat > 0 ? ' +肉' : ''), 'coin');
+        break;
+      case 'serve': {
+        this.burst('fx_boom', 118, GROUND_Y - 36, 0.65);
+        const guest = game.run.guests.find((o) => o.id === e.guestId);
+        const gx = guest ? guest.x : 340;
+        floaters.add(gx, GROUND_Y - 62, '+' + e.coins + ' 金币', 'coin');
+        break;
+      }
+      case 'cook':
+        if (game.run.inside) {
+          this.burst('fx_boom', 118, GROUND_Y - 36, 0.6);
+          floaters.add(118, GROUND_Y - 60, '+' + e.coins + ' 金币', 'coin');
+        }
         break;
       case 'boom': {
         this.burst('fx_boom', e.x, e.y, Math.max(0.9, e.r / 26));
