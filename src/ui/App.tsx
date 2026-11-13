@@ -363,7 +363,7 @@ export function App() {
       {panel === 'title' && (
         <Panel id="panel-title" cls="title" title="">
           <h1>十五波围城</h1>
-          <p>跃上黄昏酒馆二层屋顶自动索敌狙击尸潮，夜归温馨食堂招待幸存者熟客、打造四座防线炮塔！（完整 {LAST_DAY} 天 + Boss 战）</p>
+          <p>跃上黄昏酒馆二层屋顶迎战尸潮（按住攻击自动锁敌、拖拽手雷控抛物线），夜归温馨食堂招待熟客、打造四座防线炮塔！（完整 {LAST_DAY} 天 + Boss 战）</p>
           <Progress />
           <Btn id="btn-start" kind="primary" onClick={() => game.chooseClass()}>开始守城</Btn>
         </Panel>

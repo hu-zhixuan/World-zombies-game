@@ -5,9 +5,9 @@ import {
 } from '../src/content/data';
 import { runBot } from '../src/sim/bot';
 import {
-  BODY_Y, MAX_CARRY, command, damageMul, effectiveRange, isOnPorch, isOnRoof, meatPrice, newRun, step, turretBuildCost, turretUpgradeCost,
+  BODY_Y, MAX_CARRY, command, computeGrenadeThrow, damageMul, effectiveRange, isOnPorch, isOnRoof, meatPrice, newRun, step, turretBuildCost, turretUpgradeCost,
 } from '../src/sim/sim';
-import { DOOR_X, HOUSE_WALL_X, IN_STATIONS, NO_INPUT, PORCH_MAX_X, PORCH_Y, ROOF_Y, WALL_X, type RunState } from '../src/sim/types';
+import { DOOR_X, GROUND_Y, HOUSE_WALL_X, IN_STATIONS, NO_INPUT, PORCH_MAX_X, PORCH_Y, ROOF_Y, WALL_X, type RunState } from '../src/sim/types';
 
 const clone = (r: RunState): RunState => JSON.parse(JSON.stringify(r));
 const zombie = (r: RunState, x: number, hp = 100000, kind: 'roamer' | 'ghoul' | 'boss_beast' = 'roamer') => {
@@ -65,7 +65,7 @@ describe('手感曲线与枪械特色', () => {
   });
 });
 
-describe('2D 小屋实体碰撞、阶梯跳台与自动瞄准', () => {
+describe('2D 小屋实体碰撞、阶梯跳台与元气骑士式手动开火锁敌', () => {
   test('一楼有实体砖墙阻挡不穿模，玩家可通过门廊阶梯二次跳跃亲自跳上二楼房顶', () => {
     const r = quiet(); r.spawn.left = 99;
     expect(isOnRoof(r)).toBe(true);
@@ -95,12 +95,28 @@ describe('2D 小屋实体碰撞、阶梯跳台与自动瞄准', () => {
     expect(r.player.x).toBeLessThan(HOUSE_WALL_X); // 在二楼房顶可以自由走到小屋正上方
   });
 
-  test('自动瞄准开火：进入射程自动转身并击杀背后僵尸', () => {
-    const r = quiet(); r.player.x = 400; r.player.y = 0; r.player.facing = 1;
-    const behind = zombie(r, 300, 60); zombie(r, 850);
+  test('元气骑士手感：默认绝不自动开枪，按住攻击键才自动锁敌或朝面朝方向盲射', () => {
+    const r = quiet();
+    expect(r.autoFire).toBe(false);
+    r.player.x = 400; r.player.y = 0; r.player.facing = 1;
+    const behind = zombie(r, 300, 60);
+    // 不按开火键：准星可锁定射程内目标，但一发子弹都不射出、不擅自转身
+    for (let i = 0; i < 30; i++) {
+      const evs = step(r, NO_INPUT);
+      expect(evs.some((e) => e.t === 'shot' && e.from === 'player')).toBe(false);
+    }
+    expect(r.targetId).toBe(behind.id);
+    expect(r.player.weapons[0].ammo).toBe(WEAPONS.pistol.mag);
+
+    // 按住攻击键：自动锁敌转身击杀身后僵尸；没有目标时也能朝前空射一枪
     for (let i = 0; i < 90; i++) step(r, { ...NO_INPUT, fire: true });
     expect(r.player.facing).toBe(-1);
     expect(r.zombies.find((z) => z.id === behind.id)).toBeUndefined();
+
+    r.player.fireCd = 0; r.player.reloadT = 0; r.player.facing = 1;
+    const blindEv = step(r, { ...NO_INPUT, fire: true });
+    expect(r.targetId).toBeNull();
+    expect(blindEv.some((e) => e.t === 'shot' && e.from === 'player')).toBe(true);
   });
 
   test('在房顶自带 +15% 高低差射程加成', () => {
@@ -139,7 +155,7 @@ describe('2D 小屋实体碰撞、阶梯跳台与自动瞄准', () => {
   });
 });
 
-describe('武器升星、手雷、护甲与商店', () => {
+describe('武器升星、可控抛物线手雷、护甲与商店', () => {
   test('捡到新武器进武器栏，捡到已有的升星，满星转废铁', () => {
     const r = quiet(); r.player.x = 280; r.player.y = 0;
     r.crates.push({ id: 900, x: 280, weapon: 'smg' });
@@ -178,13 +194,22 @@ describe('武器升星、手雷、护甲与商店', () => {
     expect(r.player.weapons.length).toBe(1);
   });
 
-  test('破片手雷落地爆炸并造成范围伤害，护甲优先抵扣伤害', () => {
+  test('手雷可拖拽控制抛物线远近与高低弧度，且越过前排命中精准爆区，护甲优先抵扣伤害', () => {
     const r = quiet();
-    const a = zombie(r, 400, 300), b = zombie(r, 420, 300);
-    step(r, { ...NO_INPUT, grenade: true });
-    for (let i = 0; i < 65; i++) step(r, NO_INPUT);
-    expect(a.hp).toBeLessThan(220);
-    expect(b.hp).toBeLessThan(220);
+    const highFar = computeGrenadeThrow(r, { dx: 1, dy: -1 });
+    const lowClose = computeGrenadeThrow(r, { dx: -0.4, dy: 0.9 });
+    expect(highFar.frames).toBeGreaterThan(lowClose.frames + 15);
+    expect(highFar.vx).toBeGreaterThan(lowClose.vx);
+    expect(highFar.vy).toBeLessThan(lowClose.vy); // 更强向上抛射弧线
+
+    // 远距离高抛：跳过近处的 front，越过头顶精准炸毁远端 walking 过来的 back 僵尸
+    const front = zombie(r, 340, 300);
+    const back = zombie(r, 690, 300);
+    step(r, { ...NO_INPUT, grenade: true, grenadeAim: { dx: 1, dy: -0.9 } });
+    for (let i = 0; i < 80; i++) step(r, NO_INPUT);
+    expect(front.hp).toBe(300);
+    expect(back.hp).toBeLessThan(200);
+    expect(GROUND_Y).toBeGreaterThan(200);
 
     // 护甲先扣伤
     r.player.armor = 30; r.player.hp = 100; r.player.y = 0; r.player.x = 500;

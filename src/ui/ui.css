@@ -44,89 +44,122 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .btn-icon.muted { background: var(--plum); border-color: var(--grey); color: var(--grey); }
 .btn-icon:active { transform: translateY(1px); }
 
-/* ── 左下角摇杆（皮革+铜环质感） ── */
-.pad { position: absolute; z-index: var(--z-hud); left: max(20px, env(safe-area-inset-left)); bottom: 10px; width: 104px; height: 104px; border-radius: 50%;
-  background: radial-gradient(circle at 38% 32%, color-mix(in srgb, var(--plum) 88%, transparent), color-mix(in srgb, var(--leather) 94%, transparent) 74%);
+/* ── 左下角元气骑士式浮动摇杆（宽热区捕获 + 方向金光环 + 丝滑跟随） ── */
+.pad-zone { position: absolute; z-index: var(--z-hud); left: 0; bottom: 0; width: 38%; height: 60%; pointer-events: auto; touch-action: none; }
+.pad { position: absolute; left: max(22px, env(safe-area-inset-left)); bottom: 12px; width: 108px; height: 108px; border-radius: 50%;
+  transform: translate(var(--bx, 0px), var(--by, 0px)); opacity: .78; transition: opacity .15s, border-color .15s, box-shadow .15s;
+  background: radial-gradient(circle at 38% 32%, color-mix(in srgb, var(--plum) 84%, transparent), color-mix(in srgb, var(--leather) 94%, transparent) 74%);
   border: 3px solid var(--copper); box-shadow: inset 0 2px 8px color-mix(in srgb, var(--ink) 78%, transparent), 0 4px 10px color-mix(in srgb, var(--ink) 70%, transparent);
-  display: grid; place-items: center; }
-.pad::before { content: '‹   ›'; font-size: var(--f3); font-weight: 900; letter-spacing: 28px; color: color-mix(in srgb, var(--paper) 28%, transparent); pointer-events: none; }
-.pad > i { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px; border-radius: 50%;
+  display: grid; place-items: center; pointer-events: none; }
+.pad.active { opacity: 1; border-color: var(--gold); box-shadow: inset 0 2px 8px color-mix(in srgb, var(--ink) 72%, transparent), 0 0 14px color-mix(in srgb, var(--gold) 45%, transparent), 0 4px 10px color-mix(in srgb, var(--ink) 75%, transparent); }
+.pad[data-dir='left'] { border-left-color: var(--lamp); }
+.pad[data-dir='right'] { border-right-color: var(--lamp); }
+.pad::before { content: '‹   ›'; font-size: var(--f3); font-weight: 900; letter-spacing: 30px; color: color-mix(in srgb, var(--paper) 34%, transparent); pointer-events: none; }
+.pad > i { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px; border-radius: 50%;
   background: radial-gradient(circle at 32% 30%, var(--copper), var(--wood-dark) 82%);
-  border: 2px solid var(--paper); box-shadow: 0 3px 6px var(--ink);
-  transform: translate(calc(var(--x, 0) * 32px), calc(var(--y, 0) * 32px)); pointer-events: none; }
+  border: 2.5px solid var(--paper); box-shadow: 0 3px 6px var(--ink);
+  transform: translate(calc(var(--x, 0) * 34px), calc(var(--y, 0) * 34px)); pointer-events: none; }
+.pad.active > i { background: radial-gradient(circle at 32% 30%, var(--gold), var(--copper) 82%); border-color: var(--paper); }
 
-/* ── 右下角：主攻击键（自动瞄准开火） + 扇形战术键弧（跳跃、闪避、手雷、技能） ── */
-.keys-fan { position: absolute; z-index: var(--z-hud); right: max(14px, env(safe-area-inset-right)); bottom: 10px; width: 212px; height: 148px; pointer-events: none; }
+/* ── 右下角：元气骑士式弧形战术键区（82px 主攻击键 + 四周圆弧副键，手雷键支持拖拽控曲线） ── */
+.keys-fan { position: absolute; z-index: var(--z-hud); right: max(12px, env(safe-area-inset-right)); bottom: 8px; width: 176px; height: 178px; pointer-events: none; }
 .keys-fan > * { position: absolute; pointer-events: auto; }
 
 .fkey { width: 50px; height: 50px; border-radius: 50%; border: 2.5px solid var(--copper); padding: 0;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-  color: var(--paper); font: 800 var(--f1) var(--font); text-shadow: 0 1px 0 var(--ink); cursor: pointer;
+  color: var(--paper); font: 800 10.5px var(--font); text-shadow: 0 1px 0 var(--ink); cursor: pointer;
   background: radial-gradient(circle at 35% 30%, var(--wood), var(--leather) 82%);
-  box-shadow: 0 3px 0 var(--ink), inset 0 1px 0 color-mix(in srgb, var(--paper) 35%, transparent);
-  transition: transform .08s, border-color .15s; }
-.fkey:active, .fkey.down { transform: scale(.92) translateY(2px); }
-.fkey .icon { width: 18px; height: 18px; filter: drop-shadow(0 1px 0 var(--ink)); }
-.fkey b { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+  box-shadow: 0 3px 0 var(--ink), inset 0 1px 0 color-mix(in srgb, var(--paper) 42%, transparent);
+  transition: transform .08s, border-color .15s, box-shadow .15s; }
+.fkey:active, .fkey.down { transform: scale(.9) translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+.fkey .icon { width: 16px; height: 16px; filter: drop-shadow(0 1px 0 var(--ink)); position: relative; z-index: 1; }
+.fkey span { position: relative; z-index: 1; line-height: 1; }
+.fkey b { position: absolute; top: -4px; right: -4px; z-index: 2; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
   background: var(--gold); color: var(--ink); border: 1.5px solid var(--ink); font-size: 11px; line-height: 15px; text-shadow: none; }
-.fkey.lit { border-color: var(--gold); box-shadow: 0 0 14px color-mix(in srgb, var(--gold) 65%, transparent), 0 3px 0 var(--ink); }
-.fkey.empty { filter: grayscale(.85); opacity: .6; }
+.fkey.lit { border-color: var(--gold); box-shadow: 0 0 16px color-mix(in srgb, var(--gold) 72%, transparent), 0 3px 0 var(--ink); }
+.fkey.empty { filter: grayscale(.85); opacity: .55; }
 
-/* 扇形排布：主攻击键锚点右下，跳跃/技能居左，闪避/手雷居上，互不重叠 */
-.fkey-fire { right: 4px; bottom: 2px; width: 76px; height: 76px; border-width: 3px; font-size: var(--f2);
-  background: radial-gradient(circle at 35% 28%, var(--wood), var(--wood-dark) 84%); border-color: var(--gold); }
-.fkey-fire .icon { width: 34px; height: 20px; }
-.fkey-jump  { right: 88px; bottom: 6px; width: 52px; height: 52px; }
-.fkey-dodge { right: 86px; bottom: 66px; }
-.fkey-nade  { right: 18px; bottom: 86px; }
-.fkey-skill { right: 148px; bottom: 6px; width: 54px; height: 54px; border-width: 2.5px; font-size: var(--f1);
+/* 主攻击键（元气骑士式厚实金环扳机，按住亮起并呼吸发光） */
+.fkey-fire { right: 6px; bottom: 4px; width: 82px; height: 82px; border-width: 3px; font-size: var(--f2); gap: 3px;
+  background: radial-gradient(circle at 34% 26%, var(--copper), var(--wood-dark) 82%); border-color: var(--gold);
+  box-shadow: 0 4px 0 var(--ink), inset 0 2px 0 color-mix(in srgb, var(--paper) 48%, transparent), 0 0 10px color-mix(in srgb, var(--lamp) 28%, transparent); }
+.fkey-fire::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--gold) 45%, transparent); pointer-events: none; }
+.fkey-fire .icon { width: 38px; height: 22px; }
+.fkey-fire.lit { background: radial-gradient(circle at 34% 26%, var(--gold), var(--copper) 84%); color: var(--ink); text-shadow: none;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--gold) 85%, transparent), 0 2px 0 var(--ink); }
+
+.fkey-jump  { right: 102px; bottom: 6px; width: 52px; height: 52px; }
+.fkey-dodge { right: 108px; bottom: 66px; width: 50px; height: 50px;
+  background: conic-gradient(var(--copper) calc(var(--p, 1) * 360deg), color-mix(in srgb, var(--ink) 82%, transparent) 0); }
+.fkey-dodge::before { content: ''; position: absolute; inset: 3px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, var(--wood), var(--leather) 86%); z-index: 0; }
+
+/* 可拖拽控抛物线的手雷轮盘键（与闪避/技能保持宽裕净空，四向拖拽不误触） */
+.fkey-nade  { right: 60px; bottom: 118px; width: 52px; height: 52px; }
+.fkey-nade .nade-knob { display: none; position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px; border-radius: 50%;
+  background: var(--gold); border: 2px solid var(--paper); box-shadow: 0 0 8px var(--gold); pointer-events: none; z-index: 3;
+  transform: translate(calc(var(--gx, 0) * 36px), calc(var(--gy, 0) * 36px)); }
+.fkey-nade.aiming { transform: scale(1.14); border-color: var(--gold);
+  box-shadow: 0 0 0 16px color-mix(in srgb, var(--ink) 45%, transparent), 0 0 0 18px color-mix(in srgb, var(--gold) 75%, transparent), 0 0 20px var(--lamp); }
+.fkey-nade.aiming .nade-knob { display: block; }
+
+.fkey-skill { right: 4px; bottom: 102px; width: 50px; height: 50px; border-width: 2.5px; font-size: 10px;
   background: conic-gradient(var(--gold) calc(var(--p, 1) * 360deg), color-mix(in srgb, var(--ink) 80%, transparent) 0); }
 .fkey-skill::before { content: ''; position: absolute; inset: 3px; border-radius: 50%;
   background: radial-gradient(circle at 35% 28%, var(--plum), var(--leather) 86%); z-index: 0; }
-.fkey-skill > span, .fkey-skill > img { position: relative; z-index: 1; }
+.fkey-skill:not(.cooling):not(.lit) { animation: skillReady 2s ease-in-out infinite; }
+@keyframes skillReady { 0%, 100% { box-shadow: 0 3px 0 var(--ink), 0 0 8px color-mix(in srgb, var(--gold) 35%, transparent); } 50% { box-shadow: 0 3px 0 var(--ink), 0 0 16px color-mix(in srgb, var(--gold) 75%, transparent); } }
 .fkey-skill.cooling { border-color: var(--grey); color: var(--grey); }
-.fkey-skill.lit { border-color: var(--lamp); box-shadow: 0 0 16px color-mix(in srgb, var(--lamp) 80%, transparent), 0 3px 0 var(--ink); }
+.fkey-skill.lit { border-color: var(--lamp); box-shadow: 0 0 18px color-mix(in srgb, var(--lamp) 88%, transparent), 0 3px 0 var(--ink); }
 .fkey-skill.lit::before { background: radial-gradient(circle at 35% 28%, var(--wood), var(--rose) 88%); }
 
 /* 冷却蒙层（闪避等扇形副键） */
-.fkey.cooling { border-color: var(--grey); color: var(--grey); opacity: .76; }
+.fkey.cooling { border-color: var(--grey); color: var(--grey); opacity: .78; }
 
 /* 上下文交互浮动按钮（进酒馆 / 深夜食堂 / 军火商店 / 防线工坊 / 出门） */
-.btn-act { position: absolute; z-index: var(--z-hud); left: 50%; bottom: 62px; transform: translateX(-50%);
+.btn-act { position: absolute; z-index: var(--z-hud); left: 50%; bottom: 64px; transform: translateX(-50%);
   padding: 6px var(--s3); border-radius: 999px; border: 2px solid var(--paper);
   background: linear-gradient(180deg, var(--gold), var(--copper)); color: var(--ink);
-  font: 900 var(--f2) var(--font); box-shadow: 0 3px 0 var(--ink), 0 0 12px color-mix(in srgb, var(--gold) 65%, transparent); cursor: pointer; }
-.btn-act:active { transform: translateX(-50%) translateY(2px); }
+  font: 900 var(--f2) var(--font); box-shadow: 0 3px 0 var(--ink), 0 0 14px color-mix(in srgb, var(--gold) 70%, transparent);
+  animation: actBob 1.4s ease-in-out infinite; cursor: pointer; }
+@keyframes actBob { 0%, 100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-3px); } }
+.btn-act:active { transform: translateX(-50%) translateY(2px); animation: none; }
 
 /* ── 底部中区：武器切换 + 换弹 / 营地快捷功能条 ── */
-.weapon-wrap { position: absolute; z-index: var(--z-hud); left: 42%; bottom: 12px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; }
+.weapon-wrap { position: absolute; z-index: var(--z-hud); left: 48%; bottom: 10px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; }
 .weapon { display: flex; align-items: center; gap: var(--s2);
-  padding: 5px var(--s2); background: linear-gradient(180deg, var(--leather), var(--ink)); border: 2px solid var(--wood);
-  border-radius: var(--r2); color: var(--paper); font: 700 var(--f1) var(--font); box-shadow: 0 2px 0 var(--ink); cursor: pointer; }
+  padding: 5px var(--s2); background: linear-gradient(180deg, var(--leather), var(--ink)); border: 2px solid var(--copper);
+  border-radius: var(--r2); color: var(--paper); font: 700 var(--f1) var(--font);
+  box-shadow: 0 3px 0 var(--ink), inset 0 1px 0 color-mix(in srgb, var(--paper) 24%, transparent); cursor: pointer; transition: transform .08s, border-color .15s; }
+.weapon:active { transform: translateY(2px); }
+.weapon.reloading { border-color: var(--gold); }
 .weapon .icon { width: 36px; height: 22px; }
 .weapon .col { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; }
 .weapon small { font-size: var(--f1); color: var(--gold); white-space: nowrap; }
 .btn-reload { height: 40px; padding: 0 var(--s2); border-radius: var(--r2); border: 2px solid var(--copper);
   background: linear-gradient(180deg, var(--wood), var(--wood-dark)); color: var(--paper); font: 800 var(--f1) var(--font);
-  box-shadow: 0 2px 0 var(--ink); cursor: pointer; }
-.btn-reload.cooling { opacity: .6; border-color: var(--grey); }
-.btn-reload:active { transform: translateY(1px); }
+  box-shadow: 0 3px 0 var(--ink), inset 0 1px 0 color-mix(in srgb, var(--paper) 30%, transparent); cursor: pointer; transition: transform .08s; }
+.btn-reload.cooling { opacity: .65; border-color: var(--grey); }
+.btn-reload:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
 
 .camp-dock { position: absolute; z-index: var(--z-hud); right: max(14px, env(safe-area-inset-right)); bottom: 12px;
   display: flex; align-items: center; gap: 6px; padding: 5px 8px;
   background: color-mix(in srgb, var(--ink) 88%, transparent); border: 2px solid var(--wood); border-radius: var(--r2); box-shadow: 0 3px 0 var(--ink); }
 .camp-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: var(--r1); border: 2px solid var(--wood);
-  background: linear-gradient(180deg, var(--leather), var(--wood-dark)); color: var(--paper); font: 800 var(--f1) var(--font); cursor: pointer; }
+  background: linear-gradient(180deg, var(--leather), var(--wood-dark)); color: var(--paper); font: 800 var(--f1) var(--font);
+  box-shadow: 0 2px 0 var(--ink), inset 0 1px 0 color-mix(in srgb, var(--paper) 22%, transparent); cursor: pointer; transition: transform .08s; }
 .camp-btn.primary { background: linear-gradient(180deg, var(--gold), var(--copper)); border-color: var(--paper); color: var(--ink); }
 .camp-btn.sub { background: var(--plum); border-color: var(--haze); }
-.camp-btn:active { transform: translateY(1px); }
+.camp-btn:active { transform: translateY(2px); box-shadow: none; }
 
-/* ── 面板弹窗（整数 2x 像素 9-slice 边框，彻底消除拉伸变形） ── */
+/* ── 面板弹窗（整数 2x 像素 9-slice 边框 + 弹性入场动效） ── */
 .veil { position: absolute; inset: 0; z-index: var(--z-panel); display: grid; place-items: center;
-  background: color-mix(in srgb, var(--ink) 56%, transparent); padding: var(--s1); }
+  background: color-mix(in srgb, var(--ink) 56%, transparent); padding: var(--s1); animation: veilIn .14s ease-out; }
+@keyframes veilIn { from { opacity: 0; } to { opacity: 1; } }
 .panel { min-width: 320px; max-width: min(96vw, 780px); max-height: 95vh; overflow: auto; padding: 6px var(--s2); color: var(--paper);
   border: 16px solid transparent; border-image: url('../assets/ui_panel.png') 8 fill / 16px stretch; image-rendering: pixelated; text-align: center;
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--ink) 85%, transparent); }
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--ink) 85%, transparent); animation: panelIn .18s cubic-bezier(.22, 1, .36, 1); }
+@keyframes panelIn { from { opacity: 0; transform: scale(.93) translateY(8px); } to { opacity: 1; transform: none; } }
 .panel.wide { width: min(96vw, 780px); }
 .panel.title { display: flex; flex-direction: column; align-items: center; gap: var(--s2); max-width: 520px; padding: var(--s2) var(--s3); }
 .panel-head { display: flex; align-items: center; justify-content: center; gap: var(--s2); margin-bottom: 5px; flex-wrap: wrap; }

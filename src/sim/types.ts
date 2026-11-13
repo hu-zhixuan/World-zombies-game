@@ -124,9 +124,10 @@ export interface RunState {
 /** 这一步玩家按了什么。jump/dodge/reload/swap/skill/grenade/interact 是「这一步刚按下」。 */
 export interface Input {
   move: number; fire: boolean; jump: boolean; dodge: boolean; reload: boolean; swap: boolean; skill: boolean; grenade: boolean; interact: boolean;
+  grenadeAim?: { dx: number; dy: number } | null;
 }
 export const NO_INPUT: Input = {
-  move: 0, fire: false, jump: false, dodge: false, reload: false, swap: false, skill: false, grenade: false, interact: false,
+  move: 0, fire: false, jump: false, dodge: false, reload: false, swap: false, skill: false, grenade: false, interact: false, grenadeAim: null,
 };
 
 /** 面板和按钮发给规则层的指令。 */
@@ -166,6 +167,7 @@ export type GameEvent =
   | { t: 'hurt'; dmg: number; blocked?: number }
   | { t: 'wallHit'; reflect?: boolean }
   | { t: 'homeHit' }
+  | { t: 'jump'; onRoof: boolean } | { t: 'swap'; weapon: WeaponId }
   | { t: 'dodge' } | { t: 'reload' } | { t: 'empty' }
   | { t: 'pickup'; weapon: WeaponId; star: number; isNew: boolean }
   | { t: 'star'; weapon: WeaponId; star: number }

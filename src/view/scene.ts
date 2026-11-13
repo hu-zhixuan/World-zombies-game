@@ -2,8 +2,8 @@
 import Phaser from 'phaser';
 import { game } from '../app/game';
 import { ASSETS } from '../assets';
-import { DINER_GUESTS, MEALS, ZOMBIES } from '../content/data';
-import { FORT_GUN_X, nearbyExterior, nearbyStation, turretWorldPos } from '../sim/sim';
+import { DINER_GUESTS, MEALS, WEAPONS, ZOMBIES } from '../content/data';
+import { FORT_GUN_X, computeGrenadeThrow, curWeapon, nearbyExterior, nearbyStation, turretWorldPos } from '../sim/sim';
 import {
   DOOR_X, GROUND_Y, IN_STATIONS, LADDER_X, PORCH_MAX_X, PORCH_MIN_X, PORCH_Y,
   ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, TURRET_SLOTS, VIEW_H, WALL_X, WORLD_W, type GameEvent,
@@ -16,11 +16,13 @@ export { VIEW_H };
 const D = { sky: 0, town: 1, back: 2, ground: 3, prop: 4, actor: 5, fx: 6, mark: 7 };
 
 interface BoltFx { pts: { x: number; y: number }[]; until: number; color: number; straight?: boolean }
+interface Spark { x: number; y: number; vx: number; vy: number; g: number; life: number; max: number; size: number; col: number; bounce?: boolean }
 
 export class GameScene extends Phaser.Scene {
   private sky!: Phaser.GameObjects.TileSprite;
   private town!: Phaser.GameObjects.TileSprite;
   private hero!: Phaser.GameObjects.Sprite;
+  private heroGun!: Phaser.GameObjects.Image;
 
   // 室外与室内两组静态舞台物件（随 run.inside 快速切换可见性）
   private extObjs: { setVisible(v: boolean): void }[] = [];
@@ -39,10 +41,18 @@ export class GameScene extends Phaser.Scene {
   private grenadeSprites: Phaser.GameObjects.Image[] = [];
   private enemyProjSprites: Phaser.GameObjects.Sprite[] = [];
   private bolts: BoltFx[] = [];
+  private sparks: Spark[] = [];
 
   private overlay!: Phaser.GameObjects.Graphics;
   private flashUntil = new Map<number, number>();
+  private squashUntil = new Map<number, number>();
   private camX = 0;
+  private gunRecoil = 0;
+  private gunKick = 0;
+  private gunPop = 1;
+  private heroSquash = 0;
+  private afterimageTick = -1;
+  private hearthTick = 0;
 
   constructor() { super('game'); }
 
@@ -142,9 +152,10 @@ export class GameScene extends Phaser.Scene {
       intAdd(this.add.pointlight(lx, ly, col, r, 0.22, 0.07).setDepth(D.fx));
     }
 
-    // ── 角色、武器箱、特效与矢量层 ──
+    // ── 角色、手持武器、武器箱、特效与矢量层 ──
     this.hero = this.add.sprite(0, GROUND_Y, 'hero_idle').setOrigin(0.5, 1).setDepth(D.actor);
     this.hero.play('hero_idle');
+    this.heroGun = this.add.image(0, GROUND_Y - 22, 'wp_pistol').setOrigin(0.24, 0.52).setDepth(D.actor + 0.1).setScale(1.1);
     this.overlay = this.add.graphics().setDepth(D.mark);
     this.cameras.main.setBounds(0, 0, WORLD_W, VIEW_H).setRoundPixels(true);
 
@@ -272,33 +283,66 @@ export class GameScene extends Phaser.Scene {
     this.sky.tilePositionX = cam.scrollX * 0.08;
     this.town.tilePositionX = cam.scrollX * 0.25;
 
-    // ── 主角 ──
+    // ── 主角 + 手持枪械贴图 + 闪避残影 ──
     const want = p.dodgeT > 0 ? 'hero_crouch' : p.hurtT > 22 ? 'hero_hurt' : p.vy < -0.2 ? 'hero_jump' : p.vy > 0.4 ? 'hero_fall'
       : p.shootT > 0 && Math.abs(p.vx) < 0.1 ? 'hero_shoot' : Math.abs(p.vx) > 0.1 ? 'hero_run' : 'hero_idle';
     if (this.hero.anims.currentAnim?.key !== want) this.hero.play(want);
-    this.hero.setPosition(p.x, GROUND_Y + p.y).setFlipX(p.facing < 0);
-    this.hero.setAlpha(p.dodgeT > 0 ? 0.6 : p.hurtT > 0 && Math.floor(now / 60) % 2 ? 0.5 : 1);
+    this.heroSquash *= 0.8;
+    const hsy = 1 + this.heroSquash;
+    const hsx = 1 - this.heroSquash * 0.55;
+    this.hero.setPosition(p.x, GROUND_Y + p.y).setFlipX(p.facing < 0).setScale(hsx, hsy);
+    this.hero.setAlpha(p.dodgeT > 0 ? 0.65 : p.hurtT > 0 && Math.floor(now / 60) % 2 ? 0.5 : 1);
+
+    if (p.dodgeT > 0 && run.tick !== this.afterimageTick && run.tick % 2 === 0) {
+      this.afterimageTick = run.tick;
+      const ghost = this.add.sprite(p.x, GROUND_Y + p.y, want).setOrigin(0.5, 1).setFlipX(p.facing < 0).setDepth(D.actor - 0.1).setTint(C.frost).setAlpha(0.52);
+      this.tweens.add({ targets: ghost, alpha: 0, duration: 170, onComplete: () => ghost.destroy() });
+    }
+
+    const activeTarget = run.zombies.find((z) => z.id === run.targetId);
+    const curW = curWeapon(run);
+    this.gunRecoil *= 0.72;
+    this.gunKick *= 0.74;
+    this.gunPop += (1 - this.gunPop) * 0.25;
+    const gunKey = WEAPONS[curW.id].icon;
+    if (this.heroGun.texture.key !== gunKey) this.heroGun.setTexture(gunKey);
+    const gunVisible = !inside && run.phase !== 'dead';
+    this.heroGun.setVisible(gunVisible);
+    if (gunVisible) {
+      const bob = Math.abs(p.vx) > 0.1 && Math.abs(p.y) < 1 ? Math.sin(now / 70) * 1.3 : 0;
+      const gxBase = p.x + p.facing * 5;
+      const gyBase = GROUND_Y + p.y - 23 + bob;
+      const rawAng = activeTarget ? Math.atan2((GROUND_Y - 22) - gyBase, activeTarget.x - gxBase) : (p.facing > 0 ? 0 : Math.PI);
+      const ang = rawAng + this.gunKick;
+      this.heroGun
+        .setPosition(gxBase - Math.cos(rawAng) * this.gunRecoil, gyBase - Math.sin(rawAng) * this.gunRecoil)
+        .setRotation(ang)
+        .setFlipY(Math.abs(rawAng) > Math.PI / 2)
+        .setScale(1.12 * this.gunPop);
+    }
 
     // ── 僵尸 ──
     const seen = new Set<number>();
     if (!inside) {
       for (const z of run.zombies) {
         seen.add(z.id);
+        const def = ZOMBIES[z.kind];
         let s = this.zombies.get(z.id);
         if (!s) {
-          const def = ZOMBIES[z.kind], key = def.sprites[z.id % def.sprites.length];
+          const key = def.sprites[z.id % def.sprites.length];
           s = this.add.sprite(z.x, GROUND_Y, key).setOrigin(0.5, 1).setDepth(D.actor).setScale(def.scale);
           s.play({ key, startFrame: z.id % 4 });
           this.zombies.set(z.id, s);
         }
-        s.setVisible(true).setPosition(z.x, GROUND_Y);
+        const sq = (this.squashUntil.get(z.id) ?? 0) > now;
+        s.setVisible(true).setPosition(z.x, GROUND_Y).setScale(def.scale * (sq ? 0.87 : 1), def.scale * (sq ? 1.13 : 1));
         if ((this.flashUntil.get(z.id) ?? 0) > now) s.setTintFill(C.paper);
         else if (z.burnT > 0) s.setTint(C.ember);
         else if (z.slowT > 0) s.setTint(C.frost);
         else s.clearTint();
       }
     }
-    for (const [id, s] of this.zombies) if (!seen.has(id)) { s.destroy(); this.zombies.delete(id); this.flashUntil.delete(id); }
+    for (const [id, s] of this.zombies) if (!seen.has(id)) { s.destroy(); this.zombies.delete(id); this.flashUntil.delete(id); this.squashUntil.delete(id); }
 
     // ── 武器箱 ──
     const seenCrates = new Set<number>();
@@ -342,8 +386,20 @@ export class GameScene extends Phaser.Scene {
       if (!inside && ep) sp.setPosition(ep.x, ep.y).setRotation(Math.atan2(ep.vy, ep.vx));
     });
 
-    // ── 叠加高亮层（目标准星、血条、电网火花、电弧、室内外交互提示点） ──
+    // ── 叠加高亮层（像素粒子、抛物线预览、四角准星、血条、电网火花、电弧、交互点） ──
     const g = this.overlay; g.clear();
+
+    // 室内温馨灶台火星 / 餐桌热气与通用像素粒子
+    if (inside && now > this.hearthTick + 140) {
+      this.hearthTick = now;
+      this.spawnSpark(118 + Phaser.Math.Between(-8, 8), GROUND_Y - 34, Phaser.Math.FloatBetween(-0.2, 0.2), Phaser.Math.FloatBetween(-0.9, -0.45), -0.008, 34, 2, C.ember);
+      for (const guest of run.guests) {
+        if (guest.served && Math.random() < 0.45) {
+          this.spawnSpark(guest.x + Phaser.Math.Between(-6, 6), GROUND_Y - 32, 0, -0.45, -0.004, 28, 1.8, C.paper);
+        }
+      }
+    }
+    this.stepAndDrawSparks(g);
 
     if (inside) {
       const near = nearbyStation(run);
@@ -370,6 +426,35 @@ export class GameScene extends Phaser.Scene {
         }
       }
       return;
+    }
+
+    // 拖拽手榴弹时绘制真实物理解算出的抛物线曲线与落地爆区预警圈（含空中撞怪或越过前排高抛）
+    if (game.grenadeAim && run.phase === 'fight' && p.grenades > 0) {
+      const traj = computeGrenadeThrow(run, game.grenadeAim);
+      let px = traj.sx, py = traj.sy, vx = traj.vx, vy = traj.vy;
+      let landX = px, landY = GROUND_Y - 4;
+      for (let f = 0; f < 84; f++) {
+        px += vx; py += vy; vy += traj.g;
+        landX = px;
+        const hitZ = run.zombies.some((z) => z.hp > 0 && Math.abs(px - z.x) <= 18 && py >= GROUND_Y - 46);
+        if (hitZ || py >= GROUND_Y - 4) { landY = Math.min(GROUND_Y - 4, py); break; }
+        if (f % 2 === 0 && px >= 0 && px <= WORLD_W) {
+          const t = Math.max(0.35, 1 - f / 90);
+          g.fillStyle(C.ink, t * 0.8).fillCircle(px, py, 2.8);
+          g.fillStyle(f % 4 === 0 ? C.gold : C.paper, t).fillCircle(px, py, 1.7);
+        }
+      }
+      const pulse = 1 + Math.sin(now / 85) * 0.06;
+      const blastR = 66 * pulse;
+      if (landY < GROUND_Y - 10) g.lineStyle(1.2, C.gold, 0.55).lineBetween(landX, landY, landX, GROUND_Y - 1);
+      g.fillStyle(C.ember, 0.16).fillEllipse(landX, GROUND_Y - 1, blastR * 2, 22 * pulse);
+      g.lineStyle(2, C.gold, 0.9).strokeEllipse(landX, GROUND_Y - 1, blastR * 2, 22 * pulse);
+      g.lineStyle(1.6, C.red, 0.95)
+        .lineBetween(landX - 7, landY - 5, landX + 7, landY + 5)
+        .lineBetween(landX - 7, landY + 5, landX + 7, landY - 5);
+      for (const z of run.zombies) {
+        if (Math.abs(z.x - landX) <= 66) g.lineStyle(1.6, C.gold, 0.95).strokeEllipse(z.x, GROUND_Y - 1, 28, 9);
+      }
     }
 
     // 室外电弧、狙击磁轨光束与 Lv.3 电网壁垒火花
@@ -419,22 +504,49 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(extNear === 'ladder' ? C.gold : C.lamp, 0.9).fillTriangle(LADDER_X - 5, GROUND_Y + PORCH_Y - 42 + bob, LADDER_X + 5, GROUND_Y + PORCH_Y - 42 + bob, LADDER_X, GROUND_Y + PORCH_Y - 34 + bob);
     }
 
-    // 锁定目标标记与僵尸血条
+    // 元气骑士式锁定准星（四角收缩锁敌框 + 脚底脉动光圈，优先集火目标镶金色外环）
     const target = run.zombies.find((z) => z.id === run.targetId);
     if (target) {
-      const pulse = 1 + Math.sin(now / 120) * 0.08;
-      g.lineStyle(2, C.red, 0.95).strokeEllipse(target.x, GROUND_Y - 1, 30 * pulse, 9 * pulse);
-      const top = GROUND_Y - (this.zombies.get(target.id)?.displayHeight ?? 46) - 6;
-      g.fillStyle(C.red, 0.95).fillTriangle(target.x - 4, top - 6, target.x + 4, top - 6, target.x, top);
+      const sp = this.zombies.get(target.id);
+      const h = sp?.displayHeight ?? 46;
+      const w = ZOMBIES[target.kind].boss ? 22 : 13;
+      const isPri = target.id === run.priorityId;
+      const col = isPri ? C.gold : C.red;
+      const pulse = Math.sin(now / 110) * 2;
+      const rx = w + pulse, top = GROUND_Y - h - pulse, bot = GROUND_Y - 2 + pulse * 0.5, arm = 5;
+      g.lineStyle(1.8, col, 0.92).strokeEllipse(target.x, GROUND_Y - 1, (w * 2 + 4) + pulse * 2, 9);
+      g.lineStyle(2, col, 0.98)
+        .lineBetween(target.x - rx, top, target.x - rx + arm, top).lineBetween(target.x - rx, top, target.x - rx, top + arm)
+        .lineBetween(target.x + rx, top, target.x + rx - arm, top).lineBetween(target.x + rx, top, target.x + rx, top + arm)
+        .lineBetween(target.x - rx, bot, target.x - rx + arm, bot).lineBetween(target.x - rx, bot, target.x - rx, bot - arm)
+        .lineBetween(target.x + rx, bot, target.x + rx - arm, bot).lineBetween(target.x + rx, bot, target.x + rx, bot - arm);
+      g.fillStyle(col, 0.95).fillTriangle(target.x - 4, top - 8, target.x + 4, top - 8, target.x, top - 2);
     }
     for (const z of run.zombies) {
       const isBoss = ZOMBIES[z.kind].boss;
       if (!isBoss && z.hp >= z.maxHp) continue;
       const w = isBoss ? 44 : 22;
-      const y = GROUND_Y - (this.zombies.get(z.id)?.displayHeight ?? 46) - 6;
+      const y = GROUND_Y - (this.zombies.get(z.id)?.displayHeight ?? 46) - 8;
       g.fillStyle(C.ink, 0.88).fillRect(z.x - w / 2, y, w, isBoss ? 5 : 4);
       g.fillStyle(isBoss ? C.gold : C.red, 1).fillRect(z.x - w / 2 + 1, y + 1, (w - 2) * Math.max(0, z.hp / z.maxHp), isBoss ? 3 : 2);
     }
+  }
+
+  private spawnSpark(x: number, y: number, vx: number, vy: number, g: number, max: number, size: number, col: number, bounce = false) {
+    if (this.sparks.length >= 130) this.sparks.shift();
+    this.sparks.push({ x, y, vx, vy, g, life: max, max, size, col, bounce });
+  }
+
+  private stepAndDrawSparks(g: Phaser.GameObjects.Graphics) {
+    const out: Spark[] = [];
+    for (const s of this.sparks) {
+      s.x += s.vx; s.y += s.vy; s.vy += s.g; s.life--;
+      if (s.bounce && s.y >= GROUND_Y - 1 && s.vy > 0) { s.y = GROUND_Y - 1; s.vy *= -0.45; s.vx *= 0.72; }
+      if (s.life <= 0) continue;
+      g.fillStyle(s.col, Math.min(1, s.life / (s.max * 0.45))).fillRect(s.x - s.size * 0.5, s.y - s.size * 0.5, s.size, s.size);
+      out.push(s);
+    }
+    this.sparks = out;
   }
 
   private burst(key: string, x: number, y: number, scale = 1) {
@@ -448,8 +560,19 @@ export class GameScene extends Phaser.Scene {
     switch (e.t) {
       case 'shot':
         if (game.run.inside) return;
-        this.burst('shot_hit', e.x + (e.from === 'player' ? game.run.player.facing * 6 : 6), e.y, e.from === 'player' ? 1.1 : 0.75);
-        if (e.from === 'turret') {
+        this.burst('shot_hit', e.x + (e.from === 'player' ? game.run.player.facing * 6 : 6), e.y, e.from === 'player' ? 1.15 : 0.75);
+        if (e.from === 'player') {
+          this.gunRecoil = 5.5;
+          this.gunKick = -0.22 * game.run.player.facing;
+          // 抛出一枚闪烁退壳（实弹枪械抛铜壳，激光/电磁抛青金火花）
+          const shellCol = e.weapon === 'tesla' ? C.electric : e.weapon === 'rifle' ? C.red : C.gold;
+          this.spawnSpark(
+            game.run.player.x + game.run.player.facing * 2, e.y - 2,
+            -game.run.player.facing * Phaser.Math.FloatBetween(0.9, 1.8), Phaser.Math.FloatBetween(-2.6, -1.5),
+            0.14, 28, 2.2, shellCol, true,
+          );
+          if (e.weapon === 'rocket' || e.weapon === 'shotgun' || e.weapon === 'rifle') this.cameras.main.shake(55, 0.0022);
+        } else if (e.from === 'turret') {
           for (let i = 0; i < this.turretSprites.length; i++) {
             const sp = this.turretSprites[i];
             if (sp && sp instanceof Phaser.GameObjects.Sprite && (this.turretTypes[i] === 'mg' || this.turretTypes[i] === 'frost') && Math.abs(sp.x - (e.x - 10)) < 4) {
@@ -458,16 +581,31 @@ export class GameScene extends Phaser.Scene {
           }
         }
         break;
+      case 'jump':
+        this.heroSquash = 0.16;
+        for (let i = 0; i < 4; i++) {
+          this.spawnSpark(game.run.player.x + (i - 1.5) * 4, GROUND_Y + game.run.player.y - 1, Phaser.Math.FloatBetween(-0.9, 0.9), Phaser.Math.FloatBetween(-1.4, -0.4), 0.06, 16, 2.4, C.haze);
+        }
+        break;
+      case 'swap':
+        this.gunPop = 1.48;
+        break;
       case 'railbeam':
         if (game.run.inside) return;
-        this.bolts.push({ pts: [{ x: e.x1, y: e.y1 }, { x: e.x2, y: e.y2 }], until: now + 180, color: C.red, straight: true });
+        this.bolts.push({ pts: [{ x: e.x1, y: e.y1 }, { x: e.x2, y: e.y2 }], until: now + 210, color: C.red, straight: true });
         break;
-      case 'hit':
+      case 'hit': {
         if (game.run.inside) return;
         this.flashUntil.set(e.id, now + 70);
-        this.burst('shot_hit', e.x + Phaser.Math.Between(-4, 4), e.y + Phaser.Math.Between(-6, 6));
+        this.squashUntil.set(e.id, now + 85);
+        this.burst('shot_hit', e.x + Phaser.Math.Between(-4, 4), e.y + Phaser.Math.Between(-6, 6), e.crit ? 1.2 : 0.95);
+        const col = e.crit ? C.gold : e.burn ? C.ember : e.slow ? C.frost : C.paper;
+        for (let i = 0; i < (e.crit ? 5 : 3); i++) {
+          this.spawnSpark(e.x, e.y, Phaser.Math.FloatBetween(0.6, 2.4), Phaser.Math.FloatBetween(-2.2, 0.4), 0.12, 16, e.crit ? 2.4 : 1.8, col);
+        }
         floaters.add(e.x, e.y - 22, String(e.dmg), e.burn ? 'burn' : e.crit ? 'crit' : 'dmg');
         break;
+      }
       case 'lightning':
         this.bolts.push({ pts: e.pts, until: now + 170, color: e.color === 'shock' ? C.gold : C.electric });
         break;
@@ -479,6 +617,9 @@ export class GameScene extends Phaser.Scene {
       case 'kill':
         if (game.run.inside) return;
         this.burst('z_death', e.x, GROUND_Y - 26);
+        for (let i = 0; i < 6; i++) {
+          this.spawnSpark(e.x, GROUND_Y - 22, Phaser.Math.FloatBetween(-1.8, 1.8), Phaser.Math.FloatBetween(-3.2, -0.6), 0.12, 22, 2.5, C.infected);
+        }
         floaters.add(e.x, GROUND_Y - 58, '+' + e.coins + (e.meat > 0 ? ' +肉' : ''), 'coin');
         break;
       case 'serve': {
@@ -498,6 +639,11 @@ export class GameScene extends Phaser.Scene {
         this.burst('fx_boom', e.x, e.y, Math.max(0.9, e.r / 26));
         const c = this.add.circle(e.x, e.y, 6, C.ember, 0.65).setDepth(D.fx);
         this.tweens.add({ targets: c, radius: e.r, alpha: 0, duration: 240, onComplete: () => c.destroy() });
+        for (let i = 0; i < 12; i++) {
+          const ang = (i / 12) * Math.PI * 2;
+          const sp = Phaser.Math.FloatBetween(1.4, 3.6);
+          this.spawnSpark(e.x, e.y, Math.cos(ang) * sp, Math.sin(ang) * sp - 1.2, 0.14, 24, 2.8, i % 2 ? C.gold : C.ember, true);
+        }
         this.cameras.main.shake(140, 0.005);
         break;
       }
@@ -511,6 +657,7 @@ export class GameScene extends Phaser.Scene {
       case 'dayStart':
       case 'inside':
         this.camX = this.targetCamX();
+        this.sparks = [];
         break;
       case 'bossAppear':
         this.cameras.main.shake(260, 0.008);
