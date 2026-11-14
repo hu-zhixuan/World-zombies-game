@@ -50,6 +50,35 @@ const skillActive = (run: RunState, cls: ClassId) => run.cls === cls && run.skil
 export const isOnRoof = (run: RunState) => !run.inside && run.player.y <= ROOF_Y + 2 && run.player.x >= ROOF_MIN_X && run.player.x <= ROOF_MAX_X;
 export const isOnPorch = (run: RunState) => !run.inside && Math.abs(run.player.y - PORCH_Y) <= 2 && run.player.x >= PORCH_MIN_X && run.player.x <= PORCH_MAX_X;
 
+export interface HouseBuff {
+  zone: 'roof' | 'porch' | 'ground';
+  name: string;
+  dmgMul: number;
+  rangeBonus: number;
+  critBonus: number;
+  reloadHaste: number;
+  rangedCover: number;
+  meleeImmune: boolean;
+}
+
+/** 房屋/屋顶高地防守增益：站上酒馆门廊或二楼屋顶可获得显著火力、暴击、射程、换弹与矮墙掩体减伤。 */
+export function houseBuff(run: RunState): HouseBuff {
+  const flv = Math.max(1, run.fort.level);
+  if (isOnRoof(run)) {
+    const dmgMul = flv >= 3 ? 1.36 : flv === 2 ? 1.28 : 1.20;
+    const rangeBonus = flv >= 3 ? 0.35 : flv === 2 ? 0.25 : 0.20;
+    const critBonus = flv >= 3 ? 0.18 : flv === 2 ? 0.14 : 0.10;
+    const reloadHaste = flv >= 3 ? 0.40 : flv === 2 ? 0.32 : 0.25;
+    const rangedCover = flv >= 3 ? 0.55 : flv === 2 ? 0.45 : 0.35;
+    const name = flv >= 3 ? '铁堡屋顶' : flv === 2 ? '石堡屋顶' : '酒馆屋顶';
+    return { zone: 'roof', name, dmgMul, rangeBonus, critBonus, reloadHaste, rangedCover, meleeImmune: true };
+  }
+  if (isOnPorch(run)) {
+    return { zone: 'porch', name: '门廊木台', dmgMul: 1.12, rangeBonus: 0.10, critBonus: 0.05, reloadHaste: 0.12, rangedCover: 0.20, meleeImmune: true };
+  }
+  return { zone: 'ground', name: '前院平地', dmgMul: 1.0, rangeBonus: 0, critBonus: 0, reloadHaste: 0, rangedCover: 0, meleeImmune: false };
+}
+
 export const turretBuildCost = (kind: TurretType, cls: ClassId, hasQiang = false) =>
   Math.ceil(TURRETS[kind].buildCoins * (cls === 'engineer' ? 0.75 : 1) * (hasQiang ? 0.9 : 1));
 export const turretUpgradeCost = (kind: TurretType, level: number, cls: ClassId, hasQiang = false) =>
@@ -62,32 +91,30 @@ export const turretRefundCoins = (kind: TurretType, level: number, cls: ClassId,
 export const meatPrice = (cls: ClassId) => Math.round(MEAT_SELL_PRICE * (cls === 'chef' ? 1.35 : 1));
 export const weaponDamage = (id: WeaponId, star: number) => WEAPONS[id].damage * starMul(star);
 
-/** 主角射程（在房顶有居高加成，堡垒 3 级再加 15%） */
+/** 主角射程（在门廊/屋顶享受高低差加成，居高临下天赋额外叠加） */
 export function effectiveRange(run: RunState, id: WeaponId = curWeapon(run).id): number {
-  let m = 1;
-  if (isOnRoof(run)) {
-    m += 0.15;
-    if (has(run, 'rooftop')) m += 0.2;
-    if (run.fort.level >= 3) m += 0.15;
-  }
-  return Math.round(WEAPONS[id].range * m);
+  const hb = houseBuff(run);
+  const perkBonus = isOnRoof(run) && has(run, 'rooftop') ? 0.15 : 0;
+  return Math.round(WEAPONS[id].range * (1 + hb.rangeBonus + perkBonus));
 }
 
-/** 伤害倍率：天赋 × 特餐 × 房顶高低差 × 战友。 */
+/** 伤害倍率：特餐 × 屋顶/门廊高地 × 战友 × 天赋。 */
 export function damageMul(run: RunState): number {
   const p = run.player;
-  let m = 1 + run.buff.dmgMul;
+  const hb = houseBuff(run);
+  let m = (1 + run.buff.dmgMul) * hb.dmgMul;
   if (hasAlly(run, 'zhang')) m *= 1.1;
-  if (isOnRoof(run) && has(run, 'rooftop')) m *= 1.3;
-  if (has(run, 'glasscannon')) m *= 2.2;
-  if (has(run, 'bloodfrenzy')) m *= 1 + (1 - p.hp / p.maxHp) * 0.8;
-  if (has(run, 'chainkill')) m *= 1 + Math.min(0.8, run.chain.n * 0.1);
-  if (has(run, 'vanguard') && run.vanguardT > 0) m *= 1.5;
+  if (isOnRoof(run) && has(run, 'rooftop')) m *= 1.2;
+  if (has(run, 'glasscannon')) m *= 1.65;
+  if (has(run, 'bloodfrenzy')) m *= 1 + (1 - p.hp / p.maxHp) * 0.55;
+  if (has(run, 'chainkill')) m *= 1 + Math.min(0.42, run.chain.n * 0.07);
+  if (has(run, 'vanguard') && run.vanguardT > 0) m *= 1.35;
   return m;
 }
 
-/** 攻速倍率（1.0 为基础） */
-const playerHaste = (run: RunState) => 1 + run.buff.haste + (skillActive(run, 'chef') ? 0.4 : 0);
+/** 换弹与攻速倍率（1.0 为基础，站在屋顶换弹明显更快） */
+const playerHaste = (run: RunState) => 1 + run.buff.haste + (skillActive(run, 'chef') ? 0.4 : 0) + (isOnRoof(run) ? 0.08 : 0);
+const reloadHaste = (run: RunState) => 1 + run.buff.haste + houseBuff(run).reloadHaste;
 
 /** 清场条件：这一天的僵尸都出完了，而且都死了 */
 export const dayRemaining = (run: RunState) => run.spawn.left + run.zombies.length;
@@ -145,17 +172,17 @@ const VIP_ORDER_LINES: Record<string, string> = {
   laobao: '连守七十二小时防线了，来份最够劲的热菜提提神！',
   qijie: '刚拧完一天螺栓，上最扎实管饱的菜，少敷衍我！',
   niqiu: '掌柜的，把招牌菜端上来，好吃明天再给你带稀罕门路！',
-  gaolaotou: '确定没装窃听器吧？给我盛份热腾腾又干净的菜！',
+  gaolaotou: '确定没藏窃听机关吧？给我盛份热腾腾又干净的菜！',
   guying: '高热量。五分钟内上菜。不废话。',
-  huanyin: '废土老铁们看好了！今天探店避难所米其林招牌！',
-  tongshu: '仿生胃效能下跌，需要高油脂与热蛋白料理补充燃料。',
+  huanyin: '短波频道正播着哩——上你们暮色酒馆最拿手的招牌硬菜！',
+  tongshu: '发条铁胃涩滞，需要滚烫油脂与烈性热肉润滑机件。',
   dashan: '大山……大山饿了，想吃热乎乎的大块肉肉……',
-  baishi: '太棒了！请务必做一份刺激风味料理做实验对照！',
-  jinlaoban: '净水生意刚谈完，端上你们店最拿手的菜色试试成色。',
-  wumingke: '风沙太大……在角落安静吃一碗热菜便走。',
-  yanlao: '百年前这里曾是中央大酒店……能请我尝一口战前风味吗？',
+  baishi: '妙极了！请务必上一份辛烈浓菜，助我印证今夜秘药方！',
+  jinlaoban: '净水生意刚谈完，端上你们酒馆最拿手的菜色试试成色。',
+  wumingke: '风沙太大……在角落安静吃一碗热汤便走。',
+  yanlao: '百年前这里曾是老城区最好的大酒店……能请我尝一口战前风味吗？',
   kuangya: '哈哈哈！闻到香味了！拿最扎实的硬菜上来！',
-  guancezhe: '15 波围城宵夜系统测试中——随便来道菜看看成色吧！',
+  guancezhe: '十五夜星象正往酒馆汇聚——莫掌柜，来道招牌让我尝尝今夜火候。',
 };
 
 function pickGuestMeal(run: RunState, vip: VipDef, forceTrend: boolean): MealId {
@@ -186,14 +213,12 @@ function rollDinerGuests(run: RunState) {
   const chosen: VipDef[] = [];
   const usedIds = new Set<string>();
 
-  // 优先让刚解锁且还没初遇过的 VIP 先来坐镇
   const unmet = unlocked.filter((v) => !run.diner.metVips.includes(v.id));
   for (const v of unmet) {
     if (chosen.length >= 2) break;
     chosen.push(v);
     usedIds.add(v.id);
   }
-  // 剩下座位从已解锁 VIP 中按权重抽取不重复食客
   while (chosen.length < 3) {
     const pool = unlocked.filter((v) => !usedIds.has(v.id));
     const src = pool.length > 0 ? pool : VIP_CUSTOMERS.filter((v) => !usedIds.has(v.id));
@@ -215,7 +240,7 @@ function rollDinerGuests(run: RunState) {
     const meal = MEALS[dishId];
     const trendMatch = meal.tags.includes(run.diner.trendTag);
     const shortName = vip.name.includes('·') ? vip.name.split('·').pop()! : vip.name;
-    const pay = Math.round((meal.basePay + run.day * 2) * chefMul * vip.tipBonus * (1 + repTier.bonusMul) * (trendMatch ? 1.35 : 1));
+    const pay = Math.round((meal.basePay * 0.8 + run.day * 1.1) * chefMul * (0.8 + vip.tipBonus * 0.22) * (1 + repTier.bonusMul) * (trendMatch ? 1.35 : 1));
     return {
       id: `${vip.id}_${run.day}_${idx}`,
       vipId: vip.id,
@@ -245,10 +270,11 @@ export function newRun(seed = 1, pool: WeaponId[] = ['revolver', 'smg'], cls: Cl
     inside: false, autoFire: false,
     player: {
       x: 194, y: ROOF_Y, vx: 0, vy: 0, facing: 1, hp: 100, maxHp: 100, armor: 0, maxArmor: 80, hurtT: 0, healCarry: 0,
-      dodgeT: 0, dodgeCd: 0, dodgeDir: 1, fireCd: 0, reloadT: 0, shootT: 0, grenades: 2,
+      dodgeT: 0, dodgeCd: 0, dodgeDir: 1, fireCd: 0, reloadT: 0, shootT: 0,
+      burstLeft: 0, burstCd: 0, smgHeat: 0, smgShots: 0, grenades: 2,
       weapons: [{ id: 'pistol', star: 1, ammo: WEAPONS.pistol.mag }], cur: 0,
     },
-    zombies: [], bullets: [], grenades: [], enemyProjs: [], crates: [], turrets,
+    zombies: [], bullets: [], fires: [], grenades: [], enemyProjs: [], crates: [], turrets,
     wall: { level: 1, hp: WALL_LEVELS[0].maxHp, maxHp: WALL_LEVELS[0].maxHp },
     home: { hp: FORT_LEVELS[0].maxHp, maxHp: FORT_LEVELS[0].maxHp },
     fort: { level: 1, cd: 0, aim: 0 },
@@ -270,15 +296,15 @@ function startDay(run: RunState, ev: GameEvent[]) {
   run.day++;
   run.phase = 'fight'; run.phaseT = 0; run.inside = false;
   run.player.x = 194; run.player.y = ROOF_Y; run.player.vy = 0; run.player.facing = 1;
+  run.player.burstLeft = 0; run.player.burstCd = 0; run.player.smgHeat = 0;
   const total = dayZombieCount(run.day);
-  const crateAt = run.day === 1 || rand(run) < 0.4 ? Math.floor(total / 2) : -1;
+  const crateAt = run.day === 1 || rand(run) < 0.45 ? Math.floor(total / 2) : -1;
   const bossKind = bossForDay(run.day);
-  run.spawn = { left: total, timer: 80, total, killed: 0, crateAt, bossKind, bossSpawned: false };
-  run.bullets = []; run.grenades = []; run.enemyProjs = [];
+  run.spawn = { left: total, timer: 54, total, killed: 0, crateAt, bossKind, bossSpawned: false };
+  run.bullets = []; run.fires = []; run.grenades = []; run.enemyProjs = [];
   run.chain = { n: 0, t: 0 }; run.vanguardT = 0; run.skill = { t: 0, cd: 0 };
   rollDailyTrend(run);
 
-  // 将昨晚烹饪的战前特餐转为今天的战斗增益（含手操火候倍率加成）
   const mealBoost = (run.cls === 'chef' ? 1.5 : 1) * QUALITY_META[run.mealQuality ?? 'good'].buffMul;
   if (run.meal) {
     const m = MEALS[run.meal];
@@ -309,7 +335,7 @@ function spawnZombie(run: RunState, forcedKind?: ZombieKind) {
   const index = run.spawn.total - run.spawn.left;
   run.zombies.push({
     id: run.nextId++, kind, x: SPAWN_X + rand(run) * 44, hp, maxHp: hp,
-    atkCd: 0, kb: 0, burnT: 0, slowT: 0, carriesCrate: !forcedKind && index === run.spawn.crateAt,
+    atkCd: 12, kb: 0, burnT: 0, slowT: 0, stunT: 0, freezeT: 0, carriesCrate: !forcedKind && index === run.spawn.crateAt,
   });
 }
 
@@ -331,15 +357,18 @@ function pickTarget(run: RunState): Zombie | null {
   return best;
 }
 
-function applyPlayerDamage(run: RunState, rawDmg: number, ev: GameEvent[]) {
+function applyPlayerDamage(run: RunState, rawDmg: number, ev: GameEvent[], fromRanged = false) {
   const p = run.player;
   if (p.dodgeT > 0 || p.hurtT > 0) return;
-  const blocked = Math.min(p.armor, rawDmg);
+  const coverFrac = fromRanged ? houseBuff(run).rangedCover : 0;
+  const covered = Math.floor(rawDmg * coverFrac);
+  const finalDmg = Math.max(1, rawDmg - covered);
+  const blocked = Math.min(p.armor, finalDmg);
   p.armor -= blocked;
-  const hpDmg = rawDmg - blocked;
+  const hpDmg = finalDmg - blocked;
   p.hp -= hpDmg;
   p.hurtT = 30;
-  ev.push({ t: 'hurt', dmg: rawDmg, blocked });
+  ev.push({ t: 'hurt', dmg: finalDmg, blocked, cover: covered > 0 ? covered : undefined });
 }
 
 function damageZombie(
@@ -347,16 +376,27 @@ function damageZombie(
   z: Zombie,
   dmg: number,
   ev: GameEvent[],
-  opts: { byPlayer: boolean; burn?: boolean; kb?: number; crit?: boolean; slow?: number; weaponId?: WeaponId; dir?: 1 | -1; heavy?: boolean },
+  opts: {
+    byPlayer: boolean; burn?: boolean; kb?: number; crit?: boolean; slow?: number;
+    freeze?: number; stun?: number; overload?: boolean; weaponId?: WeaponId; dir?: 1 | -1; heavy?: boolean;
+  },
 ) {
   if (z.hp <= 0) return;
   const before = z.hp;
   z.hp -= dmg;
-  if (opts.kb) z.kb = Math.max(z.kb, ZOMBIES[z.kind].boss ? opts.kb * 0.25 : opts.kb);
+  const bossScale = ZOMBIES[z.kind].boss ? 0.25 : 1;
+  if (opts.kb) z.kb = Math.max(z.kb, opts.kb * bossScale);
   if (opts.slow) z.slowT = Math.max(z.slowT, opts.slow);
+  if (opts.freeze) z.freezeT = Math.max(z.freezeT, Math.round(opts.freeze * (ZOMBIES[z.kind].boss ? 0.4 : 1)));
+  if (opts.stun) z.stunT = Math.max(z.stunT, Math.round(opts.stun * (ZOMBIES[z.kind].boss ? 0.35 : 1)));
   const dir: 1 | -1 = opts.dir ?? (z.x >= run.player.x ? 1 : -1);
   const heavy = opts.heavy || (opts.kb ?? 0) >= 2.5 || opts.weaponId === 'revolver' || opts.weaponId === 'shotgun' || opts.weaponId === 'rifle' || opts.weaponId === 'rocket';
-  ev.push({ t: 'hit', id: z.id, x: z.x, y: BODY_Y, dmg: Math.round(dmg), burn: opts.burn, crit: opts.crit, slow: !!opts.slow, dir, weapon: opts.weaponId, heavy });
+  ev.push({
+    t: 'hit', id: z.id, x: z.x, y: BODY_Y, dmg: Math.round(dmg),
+    burn: opts.burn, crit: opts.crit, slow: !!opts.slow, freeze: !!opts.freeze, stun: !!opts.stun, overload: opts.overload,
+    dir, weapon: opts.weaponId, heavy,
+  });
+
   if (opts.byPlayer && has(run, 'lifesteal')) {
     const p = run.player;
     p.healCarry += Math.min(dmg, before) * 0.08;
@@ -365,18 +405,16 @@ function damageZombie(
   }
   if (z.hp > 0) return;
 
-  // 战术自卫手枪特色：击杀立即回膛 2 发子弹
-  if (opts.byPlayer && (opts.weaponId === 'pistol' || curWeapon(run).id === 'pistol')) {
-    const cw = curWeapon(run);
-    if (cw.id === 'pistol') {
-      cw.ammo = Math.min(magSize('pistol', cw.star), cw.ammo + 2);
-    }
+  // 猎手双发手枪特色：击杀立即回膛 2 发子弹
+  if (opts.byPlayer && opts.weaponId === 'pistol') {
+    const pw = run.player.weapons.find((w) => w.id === 'pistol');
+    if (pw) pw.ammo = Math.min(magSize('pistol', pw.star), pw.ammo + 2);
   }
 
   const def = ZOMBIES[z.kind];
   run.coins += def.coins; run.kills++; run.spawn.killed++;
   const chef = run.cls === 'chef';
-  const meatDrop = def.meat > 1 ? def.meat + (chef ? 1 : 0) : (rand(run) < (chef ? 0.9 : 0.65) ? 1 : 0);
+  const meatDrop = def.meat > 1 ? def.meat + (chef ? 1 : 0) : (rand(run) < (chef ? 0.56 : 0.38) ? 1 : 0);
   run.meat += meatDrop;
 
   if (has(run, 'chainkill')) run.chain = { n: Math.min(8, run.chain.n + 1), t: 180 };
@@ -394,7 +432,7 @@ function damageZombie(
     run.crates.push({ id: run.nextId++, x: Math.min(Math.max(z.x, HOME_X + 20), PLAYER_MAX_X - 20), weapon });
   }
   if (opts.byPlayer && has(run, 'overkill') && z.hp < 0) {
-    const boom = -z.hp * 2, r = 44 * (has(run, 'shrapnel') ? 1.35 : 1);
+    const boom = -z.hp * 1.15, r = 42 * (has(run, 'shrapnel') ? 1.28 : 1);
     ev.push({ t: 'boom', x: z.x, y: BODY_Y, r });
     for (const o of run.zombies) if (o !== z && o.hp > 0 && Math.abs(o.x - z.x) <= r) damageZombie(run, o, boom, ev, { byPlayer: false, kb: 2, dir: o.x >= z.x ? 1 : -1, heavy: true });
   }
@@ -407,7 +445,7 @@ function collectCrate(run: RunState, weapon: WeaponId, ev: GameEvent[]) {
     const fresh = { id: weapon, star: 1, ammo: magSize(weapon, 1) };
     if (p.weapons.length >= MAX_CARRY) { p.weapons[p.cur] = fresh; run.coins += 40; }
     else { p.weapons.push(fresh); p.cur = p.weapons.length - 1; }
-    p.reloadT = 0;
+    p.reloadT = 0; p.burstLeft = 0; p.smgHeat = 0;
     ev.push({ t: 'pickup', weapon, star: 1, isNew: true });
   } else if (owned.star < MAX_STAR) {
     owned.star++; owned.ammo = magSize(owned.id, owned.star);
@@ -423,7 +461,7 @@ function fireLightning(
   run: RunState,
   sx: number, sy: number, first: Zombie, dmg: number, jumps: number,
   ev: GameEvent[],
-  opts: { byPlayer: boolean; crit?: boolean; color: 'tesla' | 'shock' },
+  opts: { byPlayer: boolean; crit?: boolean; color: 'tesla' | 'shock'; stun?: number },
 ) {
   const pts: { x: number; y: number }[] = [{ x: sx, y: sy }];
   const hit = new Set<number>();
@@ -432,18 +470,33 @@ function fireLightning(
   for (let i = 0; i < jumps && cur; i++) {
     hit.add(cur.id);
     pts.push({ x: cur.x, y: BODY_Y });
-    damageZombie(run, cur, curDmg, ev, { byPlayer: opts.byPlayer, crit: opts.crit, kb: 0.8, dir: cur.x >= sx ? 1 : -1, weaponId: 'tesla' });
-    curDmg *= 0.78;
+    const overloaded = opts.byPlayer && (cur.burnT > 0 || cur.slowT > 0 || cur.freezeT > 0);
+    damageZombie(run, cur, curDmg * (overloaded ? 1.35 : 1), ev, {
+      byPlayer: opts.byPlayer,
+      crit: opts.crit,
+      kb: 0.9,
+      stun: opts.stun,
+      overload: overloaded,
+      dir: cur.x >= sx ? 1 : -1,
+      weaponId: 'tesla',
+      heavy: overloaded,
+    });
+    curDmg *= 0.82;
     const fromX: number = cur.x;
-    cur = run.zombies.filter((o) => o.hp > 0 && !hit.has(o.id) && Math.abs(o.x - fromX) <= 135)
+    cur = run.zombies.filter((o) => o.hp > 0 && !hit.has(o.id) && Math.abs(o.x - fromX) <= 155)
       .sort((a, b) => Math.abs(a.x - fromX) - Math.abs(b.x - fromX))[0];
   }
   if (pts.length >= 2) ev.push({ t: 'lightning', pts, color: opts.color });
 }
 
-function explodeAt(run: RunState, x: number, y: number, r: number, dmg: number, ev: GameEvent[], byPlayer: boolean, burn = false) {
-  const shrapMul = has(run, 'shrapnel') ? 1.45 : 1;
-  const rMul = has(run, 'shrapnel') ? 1.35 : 1;
+function addGroundFire(run: RunState, x: number, r: number, dmg: number) {
+  run.fires.push({ x, r, t: 210, maxT: 210, dmg });
+  if (run.fires.length > 6) run.fires.shift();
+}
+
+function explodeAt(run: RunState, x: number, y: number, r: number, dmg: number, ev: GameEvent[], byPlayer: boolean, burn = false, scorch = false) {
+  const shrapMul = has(run, 'shrapnel') ? 1.32 : 1;
+  const rMul = has(run, 'shrapnel') ? 1.28 : 1;
   const finalR = Math.round(r * rMul);
   const finalDmg = dmg * (byPlayer ? shrapMul : 1);
   ev.push({ t: 'boom', x, y, r: finalR });
@@ -451,18 +504,20 @@ function explodeAt(run: RunState, x: number, y: number, r: number, dmg: number, 
     if (z.hp <= 0) continue;
     const d = Math.abs(z.x - x);
     if (d <= finalR) {
-      damageZombie(run, z, finalDmg * (1 - 0.35 * (d / Math.max(1, finalR))), ev, { byPlayer, kb: 3.5, dir: z.x >= x ? 1 : -1, heavy: true });
-      if (burn && z.hp > 0) z.burnT = Math.max(z.burnT, 120);
+      damageZombie(run, z, finalDmg * (1 - 0.35 * (d / Math.max(1, finalR))), ev, {
+        byPlayer, kb: 3.8, burn, weaponId: byPlayer ? 'rocket' : undefined, dir: z.x >= x ? 1 : -1, heavy: true,
+      });
+      if (burn && z.hp > 0) z.burnT = Math.max(z.burnT, 140);
     }
+  }
+  if (scorch) {
+    addGroundFire(run, x, Math.round(finalR * 0.88), Math.max(12, Math.round(finalDmg * 0.14)));
   }
 }
 
-function fire(run: RunState, target: Zombie | null, ev: GameEvent[]) {
+/** 向目标发射一发/一组实体弹丸（也供双发手枪二连补射复用）。 */
+function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[], consumeAmmo: boolean) {
   const p = run.player, ow = curWeapon(run), def = WEAPONS[ow.id];
-  if (ow.ammo <= 0) { startReload(run, ev); return; }
-  ow.ammo--;
-  p.fireCd = Math.max(2, Math.round((def.interval * (has(run, 'pierce') ? 1.25 : 1)) / playerHaste(run)));
-  p.shootT = 10;
   const mx = p.x + p.facing * 26, my = MUZZLE_Y + p.y;
   let dx: number = p.facing, dy = 0;
   if (target) {
@@ -471,52 +526,127 @@ function fire(run: RunState, target: Zombie | null, ev: GameEvent[]) {
   }
   const ang = Math.atan2(dy, dx);
   const hawkeye = skillActive(run, 'gunner');
-  const baseCrit = (run.cls === 'gunner' ? CRIT_CHANCE : 0) + (ow.id === 'pistol' ? 0.2 : 0);
+  const hb = houseBuff(run);
+  const baseCrit = (run.cls === 'gunner' ? CRIT_CHANCE : 0) + (ow.id === 'pistol' ? 0.2 : 0) + hb.critBonus;
   const crit = hawkeye || (baseCrit > 0 && rand(run) < baseCrit);
   const dmg = weaponDamage(ow.id, ow.star) * damageMul(run) * (crit ? CRIT_MUL : 1);
+  const range = effectiveRange(run, ow.id);
+  const fullPierce = !!def.pierce || has(run, 'pierce') || hawkeye;
 
-  if (def.chain) {
-    if (target) {
-      const jumps = def.chain + (has(run, 'shock') ? 2 : 0) + (ow.star >= 5 ? 1 : 0);
-      fireLightning(run, mx, my, target, dmg, jumps, ev, { byPlayer: true, crit, color: 'tesla' });
-    } else {
-      ev.push({ t: 'lightning', pts: [{ x: mx, y: my }, { x: mx + dx * 125, y: my + (rand(run) - 0.5) * 14 }], color: 'tesla' });
+  if (ow.id === 'smg') p.smgShots++;
+  const hotSmg = ow.id === 'smg' && p.smgHeat >= 0.65 && p.smgShots % 3 === 0;
+
+  // 1. 猩红磁轨激光：扣扳机瞬间全屏 hitscan 穿透整列敌军 + 对重甲/Boss +35%（★5 +50%）破甲伤
+  if (def.hitscan) {
+    const x2 = mx + dx * range, y2 = my + dy * range;
+    ev.push({ t: 'railbeam', x1: mx, y1: my, x2, y2, crit });
+    const sorted = [...run.zombies].sort((a, b) => Math.abs(a.x - mx) - Math.abs(b.x - mx));
+    for (const z of sorted) {
+      if (z.hp <= 0) continue;
+      if ((z.x - mx) * dx < -10) continue;
+      const distX = Math.abs(z.x - mx);
+      if (distX > range + 20) continue;
+      const t = Math.abs(dx) > 0.06 ? (z.x - mx) / dx : 0;
+      if (t < -10 || t > range + 24) continue;
+      const beamY = my + dy * t;
+      const zDef = ZOMBIES[z.kind];
+      const hitTop = zDef.boss ? GROUND_Y - 114 : GROUND_Y - 58;
+      if (beamY < hitTop - 16 || beamY > GROUND_Y + 14) continue;
+      const armorBreaker = zDef.boss || z.kind === 'bruiser' ? (ow.star >= 5 ? 1.5 : 1.35) : 1.0;
+      damageZombie(run, z, dmg * armorBreaker, ev, {
+        byPlayer: true, crit, kb: 2.8, weaponId: 'rifle', dir: dx >= 0 ? 1 : -1, heavy: true,
+      });
+      if (has(run, 'incendiary') && z.hp > 0 && rand(run) < 0.25) z.burnT = 180;
+      if (has(run, 'frostbite')) z.slowT = Math.max(z.slowT, 135);
+      if (has(run, 'shock') && z.hp > 0 && rand(run) < 0.2) {
+        const next = run.zombies.find((o) => o.id !== z.id && o.hp > 0 && Math.abs(o.x - z.x) <= 130);
+        if (next) fireLightning(run, z.x, BODY_Y, next, dmg * 0.45, 2, ev, { byPlayer: true, color: 'shock' });
+      }
     }
     ev.push({ t: 'shot', x: mx, y: my, from: 'player', weapon: ow.id, ang });
-    if (ow.ammo <= 0) startReload(run, ev);
+    if (consumeAmmo && ow.ammo <= 0) startReload(run, ev);
     return;
   }
 
-  const fullPierce = !!def.pierce || has(run, 'pierce') || hawkeye;
-  const range = effectiveRange(run, ow.id);
-  if (ow.id === 'rifle') {
-    ev.push({ t: 'railbeam', x1: mx, y1: my, x2: mx + dx * range, y2: my + dy * range });
+  // 2. 特斯拉雷暴线圈：多段电弧链 + 麻痹定身 + 元素超载
+  if (def.chain) {
+    if (target) {
+      const jumps = def.chain + (ow.star >= 3 ? 1 : 0) + (ow.star >= 5 ? 1 : 0) + (has(run, 'shock') ? 2 : 0);
+      fireLightning(run, mx, my, target, dmg, jumps, ev, { byPlayer: true, crit, color: 'tesla', stun: 22 });
+    } else {
+      ev.push({ t: 'lightning', pts: [{ x: mx, y: my }, { x: mx + dx * 135, y: my + (rand(run) - 0.5) * 16 }], color: 'tesla' });
+    }
+    ev.push({ t: 'shot', x: mx, y: my, from: 'player', weapon: ow.id, ang });
+    if (consumeAmmo && ow.ammo <= 0) startReload(run, ev);
+    return;
   }
 
-  const count = (def.pellets ?? 1) + extraBullets(ow.id, ow.star);
+  // 3. 实体弹丸组（双发手枪 / 跳弹左轮 / 蓄热机炮 / 龙息霰弹 / 冰暴步枪 / 追踪焦土火箭）
+  const bonusAt5 = def.burst ? 0 : extraBullets(ow.id, ow.star);
+  const count = (def.pellets ?? 1) + bonusAt5;
+  const rocketSplitScale = def.aoe && count > 1 ? 0.68 : 1;
   for (let i = 0; i < count; i++) {
-    const a = def.spread ? (rand(run) - 0.5) * 2 * def.spread : i === 0 ? 0 : (i % 2 ? 0.05 : -0.05) * Math.ceil(i / 2);
-    const c = Math.cos(a), s = Math.sin(a);
+    const spreadRad = def.aoe && count > 1 ? (i % 2 ? 0.16 : -0.16)
+      : def.spread ? (rand(run) - 0.5) * 2 * def.spread
+      : i === 0 ? 0 : (i % 2 ? 0.05 : -0.05) * Math.ceil(i / 2);
+    const c = Math.cos(spreadRad), s = Math.sin(spreadRad);
+    const finalDmg = (hotSmg ? dmg * 1.5 : dmg) * rocketSplitScale;
+    const pierceCnt = fullPierce ? 99 : hotSmg ? Math.max(2, def.pierceCount ?? 1) : (def.pierceCount ?? 1);
+    const ricochetLeft = (def.ricochet ?? 0) + (ow.id === 'revolver' && ow.star >= 5 ? 1 : 0);
     run.bullets.push({
-      x: mx, y: my, vx: (dx * c - dy * s) * def.speed, vy: (dx * s + dy * c) * def.speed, dmg,
-      life: Math.ceil((range + 70) / def.speed), from: 'player',
-      pierce: fullPierce || (def.pierceCount ?? 1) > 1,
-      pierceLeft: fullPierce ? 99 : (def.pierceCount ?? 1),
-      crit, bounces: 0, hit: [],
-      aoe: def.aoe, slow: def.slow, kind: def.aoe ? 'rocket' : 'normal',
-      weaponId: ow.id, startX: mx,
+      x: mx, y: my,
+      vx: (dx * c - dy * s) * def.speed,
+      vy: (dx * s + dy * c) * def.speed,
+      dmg: finalDmg,
+      life: Math.ceil((range + 70) / def.speed),
+      from: 'player',
+      pierce: fullPierce || pierceCnt > 1,
+      pierceLeft: pierceCnt,
+      ricochetLeft,
+      crit: crit || hotSmg,
+      bounces: 0,
+      hit: [],
+      aoe: def.aoe,
+      slow: def.slow,
+      stun: ow.id === 'revolver' ? 18 : undefined,
+      burn: hotSmg ? 105 : undefined,
+      homing: def.homing,
+      kind: def.aoe ? 'rocket' : hotSmg ? 'firebolt' : 'normal',
+      weaponId: ow.id,
+      startX: mx,
       closeBoost: ow.id === 'shotgun',
       shatter: ow.id === 'assault',
     });
   }
-  ev.push({ t: 'shot', x: mx, y: my, from: 'player', weapon: ow.id, ang });
-  if (ow.ammo <= 0) startReload(run, ev);
+  ev.push({ t: 'shot', x: mx, y: my, from: 'player', weapon: ow.id, ang, hot: hotSmg });
+  if (consumeAmmo && ow.ammo <= 0) startReload(run, ev);
+}
+
+function fire(run: RunState, target: Zombie | null, ev: GameEvent[]) {
+  const p = run.player, ow = curWeapon(run), def = WEAPONS[ow.id];
+  if (ow.ammo <= 0) { startReload(run, ev); return; }
+  ow.ammo--;
+
+  // 暴风加特林蓄热变速（按住越久射速越快，interval 从 8 步一路缩至 3 步）
+  const baseInt = ow.id === 'smg'
+    ? Math.max(3, Math.round(def.interval * (1 - 0.62 * p.smgHeat)))
+    : def.interval;
+  p.fireCd = Math.max(2, Math.round((baseInt * (has(run, 'pierce') ? 1.2 : 1)) / playerHaste(run)));
+  p.shootT = 10;
+
+  // 猎手双发手枪：一发扳机排队二连点射（★5 时三连射）
+  if (def.burst && def.burst > 1) {
+    p.burstLeft = (def.burst - 1) + (ow.star >= 5 ? 1 : 0);
+    p.burstCd = 4;
+  }
+  launchWeaponShot(run, target, ev, true);
 }
 
 function startReload(run: RunState, ev: GameEvent[]) {
   const p = run.player, ow = curWeapon(run), def = WEAPONS[ow.id];
   if (p.reloadT > 0 || ow.ammo >= magSize(ow.id, ow.star)) return;
-  p.reloadT = Math.max(18, Math.round(def.reload / playerHaste(run)));
+  p.burstLeft = 0; p.burstCd = 0;
+  p.reloadT = Math.max(16, Math.round(def.reload / reloadHaste(run)));
   ev.push({ t: 'reload' });
 }
 
@@ -563,7 +693,7 @@ function throwGrenade(run: RunState, aim: { dx: number; dy: number } | null | un
   p.facing = traj.dir as 1 | -1;
   run.grenades.push({
     x: traj.sx, y: traj.sy, vx: traj.vx, vy: traj.vy,
-    dmg: 95 + run.day * 18, r: 66,
+    dmg: 105 + run.day * 22, r: 70,
   });
   ev.push({ t: 'grenadeThrow' });
 }
@@ -614,13 +744,9 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
     ev.push({ t: 'jump', onRoof });
   }
 
-  // 水平移动：按角色当前高度判定一楼实体砖墙 / 中层挑台边界，绝不穿模进屋体内部
   let minX = HOUSE_WALL_X;
-  if (p.y <= ROOF_Y + 4) {
-    minX = PLAYER_MIN_X;
-  } else if (p.y <= PORCH_Y + 4) {
-    minX = PORCH_MIN_X;
-  }
+  if (p.y <= ROOF_Y + 4) minX = PLAYER_MIN_X;
+  else if (p.y <= PORCH_Y + 4) minX = PORCH_MIN_X;
   p.x = Math.max(minX, Math.min(PLAYER_MAX_X, p.x + p.vx));
 
   const nowInRoof = p.x >= ROOF_MIN_X && p.x <= ROOF_MAX_X;
@@ -646,13 +772,20 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
     p.vy = 0;
   }
 
+  // 堡垒 2 级+ 站在屋顶享要塞缓慢庇护回血
+  if (run.phase === 'fight' && run.fort.level >= 2 && isOnRoof(run)) {
+    const interval = run.fort.level >= 3 ? 110 : 170;
+    if (run.tick % interval === 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + 1);
+  }
+
   if (input.interact && nearbyExterior(run) === 'door' && run.phase === 'camp') {
     command(run, { t: 'enterHouse' });
     return;
   }
 
   if (input.swap && p.weapons.length > 1) {
-    p.cur = (p.cur + 1) % p.weapons.length; p.reloadT = 0; p.fireCd = 8;
+    p.cur = (p.cur + 1) % p.weapons.length;
+    p.reloadT = 0; p.fireCd = 8; p.burstLeft = 0; p.burstCd = 0; p.smgHeat = 0;
     ev.push({ t: 'swap', weapon: curWeapon(run).id });
   }
   if (input.reload) startReload(run, ev);
@@ -661,9 +794,20 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
   const target = pickTarget(run);
   run.targetId = target ? target.id : null;
   const wantFire = run.autoFire || input.fire;
+  const holdingSmg = curWeapon(run).id === 'smg' && wantFire && (target || input.fire) && run.phase !== 'camp' && p.reloadT === 0 && p.dodgeT === 0;
+  const heatUp = curWeapon(run).star >= 5 ? 0.022 : 0.016;
+  p.smgHeat = holdingSmg ? Math.min(1, p.smgHeat + heatUp) : Math.max(0, p.smgHeat - 0.025);
   if (wantFire && target) p.facing = target.x >= p.x ? 1 : -1;
   else if (move !== 0 && p.dodgeT === 0) p.facing = move > 0 ? 1 : -1;
-  if (wantFire && (target || input.fire) && run.phase !== 'camp' && p.fireCd === 0 && p.reloadT === 0 && p.dodgeT === 0) {
+
+  // 处理二连点射待发队列（手枪二连）
+  if (p.burstLeft > 0) {
+    if (--p.burstCd <= 0) {
+      p.burstLeft--;
+      p.burstCd = 4;
+      launchWeaponShot(run, target, ev, false);
+    }
+  } else if (wantFire && (target || input.fire) && run.phase !== 'camp' && p.fireCd === 0 && p.reloadT === 0 && p.dodgeT === 0) {
     fire(run, target, ev);
   }
 
@@ -681,24 +825,29 @@ function stepZombies(run: RunState, ev: GameEvent[]) {
   for (const z of run.zombies) {
     const def = ZOMBIES[z.kind];
     if (z.atkCd > 0) z.atkCd--;
-    if (z.burnT > 0) { z.burnT--; if (z.burnT % 30 === 0) damageZombie(run, z, 5, ev, { byPlayer: false, burn: true }); }
+    if (z.burnT > 0) { z.burnT--; if (z.burnT % 30 === 0) damageZombie(run, z, 6 + Math.floor(run.day * 0.6), ev, { byPlayer: false, burn: true }); }
     if (z.hp <= 0) continue;
     if (z.slowT > 0) z.slowT--;
+    if (z.freezeT > 0) z.freezeT--;
+    if (z.stunT > 0) { z.stunT--; continue; }
     if (z.kb > 0) { z.x += z.kb; z.kb *= 0.7; if (z.kb < 0.2) z.kb = 0; continue; }
 
-    // 远程僵尸（燃烧食尸鬼、地狱兽、深渊魔王）会在中距离抛射火球砸路障或打房顶主角
-    if (def.ranged && z.x <= WALL_X + 210 && z.x >= WALL_X + 36) {
+    // 远程僵尸（提灯怨灵、暴君、深渊魔王）进入可交火射程后停止前压，抛射高弧火球打击主角或前线路障
+    const rangedStopX = def.boss ? WALL_X + 245 : WALL_X + 215;
+    if (def.ranged && z.x <= rangedStopX && z.x >= WALL_X + 24) {
       if (z.atkCd === 0) {
-        z.atkCd = Math.round(def.attackEvery * 1.4);
-        const aimRoof = !run.inside && isOnRoof(run) && Math.abs(p.x - z.x) <= 440 && rand(run) < 0.6;
-        const tx = aimRoof ? p.x : (run.wall.hp > 0 ? WALL_X : HOME_X);
-        const ty = aimRoof ? (GROUND_Y + p.y - 22) : (GROUND_Y - 22);
-        const sx = z.x - 10, sy = BODY_Y - 8;
+        z.atkCd = Math.round(def.attackEvery * (def.boss ? 1.2 : 1.38));
+        const onRoofOrPorch = isOnRoof(run) || isOnPorch(run);
+        const aimPlayer = !run.inside && Math.abs(p.x - z.x) <= 520 && (rand(run) < (onRoofOrPorch ? 0.56 : 0.72));
+        const tx = aimPlayer ? p.x : (run.wall.hp > 0 ? WALL_X : HOME_X);
+        const ty = aimPlayer ? (GROUND_Y + p.y - 24) : (GROUND_Y - 14);
+        const sx = z.x - 10, sy = BODY_Y - 10;
         const dx = tx - sx, dist = Math.abs(dx) || 1;
-        const speed = def.boss ? 4.4 : 3.6;
-        const frames = Math.max(18, dist / speed);
-        const vy = (ty - sy) / frames - 0.5 * 0.08 * frames;
-        run.enemyProjs.push({ x: sx, y: sy, vx: Math.sign(dx) * speed, vy, dmg: Math.round(def.damage * 0.85), life: 150 });
+        const speed = def.boss ? 4.4 : 3.8;
+        const frames = Math.max(aimPlayer ? 28 : 16, dist / speed);
+        const g = 0.11;
+        const vy = (ty - sy) / frames - 0.5 * g * (frames - 1);
+        run.enemyProjs.push({ x: sx, y: sy, vx: Math.sign(dx) * speed, vy, dmg: Math.round(def.damage * 0.85), life: 165 });
         continue;
       }
     }
@@ -710,7 +859,7 @@ function stepZombies(run: RunState, ev: GameEvent[]) {
       if (z.atkCd > 0) continue;
       z.atkCd = def.attackEvery;
       if (nearPlayer) {
-        applyPlayerDamage(run, def.damage, ev);
+        applyPlayerDamage(run, def.damage, ev, false);
       } else if (atWall) {
         run.wall.hp = Math.max(0, run.wall.hp - def.damage);
         ev.push({ t: 'wallHit', reflect: reflectDmg > 0 });
@@ -722,8 +871,27 @@ function stepZombies(run: RunState, ev: GameEvent[]) {
       }
       continue;
     }
-    z.x -= def.speed * (z.slowT > 0 ? 0.55 : 1);
+    const moveFactor = z.freezeT > 0 ? 0.16 : z.slowT > 0 ? 0.52 : 1;
+    z.x -= def.speed * moveFactor;
   }
+}
+
+function stepFires(run: RunState, ev: GameEvent[]) {
+  const out: typeof run.fires = [];
+  for (const f of run.fires) {
+    f.t--;
+    if (f.t <= 0) continue;
+    if (f.t % 20 === 0) {
+      for (const z of run.zombies) {
+        if (z.hp > 0 && Math.abs(z.x - f.x) <= f.r) {
+          damageZombie(run, z, f.dmg, ev, { byPlayer: true, burn: true, weaponId: 'rocket' });
+          z.burnT = Math.max(z.burnT, 90);
+        }
+      }
+    }
+    out.push(f);
+  }
+  run.fires = out;
 }
 
 function stepTurrets(run: RunState, ev: GameEvent[]) {
@@ -738,7 +906,7 @@ function stepTurrets(run: RunState, ev: GameEvent[]) {
     const def = TURRETS[slot.type], lv = def.levels[slot.level - 1];
     if (slot.cd > 0) { slot.cd--; continue; }
     const pos = turretWorldPos(i);
-    const range = def.range + (pos.roof ? 80 : 0);
+    const range = def.range + (pos.roof ? 55 : 0);
     let best: Zombie | null = null, bd = range;
     for (const z of run.zombies) {
       const d = Math.abs(z.x - pos.x);
@@ -752,7 +920,7 @@ function stepTurrets(run: RunState, ev: GameEvent[]) {
     slot.aim = Math.atan2(dy, dx);
 
     if (slot.type === 'tesla') {
-      fireLightning(run, pos.x, pos.muzzleY, best, dmg, lv.chain ?? 3, ev, { byPlayer: false, color: 'tesla' });
+      fireLightning(run, pos.x, pos.muzzleY, best, dmg, lv.chain ?? 3, ev, { byPlayer: false, color: 'tesla', stun: 12 });
     } else if (slot.type === 'frost') {
       run.bullets.push({
         x: pos.x + 10, y: pos.muzzleY, vx: (dx / len) * 7.5, vy: (dy / len) * 7.5,
@@ -778,14 +946,14 @@ function stepTurrets(run: RunState, ev: GameEvent[]) {
   if (run.fort.level >= 2) {
     if (run.fort.cd > 0) run.fort.cd--;
     else {
-      let best: Zombie | null = null, bd = 410;
+      let best: Zombie | null = null, bd = 385;
       for (const z of run.zombies) {
         const d = Math.abs(z.x - FORT_GUN_X);
         if (z.x > FORT_GUN_X && d <= bd) { bd = d; best = z; }
       }
       if (best) {
         const lv3 = run.fort.level >= 3;
-        run.fort.cd = Math.round((lv3 ? 52 : 88) / (1 + run.buff.haste));
+        run.fort.cd = Math.round((lv3 ? 56 : 92) / (1 + run.buff.haste));
         const dx = best.x - FORT_GUN_X, dy = BODY_Y - FORT_GUN_Y, len = Math.hypot(dx, dy) || 1;
         run.fort.aim = Math.atan2(dy, dx);
         const shots = lv3 ? 2 : 1;
@@ -795,7 +963,7 @@ function stepTurrets(run: RunState, ev: GameEvent[]) {
           const vx = ((dx / len) * ca - (dy / len) * sa) * 10;
           const vy = ((dx / len) * sa + (dy / len) * ca) * 10;
           run.bullets.push({
-            x: FORT_GUN_X + 10, y: FORT_GUN_Y, vx, vy, dmg: lv3 ? 58 : 42, life: 54,
+            x: FORT_GUN_X + 10, y: FORT_GUN_Y, vx, vy, dmg: lv3 ? 54 : 38, life: 54,
             from: 'fort', pierce: false, crit: false, bounces: 0, hit: [], kind: 'normal',
           });
         }
@@ -809,6 +977,19 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
   const out: Bullet[] = [];
   const spawned: Bullet[] = [];
   for (const b of run.bullets) {
+    // 蜂巢追踪火箭在半空柔和转向锁定前方尸群
+    if (b.homing && b.life > 2) {
+      const steerTarget = run.zombies.filter((z) => z.hp > 0 && !b.hit.includes(z.id) && Math.abs(z.x - b.x) <= 220)
+        .sort((a, c) => Math.abs(a.x - b.x) - Math.abs(c.x - b.x))[0];
+      if (steerTarget) {
+        const sp = Math.hypot(b.vx, b.vy) || 8.8;
+        const tx = steerTarget.x - b.x, ty = BODY_Y - b.y, len = Math.hypot(tx, ty) || 1;
+        const dvx = (tx / len) * sp, dvy = (ty / len) * sp;
+        b.vx += (dvx - b.vx) * 0.14;
+        b.vy += (dvy - b.vy) * 0.14;
+      }
+    }
+
     b.x += b.vx; b.y += b.vy; b.life--;
     let alive = b.life > 0 && b.y < GROUND_Y + 4;
     if (alive) {
@@ -819,6 +1000,7 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
         if (Math.abs(b.x - z.x) > hitW || b.y < hitTop || b.y > GROUND_Y) continue;
         b.hit.push(z.id);
         const byPlayer = b.from === 'player';
+
         if (b.kind === 'frost' && b.aoe) {
           ev.push({ t: 'frost', x: b.x, y: Math.min(BODY_Y, b.y), r: b.aoe });
           for (const o of run.zombies) if (o.hp > 0 && Math.abs(o.x - b.x) <= b.aoe) damageZombie(run, o, b.dmg, ev, { byPlayer: false, slow: b.slow ?? 150 });
@@ -826,23 +1008,34 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
           break;
         }
         if ((b.kind === 'rocket' || b.kind === 'cannon') && b.aoe) {
-          explodeAt(run, b.x, Math.min(BODY_Y, b.y), b.aoe, b.dmg, ev, byPlayer, b.kind === 'rocket');
+          explodeAt(run, b.x, Math.min(BODY_Y, b.y), b.aoe, b.dmg, ev, byPlayer, b.kind === 'rocket', b.kind === 'rocket');
           alive = false;
           break;
         }
-        const wasSlowed = z.slowT > 0;
-        const closeHit = b.closeBoost && b.startX !== undefined && Math.abs(z.x - b.startX) <= 135;
-        const hitDmg = b.dmg * (closeHit ? 1.4 : 1);
-        const kb = closeHit ? 4.4 : b.weaponId === 'revolver' ? 3.6 : byPlayer ? 1.6 : 0.6;
-        const dir: 1 | -1 = b.vx >= 0 ? 1 : -1;
-        damageZombie(run, z, hitDmg, ev, { byPlayer, kb, crit: b.crit || closeHit, slow: b.slow, weaponId: b.weaponId, dir, heavy: !!closeHit || b.weaponId === 'revolver' || b.weaponId === 'rifle' });
 
-        // 极地急冻步枪特色：命中已冰冻减速的目标触发碎冰范围溅射
+        const wasSlowed = z.slowT > 0 || z.freezeT > 0;
+        const closeHit = b.closeBoost && b.startX !== undefined && Math.abs(z.x - b.startX) <= 205;
+        const hitDmg = b.dmg * (closeHit ? 1.5 : 1);
+        const kb = closeHit ? 5.6 : b.weaponId === 'revolver' ? 4.6 : byPlayer ? 1.6 : 0.6;
+        const dir: 1 | -1 = b.vx >= 0 ? 1 : -1;
+        damageZombie(run, z, hitDmg, ev, {
+          byPlayer, kb, crit: b.crit || closeHit, slow: b.slow,
+          freeze: byPlayer && b.shatter && wasSlowed ? 65 : undefined,
+          stun: b.stun, burn: !!(b.burn || closeHit), weaponId: b.weaponId, dir,
+          heavy: !!closeHit || b.weaponId === 'revolver' || b.weaponId === 'rifle' || b.kind === 'firebolt',
+        });
+
+        if (b.burn || closeHit) {
+          if (z.hp > 0) z.burnT = Math.max(z.burnT, b.burn ?? 120);
+        }
+
+        // 极地急冻步枪特色：命中已减速目标深冻定身并引爆碎冰溅射
         if (byPlayer && b.shatter && wasSlowed) {
-          ev.push({ t: 'frost', x: z.x, y: BODY_Y, r: 44 });
+          const shatterR = curWeapon(run).id === 'assault' && curWeapon(run).star >= 5 ? 58 : 48;
+          ev.push({ t: 'frost', x: z.x, y: BODY_Y, r: shatterR });
           for (const o of run.zombies) {
-            if (o.id !== z.id && o.hp > 0 && Math.abs(o.x - z.x) <= 44) {
-              damageZombie(run, o, b.dmg * 0.48, ev, { byPlayer: true, slow: 90, weaponId: b.weaponId });
+            if (o.id !== z.id && o.hp > 0 && Math.abs(o.x - z.x) <= shatterR) {
+              damageZombie(run, o, b.dmg * 0.55, ev, { byPlayer: true, slow: 115, freeze: 36, weaponId: b.weaponId });
             }
           }
         }
@@ -852,14 +1045,29 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
           const next = run.zombies.find((o) => o.id !== z.id && o.hp > 0 && Math.abs(o.x - z.x) <= 130);
           if (next) fireLightning(run, z.x, BODY_Y, next, b.dmg * 0.55, 2, ev, { byPlayer: true, color: 'shock' });
         }
-        if (byPlayer && has(run, 'ricochet') && b.bounces < 3 && rand(run) < 0.5) {
-          const next = run.zombies.filter((o) => o.hp > 0 && !b.hit.includes(o.id) && Math.abs(o.x - z.x) <= 130)
+
+        // 重锤左轮先天跳弹追击 + 弹射天赋叠加（仅在消耗本次弹跳次数且防父弹同体重复命中时生成跳弹）
+        if (byPlayer && ((b.ricochetLeft ?? 0) > 0 || (has(run, 'ricochet') && b.bounces < 3 && rand(run) < 0.55))) {
+          const next = run.zombies.filter((o) => o.hp > 0 && !b.hit.includes(o.id) && Math.abs(o.x - z.x) <= 155)
             .sort((a, c) => Math.abs(a.x - z.x) - Math.abs(c.x - z.x))[0];
           if (next) {
             const sp = Math.hypot(b.vx, b.vy), nx = next.x - z.x, ny = BODY_Y - b.y, nlen = Math.hypot(nx, ny) || 1;
-            spawned.push({ ...b, x: z.x, y: BODY_Y, vx: (nx / nlen) * sp, vy: (ny / nlen) * sp, dmg: b.dmg * 0.72, life: 22, bounces: b.bounces + 1, hit: [...b.hit] });
+            const useWeaponBounce = (b.ricochetLeft ?? 0) > 0;
+            spawned.push({
+              ...b,
+              x: z.x, y: BODY_Y,
+              vx: (nx / nlen) * sp, vy: (ny / nlen) * sp,
+              dmg: b.dmg * 0.78, life: 24,
+              bounces: b.bounces + 1,
+              ricochetLeft: 0,
+              pierce: false, pierceLeft: 1,
+              hit: [...b.hit],
+            });
+            b.hit.push(next.id);
+            if (useWeaponBounce) b.ricochetLeft = Math.max(0, (b.ricochetLeft ?? 0) - 1);
           }
         }
+
         if (b.pierceLeft !== undefined) {
           b.pierceLeft--;
           if (b.pierceLeft <= 0) { alive = false; break; }
@@ -869,9 +1077,9 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
         }
       }
     }
-    // 火箭弹/重炮落到地面直接炸
+    // 火箭弹/重炮落到地面直接爆开并铺设焦土火海
     if (!alive && b.life > 0 && b.y >= GROUND_Y + 2 && (b.kind === 'rocket' || b.kind === 'cannon') && b.aoe && b.hit.length === 0) {
-      explodeAt(run, b.x, GROUND_Y - 12, b.aoe, b.dmg, ev, b.from === 'player', b.kind === 'rocket');
+      explodeAt(run, b.x, GROUND_Y - 12, b.aoe, b.dmg, ev, b.from === 'player', b.kind === 'rocket', b.kind === 'rocket');
     }
     if (alive) out.push(b);
   }
@@ -884,7 +1092,7 @@ function stepGrenades(run: RunState, ev: GameEvent[]) {
     g.x += g.vx; g.y += g.vy; g.vy += GRENADE_G;
     const hitZ = run.zombies.some((z) => z.hp > 0 && Math.abs(g.x - z.x) <= 18 && g.y >= GROUND_Y - 46);
     if (hitZ || g.y >= GROUND_Y - 4) {
-      explodeAt(run, g.x, Math.min(GROUND_Y - 14, g.y), g.r, g.dmg, ev, true, true);
+      explodeAt(run, g.x, Math.min(GROUND_Y - 14, g.y), g.r, g.dmg, ev, true, true, false);
     } else if (g.x >= 0 && g.x <= SPAWN_X) {
       out.push(g);
     }
@@ -895,19 +1103,19 @@ function stepGrenades(run: RunState, ev: GameEvent[]) {
 function stepEnemyProjs(run: RunState, ev: GameEvent[]) {
   const p = run.player, out: typeof run.enemyProjs = [];
   for (const ep of run.enemyProjs) {
-    ep.x += ep.vx; ep.y += ep.vy; ep.vy += 0.08; ep.life--;
+    ep.x += ep.vx; ep.y += ep.vy; ep.vy += 0.11; ep.life--;
     if (ep.life <= 0 || ep.y >= GROUND_Y + 2 || ep.x < 0) continue;
-    if (!run.inside && Math.abs(ep.x - p.x) <= 15 && ep.y >= GROUND_Y + p.y - 40 && ep.y <= GROUND_Y + p.y + 4) {
-      applyPlayerDamage(run, ep.dmg, ev);
+    if (!run.inside && Math.abs(ep.x - p.x) <= 16 && ep.y >= GROUND_Y + p.y - 42 && ep.y <= GROUND_Y + p.y + 4) {
+      applyPlayerDamage(run, ep.dmg, ev, true);
       continue;
     }
-    if (run.wall.hp > 0 && Math.abs(ep.x - WALL_X) <= 16 && ep.y >= GROUND_Y - 46) {
-      run.wall.hp = Math.max(0, run.wall.hp - Math.round(ep.dmg * 0.7));
+    if (run.wall.hp > 0 && Math.abs(ep.x - WALL_X) <= 16 && ep.y >= GROUND_Y - 36) {
+      run.wall.hp = Math.max(0, run.wall.hp - Math.round(ep.dmg * 0.75));
       ev.push({ t: 'wallHit' });
       continue;
     }
-    if (Math.abs(ep.x - HOME_X) <= 16 && ep.y >= GROUND_Y - 90) {
-      run.home.hp = Math.max(0, run.home.hp - Math.round(ep.dmg * 0.7));
+    if (run.wall.hp <= 0 && Math.abs(ep.x - HOME_X) <= 16 && ep.y >= GROUND_Y - 90) {
+      run.home.hp = Math.max(0, run.home.hp - Math.round(ep.dmg * 0.75));
       ev.push({ t: 'homeHit' });
       continue;
     }
@@ -931,18 +1139,20 @@ export function step(run: RunState, input: Input): GameEvent[] {
 
   if (run.phase === 'fight') {
     if (run.spawn.left > 0 && --run.spawn.timer <= 0) {
-      const group = Math.min(run.spawn.left, 1 + Math.floor(rand(run) * (1.2 + run.day * 0.55)));
+      const groupCap = run.day === 1 ? 1.15 : 1.7 + run.day * 0.42;
+      const group = Math.min(run.spawn.left, 1 + Math.floor(rand(run) * groupCap));
       for (let i = 0; i < group; i++) { spawnZombie(run); run.spawn.left--; }
       if (run.spawn.bossKind && !run.spawn.bossSpawned && run.spawn.left <= Math.floor(run.spawn.total / 2)) {
         run.spawn.bossSpawned = true;
         spawnZombie(run, run.spawn.bossKind);
         ev.push({ t: 'bossAppear', kind: run.spawn.bossKind });
       }
-      run.spawn.timer = Math.round(Math.max(16, (38 - run.day * 1.4)) * (0.7 + group * 0.7)) + Math.floor(rand(run) * 18);
+      run.spawn.timer = Math.round(Math.max(12, 28 - run.day * 0.9) * (0.55 + group * 0.45)) + Math.floor(rand(run) * 10);
     }
   }
 
   stepZombies(run, ev);
+  stepFires(run, ev);
   stepTurrets(run, ev);
   stepBullets(run, ev);
   stepGrenades(run, ev);
@@ -960,7 +1170,6 @@ export function step(run: RunState, input: Input): GameEvent[] {
     run.phase = 'clear'; run.phaseT = 0;
     ev.push({ t: 'dayClear', day: run.day });
   } else if (run.phase === 'clear' && run.phaseT >= 110 && (run.crates.length === 0 || run.phaseT >= 220)) {
-    // 若玩家一直在房顶防守，过一会帮他把地面残留的箱子自动收回，不丢掉落
     while (run.crates.length > 0) {
       const c = run.crates.shift()!;
       collectCrate(run, c.weapon, ev);
@@ -1000,7 +1209,6 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
         run.player.armor = Math.min(run.player.maxArmor, run.player.armor + 25);
       }
 
-      // 关键夜晚（第 2/4/6/8 天清场）战友慕名加入据点，立即赋予永久增益并触发入伙剧情
       const join = COMPANION_JOIN_STORIES[run.day];
       if (join && !run.story.allies.includes(join.ally)) {
         run.story.allies.push(join.ally);
@@ -1018,7 +1226,6 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
         ev.push({ t: 'dinerStory', eventKey: 'firstOpen' });
       }
 
-      // 晚上自动回到酒馆屋里招待食客、做饭、逛工坊
       run.inside = true; run.player.x = IN_STATIONS.kitchen + 40; run.player.y = 0; run.player.vy = 0;
       rollShopOffers(run);
       rollDinerGuests(run);
@@ -1132,7 +1339,7 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       const fresh = { id: cmd.weapon, star: 1, ammo: magSize(cmd.weapon, 1) };
       if (run.player.weapons.length >= MAX_CARRY) { run.player.weapons[run.player.cur] = fresh; run.coins += 40; }
       else { run.player.weapons.push(fresh); run.player.cur = run.player.weapons.length - 1; }
-      run.player.reloadT = 0;
+      run.player.reloadT = 0; run.player.burstLeft = 0; run.player.smgHeat = 0;
       ev.push({ t: 'shop', item: def.name });
       return ev;
     }
@@ -1169,6 +1376,7 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       if (list.length <= 1 || cmd.index < 0 || cmd.index >= list.length) return null;
       const [removed] = list.splice(cmd.index, 1);
       run.player.cur = Math.min(run.player.cur, list.length - 1);
+      run.player.burstLeft = 0; run.player.smgHeat = 0;
       run.coins += 45 + removed.star * 20;
       return ev;
     }

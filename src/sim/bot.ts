@@ -52,24 +52,28 @@ function manageCamp(run: RunState) {
   if (!run.meal && run.meat >= 1) command(run, { t: 'pickMeal', id: 'spicy_skewer', quality: 'good' });
   if (run.meat > 0) command(run, { t: 'cookSell', count: run.meat });
 
-  // 2. 优先修补并升级壁垒与大屋，随后补齐武器与 4 座金币炮塔防线
+  // 2. 优先修补防线；工程师优先建好冰霜+电弧炮塔发挥职业特长，再逐步升级墙壁/堡垒与主力武器
   command(run, { t: 'repairWall' });
   command(run, { t: 'repairFort' });
-  if (run.day >= 2) command(run, { t: 'upgradeWall' });
-  if (run.day >= 4) command(run, { t: 'upgradeFort' });
+  if (run.day >= 2 && run.wall.level < 2) command(run, { t: 'upgradeWall' });
+
+  const order: [number, TurretType][] = [[0, 'frost'], [2, 'tesla'], [3, 'cannon'], [1, 'mg']];
+  if (run.cls === 'engineer') {
+    for (const [slot, kind] of order) if (!run.turrets[slot].type) command(run, { t: 'buildTurret', slot, kind });
+  }
 
   for (const id of run.shop) {
     if (!run.player.weapons.some((w) => w.id === id) && WEAPONS[id].price <= run.coins) {
       command(run, { t: 'buyWeapon', weapon: id });
     }
   }
-  const ranked = [...run.player.weapons].sort((a, b) => WEAPONS[b.id].price - WEAPONS[a.id].price);
-  for (const w of ranked) command(run, { t: 'buyStar', weapon: w.id });
-
-  const order: [number, TurretType][] = [[0, 'frost'], [2, 'tesla'], [3, 'cannon'], [1, 'mg']];
+  if (run.day >= 3) command(run, { t: 'upgradeWall' });
+  if (run.day >= 4) command(run, { t: 'upgradeFort' });
   for (const [slot, kind] of order) {
     if (!run.turrets[slot].type) command(run, { t: 'buildTurret', slot, kind });
   }
+  const ranked = [...run.player.weapons].sort((a, b) => WEAPONS[b.id].price - WEAPONS[a.id].price);
+  for (const w of ranked) command(run, { t: 'buyStar', weapon: w.id });
   for (let i = 0; i < run.turrets.length; i++) command(run, { t: 'upgradeTurret', slot: i });
 
   if (run.player.grenades < 2) command(run, { t: 'buySupply', item: 'grenade' });

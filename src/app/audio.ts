@@ -361,33 +361,39 @@ class SoundEngine {
         }
         const w = e.weapon ?? 'pistol';
         if (w === 'tesla') {
-          this.tone(980, 0.11, 'sawtooth', 0.18, { slide: 260 });
-          this.noise(0.055, 0.13, 3600, { highpass: true });
+          this.tone(1040, 0.11, 'sawtooth', 0.18, { slide: 280 });
+          this.noise(0.06, 0.14, 3800, { highpass: true });
         } else if (w === 'rocket') {
-          this.tone(150, 0.16, 'sine', 0.24, { slide: 42 });
-          this.tone(240, 0.2, 'sawtooth', 0.22, { slide: 78, cutoff: 950 });
-          this.noise(0.16, 0.24, 1150);
+          this.tone(145, 0.18, 'sine', 0.25, { slide: 40 });
+          this.tone(230, 0.22, 'sawtooth', 0.22, { slide: 72, cutoff: 950 });
+          this.noise(0.18, 0.25, 1150);
         } else if (w === 'shotgun') {
-          this.tone(135, 0.13, 'sine', 0.28, { slide: 36 });
-          this.tone(185, 0.12, 'square', 0.22, { slide: 54, cutoff: 920 });
-          this.noise(0.14, 0.3, 1600);
-          this.noise(0.04, 0.12, 3200, { highpass: true, delay: 0.08 });
+          this.tone(130, 0.14, 'sine', 0.28, { slide: 34 });
+          this.tone(185, 0.13, 'square', 0.22, { slide: 52, cutoff: 920 });
+          this.noise(0.15, 0.3, 1550);
+          this.noise(0.05, 0.14, 3100, { highpass: true, delay: 0.07 });
         } else if (w === 'rifle') {
-          this.tone(1360, 0.12, 'sawtooth', 0.2, { slide: 150 });
-          this.tone(175, 0.15, 'sine', 0.27, { slide: 42 });
-          this.noise(0.1, 0.26, 2600);
-        } else if (w === 'smg' || w === 'assault') {
-          this.tone(145, 0.04, 'sine', 0.14, { slide: 48 });
-          this.tone(390, 0.048, 'square', 0.12, { slide: 135, cutoff: 1650 });
-          this.noise(0.036, 0.11, 2200);
+          this.tone(1420, 0.13, 'sawtooth', 0.21, { slide: 165 });
+          this.tone(180, 0.16, 'sine', 0.28, { slide: 42 });
+          this.noise(0.11, 0.26, 2800);
+        } else if (w === 'smg') {
+          const baseF = e.hot ? 490 : 370;
+          this.tone(e.hot ? 165 : 140, 0.042, 'sine', e.hot ? 0.17 : 0.13, { slide: 50 });
+          this.tone(baseF, 0.052, e.hot ? 'sawtooth' : 'square', e.hot ? 0.15 : 0.11, { slide: e.hot ? 175 : 130, cutoff: e.hot ? 2400 : 1550 });
+          this.noise(0.036, e.hot ? 0.14 : 0.1, e.hot ? 2900 : 2100);
+        } else if (w === 'assault') {
+          this.tone(155, 0.045, 'sine', 0.14, { slide: 56 });
+          this.tone(680, 0.058, 'triangle', 0.14, { slide: 320 });
+          this.noise(0.038, 0.11, 3200, { highpass: true });
         } else if (w === 'revolver') {
-          this.tone(140, 0.1, 'sine', 0.25, { slide: 42 });
-          this.tone(265, 0.1, 'square', 0.22, { slide: 72, cutoff: 1350 });
-          this.noise(0.09, 0.23, 1950);
+          this.tone(132, 0.12, 'sine', 0.26, { slide: 40 });
+          this.tone(260, 0.11, 'square', 0.22, { slide: 70, cutoff: 1400 });
+          this.tone(1080, 0.08, 'triangle', 0.11, { delay: 0.03, slide: 1520 });
+          this.noise(0.095, 0.24, 1950);
         } else {
-          this.tone(135, 0.06, 'sine', 0.18, { slide: 46 });
-          this.tone(340, 0.06, 'square', 0.15, { slide: 98, cutoff: 1600 });
-          this.noise(0.052, 0.15, 2000);
+          this.tone(155, 0.052, 'sine', 0.17, { slide: 54 });
+          this.tone(420, 0.052, 'triangle', 0.16, { slide: 120 });
+          this.noise(0.042, 0.14, 2400);
         }
         break;
       }
@@ -396,7 +402,12 @@ class SoundEngine {
         this.lastHit = now;
         this.tone(e.heavy || e.crit ? 148 : 172, 0.052, 'sine', e.crit ? 0.22 : 0.14, { slide: 44 });
         this.noise(0.036, e.crit ? 0.14 : 0.085, e.crit ? 2200 : 1250);
-        if (e.crit) {
+        if (e.overload) {
+          this.tone(1260, 0.1, 'sawtooth', 0.15, { slide: 1780, cutoff: 2600 });
+          this.noise(0.07, 0.13, 3400, { highpass: true });
+        } else if (e.freeze) {
+          this.tone(1480, 0.075, 'sine', 0.12, { slide: 860 });
+        } else if (e.crit) {
           this.tone(1180, 0.085, 'triangle', 0.16, { slide: 1640 });
           this.tone(680, 0.06, 'square', 0.075, { slide: 920, cutoff: 2000 });
         }
@@ -426,7 +437,8 @@ class SoundEngine {
         break;
       }
       case 'hurt':
-        this.tone(145, 0.18, 'sawtooth', 0.25, { slide: 58, cutoff: 650 });
+        this.tone(145, 0.18, 'sawtooth', e.cover ? 0.18 : 0.25, { slide: 58, cutoff: 650 });
+        if (e.cover) this.tone(480, 0.08, 'triangle', 0.13, { slide: 260 });
         break;
       case 'jump':
         this.tone(240, 0.085, 'triangle', 0.13, { slide: 540 });

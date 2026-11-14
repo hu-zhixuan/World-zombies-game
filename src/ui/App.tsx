@@ -12,7 +12,7 @@ import {
   getFansRank, getRepTier, type DishQuality, type RestStoryKey,
 } from '../content/story';
 import {
-  MAX_CARRY, dayRemaining, hasAlly, meatPrice, turretBuildCost, turretRefundCoins, turretUpgradeCost,
+  MAX_CARRY, dayRemaining, hasAlly, houseBuff, meatPrice, turretBuildCost, turretRefundCoins, turretUpgradeCost,
 } from '../sim/sim';
 import { TURRET_SLOTS, type GameEvent } from '../sim/types';
 import { CampDock, InteractHint, Keys, Pad, WeaponChip } from './controls';
@@ -58,6 +58,23 @@ function Hud() {
         <button class="btn-icon" id="btn-pause" onClick={() => game.open('pause')}>暂停</button>
       </div>
     </header>
+  );
+}
+
+function HouseBadge() {
+  const run = game.run;
+  if (run.inside) return null;
+  const hb = houseBuff(run);
+  const text = hb.zone === 'roof'
+    ? `${hb.name} · 伤+${Math.round((hb.dmgMul - 1) * 100)}% 程+${Math.round(hb.rangeBonus * 100)}% 暴+${Math.round(hb.critBonus * 100)}% 掩体-${Math.round(hb.rangedCover * 100)}%`
+    : hb.zone === 'porch'
+      ? `${hb.name} · 伤+12% 程+10% 掩体-20%`
+      : `${hb.name} · 跃上酒馆屋顶获高地强效增益`;
+  return (
+    <div class="house-badge" id="hud-house" data-zone={hb.zone}>
+      <Icon k="ic_rooftop" />
+      <span>{text}</span>
+    </div>
   );
 }
 
@@ -328,7 +345,7 @@ function KitchenPanel() {
         <>
           <div class="diner-ribbon">
             <span><b>{fansRank.cur.grade}级·{fansRank.cur.name}</b> ({run.diner.fans}粉 · {repTier.name})</span>
-            <em class="ribbon-trend">热搜「{run.diner.trendTag}」+35%金 · ×2粉</em>
+            <em class="ribbon-trend">今夜热门「{run.diner.trendTag}」+35%金 · ×2粉</em>
             <small class={run.meal ? 'meal-set' : ''}>{run.meal ? `明日特餐：${MEALS[run.meal].name}` : '未留明日特餐'}</small>
           </div>
 
@@ -650,7 +667,7 @@ export function App() {
 
   return (
     <>
-      {panel !== 'title' && panel !== 'class' && <Hud />}
+      {panel !== 'title' && panel !== 'class' && <><Hud />{panel === null && <HouseBadge />}</>}
       {panel === null && (
         <>
           <Pad />

@@ -4,7 +4,7 @@ import { game } from '../app/game';
 import { ASSETS } from '../assets';
 import { MEALS, WEAPONS, ZOMBIES } from '../content/data';
 import { ALLIES } from '../content/story';
-import { BODY_Y, FORT_GUN_X, computeGrenadeThrow, curWeapon, nearbyStation, turretWorldPos } from '../sim/sim';
+import { BODY_Y, FORT_GUN_X, computeGrenadeThrow, curWeapon, houseBuff, nearbyStation, turretWorldPos } from '../sim/sim';
 import {
   DOOR_X, GROUND_Y, IN_STATIONS, LADDER_X, PORCH_MAX_X, PORCH_MIN_X, PORCH_Y,
   ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, TURRET_SLOTS, VIEW_H, WALL_X, WORLD_W, type GameEvent,
@@ -28,7 +28,7 @@ const WEAPON_GRIP: Record<string, { ox: number; oy: number; reach: number; gyOff
   rocket:   { ox: 0.32, oy: 0.56, reach: 9.5,  gyOff: 0.5, muzzle: 13, scale: 1.15, kick: 0.5,  recoil: 8.4, shake: 0.0052 },
 };
 
-interface BoltFx { pts: { x: number; y: number }[]; until: number; color: number; straight?: boolean }
+interface BoltFx { pts: { x: number; y: number }[]; until: number; color: number; straight?: boolean; crit?: boolean }
 interface Spark { x: number; y: number; vx: number; vy: number; g: number; life: number; max: number; size: number; col: number; bounce?: boolean }
 interface Shockwave { x: number; y: number; r: number; maxR: number; col: number; life: number; max: number; width: number }
 interface SlashFx { x: number; y: number; ang: number; len: number; col: number; until: number; core?: boolean }
@@ -481,7 +481,9 @@ export class GameScene extends Phaser.Scene {
         }
 
         const sq = (this.squashUntil.get(z.id) ?? 0) > now;
-        const jit = (this.hitJitterUntil.get(z.id) ?? 0) > now ? Math.sin(now * 0.55) * 2.4 : 0;
+        const jit = (this.hitJitterUntil.get(z.id) ?? 0) > now
+          ? Math.sin(now * 0.55) * 2.4
+          : z.stunT > 0 ? Math.sin(now * 0.9 + z.id) * 1.6 : 0;
         const tilt = this.hitTilt.get(z.id) ?? 0;
         if (Math.abs(tilt) > 0.004) this.hitTilt.set(z.id, tilt * 0.78);
         else this.hitTilt.delete(z.id);
@@ -491,6 +493,8 @@ export class GameScene extends Phaser.Scene {
           .setRotation(tilt)
           .setScale(def.scale * (sq ? 1.18 : 1), def.scale * (sq ? 0.84 : 1));
         if ((this.flashUntil.get(z.id) ?? 0) > now) s.setTintFill(C.paper);
+        else if (z.freezeT > 0) s.setTint(C.frost);
+        else if (z.stunT > 0) s.setTint(C.electric);
         else if (z.burnT > 0) s.setTint(C.ember);
         else if (z.slowT > 0) s.setTint(C.frost);
         else s.clearTint();
@@ -528,10 +532,16 @@ export class GameScene extends Phaser.Scene {
       s.setVisible(vis);
       if (vis && b) {
         s.setPosition(b.x, b.y).setRotation(Math.atan2(b.vy, b.vx));
-        if (b.kind === 'frost' || b.weaponId === 'assault') s.setScale(1.12).setTint(C.frost);
-        else if (b.kind === 'rocket' || b.kind === 'cannon') s.setScale(1.45).setTint(C.ember);
-        else if (b.weaponId === 'rifle') s.setScale(1.35).setTint(C.red);
-        else if (b.weaponId === 'revolver') s.setScale(1.22).setTint(C.gold);
+        if (b.kind === 'firebolt') s.setScale(1.36).setTint(C.ember);
+        else if (b.kind === 'frost' || b.weaponId === 'assault') s.setScale(1.18).setTint(C.frost);
+        else if (b.kind === 'rocket') {
+          s.setScale(1.55).setTint(C.red);
+          if (run.tick % 2 === 0) this.spawnSpark(b.x - b.vx * 0.4, b.y - b.vy * 0.4, -b.vx * 0.14, Phaser.Math.FloatBetween(-0.4, 0.2), 0.02, 12, 2.2, C.ember);
+        } else if (b.kind === 'cannon') s.setScale(1.45).setTint(C.copper);
+        else if (b.weaponId === 'revolver') s.setScale(1.34).setTint(C.gold);
+        else if (b.weaponId === 'shotgun') s.setScale(0.92).setTint(C.ember);
+        else if (b.weaponId === 'smg') s.setScale(0.88).setTint(C.lamp);
+        else if (b.weaponId === 'pistol') s.setScale(1.06).setTint(C.paper);
         else { s.clearTint(); s.setScale(b.from === 'turret' ? 0.72 : b.from === 'fort' ? 1.25 : 1); }
       }
     });
@@ -615,15 +625,67 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    // 焦土火箭残余火海地面特效
+    for (const f of run.fires) {
+      const fade = Math.min(1, f.t / 45);
+      const flick = 0.85 + Math.sin(now * 0.03 + f.x) * 0.15;
+      g.fillStyle(C.ember, 0.24 * fade).fillEllipse(f.x, GROUND_Y - 1, f.r * 1.9 * flick, 11);
+      g.fillStyle(C.red, 0.34 * fade).fillEllipse(f.x, GROUND_Y - 1, f.r * 1.25 * flick, 7);
+      g.fillStyle(C.gold, 0.55 * fade).fillEllipse(f.x, GROUND_Y - 2, f.r * 0.55, 4);
+      if (run.tick % 4 === 0) {
+        this.spawnSpark(f.x + Phaser.Math.FloatBetween(-f.r * 0.7, f.r * 0.7), GROUND_Y - 2, Phaser.Math.FloatBetween(-0.25, 0.25), Phaser.Math.FloatBetween(-1.3, -0.5), -0.02, 18, 2.1, C.gold);
+      }
+    }
+
+    // 屋顶 / 门廊高地防守增益光环与矮墙护线
+    const hb = houseBuff(run);
+    if (run.phase !== 'dead' && hb.zone !== 'ground') {
+      const col = hb.zone === 'roof' ? C.gold : C.copper;
+      const pulse = 0.65 + Math.sin(now / 260) * 0.2;
+      const py = GROUND_Y + (hb.zone === 'roof' ? ROOF_Y : PORCH_Y);
+      const px1 = hb.zone === 'roof' ? ROOF_MIN_X + 6 : PORCH_MIN_X + 4;
+      const px2 = hb.zone === 'roof' ? ROOF_MAX_X - 4 : PORCH_MAX_X - 4;
+      g.lineStyle(hb.zone === 'roof' ? 2.2 : 1.5, col, 0.48 * pulse).lineBetween(px1, py - 1, px2, py - 1);
+      if (hb.zone === 'roof' && run.fort.level >= 2) {
+        g.lineStyle(1.4, C.lamp, 0.55 * pulse).lineBetween(px1, py - 5, px2, py - 5);
+      }
+      g.fillStyle(col, 0.18).fillEllipse(p.x, py - 1, 28, 7);
+      g.lineStyle(1.4, col, 0.78).strokeEllipse(p.x, py - 1, 28, 7);
+    }
+
+    // 特色子弹拖尾（左轮金痕 / 加特林过热火弹 / 急冻冰晶痕）
+    for (const b of run.bullets) {
+      if (b.kind === 'firebolt') {
+        g.lineStyle(2.4, C.ember, 0.82).lineBetween(b.x - b.vx * 1.3, b.y - b.vy * 1.3, b.x, b.y);
+      } else if (b.weaponId === 'revolver') {
+        g.lineStyle(2.0, C.gold, 0.75).lineBetween(b.x - b.vx * 1.4, b.y - b.vy * 1.4, b.x, b.y);
+      } else if (b.weaponId === 'assault') {
+        g.lineStyle(1.6, C.frost, 0.65).lineBetween(b.x - b.vx * 1.1, b.y - b.vy * 1.1, b.x, b.y);
+      }
+    }
+
+    // 僵尸深冻冰壳 & 麻痹电弧
+    for (const z of run.zombies) {
+      if (z.freezeT > 0) {
+        g.fillStyle(C.frost, 0.22).fillRoundedRect(z.x - 13, GROUND_Y - 40, 26, 38, 4);
+        g.lineStyle(1.5, C.paper, 0.75).strokeRoundedRect(z.x - 13, GROUND_Y - 40, 26, 38, 4);
+      }
+      if (z.stunT > 0 && Math.floor(now / 70 + z.id) % 2 === 0) {
+        g.lineStyle(1.4, C.electric, 0.9)
+          .lineBetween(z.x - 10, GROUND_Y - 34, z.x + 2, GROUND_Y - 22)
+          .lineBetween(z.x + 2, GROUND_Y - 22, z.x - 6, GROUND_Y - 10);
+      }
+    }
+
     // 室外电弧、狙击磁轨光束与 Lv.3 电网壁垒火花
     this.bolts = this.bolts.filter((bf) => bf.until > now);
     for (const bf of this.bolts) {
       const alpha = Math.min(1, (bf.until - now) / 140);
       if (bf.straight && bf.pts.length >= 2) {
         const a = bf.pts[0], b = bf.pts[1];
-        g.lineStyle(6, bf.color, alpha * 0.45).lineBetween(a.x, a.y, b.x, b.y);
-        g.lineStyle(2.5, C.gold, alpha * 0.92).lineBetween(a.x, a.y, b.x, b.y);
-        g.lineStyle(1.2, C.paper, alpha).lineBetween(a.x, a.y, b.x, b.y);
+        g.lineStyle(bf.crit ? 9 : 6, bf.color, alpha * 0.5).lineBetween(a.x, a.y, b.x, b.y);
+        g.lineStyle(bf.crit ? 4 : 2.5, C.gold, alpha * 0.94).lineBetween(a.x, a.y, b.x, b.y);
+        g.lineStyle(bf.crit ? 2 : 1.2, C.paper, alpha).lineBetween(a.x, a.y, b.x, b.y);
         continue;
       }
       g.lineStyle(3.2, bf.color, alpha * 0.45);
@@ -746,16 +808,16 @@ export class GameScene extends Phaser.Scene {
           const grip = WEAPON_GRIP[wId] ?? WEAPON_GRIP.pistol;
           const ang = e.ang ?? (game.run.player.facing > 0 ? 0 : Math.PI);
           const tip = this.heroMuzzlePos(now, ang);
-          this.burst('shot_hit', tip.x, tip.y, wId === 'smg' ? 0.9 : 1.15);
+          this.burst('shot_hit', tip.x, tip.y, wId === 'smg' ? (e.hot ? 1.25 : 0.9) : 1.15);
           // 枪口爆焰斜线 + 后坐力 + 退壳 + 方向性机位推拉
-          const flashCol = wId === 'tesla' ? C.electric : wId === 'assault' ? C.frost : wId === 'rifle' ? C.red : C.gold;
-          this.slashes.push({ x: tip.x, y: tip.y, ang, len: wId === 'shotgun' || wId === 'rifle' ? 14 : 9, col: flashCol, until: now + 75 });
-          this.slashes.push({ x: tip.x, y: tip.y, ang: ang + 0.35, len: 6, col: C.lamp, until: now + 60, core: false });
-          this.slashes.push({ x: tip.x, y: tip.y, ang: ang - 0.35, len: 6, col: C.lamp, until: now + 60, core: false });
+          const flashCol = wId === 'tesla' ? C.electric : wId === 'assault' ? C.frost : wId === 'rifle' ? C.red : e.hot || wId === 'shotgun' ? C.ember : C.gold;
+          this.slashes.push({ x: tip.x, y: tip.y, ang, len: wId === 'shotgun' || wId === 'rifle' ? 15 : e.hot ? 12 : 9, col: flashCol, until: now + 75 });
+          this.slashes.push({ x: tip.x, y: tip.y, ang: ang + (wId === 'shotgun' ? 0.5 : 0.35), len: wId === 'shotgun' ? 9 : 6, col: wId === 'shotgun' ? C.ember : C.lamp, until: now + 60, core: false });
+          this.slashes.push({ x: tip.x, y: tip.y, ang: ang - (wId === 'shotgun' ? 0.5 : 0.35), len: wId === 'shotgun' ? 9 : 6, col: wId === 'shotgun' ? C.ember : C.lamp, until: now + 60, core: false });
           this.gunRecoil = grip.recoil;
           this.gunKick = -grip.kick;
-          this.camKickX = -Math.cos(ang) * (wId === 'smg' ? 1.4 : wId === 'shotgun' || wId === 'rifle' || wId === 'rocket' ? 5.2 : 2.8);
-          const shellCol = wId === 'tesla' ? C.electric : wId === 'rifle' ? C.red : C.gold;
+          this.camKickX = -Math.cos(ang) * (wId === 'smg' ? (e.hot ? 2.4 : 1.4) : wId === 'shotgun' || wId === 'rifle' || wId === 'rocket' ? 5.2 : 2.8);
+          const shellCol = wId === 'tesla' ? C.electric : wId === 'rifle' ? C.red : e.hot ? C.ember : C.gold;
           this.spawnSpark(
             tip.x - Math.cos(ang) * 8, tip.y - 1,
             -game.run.player.facing * Phaser.Math.FloatBetween(1.1, 2.2), Phaser.Math.FloatBetween(-2.8, -1.6),
@@ -785,34 +847,42 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'railbeam':
         if (game.run.inside) return;
-        this.bolts.push({ pts: [{ x: e.x1, y: e.y1 }, { x: e.x2, y: e.y2 }], until: now + 220, color: C.red, straight: true });
+        this.bolts.push({ pts: [{ x: e.x1, y: e.y1 }, { x: e.x2, y: e.y2 }], until: now + (e.crit ? 260 : 210), color: C.red, straight: true, crit: e.crit });
+        this.waves.push({ x: e.x1, y: e.y1, r: 4, maxR: e.crit ? 20 : 14, col: C.red, life: 10, max: 10, width: 2.4 });
         break;
       case 'hit': {
         if (game.run.inside) return;
         const dir = e.dir ?? 1;
-        this.flashUntil.set(e.id, now + (e.crit ? 85 : 68));
-        this.squashUntil.set(e.id, now + (e.crit || e.heavy ? 95 : 70));
-        this.hitJitterUntil.set(e.id, now + (e.crit ? 85 : 55));
-        if (e.crit || e.heavy) this.hitStopUntil.set(e.id, now + 45);
-        this.hitTilt.set(e.id, dir * (e.crit ? 0.16 : e.heavy ? 0.12 : 0.07));
-        this.burst('shot_hit', e.x + Phaser.Math.Between(-4, 4), e.y + Phaser.Math.Between(-6, 6), e.crit ? 1.32 : 0.95);
+        this.flashUntil.set(e.id, now + (e.crit || e.overload ? 88 : 68));
+        this.squashUntil.set(e.id, now + (e.crit || e.heavy || e.overload ? 98 : 70));
+        this.hitJitterUntil.set(e.id, now + (e.crit || e.overload ? 90 : 55));
+        if (e.crit || e.heavy || e.overload) this.hitStopUntil.set(e.id, now + 45);
+        this.hitTilt.set(e.id, dir * (e.crit || e.overload ? 0.16 : e.heavy ? 0.12 : 0.07));
+        this.burst('shot_hit', e.x + Phaser.Math.Between(-4, 4), e.y + Phaser.Math.Between(-6, 6), e.crit || e.overload ? 1.32 : 0.95);
 
-        const col = e.crit ? C.gold : e.burn ? C.ember : e.slow ? C.frost : C.paper;
-        const count = e.crit ? 7 : e.heavy ? 5 : 3;
+        const col = e.overload ? C.electric : e.freeze ? C.frost : e.crit ? C.gold : e.burn ? C.ember : e.slow ? C.frost : C.paper;
+        const count = e.crit || e.overload ? 7 : e.heavy ? 5 : 3;
         for (let i = 0; i < count; i++) {
           this.spawnSpark(
             e.x, e.y + Phaser.Math.Between(-6, 4),
             dir * Phaser.Math.FloatBetween(1.4, 3.6),
             Phaser.Math.FloatBetween(-2.6, 0.6),
-            0.13, 18, e.crit ? 2.6 : 1.9, i % 3 === 0 ? C.infected : col,
+            0.13, 18, e.crit || e.overload ? 2.6 : 1.9, i % 3 === 0 ? C.infected : col,
           );
         }
-        if (e.crit) {
+        if (e.overload) {
+          this.waves.push({ x: e.x, y: e.y, r: 6, maxR: 28, col: C.electric, life: 13, max: 13, width: 2.6 });
+          this.slashes.push({ x: e.x, y: e.y - 2, ang: 0.65, len: 15, col: C.electric, until: now + 100 });
+          this.slashes.push({ x: e.x, y: e.y - 2, ang: -0.65, len: 15, col: C.ember, until: now + 100 });
+        } else if (e.freeze) {
+          this.waves.push({ x: e.x, y: e.y, r: 4, maxR: 22, col: C.frost, life: 12, max: 12, width: 2.2 });
+        } else if (e.crit) {
           this.slashes.push({ x: e.x, y: e.y - 2, ang: dir * -0.55, len: 16, col: C.gold, until: now + 95 });
           this.waves.push({ x: e.x, y: e.y, r: 4, maxR: 20, col: C.gold, life: 11, max: 11, width: 2.2 });
           this.camZoom = Math.max(this.camZoom, 1.015);
         }
-        floaters.add(e.x, e.y - 24, e.crit ? `${e.dmg}!` : String(e.dmg), e.burn ? 'burn' : e.crit ? 'crit' : 'dmg');
+        const label = e.overload ? `超载 ${e.dmg}!` : e.crit ? `${e.dmg}!` : String(e.dmg);
+        floaters.add(e.x, e.y - 24, label, e.overload || e.crit ? 'crit' : e.burn ? 'burn' : 'dmg');
         break;
       }
       case 'lightning':
@@ -877,8 +947,12 @@ export class GameScene extends Phaser.Scene {
         break;
       }
       case 'hurt':
-        this.cameras.main.shake(150, 0.006);
-        floaters.add(game.run.player.x, GROUND_Y + game.run.player.y - 42, '-' + e.dmg, 'hurt');
+        this.cameras.main.shake(e.cover ? 105 : 150, e.cover ? 0.004 : 0.006);
+        if (e.cover && e.cover > 0) {
+          this.waves.push({ x: game.run.player.x, y: GROUND_Y + game.run.player.y - 24, r: 6, maxR: 22, col: C.gold, life: 10, max: 10, width: 2 });
+          floaters.add(game.run.player.x, GROUND_Y + game.run.player.y - 54, `掩体-${e.cover}`, 'coin');
+        }
+        floaters.add(game.run.player.x, GROUND_Y + game.run.player.y - 40, '-' + e.dmg, 'hurt');
         break;
       case 'wallHit':
         for (const w of this.wallTierObjs) this.tweens.add({ targets: w.obj, x: '+=2', duration: 35, yoyo: true });
