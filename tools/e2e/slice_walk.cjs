@@ -62,13 +62,8 @@ const L = require('./lib.cjs');
   s = await g.state();
   check(s.panel === null && s.y <= -90, `跳过序幕进入第 1 天且主角站在二楼房顶防御 (y=${s.y})`);
   await wait(240);
-  check(await g.page.evaluate(() => {
-    const rb = document.querySelector('#wave-dlg-bar');
-    if (!rb) return false;
-    const b = rb.getBoundingClientRect();
-    return b.top >= 32 && b.bottom <= 120;
-  }), '第 1 天开场顶部无线电对白条正确显现且不遮挡按键');
-  await g.shot('01e-radio-bar');
+  check(await g.page.evaluate(() => !document.querySelector('#wave-dlg-bar')), '第 1 天开场战斗顶部不弹出无线电对白条');
+  await g.shot('01e-wave1-clean');
 
   check(await g.page.evaluate(() => !!document.querySelector('#key-fire')), '右下角主开火键 #key-fire 已就位');
   const noOverlap = await g.page.evaluate(() => {
@@ -233,6 +228,7 @@ const L = require('./lib.cjs');
   });
   check(await until((st) => st.boss, 6000, '触发第 5 天 Boss'), 'Boss 登场');
   check(await g.page.evaluate(() => document.querySelector('.chip.boss') !== null), '顶部 HUD 正确出现 Boss 血条');
+  check(await g.page.evaluate(() => !document.querySelector('#wave-dlg-bar')), 'Boss 现身战斗顶部不弹出无线电对白条');
   await g.page.evaluate(() => { const b = window.__game.run.zombies.find((z) => z.kind.startsWith('boss_')); if (b) b.x = 580; });
   await wait(350);
   await g.shot('10-boss5');

@@ -79,21 +79,6 @@ const Purse = () => (
   </div>
 );
 
-/** 战斗/营地顶部非阻塞无线电短对白条，点按可快进 */
-function RadioBar() {
-  const line = game.radioLine;
-  if (!line) return null;
-  return (
-    <button class="radio-bar" id="wave-dlg-bar" onClick={() => game.dismissRadio()}>
-      <NpcPortrait avatar={line.avatar} initial={line.initial} cls="sm" />
-      <span class="radio-body">
-        <b>{line.name}</b>
-        <span>{line.text}</span>
-      </span>
-      <em class="radio-next">点按继续</em>
-    </button>
-  );
-}
 
 /** 全屏沉浸剧情对话弹窗（支持逐句推进或一键跳过） */
 function StoryPanel() {
@@ -619,7 +604,7 @@ function BuildPanel() {
   );
 }
 
-function Toasts(p: { hasRadio?: boolean }) {
+function Toasts() {
   const [items, setItems] = useState<{ id: number; text: string; big?: boolean }[]>([]);
   const [hurt, setHurt] = useState(0);
   useEffect(() => game.onEvent((e: GameEvent) => {
@@ -647,7 +632,7 @@ function Toasts(p: { hasRadio?: boolean }) {
   return (
     <>
       {hurt > 0 && <div class="hurt-flash" key={hurt} />}
-      <div class={`toasts ${p.hasRadio ? 'has-radio' : ''}`}>{items.map((t) => <div class={`toast ${t.big ? 'big' : ''}`} key={t.id}>{t.text}</div>)}</div>
+      <div class="toasts">{items.map((t) => <div class={`toast ${t.big ? 'big' : ''}`} key={t.id}>{t.text}</div>)}</div>
     </>
   );
 }
@@ -657,7 +642,6 @@ export function App() {
   useEffect(() => game.subscribe(() => redraw(0)), []);
   const panel = game.panel(), run = game.run;
   const isCamp = run.phase === 'camp';
-  const showRadio = panel === null && !!game.radioLine;
   const fansRank = getFansRank(run.diner.fans).cur;
 
   return (
@@ -665,14 +649,13 @@ export function App() {
       {panel !== 'title' && panel !== 'class' && <Hud />}
       {panel === null && (
         <>
-          <RadioBar />
           <Pad />
           <InteractHint />
           {!isCamp && !run.inside && <><WeaponChip /><Keys /></>}
           {isCamp && <CampDock />}
         </>
       )}
-      <Toasts hasRadio={showRadio} />
+      <Toasts />
       {panel === 'title' && (
         <Panel id="panel-title" cls="title" title="">
           <h1>十五波围城</h1>
