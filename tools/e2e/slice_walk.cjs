@@ -13,13 +13,13 @@ const L = require('./lib.cjs');
     return false;
   };
 
-  // 面板必须整个在 844x390 屏幕里，不能滚动溢出
+  // 面板必须整个在 844x390 屏幕里，不能横向或纵向溢出
   const fits = async (sel) => {
     const r = await g.page.evaluate((s) => {
       const el = document.querySelector(s);
       if (!el) return false;
       const b = el.getBoundingClientRect();
-      return b.top >= 0 && b.left >= 0 && b.bottom <= innerHeight && b.right <= innerWidth && el.scrollHeight <= el.clientHeight + 2;
+      return b.top >= 0 && b.left >= 0 && b.bottom <= innerHeight && b.right <= innerWidth && el.scrollHeight <= el.clientHeight + 2 && el.scrollWidth <= el.clientWidth + 2;
     }, sel);
     check(r, sel + ' 整个面板都在屏幕里');
   };

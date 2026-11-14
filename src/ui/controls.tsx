@@ -182,9 +182,10 @@ function GrenadeKey(props: { count: number }) {
   );
 }
 
-/** 靠近酒馆功能区或大门时弹出的情景交互按钮（上下房顶由玩家自己按跳跃键跳上阶梯） */
+/** 靠近室外大门时弹出的情景交互按钮（室内交互统一整合至底部 CampDock 高亮，不重复遮挡屏幕） */
 export function InteractHint() {
   const run = game.run;
+  if (run.inside && run.phase === 'camp') return null;
   let label = '';
   if (run.inside) {
     const st = nearbyStation(run);
@@ -260,22 +261,23 @@ export function WeaponChip() {
   );
 }
 
-/** 营地夜晚底栏：可一边走动，一边直接点开深夜食堂/商店/工坊/出门或迎战下一天 */
+/** 营地夜晚底栏：可一边走动，靠近功能区时自动微光提示对应按钮，不弹窗不挡视野 */
 export function CampDock() {
   const run = game.run;
+  const near = run.inside ? nearbyStation(run) : null;
   const unserved = run.guests.filter((g) => !g.served).length;
   return (
     <div class="camp-dock" id="camp-dock">
-      <button id="btn-kitchen" class="camp-btn" onClick={() => game.open('kitchen')}>
+      <button id="btn-kitchen" class={`camp-btn ${near === 'kitchen' ? 'near' : ''}`} onClick={() => game.open('kitchen')}>
         <Icon k="ic_kitchen" />深夜食堂{unserved > 0 ? `(${unserved}客)` : run.meat > 0 ? `(${run.meat}肉)` : ''}
       </button>
-      <button id="btn-shop" class="camp-btn" onClick={() => game.open('shop')}>
+      <button id="btn-shop" class={`camp-btn ${near === 'shop' ? 'near' : ''}`} onClick={() => game.open('shop')}>
         <Icon k="ic_shop" />军火商店
       </button>
-      <button id="btn-build" class="camp-btn" onClick={() => game.open('build')}>
+      <button id="btn-build" class={`camp-btn ${near === 'workshop' ? 'near' : ''}`} onClick={() => game.open('build')}>
         <Icon k="ic_anvil" />防线工坊
       </button>
-      <button id="btn-inout" class="camp-btn sub" onClick={() => game.send({ t: run.inside ? 'exitHouse' : 'enterHouse' })}>
+      <button id="btn-inout" class={`camp-btn sub ${near === 'door' ? 'near' : ''}`} onClick={() => game.send({ t: run.inside ? 'exitHouse' : 'enterHouse' })}>
         {run.inside ? '出门看防线' : '回酒馆'}
       </button>
       <button id="btn-next" class="camp-btn primary" onClick={() => game.send({ t: 'nextDay' })}>

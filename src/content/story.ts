@@ -263,13 +263,13 @@ export function getRepTier(rep: number): RepTierDef {
 
 export interface TrendDef { id: string; tag: string; title: string; desc: string; unlockDay: number }
 export const DAILY_TRENDS: TrendDef[] = [
-  { id: 'spicy_night', tag: '辣', title: '#深夜就想吃重口味#', desc: '【辣】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 1 },
-  { id: 'homestyle', tag: '家常', title: '#想念家的味道，来点家常的#', desc: '【家常】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 1 },
-  { id: 'tender', tag: '鲜嫩', title: '#嫩一点，暖汤炖肉最治愈#', desc: '【鲜嫩】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 2 },
-  { id: 'hearty', tag: '饱腹', title: '#大口吃肉，饱腹才守得住防线#', desc: '【饱腹】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 2 },
-  { id: 'protein', tag: '高蛋白', title: '#战前高蛋白特餐打卡#', desc: '【高蛋白】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 3 },
-  { id: 'smoky', tag: '烟熏', title: '#铁板碳烤，烟熏焦香夜宵#', desc: '【烟熏】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 3 },
-  { id: 'exotic', tag: '异变', title: '#异变美食挑战，据点网红都在问#', desc: '【异变】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 5 },
+  { id: 'spicy_night', tag: '辣', title: '深夜就想吃重口味', desc: '【辣】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 1 },
+  { id: 'homestyle', tag: '家常', title: '想念家的味道，来点家常的', desc: '【家常】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 1 },
+  { id: 'tender', tag: '鲜嫩', title: '嫩一点，暖汤炖肉最治愈', desc: '【鲜嫩】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 2 },
+  { id: 'hearty', tag: '饱腹', title: '大口吃肉，饱腹才守得住防线', desc: '【饱腹】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 2 },
+  { id: 'protein', tag: '高蛋白', title: '战前高蛋白特餐打卡', desc: '【高蛋白】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 3 },
+  { id: 'smoky', tag: '烟熏', title: '铁板碳烤，烟熏焦香夜宵', desc: '【烟熏】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 3 },
+  { id: 'exotic', tag: '异变', title: '异变美食挑战，据点网红都在问', desc: '【异变】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 5 },
 ];
 
 export const QUALITY_META = {

@@ -5,7 +5,7 @@
 来源全部是 OpenGameArt 上的公开素材包，出处和许可见 assets/CREDITS.md。
 这个脚本只做裁切和拼条，不改像素。
 """
-import io, json, os, re, sys, urllib.request, zipfile
+import io, json, os, re, struct, sys, urllib.request, zipfile, zlib
 from PIL import Image
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
@@ -120,10 +120,104 @@ def build_porch_deck(top_l, top_r, legs, g_legs):
     porch.paste(g_legs, (32, 32), g_legs)
     return porch
 
+def load_ase_cels(ase_path):
+    """解析 ansimuz 源文件 player.ase 的分层帧图像（Layer 0 Cape, Layer 1 body, Layer 2 Arm）。"""
+    data = open(ase_path, 'rb').read()
+    w, h = struct.unpack_from('<HH', data, 8)
+    frames_n = struct.unpack_from('<H', data, 6)[0]
+    pos = 128
+    cels = {}
+    for fi in range(frames_n):
+        fbytes = struct.unpack_from('<I', data, pos)[0]
+        chunks = struct.unpack_from('<H', data, pos + 6)[0]
+        chunks2 = struct.unpack_from('<I', data, pos + 12)[0]
+        cpos = pos + 16
+        for _ in range(chunks2 or chunks):
+            csize, ctype = struct.unpack_from('<IH', data, cpos)
+            body = data[cpos + 6:cpos + csize]
+            if ctype == 0x2005:
+                li, cx, cy, _, ct = struct.unpack_from('<HhhBH', body, 0)
+                if ct == 2:
+                    cw, ch = struct.unpack_from('<HH', body, 16)
+                    cels[(fi, li)] = (cx, cy, Image.frombytes('RGBA', (cw, ch), zlib.decompress(body[20:])))
+            cpos += csize
+        pos += fbytes
+    return w, h, cels
+
+def extract_hero_layers(ase_path):
+    """把原版持枪猎人的身体披风（去枪手层）与独立活动手臂剥离，解决双枪重叠与浮空枪模问题。"""
+    w, h, cels = load_ase_cels(ase_path)
+    cape_cols = {(0x1c, 0x33, 0xb1), (0xe5, 0xb9, 0x1b), (0x2c, 0x12, 0x75)}
+
+    def body_frame(fi):
+        cv = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+        for li in (0, 1):
+            if (fi, li) in cels:
+                cx, cy, cim = cels[(fi, li)]
+                cv.alpha_composite(cim, (cx, cy))
+        # 还原画师放在 Arm 层上的披风肩领及受击完整披风（只取披风蓝金色，不带枪身，避免胸前渗出碎点）
+        if (fi, 2) in cels:
+            cx, cy, aim = cels[(fi, 2)]
+            for y in range(aim.height):
+                for x in range(aim.width):
+                    if cx + x >= 31: continue
+                    px = aim.getpixel((x, y))
+                    if px[3] > 0 and px[:3] in cape_cols:
+                        cv.putpixel((cx + x, cy + y), px)
+        # 清理 Idle 帧里残留在身体前方的零散枪口/手部残像素
+        if 1 <= fi <= 6:
+            for y in range(16, 35):
+                for x in range(32, w):
+                    cv.putpixel((x, y), (0, 0, 0, 0))
+        return cv
+
+    tags = [
+        ('idle', range(1, 7)),
+        ('run', range(7, 21)),
+        ('shoot', range(21, 24)),
+        ('crouch', range(24, 27)),
+        ('jump', range(30, 32)),
+        ('fall', range(32, 34)),
+        ('hurt', range(34, 36)),
+    ]
+    bodies = {name: [body_frame(fi) for fi in rng] for name, rng in tags}
+
+    # 从 Shoot 第 21 帧的 Arm 层单独裁出夹克袖管 + 握把右拳（15x8，去除披风领与长步枪管）
+    cx, cy, arm21 = cels[(21, 2)]
+    arm_canvas = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    arm_canvas.alpha_composite(arm21, (cx, cy))
+    arm_crop = arm_canvas.crop((18, 17, 33, 25))
+    hero_arm = Image.new('RGBA', (15, 8), (0, 0, 0, 0))
+    for y in range(8):
+        for x in range(15):
+            px = arm_crop.getpixel((x, y))
+            if px[3] == 0 or px[:3] in cape_cols: continue
+            if y == 0 and x >= 6: continue
+            if y == 1 and x >= 7: continue
+            if x >= 13 and px[:3] in ((0x32, 0x22, 0x2e), (0x4f, 0x2b, 0x22)): continue
+            if y >= 6 and x >= 11: continue
+            hero_arm.putpixel((x, y), px)
+
+    # 室内脱枪闲逛用的自然下垂袖管（沿用同色卡原画夹克+手掌）
+    pal = {
+        'B': (0x8c, 0x4c, 0x35, 255), 'C': (0xb3, 0x80, 0x4a, 255), 'E': (0x4f, 0x2b, 0x22, 255),
+        'G': (0xe1, 0x92, 0x4d, 255), 'H': (0xa4, 0x49, 0x3e, 255), '.': (0, 0, 0, 0),
+    }
+    rest_art = [
+        '.BCCB.', 'BCCCCB', 'BCCCCE', 'BCBBCE', '.BCCBE', '.BCCBE',
+        '.BBCCE', '.BEEEE', '..EE..', '..GG..', '.GGH..', '.GH...',
+    ]
+    hero_arm_rest = Image.new('RGBA', (6, 12), (0, 0, 0, 0))
+    for y, row in enumerate(rest_art):
+        for x, ch in enumerate(row):
+            hero_arm_rest.putpixel((x, y), pal[ch])
+
+    return bodies, hero_arm, hero_arm_rest
+
 def build_tavern_interior(house, house_b, wall_a, wall_b, left_roof, roof_t, right_roof,
                           top_l, top_m, top_r, g_legs, barrel, sign, lamp, mi):
-    """用 Gothicvania Town + Bridge 原版建筑图块拼出温馨统一的剖面深夜小食堂（560x220）。
-    左区：砖砌烟囱与铁板烧灶台；中区：暖窗与双人堂食木桌；右区：整备柜台与出击木门。"""
+    """用 Gothicvania Town + Bridge + Medieval Interior 拼出干净温馨的深夜食堂剖面（560x220）。
+    左区：砖窑烤炉、香料架与料理台；中区：暖窗与空洁原木双人餐桌；右区：整备铁砧柜台与木门。"""
     W, H = 560, 220
     FLOOR_Y = 196
     room = Image.new('RGBA', (W, H), (0, 0, 0, 0))
@@ -134,7 +228,7 @@ def build_tavern_interior(house, house_b, wall_a, wall_b, left_roof, roof_t, rig
         room.paste(roof_t, (x, 4), roof_t)
     room.paste(right_roof, (512, 4), right_roof)
     chimney = house_b.crop((56, 0, 82, 54))
-    room.paste(chimney, (68, 0), chimney)
+    room.paste(chimney, (58, 0), chimney)
 
     # 2. 暖色砖木内墙与横竖橡木梁
     for y in range(76, FLOOR_Y, 16):
@@ -149,17 +243,17 @@ def build_tavern_interior(house, house_b, wall_a, wall_b, left_roof, roof_t, rig
         room.paste(b, (x, 74), b)
 
     v_pillar = house.crop((33, 82, 43, 144))
-    for px in [32, 188, 396, 518]:
+    for px in [32, 184, 386, 518]:
         room.paste(v_pillar, (px, 82), v_pillar)
         room.paste(v_pillar, (px, 134), v_pillar)
 
-    # 3. 暖光拱窗与吊灯
+    # 3. 暖光拱窗与均匀分布的吊灯
     warm_win = house.crop((134, 86, 178, 134))
-    for wx in [124, 220, 320]:
-        room.paste(warm_win, (wx, 106), warm_win)
+    for wx in [212, 316]:
+        room.paste(warm_win, (wx, 104), warm_win)
 
     lamp_head = lamp.crop((0, 0, lamp.width, 32))
-    for lx in [88, 250, 348, 452]:
+    for lx in [120, 224, 328, 444]:
         room.paste(lamp_head, (lx, 78), lamp_head)
 
     def draw_oak_table(x, w_mid_count):
@@ -173,30 +267,36 @@ def build_tavern_interior(house, house_b, wall_a, wall_b, left_roof, roof_t, rig
         room.paste(top_r, (cx, y_top), top_r)
         room.paste(g_legs, (cx, FLOOR_Y - 16), g_legs)
 
-    # ── 左区（x = 44..184）：深夜食堂红砖灶台与料理长案 ──
+    # ── 左区：红砖烟道 + 发光石头烤炉 + 香料架与干净料理备餐台 ──
     brick_col = house_b.crop((56, 6, 82, 54))
-    room.paste(brick_col, (56, 84), brick_col)
-    room.paste(brick_col, (56, 130), brick_col)
-    draw_oak_table(48, 2)  # 96px 料理灶台
-    platter = mi.crop((192, 208, 208, 224))
-    steak = mi.crop((208, 208, 224, 224))
-    mug = mi.crop((176, 224, 192, 240))
-    room.paste(platter, (94, FLOOR_Y - 44), platter)
-    room.paste(steak, (116, FLOOR_Y - 44), steak)
-    room.paste(barrel, (152, FLOOR_Y - barrel.height), barrel)
+    room.paste(brick_col, (58, 84), brick_col)
+    room.paste(brick_col, (58, 132), brick_col)
+    oven = mi.crop((96, 288, 144, 320))
+    room.paste(oven, (47, FLOOR_Y - oven.height), oven)
+    shelf = mi.crop((192, 128, 224, 176))
+    room.paste(shelf, (112, 112), shelf)
+    herbs = mi.crop((224, 128, 240, 140))
+    berries = mi.crop((224, 140, 240, 150))
+    room.paste(herbs, (115, 118), herbs)
+    room.paste(berries, (127, 134), berries)
+    draw_oak_table(100, 0)
+    room.paste(barrel, (160, FLOOR_Y - barrel.height), barrel)
 
-    # ── 中区（x = 200..392）：两张堂食木桌，供夜晚幸存者食客落座点餐 ──
-    draw_oak_table(204, 1)  # 1号餐桌
-    draw_oak_table(304, 1)  # 2号餐桌
-    room.paste(platter, (224, FLOOR_Y - 44), platter)
-    room.paste(mug, (248, FLOOR_Y - 46), mug)
-    room.paste(steak, (324, FLOOR_Y - 44), steak)
-    room.paste(mug, (348, FLOOR_Y - 46), mug)
+    # ── 中区：两张干净清爽的堂食木桌与木椅（桌面留白，待点餐上菜后呈现热菜）──
+    chair_l = mi.crop((176, 176, 192, 208))
+    chair_r = mi.crop((192, 176, 208, 208))
+    draw_oak_table(206, 1)  # 1号大餐桌 (坐席 0、1 左右对坐)
+    room.paste(chair_l, (194, FLOOR_Y - chair_l.height), chair_l)
+    room.paste(chair_r, (282, FLOOR_Y - chair_r.height), chair_r)
+    draw_oak_table(312, 0)  # 2号餐桌 (坐席 2 右侧落座)
+    room.paste(chair_l, (300, FLOOR_Y - chair_l.height), chair_l)
+    room.paste(chair_r, (372, FLOOR_Y - chair_r.height), chair_r)
 
-    # ── 右区（x = 404..518）：整备工坊吧台与出击木门 ──
-    room.paste(sign, (412, 96), sign)
-    draw_oak_table(406, 0)
-    room.paste(mug, (428, FLOOR_Y - 46), mug)
+    # ── 右区：防线铁砧工作台、酒馆招牌与出击木门 ──
+    room.paste(sign, (414, 96), sign)
+    draw_oak_table(402, 0)
+    anvil = mi.crop((192, 240, 208, 256))
+    room.paste(anvil, (416, FLOOR_Y - 46), anvil)
     door = house_b.crop((66, 178, 104, 244))
     room.paste(door, (476, FLOOR_Y - door.height), door)
 
@@ -217,10 +317,12 @@ def main():
         p = os.path.join(OUT, old + '.png')
         if os.path.exists(p): os.remove(p)
 
-    # ── 主角：持枪猎人（Gothicvania Swamp, ansimuz）──
-    for anim, stem, n in [('idle', 'idle', 6), ('run', 'run', 14), ('shoot', 'shoot', 3), ('jump', 'jump', 2),
-                          ('fall', 'fall', 2), ('hurt', 'Hurt', 2), ('crouch', 'crouch', 3)]:
-        strip('hero_' + anim, [img('gotthicvania-swamp', 'Player', anim, f'{stem}{i}.png') for i in range(1, n + 1)])
+    # ── 主角：分层剥离后的持枪猎人躯干 + 独立瞄准握把手臂（解决手模浮空/双枪穿模）──
+    bodies, hero_arm, hero_arm_rest = extract_hero_layers(find('gotthicvania-swamp', 'Player', 'player.ase'))
+    for anim, frames in bodies.items():
+        strip('hero_' + anim, frames)
+    save('hero_arm', hero_arm)
+    save('hero_arm_rest', hero_arm_rest)
 
     # ── 统一画风的僵尸与魔物大军（全部出自 ansimuz 的 Gothicvania 系列，天然朝左迎战）──
     strip('z_swamp', [img('gotthicvania-swamp', 'walk thing', f'thing{i}.png') for i in range(1, 5)])
@@ -318,11 +420,22 @@ def main():
                       ('ic_rooftop', 11, 0), ('ic_shrapnel', 12, 11), ('ic_fortify', 13, 15), ('ic_shock', 2, 7)]:
         save(key, ic.crop((c * 16, r * 16, c * 16 + 16, r * 16 + 16)))
 
+    def center16(crop_im):
+        c = Image.new('RGBA', (16, 16), (0, 0, 0, 0))
+        box = crop_im.getbbox()
+        if box:
+            sub = crop_im.crop(box)
+            c.paste(sub, ((16 - sub.width) // 2, (16 - sub.height) // 2), sub)
+        return c
+
     save('ic_meat', mi.crop((224, 224, 240, 240)))
     save('ic_kitchen', mi.crop((192, 208, 208, 224)))
-    save('ic_dish_skewer', mi.crop((192, 208, 208, 224)))
-    save('ic_dish_stew', mi.crop((176, 224, 192, 240)))
-    save('ic_dish_steak', mi.crop((208, 208, 224, 224)))
+    save('ic_dish_skewer', center16(mi.crop((240, 224, 256, 240))))   # 炭烤香辣肉串
+    save('ic_dish_stew', center16(mi.crop((208, 224, 224, 240))))     # 末世暖胃肉汤
+    save('ic_dish_steak', center16(mi.crop((192, 208, 208, 224))))    # 铁板滋滋厚排
+    save('ic_dish_grill', center16(mi.crop((225, 136, 239, 144))))    # 碳火三拼盛宴
+    save('ic_dish_hotpot', center16(mi.crop((225, 151, 239, 161))))   # 地狱异变火锅
+    save('ic_dish_feast', center16(mi.crop((192, 224, 208, 240))))    # 终章末日大餐
     save('ic_shop', mi.crop((176, 288, 192, 304)))
     save('ic_anvil', mi.crop((192, 240, 208, 256)))
 

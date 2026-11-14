@@ -244,7 +244,7 @@ export function newRun(seed = 1, pool: WeaponId[] = ['revolver', 'smg'], cls: Cl
     seed, rng: seed >>> 0, tick: 0, nextId: 1, day: 0, phase: 'camp', phaseT: 0,
     inside: false, autoFire: false,
     player: {
-      x: 215, y: ROOF_Y, vx: 0, vy: 0, facing: 1, hp: 100, maxHp: 100, armor: 0, maxArmor: 80, hurtT: 0, healCarry: 0,
+      x: 194, y: ROOF_Y, vx: 0, vy: 0, facing: 1, hp: 100, maxHp: 100, armor: 0, maxArmor: 80, hurtT: 0, healCarry: 0,
       dodgeT: 0, dodgeCd: 0, dodgeDir: 1, fireCd: 0, reloadT: 0, shootT: 0, grenades: 2,
       weapons: [{ id: 'pistol', star: 1, ammo: WEAPONS.pistol.mag }], cur: 0,
     },
@@ -269,7 +269,7 @@ export function newRun(seed = 1, pool: WeaponId[] = ['revolver', 'smg'], cls: Cl
 function startDay(run: RunState, ev: GameEvent[]) {
   run.day++;
   run.phase = 'fight'; run.phaseT = 0; run.inside = false;
-  run.player.x = 215; run.player.y = ROOF_Y; run.player.vy = 0; run.player.facing = 1;
+  run.player.x = 194; run.player.y = ROOF_Y; run.player.vy = 0; run.player.facing = 1;
   const total = dayZombieCount(run.day);
   const crateAt = run.day === 1 || rand(run) < 0.4 ? Math.floor(total / 2) : -1;
   const bossKind = bossForDay(run.day);
@@ -347,14 +347,16 @@ function damageZombie(
   z: Zombie,
   dmg: number,
   ev: GameEvent[],
-  opts: { byPlayer: boolean; burn?: boolean; kb?: number; crit?: boolean; slow?: number; weaponId?: WeaponId },
+  opts: { byPlayer: boolean; burn?: boolean; kb?: number; crit?: boolean; slow?: number; weaponId?: WeaponId; dir?: 1 | -1; heavy?: boolean },
 ) {
   if (z.hp <= 0) return;
   const before = z.hp;
   z.hp -= dmg;
   if (opts.kb) z.kb = Math.max(z.kb, ZOMBIES[z.kind].boss ? opts.kb * 0.25 : opts.kb);
   if (opts.slow) z.slowT = Math.max(z.slowT, opts.slow);
-  ev.push({ t: 'hit', id: z.id, x: z.x, y: BODY_Y, dmg: Math.round(dmg), burn: opts.burn, crit: opts.crit, slow: !!opts.slow });
+  const dir: 1 | -1 = opts.dir ?? (z.x >= run.player.x ? 1 : -1);
+  const heavy = opts.heavy || (opts.kb ?? 0) >= 2.5 || opts.weaponId === 'revolver' || opts.weaponId === 'shotgun' || opts.weaponId === 'rifle' || opts.weaponId === 'rocket';
+  ev.push({ t: 'hit', id: z.id, x: z.x, y: BODY_Y, dmg: Math.round(dmg), burn: opts.burn, crit: opts.crit, slow: !!opts.slow, dir, weapon: opts.weaponId, heavy });
   if (opts.byPlayer && has(run, 'lifesteal')) {
     const p = run.player;
     p.healCarry += Math.min(dmg, before) * 0.08;
@@ -378,7 +380,7 @@ function damageZombie(
   run.meat += meatDrop;
 
   if (has(run, 'chainkill')) run.chain = { n: Math.min(8, run.chain.n + 1), t: 180 };
-  ev.push({ t: 'kill', id: z.id, x: z.x, kind: z.kind, coins: def.coins, meat: meatDrop });
+  ev.push({ t: 'kill', id: z.id, x: z.x, kind: z.kind, coins: def.coins, meat: meatDrop, dir, crit: opts.crit, boss: def.boss });
   if (def.boss) {
     ev.push({ t: 'bossDead', kind: z.kind, bossIdx: run.day <= 5 ? 0 : run.day <= 10 ? 1 : 2 });
   }
@@ -394,7 +396,7 @@ function damageZombie(
   if (opts.byPlayer && has(run, 'overkill') && z.hp < 0) {
     const boom = -z.hp * 2, r = 44 * (has(run, 'shrapnel') ? 1.35 : 1);
     ev.push({ t: 'boom', x: z.x, y: BODY_Y, r });
-    for (const o of run.zombies) if (o !== z && o.hp > 0 && Math.abs(o.x - z.x) <= r) damageZombie(run, o, boom, ev, { byPlayer: false, kb: 2 });
+    for (const o of run.zombies) if (o !== z && o.hp > 0 && Math.abs(o.x - z.x) <= r) damageZombie(run, o, boom, ev, { byPlayer: false, kb: 2, dir: o.x >= z.x ? 1 : -1, heavy: true });
   }
 }
 
@@ -430,7 +432,7 @@ function fireLightning(
   for (let i = 0; i < jumps && cur; i++) {
     hit.add(cur.id);
     pts.push({ x: cur.x, y: BODY_Y });
-    damageZombie(run, cur, curDmg, ev, { byPlayer: opts.byPlayer, crit: opts.crit, kb: 0.8 });
+    damageZombie(run, cur, curDmg, ev, { byPlayer: opts.byPlayer, crit: opts.crit, kb: 0.8, dir: cur.x >= sx ? 1 : -1, weaponId: 'tesla' });
     curDmg *= 0.78;
     const fromX: number = cur.x;
     cur = run.zombies.filter((o) => o.hp > 0 && !hit.has(o.id) && Math.abs(o.x - fromX) <= 135)
@@ -449,7 +451,7 @@ function explodeAt(run: RunState, x: number, y: number, r: number, dmg: number, 
     if (z.hp <= 0) continue;
     const d = Math.abs(z.x - x);
     if (d <= finalR) {
-      damageZombie(run, z, finalDmg * (1 - 0.35 * (d / Math.max(1, finalR))), ev, { byPlayer, kb: 3.5 });
+      damageZombie(run, z, finalDmg * (1 - 0.35 * (d / Math.max(1, finalR))), ev, { byPlayer, kb: 3.5, dir: z.x >= x ? 1 : -1, heavy: true });
       if (burn && z.hp > 0) z.burnT = Math.max(z.burnT, 120);
     }
   }
@@ -467,6 +469,7 @@ function fire(run: RunState, target: Zombie | null, ev: GameEvent[]) {
     const tx = target.x - mx, ty = BODY_Y - my, len = Math.hypot(tx, ty) || 1;
     dx = tx / len; dy = ty / len;
   }
+  const ang = Math.atan2(dy, dx);
   const hawkeye = skillActive(run, 'gunner');
   const baseCrit = (run.cls === 'gunner' ? CRIT_CHANCE : 0) + (ow.id === 'pistol' ? 0.2 : 0);
   const crit = hawkeye || (baseCrit > 0 && rand(run) < baseCrit);
@@ -479,7 +482,7 @@ function fire(run: RunState, target: Zombie | null, ev: GameEvent[]) {
     } else {
       ev.push({ t: 'lightning', pts: [{ x: mx, y: my }, { x: mx + dx * 125, y: my + (rand(run) - 0.5) * 14 }], color: 'tesla' });
     }
-    ev.push({ t: 'shot', x: mx, y: my, from: 'player', weapon: ow.id });
+    ev.push({ t: 'shot', x: mx, y: my, from: 'player', weapon: ow.id, ang });
     if (ow.ammo <= 0) startReload(run, ev);
     return;
   }
@@ -506,7 +509,7 @@ function fire(run: RunState, target: Zombie | null, ev: GameEvent[]) {
       shatter: ow.id === 'assault',
     });
   }
-  ev.push({ t: 'shot', x: mx, y: my, from: 'player', weapon: ow.id });
+  ev.push({ t: 'shot', x: mx, y: my, from: 'player', weapon: ow.id, ang });
   if (ow.ammo <= 0) startReload(run, ev);
 }
 
@@ -831,7 +834,8 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
         const closeHit = b.closeBoost && b.startX !== undefined && Math.abs(z.x - b.startX) <= 135;
         const hitDmg = b.dmg * (closeHit ? 1.4 : 1);
         const kb = closeHit ? 4.4 : b.weaponId === 'revolver' ? 3.6 : byPlayer ? 1.6 : 0.6;
-        damageZombie(run, z, hitDmg, ev, { byPlayer, kb, crit: b.crit || closeHit, slow: b.slow, weaponId: b.weaponId });
+        const dir: 1 | -1 = b.vx >= 0 ? 1 : -1;
+        damageZombie(run, z, hitDmg, ev, { byPlayer, kb, crit: b.crit || closeHit, slow: b.slow, weaponId: b.weaponId, dir, heavy: !!closeHit || b.weaponId === 'revolver' || b.weaponId === 'rifle' });
 
         // 极地急冻步枪特色：命中已冰冻减速的目标触发碎冰范围溅射
         if (byPlayer && b.shatter && wasSlowed) {
