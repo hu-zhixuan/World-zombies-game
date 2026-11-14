@@ -63,11 +63,19 @@ const L = require('./lib.cjs');
   check(s.panel === null && s.y <= -90, `跳过序幕进入第 1 天且主角站在二楼房顶防御 (y=${s.y})`);
   await wait(240);
   check(await g.page.evaluate(() => !document.querySelector('#wave-dlg-bar')), '第 1 天开场战斗顶部不弹出无线电对白条');
+  const houseRoofOk = await g.page.evaluate(() => {
+    const hb = document.querySelector('#hud-house');
+    const hud = document.querySelector('.hud');
+    if (!hb || !hud) return false;
+    const hr = hb.getBoundingClientRect(), tr = hud.getBoundingClientRect();
+    return hb.getAttribute('data-zone') === 'roof' && /屋顶/.test(hb.textContent || '') && hr.top >= tr.bottom + 1;
+  });
+  check(houseRoofOk, '顶部下方屋顶增益徽章 #hud-house(roof) 清晰不压 HUD');
   await g.shot('01e-wave1-clean');
 
   check(await g.page.evaluate(() => !!document.querySelector('#key-fire')), '右下角主开火键 #key-fire 已就位');
   const noOverlap = await g.page.evaluate(() => {
-    const ids = ['#key-fire', '#key-jump', '#key-dodge', '#key-grenade', '#key-skill', '#weapon-chip', '#key-reload'];
+    const ids = ['#key-fire', '#key-jump', '#key-dodge', '#key-grenade', '#key-skill', '#weapon-chip', '#key-reload', '#hud-house'];
     const rects = ids.map((id) => ({ id, r: document.querySelector(id).getBoundingClientRect() }));
     for (let i = 0; i < rects.length; i++) {
       for (let j = i + 1; j < rects.length; j++) {
@@ -79,12 +87,12 @@ const L = require('./lib.cjs');
     }
     return 'ok';
   });
-  check(noOverlap === 'ok', '右下角按钮与武器条互不重叠 (' + noOverlap + ')');
+  check(noOverlap === 'ok', '右下角按钮、武器条与屋顶增益条互不重叠 (' + noOverlap + ')');
 
   // 3. 元气骑士式手感：不按攻击键绝不乱开枪；按住攻击键才自动锁敌射杀 + 可拖拽控抛物线手雷
   check(await until((st) => st.zombies >= 2 && st.target !== null, 30000, '等僵尸进射程出现锁定框'), '僵尸进入射程出现锁定准星');
   const idleAmmo = await g.page.evaluate(() => ({ auto: window.__game.run.autoFire, ammo: window.__game.run.player.weapons[0].ammo }));
-  check(!idleAmmo.auto && idleAmmo.ammo === 12, `默认不自动开枪 (autoFire=${idleAmmo.auto}, ammo=${idleAmmo.ammo})`);
+  check(!idleAmmo.auto && idleAmmo.ammo === 10, `默认不自动开枪 (autoFire=${idleAmmo.auto}, ammo=${idleAmmo.ammo})`);
 
   const fireBtn = await g.center('#key-fire');
   await g.touch('touchStart', fireBtn.x, fireBtn.y);
@@ -101,9 +109,9 @@ const L = require('./lib.cjs');
   const nadeBtn = await g.center('#key-grenade');
   await g.touch('touchStart', nadeBtn.x, nadeBtn.y);
   await wait(60);
-  await g.touch('touchMove', nadeBtn.x + 36, nadeBtn.y - 34);
+  await g.touch('touchMove', nadeBtn.x + 20, nadeBtn.y - 26);
   await wait(200);
-  check(await g.page.evaluate(() => !!window.__game.grenadeAim && window.__game.grenadeAim.dx > 0.5 && window.__game.grenadeAim.dy < -0.4), '按住手雷拖拽能实时调出抛物线方向与高低弧度');
+  check(await g.page.evaluate(() => !!window.__game.grenadeAim && window.__game.grenadeAim.dx > 0.3 && window.__game.grenadeAim.dy < -0.35), '按住手雷拖拽能实时调出抛物线方向与高低弧度');
   await g.shot('02c-grenade-aim');
   await g.touch('touchEnd');
   await wait(260);
@@ -117,6 +125,8 @@ const L = require('./lib.cjs');
   await g.touch('touchMove', pad.x + 128, pad.y - 26);
   check(await until((st) => st.y === 0, 6000, '浮动摇杆向右走下房顶'), '浮动摇杆抓边也能向右走下房顶到庭院');
   await g.touch('touchEnd');
+  await wait(80);
+  check(await g.page.evaluate(() => document.querySelector('#hud-house')?.getAttribute('data-zone') === 'ground'), '落到地面时增益徽章实时切换为地面状态 (ground)');
   await g.touch('touchStart', pad.x - 36, pad.y);
   await wait(950);
   await g.touch('touchEnd');
@@ -125,11 +135,13 @@ const L = require('./lib.cjs');
   await g.tap('#key-jump'); // 第一跳：跳上门廊中层挑台 (PORCH_Y = -48)
   await wait(650);
   check((await g.state()).y === -48, '第一跳跳上门廊中层木挑台');
+  check(await g.page.evaluate(() => document.querySelector('#hud-house')?.getAttribute('data-zone') === 'porch'), '跳上门廊挑台时增益徽章切换为门廊增益 (porch)');
   await g.tap('#key-jump'); // 第二跳：起跳后向左空中移动落上二楼屋顶平台 (ROOF_Y = -92)
   await g.touch('touchStart', pad.x - 36, pad.y);
   await wait(700);
   await g.touch('touchEnd');
   check((await g.state()).y <= -90, '第二跳亲自跳回二楼屋顶平台');
+  check(await g.page.evaluate(() => document.querySelector('#hud-house')?.getAttribute('data-zone') === 'roof'), '跃回房顶立即恢复屋顶高地增益 (roof)');
 
   // 5. 等待第 1 天清场与三选一（手动按住攻击键帮忙收尾）
   await g.touch('touchStart', fireBtn.x, fireBtn.y);
@@ -156,10 +168,11 @@ const L = require('./lib.cjs');
   await g.touch('touchStart', pad.x - 36, pad.y); await wait(700); await g.touch('touchEnd');
   check((await g.state()).x < inX0 - 20, '推摇杆能在酒馆屋内向左走到小厨房');
 
-  // 7. 深夜小食堂（热搜 + 铁板火候 QTE 招待 + 6道特餐 + 15位VIP图鉴与点评墙 + 炒肉）、商店、纯金币工坊
+  // 7. 深夜小食堂（今夜热门 + 铁板火候 QTE 招待 + 6道特餐 + 15位VIP图鉴与点评墙 + 炒肉）、商店、纯金币工坊
   await g.page.evaluate(() => { window.__game.run.meat = 8; window.__game.run.coins = 700; window.__game.notify(); });
   await g.tap('#btn-kitchen');
   check((await g.state()).panel === 'kitchen', '能打开深夜小食堂');
+  check(await g.page.evaluate(() => !/废品改造狂|米其林|消防栓|期末考试|地雷|微波炉|热搜/.test(document.querySelector('#panel-kitchen').innerText)), '深夜食堂界面无出戏或过时设定文案');
   await g.shot('06-kitchen'); await fits('#panel-kitchen');
 
   await g.tap('#btn-serve-0');
@@ -250,6 +263,25 @@ const L = require('./lib.cjs');
   await g.tap('#btn-story-skip');
   s = await g.state();
   check(s.panel === null && s.day === 1 && s.hp === 100 && s.kills === 0, '重开是全新的一局');
+
+  // 11. 窄横屏 780x360 适配检查（#hud-house、#weapon-chip、.keys-fan、#pad 互不重叠或溢出）
+  await g.page.setViewportSize({ width: 780, height: 360 });
+  await wait(160);
+  const narrowOk = await g.page.evaluate(() => {
+    const ids = ['#hud-house', '#weapon-chip', '#key-reload', '#key-fire', '#key-jump', '#key-dodge', '#key-grenade', '#key-skill'];
+    const rects = ids.map((id) => ({ id, r: document.querySelector(id)?.getBoundingClientRect() }));
+    if (rects.some((x) => !x.r || x.r.right > innerWidth || x.r.bottom > innerHeight || x.r.left < 0 || x.r.top < 0)) return 'out-of-bounds';
+    for (let i = 0; i < rects.length; i++) {
+      for (let j = i + 1; j < rects.length; j++) {
+        const a = rects[i].r, b = rects[j].r;
+        const ox = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+        const oy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+        if (ox > 2 && oy > 2) return `${rects[i].id} 与 ${rects[j].id} 重叠`;
+      }
+    }
+    return 'ok';
+  });
+  check(narrowOk === 'ok', '780x360 窄横屏布局无溢出无遮挡 (' + narrowOk + ')');
 
   const text = await g.page.evaluate(() => document.body.innerText);
   check(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(text.replace(/★/g, '')), '界面里没有 emoji');

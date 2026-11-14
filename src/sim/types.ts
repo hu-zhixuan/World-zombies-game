@@ -57,19 +57,22 @@ export interface Player {
   hp: number; maxHp: number; armor: number; maxArmor: number; hurtT: number; healCarry: number;
   dodgeT: number; dodgeCd: number; dodgeDir: 1 | -1;
   fireCd: number; reloadT: number; shootT: number;
+  burstLeft: number; burstCd: number; smgHeat: number; smgShots: number;
   grenades: number;
   weapons: OwnedWeapon[]; cur: number;
 }
 export interface Zombie {
   id: number; kind: ZombieKind; x: number; hp: number; maxHp: number;
-  atkCd: number; kb: number; burnT: number; slowT: number; carriesCrate: boolean;
+  atkCd: number; kb: number; burnT: number; slowT: number; stunT: number; freezeT: number; carriesCrate: boolean;
 }
 export interface Bullet {
   x: number; y: number; vx: number; vy: number; dmg: number; life: number;
   from: 'player' | 'turret' | 'fort'; pierce: boolean; crit: boolean; bounces: number; hit: number[];
-  aoe?: number; slow?: number; kind?: 'normal' | 'rocket' | 'frost' | 'cannon';
-  weaponId?: WeaponId; startX?: number; pierceLeft?: number; closeBoost?: boolean; shatter?: boolean;
+  aoe?: number; slow?: number; kind?: 'normal' | 'rocket' | 'frost' | 'cannon' | 'firebolt';
+  weaponId?: WeaponId; startX?: number; pierceLeft?: number; ricochetLeft?: number;
+  closeBoost?: boolean; shatter?: boolean; homing?: boolean; stun?: number; burn?: number;
 }
+export interface GroundFire { x: number; r: number; t: number; maxT: number; dmg: number }
 export interface GrenadeProj {
   x: number; y: number; vx: number; vy: number; dmg: number; r: number;
 }
@@ -131,7 +134,7 @@ export interface RunState {
   day: number; phase: Phase; phaseT: number;
   inside: boolean;
   autoFire: boolean;
-  player: Player; zombies: Zombie[]; bullets: Bullet[]; grenades: GrenadeProj[]; enemyProjs: EnemyProj[]; crates: Crate[];
+  player: Player; zombies: Zombie[]; bullets: Bullet[]; fires: GroundFire[]; grenades: GrenadeProj[]; enemyProjs: EnemyProj[]; crates: Crate[];
   turrets: TurretSlotState[];
   wall: { level: number; hp: number; maxHp: number };
   home: { hp: number; maxHp: number };
@@ -190,16 +193,16 @@ export type Command =
 
 /** 这一步发生了什么，给画面层播特效和音效用。 */
 export type GameEvent =
-  | { t: 'shot'; x: number; y: number; from: 'player' | 'turret' | 'fort'; weapon?: WeaponId; turret?: TurretType; ang?: number }
-  | { t: 'railbeam'; x1: number; y1: number; x2: number; y2: number }
-  | { t: 'hit'; id: number; x: number; y: number; dmg: number; burn?: boolean; crit?: boolean; slow?: boolean; dir?: 1 | -1; weapon?: WeaponId; heavy?: boolean }
+  | { t: 'shot'; x: number; y: number; from: 'player' | 'turret' | 'fort'; weapon?: WeaponId; turret?: TurretType; ang?: number; hot?: boolean }
+  | { t: 'railbeam'; x1: number; y1: number; x2: number; y2: number; crit?: boolean }
+  | { t: 'hit'; id: number; x: number; y: number; dmg: number; burn?: boolean; crit?: boolean; slow?: boolean; freeze?: boolean; stun?: boolean; overload?: boolean; dir?: 1 | -1; weapon?: WeaponId; heavy?: boolean }
   | { t: 'lightning'; pts: { x: number; y: number }[]; color?: 'tesla' | 'shock' }
   | { t: 'frost'; x: number; y: number; r: number }
   | { t: 'grenadeThrow' }
   | { t: 'skill'; cls: ClassId }
   | { t: 'kill'; id: number; x: number; kind: ZombieKind; coins: number; meat: number; dir?: 1 | -1; crit?: boolean; boss?: boolean }
   | { t: 'boom'; x: number; y: number; r: number }
-  | { t: 'hurt'; dmg: number; blocked?: number }
+  | { t: 'hurt'; dmg: number; blocked?: number; cover?: number }
   | { t: 'wallHit'; reflect?: boolean }
   | { t: 'homeHit' }
   | { t: 'jump'; onRoof: boolean } | { t: 'swap'; weapon: WeaponId }

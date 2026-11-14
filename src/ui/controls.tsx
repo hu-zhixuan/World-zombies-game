@@ -242,19 +242,23 @@ export function Keys() {
   );
 }
 
-/** 底部中间：当前武器、星级、弹药 + 独立换弹键 */
+/** 底部中间：当前武器、星级、弹药/加特林蓄热 + 独立换弹键 */
 export function WeaponChip() {
-  const run = game.run, w = curWeapon(run), def = WEAPONS[w.id];
-  const reloading = run.player.reloadT > 0, mag = magSize(w.id, w.star);
+  const run = game.run, p = run.player, w = curWeapon(run), def = WEAPONS[w.id];
+  const reloading = p.reloadT > 0, mag = magSize(w.id, w.star);
+  const isSmg = w.id === 'smg', hot = isSmg && p.smgHeat >= 0.65;
   return (
     <div class="weapon-wrap">
-      <button class={`weapon ${reloading ? 'reloading' : ''}`} id="weapon-chip" onPointerDown={() => game.press('swap')}>
+      <button class={`weapon ${reloading ? 'reloading' : ''}`} data-hot={hot ? '1' : '0'} id="weapon-chip" onPointerDown={() => game.press('swap')}>
         <Icon k={def.icon} />
         <span class="col">
           <Stars n={w.star} />
-          <Bar cls="ammo" v={reloading ? 1 - run.player.reloadT / def.reload : w.ammo / mag} />
+          <Bar cls="ammo" v={reloading ? 1 - p.reloadT / def.reload : w.ammo / mag} />
+          {isSmg && (
+            <span class="bar heat" id="hud-smg-heat" ref={(el) => { el?.style.setProperty('--v', Math.max(0, Math.min(1, p.smgHeat)).toFixed(2)); }}><b /></span>
+          )}
         </span>
-        <small>{reloading ? '换弹中' : `${w.ammo}/${mag}`}{run.player.weapons.length > 1 ? ` · 切(${run.player.cur + 1}/${run.player.weapons.length})` : ` · ${def.trait}`}</small>
+        <small>{reloading ? '换弹中' : `${w.ammo}/${mag}`}{hot ? ' · 高热' : p.weapons.length > 1 ? ` · 切(${p.cur + 1}/${p.weapons.length})` : ` · ${def.trait}`}</small>
       </button>
       <button id="key-reload" class={`btn-reload ${reloading ? 'cooling' : ''}`} onPointerDown={() => game.press('reload')}>换弹</button>
     </div>
