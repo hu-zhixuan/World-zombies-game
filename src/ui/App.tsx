@@ -293,13 +293,18 @@ function KitchenPanel() {
     : 1;
 
   return (
-    <Panel id="panel-kitchen" cls="wide" title="深夜小食堂" head={<><Purse /><Btn id="btn-close" kind="primary" onClick={() => game.close()}>回堂内</Btn></>}>
-      <div class="diner-meta">
-        <span class="meta-pill">口碑 <b>{repTier.name}</b> ({run.diner.rep})</span>
-        <span class="meta-pill">废土榜 <b>{fansRank.cur.grade}级·{fansRank.cur.name}</b> ({run.diner.fans}粉)</span>
-        <span class="meta-pill trend">{run.diner.trendTitle} · +35%金/×2粉</span>
+    <Panel id="panel-kitchen" cls="wide" title="深夜小食堂" head={
+      <div class="diner-head-right">
+        {!cookTarget && (
+          <div class="diner-tabs">
+            <button id="tab-kitchen-dine" class={`tab-btn ${tab === 'dine' ? 'on' : ''}`} onClick={() => setTab('dine')}>今夜堂食</button>
+            <button id="tab-kitchen-menu" class={`tab-btn ${tab === 'menu' ? 'on' : ''}`} onClick={() => setTab('menu')}>特餐 ({unlockedCount}/6)</button>
+            <button id="tab-kitchen-vip" class={`tab-btn ${tab === 'vip' ? 'on' : ''}`} onClick={() => setTab('vip')}>图鉴 ({run.diner.metVips.length}/15)</button>
+          </div>
+        )}
+        <Btn id="btn-close" kind="primary" onClick={() => game.close()}>回堂内</Btn>
       </div>
-
+    }>
       {cookTarget ? (
         <div class="cook-qte" id="cook-qte-box">
           <div class="qte-head">
@@ -321,11 +326,10 @@ function KitchenPanel() {
         </div>
       ) : (
         <>
-          <div class="diner-tabs">
-            <button id="tab-kitchen-dine" class={`tab-btn ${tab === 'dine' ? 'on' : ''}`} onClick={() => setTab('dine')}>今夜堂食</button>
-            <button id="tab-kitchen-menu" class={`tab-btn ${tab === 'menu' ? 'on' : ''}`} onClick={() => setTab('menu')}>特餐菜单 ({unlockedCount}/6)</button>
-            <button id="tab-kitchen-vip" class={`tab-btn ${tab === 'vip' ? 'on' : ''}`} onClick={() => setTab('vip')}>VIP与点评 ({run.diner.metVips.length}/15)</button>
-            <span class="tab-stat">{run.meal ? `已备特餐：${MEALS[run.meal].name}` : '今晚未留特餐'}</span>
+          <div class="diner-ribbon">
+            <span><b>{fansRank.cur.grade}级·{fansRank.cur.name}</b> ({run.diner.fans}粉 · {repTier.name})</span>
+            <em class="ribbon-trend">热搜「{run.diner.trendTag}」+35%金 · ×2粉</em>
+            <small class={run.meal ? 'meal-set' : ''}>{run.meal ? `明日特餐：${MEALS[run.meal].name}` : '未留明日特餐'}</small>
           </div>
 
           {tab === 'dine' && (
@@ -349,9 +353,9 @@ function KitchenPanel() {
                         )}
                       </div>
                       <div class="guest-dish">
-                        <Icon k={MEALS[g.dish].icon} />
+                        <Icon k={MEALS[g.dish].icon} cls="dish" />
                         <b>{g.dishName}</b>
-                        {g.trendMatch && <u class="trend-hit">热搜</u>}
+                        {g.trendMatch && <u class="trend-hit">热</u>}
                         <small>{g.meatCost}肉→{g.pay}金</small>
                       </div>
                       <small class="quote">「{g.served ? (g.reactionQuote ?? g.thanksQuote) : g.orderQuote}」</small>

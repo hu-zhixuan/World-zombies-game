@@ -360,24 +360,51 @@ class SoundEngine {
           return;
         }
         const w = e.weapon ?? 'pistol';
-        if (w === 'tesla') { this.tone(960, 0.11, 'sawtooth', 0.17, { slide: 260 }); this.noise(0.05, 0.11, 3600, { highpass: true }); }
-        else if (w === 'rocket') { this.tone(220, 0.18, 'sawtooth', 0.22, { slide: 75, cutoff: 950 }); this.noise(0.15, 0.22, 1100); }
-        else if (w === 'shotgun') { this.tone(165, 0.12, 'square', 0.22, { slide: 52, cutoff: 900 }); this.noise(0.12, 0.28, 1450); }
-        else if (w === 'rifle') { this.tone(1320, 0.12, 'sawtooth', 0.19, { slide: 140 }); this.tone(180, 0.14, 'sine', 0.22, { slide: 48 }); this.noise(0.09, 0.24, 2400); }
-        else if (w === 'smg' || w === 'assault') { this.tone(360, 0.045, 'square', 0.11, { slide: 130, cutoff: 1500 }); this.noise(0.035, 0.1, 1950); }
-        else if (w === 'revolver') { this.tone(240, 0.1, 'square', 0.21, { slide: 68, cutoff: 1250 }); this.noise(0.08, 0.2, 1750); }
-        else { this.tone(310, 0.06, 'square', 0.14, { slide: 95, cutoff: 1450 }); this.noise(0.05, 0.13, 1800); }
+        if (w === 'tesla') {
+          this.tone(980, 0.11, 'sawtooth', 0.18, { slide: 260 });
+          this.noise(0.055, 0.13, 3600, { highpass: true });
+        } else if (w === 'rocket') {
+          this.tone(150, 0.16, 'sine', 0.24, { slide: 42 });
+          this.tone(240, 0.2, 'sawtooth', 0.22, { slide: 78, cutoff: 950 });
+          this.noise(0.16, 0.24, 1150);
+        } else if (w === 'shotgun') {
+          this.tone(135, 0.13, 'sine', 0.28, { slide: 36 });
+          this.tone(185, 0.12, 'square', 0.22, { slide: 54, cutoff: 920 });
+          this.noise(0.14, 0.3, 1600);
+          this.noise(0.04, 0.12, 3200, { highpass: true, delay: 0.08 });
+        } else if (w === 'rifle') {
+          this.tone(1360, 0.12, 'sawtooth', 0.2, { slide: 150 });
+          this.tone(175, 0.15, 'sine', 0.27, { slide: 42 });
+          this.noise(0.1, 0.26, 2600);
+        } else if (w === 'smg' || w === 'assault') {
+          this.tone(145, 0.04, 'sine', 0.14, { slide: 48 });
+          this.tone(390, 0.048, 'square', 0.12, { slide: 135, cutoff: 1650 });
+          this.noise(0.036, 0.11, 2200);
+        } else if (w === 'revolver') {
+          this.tone(140, 0.1, 'sine', 0.25, { slide: 42 });
+          this.tone(265, 0.1, 'square', 0.22, { slide: 72, cutoff: 1350 });
+          this.noise(0.09, 0.23, 1950);
+        } else {
+          this.tone(135, 0.06, 'sine', 0.18, { slide: 46 });
+          this.tone(340, 0.06, 'square', 0.15, { slide: 98, cutoff: 1600 });
+          this.noise(0.052, 0.15, 2000);
+        }
         break;
       }
       case 'hit':
-        if (now - this.lastHit < 45) return;
+        if (now - this.lastHit < 40) return;
         this.lastHit = now;
-        if (e.crit) this.tone(1040, 0.08, 'triangle', 0.15, { slide: 1420 });
-        else this.tone(155, 0.04, 'triangle', 0.09, { slide: 68 });
+        this.tone(e.heavy || e.crit ? 148 : 172, 0.052, 'sine', e.crit ? 0.22 : 0.14, { slide: 44 });
+        this.noise(0.036, e.crit ? 0.14 : 0.085, e.crit ? 2200 : 1250);
+        if (e.crit) {
+          this.tone(1180, 0.085, 'triangle', 0.16, { slide: 1640 });
+          this.tone(680, 0.06, 'square', 0.075, { slide: 920, cutoff: 2000 });
+        }
         break;
       case 'boom':
-        this.tone(148, 0.34, 'sine', 0.36, { slide: 26 });
-        this.noise(0.36, 0.36, 760);
+        this.tone(162, 0.38, 'sine', 0.38, { slide: 24 });
+        this.tone(110, 0.24, 'triangle', 0.24, { slide: 34 });
+        this.noise(0.38, 0.38, 860);
         break;
       case 'lightning':
         this.noise(0.07, 0.13, 4200, { highpass: true });
@@ -388,12 +415,14 @@ class SoundEngine {
         this.tone(1520, 0.09, 'sine', 0.09, { delay: 0.03, slide: 880 });
         break;
       case 'kill': {
-        if (now - this.lastKill < 45) return;
+        if (now - this.lastKill < 42) return;
         this.killStreak = now - this.lastKill < 950 ? Math.min(5, this.killStreak + 1) : 0;
         this.lastKill = now;
-        const f = 740 * Math.pow(1.09, this.killStreak);
-        this.tone(f, 0.06, 'sine', 0.095, { delay: 0.015 });
-        this.tone(f * 1.4, 0.08, 'sine', 0.085, { delay: 0.045 });
+        this.tone(e.boss ? 120 : 190, e.boss ? 0.22 : 0.075, 'sine', e.boss ? 0.32 : 0.2, { slide: 42 });
+        this.noise(e.boss ? 0.2 : 0.06, e.boss ? 0.24 : 0.13, 1800);
+        const f = 760 * Math.pow(1.09, this.killStreak);
+        this.tone(f, 0.065, 'sine', 0.105, { delay: 0.015 });
+        this.tone(f * 1.45, 0.09, 'sine', 0.095, { delay: 0.045 });
         break;
       }
       case 'hurt':

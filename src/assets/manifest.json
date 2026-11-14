@@ -84,6 +84,16 @@
   "frames": 1,
   "fw": 32
  },
+ "hero_arm": {
+  "fh": 8,
+  "frames": 1,
+  "fw": 15
+ },
+ "hero_arm_rest": {
+  "fh": 12,
+  "frames": 1,
+  "fw": 6
+ },
  "hero_crouch": {
   "fh": 54,
   "frames": 3,
@@ -165,6 +175,21 @@
   "fw": 16
  },
  "ic_crate": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_dish_feast": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_dish_grill": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_dish_hotpot": {
   "fh": 16,
   "frames": 1,
   "fw": 16

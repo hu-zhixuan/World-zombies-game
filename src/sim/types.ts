@@ -41,13 +41,13 @@ export const IN_MAX_X = 626;
 export const IN_STATIONS = {
   kitchen: 148,
   shop: 354,
-  workshop: 515,
-  door: 610,
+  workshop: 520,
+  door: 598,
 } as const;
 export type StationId = keyof typeof IN_STATIONS;
 
-/** 酒馆餐桌食客座位世界 X 坐标 */
-export const DINER_SEAT_X = [282, 354, 423] as const;
+/** 酒馆餐桌食客座位世界 X 坐标（对齐两张原木餐桌两侧座椅，三人完全错开） */
+export const DINER_SEAT_X = [272, 358, 468] as const;
 
 export type Phase = 'fight' | 'clear' | 'perk' | 'camp' | 'dead' | 'won';
 
@@ -190,14 +190,14 @@ export type Command =
 
 /** 这一步发生了什么，给画面层播特效和音效用。 */
 export type GameEvent =
-  | { t: 'shot'; x: number; y: number; from: 'player' | 'turret' | 'fort'; weapon?: WeaponId; turret?: TurretType }
+  | { t: 'shot'; x: number; y: number; from: 'player' | 'turret' | 'fort'; weapon?: WeaponId; turret?: TurretType; ang?: number }
   | { t: 'railbeam'; x1: number; y1: number; x2: number; y2: number }
-  | { t: 'hit'; id: number; x: number; y: number; dmg: number; burn?: boolean; crit?: boolean; slow?: boolean }
+  | { t: 'hit'; id: number; x: number; y: number; dmg: number; burn?: boolean; crit?: boolean; slow?: boolean; dir?: 1 | -1; weapon?: WeaponId; heavy?: boolean }
   | { t: 'lightning'; pts: { x: number; y: number }[]; color?: 'tesla' | 'shock' }
   | { t: 'frost'; x: number; y: number; r: number }
   | { t: 'grenadeThrow' }
   | { t: 'skill'; cls: ClassId }
-  | { t: 'kill'; id: number; x: number; kind: ZombieKind; coins: number; meat: number }
+  | { t: 'kill'; id: number; x: number; kind: ZombieKind; coins: number; meat: number; dir?: 1 | -1; crit?: boolean; boss?: boolean }
   | { t: 'boom'; x: number; y: number; r: number }
   | { t: 'hurt'; dmg: number; blocked?: number }
   | { t: 'wallHit'; reflect?: boolean }
