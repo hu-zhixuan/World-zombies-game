@@ -1,8 +1,8 @@
 // 把规则层、画面层、音效与界面层接起来的地方。全游戏只有这一份状态。
 import { ZOMBIES, unlockedWeapons, type ClassId } from '../content/data';
 import {
-  ALLIES, BOSS_INTROS, BOSS_VICTORY, CINEMATIC_INTRO, COMPANION_JOIN_STORIES,
-  REST_STORY, WAVE_STORY_LINES, type StoryLine,
+  ALLIES, BOSS_VICTORY, CINEMATIC_INTRO, COMPANION_JOIN_STORIES,
+  REST_STORY, type StoryLine,
 } from '../content/story';
 import { command, nearbyExterior, nearbyStation, newRun, step } from '../sim/sim';
 import { NO_INPUT, type Command, type GameEvent, type Input, type RunState } from '../sim/types';
@@ -28,9 +28,6 @@ class Game {
   private stack: UserPanel[] = [];
   storyQueue: QueuedStory[] = [];
   private immediateStory = false;
-  private radioQueue: StoryLine[] = [];
-  radioLine: StoryLine | null = null;
-  private radioMs = 0;
   private listeners = new Set<Listener>();
   private eventListeners = new Set<EventListener>();
   /** 持续按住的输入（左摇杆 / 攻击键） */
@@ -110,15 +107,6 @@ class Game {
     this.notify();
   }
 
-  dismissRadio() {
-    if (!this.radioLine) return;
-    audio.uiClick();
-    this.radioLine = this.radioQueue.shift() ?? null;
-    this.radioMs = this.radioLine ? 3600 : 0;
-    if (this.radioLine) audio.storyBlip(this.radioLine.npc);
-    this.notify();
-  }
-
   chooseClass() {
     audio.unlock();
     audio.uiClick();
@@ -137,9 +125,6 @@ class Game {
     this.stack = [];
     this.storyQueue = [];
     this.immediateStory = false;
-    this.radioQueue = [];
-    this.radioLine = null;
-    this.radioMs = 0;
     this.started = true;
     this.releaseAll();
     this.enqueueStory('序幕 · 十五波围城', CINEMATIC_INTRO);
@@ -191,24 +176,9 @@ class Game {
     return true;
   }
 
-  /** 画面层每帧调用：按固定步长推进规则层与无线电对白字幕 */
+  /** 画面层每帧调用：按固定步长推进规则层 */
   advance(dtMs: number) {
     if (this.panel() !== null) { this.acc = 0; return; }
-
-    if (!this.radioLine && this.radioQueue.length > 0) {
-      this.radioLine = this.radioQueue.shift()!;
-      this.radioMs = 3600;
-      audio.storyBlip(this.radioLine.npc);
-      this.notify();
-    } else if (this.radioLine) {
-      this.radioMs -= dtMs;
-      if (this.radioMs <= 0) {
-        this.radioLine = this.radioQueue.shift() ?? null;
-        this.radioMs = this.radioLine ? 3600 : 0;
-        if (this.radioLine) audio.storyBlip(this.radioLine.npc);
-        this.notify();
-      }
-    }
 
     this.acc = Math.min(this.acc + dtMs, 100);
     const beforePhase = this.run.phase, beforeInside = this.run.inside;
@@ -258,25 +228,8 @@ class Game {
   notify() { this.listeners.forEach((fn) => fn()); }
 
   private emit(e: GameEvent) {
-    if (e.t === 'dayStart') {
-      const waveLines = WAVE_STORY_LINES[e.day];
-      this.radioLine = null;
-      this.radioQueue = waveLines ? [...waveLines] : [];
-      this.radioMs = 0;
-    } else if (e.t === 'bossAppear') {
-      const idx = this.run.day <= 5 ? 0 : this.run.day <= 10 ? 1 : 2;
-      const lines = BOSS_INTROS[idx];
-      if (lines?.length) {
-        this.radioLine = null;
-        this.radioQueue = [...lines, ...this.radioQueue];
-        this.radioMs = 0;
-      }
-    } else if (e.t === 'bossDead') {
-      if (e.bossIdx === 2) {
-        this.enqueueStory('终章 · 直升机撤离', BOSS_VICTORY[2] ?? []);
-      } else if (BOSS_VICTORY[e.bossIdx]?.length) {
-        this.radioQueue.push(...BOSS_VICTORY[e.bossIdx]);
-      }
+    if (e.t === 'bossDead' && e.bossIdx === 2) {
+      this.enqueueStory('终章 · 直升机撤离', BOSS_VICTORY[2] ?? []);
     } else if (e.t === 'allyJoin') {
       const join = COMPANION_JOIN_STORIES[e.day];
       if (join) this.enqueueStory(`${ALLIES[e.ally].name} 加入据点`, join.lines);
@@ -284,8 +237,6 @@ class Game {
       const ev = REST_STORY[e.eventKey];
       if (ev) this.enqueueStory(ev.title, ev.lines);
     } else if (e.t === 'dead' || e.t === 'won') {
-      this.radioQueue = [];
-      this.radioLine = null;
       this.lastGain = starsEarned(this.run);
       this.meta = {
         stars: this.meta.stars + this.lastGain,
