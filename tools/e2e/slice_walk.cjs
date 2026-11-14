@@ -1,4 +1,4 @@
-// 像真玩家一样用真实触摸走完完整流程：标题 → 选职业 → 房顶纯自动战斗 & 手雷技能 → 下房上梯 → 清场三选一 → 酒馆屋内走动 → 小厨房 / 商店 / 工坊建塔升墙升堡垒 → 第 2 天 / 第 5 天 Boss → 暂停 → 死亡重开。
+// 像真玩家一样用真实触摸走完完整流程：标题与档案 → 选职业 → 序幕过场 → 房顶手控锁敌与拖曳手雷 → 下房上梯 → 清场三选一 → 夜宿开张剧情 → 酒馆走动 → 深夜食堂(铁板QTE/特餐/VIP点评墙) / 商店 / 纯金币工坊 → 第 2 天 / 第 5 天 Boss → 暂停 → 死亡重开。
 const L = require('./lib.cjs');
 
 (async () => {
@@ -24,22 +24,52 @@ const L = require('./lib.cjs');
     check(r, sel + ' 整个面板都在屏幕里');
   };
 
-  // 1. 标题与全屏检查
+  // 1. 标题与全屏检查 + 废土剧情档案（3页签）
   await g.shot('01-title');
   await fits('#panel-title');
   check(await g.page.evaluate(() => /星星/.test(document.querySelector('#meta-progress').innerText)), '标题页显示星星和下一个解锁');
   check((await g.state()).panel === 'title', '打开是标题页');
+  check(await g.page.evaluate(() => !document.querySelector('#hud-scrap')), '顶部 HUD 已彻底移除废铁显示');
   const fill = await g.page.evaluate(() => { const r = document.querySelector('#stage canvas').getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), vw: innerWidth, vh: innerHeight }; });
   check(fill.w === fill.vw && fill.h === fill.vh, `画面铺满屏幕，没有黑边 (${fill.w}x${fill.h} / ${fill.vw}x${fill.vh})`);
 
-  // 2. 选职业 & 确认主开火键 (#key-fire) 及右侧扇形键互不重叠
+  await g.tap('#btn-lore');
+  check((await g.state()).panel === 'lore', '从标题可打开废土剧情档案');
+  await fits('#panel-lore');
+  await g.tap('#tab-lore-chapters');
+  await fits('#panel-lore');
+  await g.shot('01c-lore');
+  await g.tap('#tab-lore-allies');
+  await fits('#panel-lore');
+  await g.tap('#btn-close');
+
+  // 2. 选职业 -> 播放序幕剧情 -> 跳过或推进入第 1 天房顶
   await g.tap('#btn-start');
   check((await g.state()).panel === 'class', '点「开始」先选职业');
   await g.shot('01b-class'); await fits('#panel-class');
   check(await g.page.evaluate(() => document.querySelector('#panel-class [data-class=engineer]').disabled && document.querySelector('#panel-class [data-class=chef]').disabled), '0星时工程师/主厨正确锁定');
   await g.tap('#panel-class [data-class=gunner]');
+
   let s = await g.state();
-  check(s.panel === null && s.y <= -90, `进入第 1 天且主角站在二楼房顶防御 (y=${s.y})`);
+  check(s.panel === 'story' && s.storyLen >= 3, `选职业后自动进入序幕剧情动画 (${s.storyLen}段)`);
+  await fits('#panel-story');
+  await g.shot('01d-story-intro');
+  const n0 = s.storyLen;
+  await g.tap('#btn-story-next');
+  check((await g.state()).storyLen === n0 - 1, '点按「下一句」正常推进序幕对白');
+  await g.tap('#btn-story-skip');
+
+  s = await g.state();
+  check(s.panel === null && s.y <= -90, `跳过序幕进入第 1 天且主角站在二楼房顶防御 (y=${s.y})`);
+  await wait(240);
+  check(await g.page.evaluate(() => {
+    const rb = document.querySelector('#wave-dlg-bar');
+    if (!rb) return false;
+    const b = rb.getBoundingClientRect();
+    return b.top >= 32 && b.bottom <= 120;
+  }), '第 1 天开场顶部无线电对白条正确显现且不遮挡按键');
+  await g.shot('01e-radio-bar');
+
   check(await g.page.evaluate(() => !!document.querySelector('#key-fire')), '右下角主开火键 #key-fire 已就位');
   const noOverlap = await g.page.evaluate(() => {
     const ids = ['#key-fire', '#key-jump', '#key-dodge', '#key-grenade', '#key-skill', '#weapon-chip', '#key-reload'];
@@ -117,23 +147,48 @@ const L = require('./lib.cjs');
   await fits('#panel-perk');
   await g.tap('#panel-perk .card');
 
-  // 6. 自动进酒馆室内（能自由在屋内走动，且有 3 位幸存者堂食食客）
+  // 6. 第 1 夜触发深夜食堂开张剧情 -> 跳过后自动进温暖酒馆室内自由走动
   s = await g.state();
-  check(s.panel === null && s.phase === 'camp' && s.inside === true, '选天赋后自动回到酒馆小屋内且可自由走动');
+  check(s.panel === 'story' && s.phase === 'camp', '首夜触发深夜食堂开张小剧场');
+  await fits('#panel-story');
+  await g.shot('04b-diner-story');
+  await g.tap('#btn-story-skip');
+
+  s = await g.state();
+  check(s.panel === null && s.phase === 'camp' && s.inside === true, '剧场结束后进入酒馆小屋内自由走动');
   await g.shot('05-tavern-camp');
   const inX0 = s.x;
   await g.touch('touchStart', pad.x - 36, pad.y); await wait(700); await g.touch('touchEnd');
   check((await g.state()).x < inX0 - 20, '推摇杆能在酒馆屋内向左走到小厨房');
 
-  // 7. 深夜小食堂（招待食客 + 特餐 + 炒肉）、商店（买枪 + 买补给）、工坊（4塔位 + 升墙 + 升堡垒）
-  await g.page.evaluate(() => { window.__game.run.meat = Math.max(8, window.__game.run.meat); window.__game.run.coins = 360; window.__game.run.scrap = 32; window.__game.notify(); });
+  // 7. 深夜小食堂（热搜 + 铁板火候 QTE 招待 + 6道特餐 + 15位VIP图鉴与点评墙 + 炒肉）、商店、纯金币工坊
+  await g.page.evaluate(() => { window.__game.run.meat = 8; window.__game.run.coins = 700; window.__game.notify(); });
   await g.tap('#btn-kitchen');
   check((await g.state()).panel === 'kitchen', '能打开深夜小食堂');
   await g.shot('06-kitchen'); await fits('#panel-kitchen');
+
   await g.tap('#btn-serve-0');
+  check(await g.page.evaluate(() => !!document.querySelector('#cook-qte-box')), '点击上菜进入铁板火候 QTE 烹制台');
+  await fits('#panel-kitchen');
+  await wait(180);
+  await g.shot('06d-cooking-qte');
+  await g.tap('#btn-qte-hit');
+  s = await g.state();
+  check(s.fans > 0 && s.rep > 0, `铁板出锅成功招待熟客并涨粉涨口碑 (fans=${s.fans}, rep=${s.rep})`);
+
+  await g.tap('#tab-kitchen-menu');
+  await g.shot('06b-kitchen-menu'); await fits('#panel-kitchen');
   await g.tap('#btn-meal-spicy_skewer');
+  await g.tap('#btn-qte-quick');
+  check(await g.page.evaluate(() => window.__game.run.meal === 'spicy_skewer'), '特餐菜单可通过铁板/快手留餐');
+
+  await g.tap('#tab-kitchen-vip');
+  await g.shot('06c-kitchen-vip'); await fits('#panel-kitchen');
+  check(await g.page.evaluate(() => document.querySelectorAll('.vip-cell').length === 15 && document.querySelectorAll('.review-item').length >= 1), 'VIP 页展示 15 位熟客图鉴与首条食客点评');
+
+  await g.tap('#tab-kitchen-dine');
   await g.tap('#btn-cook-all');
-  check((await g.state()).meat === 0 && (await g.state()).coins > 380, '深夜小食堂能招待熟客、留特餐和炒肉卖钱');
+  check((await g.state()).meat === 0 && (await g.state()).coins > 700, '富余鲜肉现炒全部售出换金币');
   await g.tap('#btn-close');
 
   await g.tap('#btn-shop');
@@ -146,14 +201,15 @@ const L = require('./lib.cjs');
   await g.tap('#btn-close');
 
   await g.tap('#btn-build');
-  check((await g.state()).panel === 'build', '能打开防线工坊');
+  check((await g.state()).panel === 'build', '能打开防线工坊（纯金币建设，无废铁文字）');
+  check(await g.page.evaluate(() => !/废铁/.test(document.querySelector('#panel-build').innerText)), '工坊文案不再提及废铁');
   await g.tap('#btn-build-0-frost');
   await g.tap('#btn-build-2-tesla');
   await g.tap('#btn-wall-up');
   await g.tap('#btn-fort-up');
   await g.shot('08-build'); await fits('#panel-build');
   s = await g.state();
-  check(s.turrets >= 3 && s.wallLv === 2 && s.fortLv === 2, `能加建冰霜/电弧塔并升级壁垒与堡垒 (turrets=${s.turrets}, wall=${s.wallLv}, fort=${s.fortLv})`);
+  check(s.turrets >= 3 && s.wallLv === 2 && s.fortLv === 2, `纯金币能建冰霜/电弧塔并升级壁垒与堡垒 (turrets=${s.turrets}, wall=${s.wallLv}, fort=${s.fortLv})`);
   await g.tap('#btn-close');
 
   // 8. 出门查看升级后的哥特石堡与炮塔防线，随后迎战第 2 天
@@ -181,7 +237,7 @@ const L = require('./lib.cjs');
   await wait(350);
   await g.shot('10-boss5');
 
-  // 10. 暂停、死亡与重开
+  // 10. 暂停（含战局剧情入口）、死亡与重开
   await g.tap('#btn-pause');
   check((await g.state()).panel === 'pause', '能暂停');
   const tp = (await g.state()).tick;
@@ -195,6 +251,7 @@ const L = require('./lib.cjs');
   await g.tap('#btn-again');
   check((await g.state()).panel === 'class', '再来一局先选职业');
   await g.tap('#panel-class [data-class=gunner]');
+  await g.tap('#btn-story-skip');
   s = await g.state();
   check(s.panel === null && s.day === 1 && s.hp === 100 && s.kills === 0, '重开是全新的一局');
 

@@ -33,7 +33,7 @@ exports.open = async (opts = {}) => {
     browser, page, errors, center, touch,
     /** 真实触摸点一下 */
     tap: async (sel) => { const c = await center(sel); await touch('touchStart', c.x, c.y); await page.waitForTimeout(60); await touch('touchEnd'); await page.waitForTimeout(250); },
-    state: () => page.evaluate(() => { const g = window.__game, r = g.run; return { panel: g.panel(), phase: r.phase, day: r.day, tick: r.tick, hp: r.player.hp, armor: r.player.armor, grenades: r.player.grenades, x: Math.round(r.player.x), y: Math.round(r.player.y), inside: r.inside, zombies: r.zombies.length, boss: r.zombies.some((z) => z.kind.startsWith('boss_')), kills: r.kills, coins: r.coins, scrap: r.scrap, meat: r.meat, wallLv: r.wall.level, fortLv: r.fort.level, turrets: r.turrets.filter((t) => !!t.type).length, weapons: r.player.weapons.map((w) => w.id + w.star).join(','), target: r.targetId }; }),
+    state: () => page.evaluate(() => { const g = window.__game, r = g.run; return { panel: g.panel(), phase: r.phase, day: r.day, tick: r.tick, hp: r.player.hp, armor: r.player.armor, grenades: r.player.grenades, x: Math.round(r.player.x), y: Math.round(r.player.y), inside: r.inside, zombies: r.zombies.length, boss: r.zombies.some((z) => z.kind.startsWith('boss_')), kills: r.kills, coins: r.coins, meat: r.meat, fans: r.diner.fans, rep: r.diner.rep, allies: r.story.allies.length, storyLen: g.storyQueue.length, radio: !!g.radioLine, wallLv: r.wall.level, fortLv: r.fort.level, turrets: r.turrets.filter((t) => !!t.type).length, weapons: r.player.weapons.map((w) => w.id + w.star).join(','), target: r.targetId }; }),
     shot: (name) => page.screenshot({ path: path.join(exports.SHOTS, name + '.png') }),
   };
 };

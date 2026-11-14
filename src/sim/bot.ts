@@ -1,5 +1,5 @@
 // 自动打的机器人：用来在测试里跑完整 15 天流程，检验难度曲线与各模块经济联动。
-import { WEAPONS, ZOMBIES, type TurretType } from '../content/data';
+import { WEAPONS, ZOMBIES, unlockedMeals, type TurretType } from '../content/data';
 import { command, isOnPorch, isOnRoof, step } from './sim';
 import { NO_INPUT, PORCH_MAX_X, ROOF_MAX_X, WALL_X, type GameEvent, type Input, type RunState } from './types';
 
@@ -36,28 +36,28 @@ export function botInput(run: RunState): Input {
 export interface BotReport { won: boolean; ticks: number; days: { day: number; seconds: number; hpLost: number; wallLost: number }[]; events: GameEvent[] }
 
 function manageCamp(run: RunState) {
-  // 1. 先留一份明天的特餐，再把店里等餐的幸存者食客依次招待上菜，最后将富余鲜肉现炒出锅
-  if (run.meat >= 3 && !run.meal) command(run, { t: 'pickMeal', id: run.player.hp < run.player.maxHp * 0.7 ? 'hearty_stew' : 'iron_steak' });
-  else if (run.meat >= 2 && !run.meal) command(run, { t: 'pickMeal', id: 'spicy_skewer' });
-  for (const g of run.guests) {
-    if (!g.served && run.meat >= g.meatCost) command(run, { t: 'serveGuest', guestId: g.id });
+  // 1. 深夜食堂经营：先留一份明日战前特餐，再逐一招待 VIP 食客拿金币+涨粉，富余鲜肉现炒变现
+  const meals = unlockedMeals(Math.max(1, run.day));
+  if (!run.meal && run.meat >= 3) {
+    const wantId = run.player.hp < run.player.maxHp * 0.7 && meals.some((m) => m.id === 'hearty_stew')
+      ? 'hearty_stew'
+      : meals[meals.length - 1].id;
+    command(run, { t: 'pickMeal', id: wantId, quality: 'perfect' });
   }
+  for (const g of run.guests) {
+    if (!g.served && run.meat >= g.meatCost) {
+      command(run, { t: 'serveGuest', guestId: g.id, quality: 'perfect' });
+    }
+  }
+  if (!run.meal && run.meat >= 1) command(run, { t: 'pickMeal', id: 'spicy_skewer', quality: 'good' });
   if (run.meat > 0) command(run, { t: 'cookSell', count: run.meat });
 
-  // 2. 修理和升级路障与堡垒
+  // 2. 优先修补并升级壁垒与大屋，随后补齐武器与 4 座金币炮塔防线
   command(run, { t: 'repairWall' });
   command(run, { t: 'repairFort' });
   if (run.day >= 2) command(run, { t: 'upgradeWall' });
   if (run.day >= 4) command(run, { t: 'upgradeFort' });
 
-  // 3. 用废铁建满 4 个炮塔槽位并优先升级
-  const order: [number, TurretType][] = [[0, 'frost'], [2, 'tesla'], [3, 'cannon'], [1, 'mg']];
-  for (const [slot, kind] of order) {
-    if (!run.turrets[slot].type) command(run, { t: 'buildTurret', slot, kind });
-  }
-  for (let i = 0; i < run.turrets.length; i++) command(run, { t: 'upgradeTurret', slot: i });
-
-  // 4. 商店购入新武器或给主力升星 + 补充手雷与护甲
   for (const id of run.shop) {
     if (!run.player.weapons.some((w) => w.id === id) && WEAPONS[id].price <= run.coins) {
       command(run, { t: 'buyWeapon', weapon: id });
@@ -65,8 +65,15 @@ function manageCamp(run: RunState) {
   }
   const ranked = [...run.player.weapons].sort((a, b) => WEAPONS[b.id].price - WEAPONS[a.id].price);
   for (const w of ranked) command(run, { t: 'buyStar', weapon: w.id });
-  if (run.player.grenades < 3) command(run, { t: 'buySupply', item: 'grenade' });
-  if (run.player.armor < 30) command(run, { t: 'buySupply', item: 'armor' });
+
+  const order: [number, TurretType][] = [[0, 'frost'], [2, 'tesla'], [3, 'cannon'], [1, 'mg']];
+  for (const [slot, kind] of order) {
+    if (!run.turrets[slot].type) command(run, { t: 'buildTurret', slot, kind });
+  }
+  for (let i = 0; i < run.turrets.length; i++) command(run, { t: 'upgradeTurret', slot: i });
+
+  if (run.player.grenades < 2) command(run, { t: 'buySupply', item: 'grenade' });
+  if (run.player.armor < 25) command(run, { t: 'buySupply', item: 'armor' });
 }
 
 /** 跑到通关或死亡。每天清场后选第一个天赋、整备营地与小厨房。 */

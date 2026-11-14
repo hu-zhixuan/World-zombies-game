@@ -2,7 +2,8 @@
 import Phaser from 'phaser';
 import { game } from '../app/game';
 import { ASSETS } from '../assets';
-import { DINER_GUESTS, MEALS, WEAPONS, ZOMBIES } from '../content/data';
+import { MEALS, WEAPONS, ZOMBIES } from '../content/data';
+import { ALLIES } from '../content/story';
 import { FORT_GUN_X, computeGrenadeThrow, curWeapon, nearbyExterior, nearbyStation, turretWorldPos } from '../sim/sim';
 import {
   DOOR_X, GROUND_Y, IN_STATIONS, LADDER_X, PORCH_MAX_X, PORCH_MIN_X, PORCH_Y,
@@ -34,6 +35,7 @@ export class GameScene extends Phaser.Scene {
   private wallTierObjs: { minLv: number; obj: Phaser.GameObjects.Image }[] = [];
 
   private zombies = new Map<number, Phaser.GameObjects.Sprite>();
+  private allySprites = new Map<string, Phaser.GameObjects.Sprite>();
   private guestSprites = new Map<string, Phaser.GameObjects.Sprite>();
   private guestDishSprites = new Map<string, Phaser.GameObjects.Image>();
   private crates = new Map<number, Phaser.GameObjects.Image>();
@@ -67,7 +69,7 @@ export class GameScene extends Phaser.Scene {
     const anim = (key: string, fps: number, repeat = -1) => this.anims.create({ key, frames: this.anims.generateFrameNumbers(key), frameRate: fps, repeat });
     anim('hero_idle', 7); anim('hero_run', 18); anim('hero_shoot', 16); anim('hero_jump', 8); anim('hero_fall', 8); anim('hero_hurt', 10); anim('hero_crouch', 14, 0);
     for (const z of Object.values(ZOMBIES)) for (const key of z.sprites) anim(key, z.fps);
-    for (const g of DINER_GUESTS) anim(g.sprite, g.fps);
+    for (const [key, fps] of [['npc_hat', 6], ['npc_bearded', 6], ['npc_woman', 7], ['npc_oldman', 7]] as const) anim(key, fps);
     anim('z_death', 14, 0);
     anim('fx_stove', 10);
     anim('fx_fireball', 14); anim('fx_boom', 20, 0);
@@ -219,6 +221,41 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private syncAllies() {
+    const run = game.run, inside = run.inside;
+    const seen = new Set<string>();
+    const extPos: Record<string, [number, number, boolean]> = {
+      zhang: [132, GROUND_Y + ROOF_Y, false],
+      lin: [266, GROUND_Y + PORCH_Y, false],
+      qiang: [342, GROUND_Y, false],
+      zhao: [58, GROUND_Y + ROOF_Y, false],
+    };
+    const intPos: Record<string, [number, number, boolean]> = {
+      zhang: [212, GROUND_Y, false],
+      lin: [94, GROUND_Y, false],
+      qiang: [558, GROUND_Y, true],
+      zhao: [590, GROUND_Y, true],
+    };
+    for (const allyId of run.story.allies) {
+      seen.add(allyId);
+      const meta = ALLIES[allyId];
+      let sp = this.allySprites.get(allyId);
+      if (!sp) {
+        sp = this.add.sprite(0, GROUND_Y, meta.sprite).setOrigin(0.5, 1).setDepth(D.actor - 0.1).setScale(0.92);
+        sp.play(meta.sprite);
+        this.allySprites.set(allyId, sp);
+      }
+      const [x, y, flip] = (inside ? intPos : extPos)[allyId] ?? [200, GROUND_Y, false];
+      sp.setVisible(true).setPosition(x, y).setFlipX(flip);
+    }
+    for (const [id, sp] of this.allySprites) {
+      if (!seen.has(id)) {
+        sp.destroy();
+        this.allySprites.delete(id);
+      }
+    }
+  }
+
   private syncDinerGuests() {
     const run = game.run, inside = run.inside;
     const seen = new Set<string>();
@@ -245,8 +282,10 @@ export class GameScene extends Phaser.Scene {
     }
     for (const [id, sp] of this.guestSprites) {
       if (!seen.has(id)) {
-        sp.setVisible(false);
-        this.guestDishSprites.get(id)?.setVisible(false);
+        sp.destroy();
+        this.guestSprites.delete(id);
+        this.guestDishSprites.get(id)?.destroy();
+        this.guestDishSprites.delete(id);
       }
     }
   }
@@ -270,6 +309,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.syncTurretSprites();
+    this.syncAllies();
     this.syncDinerGuests();
 
     // 摄像机跟随（室内切出/入时快速贴近）
@@ -414,15 +454,17 @@ export class GameScene extends Phaser.Scene {
       drawStationMark('workshop', GROUND_Y - 72);
       drawStationMark('door', GROUND_Y - 68);
 
-      // 餐桌旁食客头顶的点单气泡提示（未上菜时显示暖金色点单呼吸气泡）
+      // 餐桌旁食客头顶的点单气泡提示（按 VIP 阶级镶边，热搜菜品加金色辉光）
       for (const guest of run.guests) {
         const gy = GROUND_Y - 54 + bob * 0.7;
+        const tierCol = guest.tier === 'diamond' ? C.rose : guest.tier === 'platinum' ? C.electric : guest.tier === 'gold' ? C.gold : guest.tier === 'silver' ? C.frost : C.copper;
         if (!guest.served) {
-          g.fillStyle(C.ink, 0.85).fillRoundedRect(guest.x - 9, gy - 12, 18, 12, 3);
-          g.lineStyle(1, C.gold, 0.95).strokeRoundedRect(guest.x - 9, gy - 12, 18, 12, 3);
-          g.fillStyle(C.gold, 0.95).fillCircle(guest.x - 4, gy - 6, 1.5).fillCircle(guest.x, gy - 6, 1.5).fillCircle(guest.x + 4, gy - 6, 1.5);
+          g.fillStyle(C.ink, 0.85).fillRoundedRect(guest.x - 10, gy - 12, 20, 12, 3);
+          g.lineStyle(1.3, guest.trendMatch ? C.gold : tierCol, 0.95).strokeRoundedRect(guest.x - 10, gy - 12, 20, 12, 3);
+          g.fillStyle(guest.trendMatch ? C.gold : tierCol, 0.95).fillCircle(guest.x - 4, gy - 6, 1.5).fillCircle(guest.x, gy - 6, 1.5).fillCircle(guest.x + 4, gy - 6, 1.5);
         } else {
-          g.fillStyle(C.green, 0.85).fillCircle(guest.x, gy - 6, 3);
+          const doneCol = guest.qualityServed === 'legendary' ? C.gold : C.green;
+          g.fillStyle(doneCol, 0.9).fillCircle(guest.x, gy - 6, guest.qualityServed === 'legendary' ? 3.5 : 3);
         }
       }
       return;
@@ -626,9 +668,18 @@ export class GameScene extends Phaser.Scene {
         this.burst('fx_boom', 118, GROUND_Y - 36, 0.65);
         const guest = game.run.guests.find((o) => o.id === e.guestId);
         const gx = guest ? guest.x : 340;
-        floaters.add(gx, GROUND_Y - 62, '+' + e.coins + ' 金币', 'coin');
+        const burstN = e.quality === 'legendary' ? 10 : e.quality === 'perfect' ? 6 : 3;
+        for (let i = 0; i < burstN; i++) {
+          this.spawnSpark(gx, GROUND_Y - 40, Phaser.Math.FloatBetween(-1.4, 1.4), Phaser.Math.FloatBetween(-2.2, -0.6), 0.08, 26, 2.2, e.quality === 'legendary' ? C.gold : C.ember);
+        }
+        floaters.add(gx, GROUND_Y - 62, '+' + e.coins + '金', 'coin');
         break;
       }
+      case 'allyJoin':
+        for (let i = 0; i < 10; i++) {
+          this.spawnSpark(game.run.player.x, GROUND_Y + game.run.player.y - 24, Phaser.Math.FloatBetween(-2, 2), Phaser.Math.FloatBetween(-2.8, -0.8), 0.09, 28, 2.6, C.gold);
+        }
+        break;
       case 'cook':
         if (game.run.inside) {
           this.burst('fx_boom', 118, GROUND_Y - 36, 0.6);
