@@ -1,11 +1,16 @@
 import { describe, expect, test } from 'vitest';
 import {
   CLASSES, CRIT_MUL, FORT_LEVELS, LAST_DAY, MEALS, WALL_LEVELS, WEAPONS,
-  nextUnlock, sustainedDps, unlockedClasses, unlockedWeapons, zombieHp,
+  nextUnlock, sustainedDps, unlockedClasses, unlockedMeals, unlockedWeapons, zombieHp,
 } from '../src/content/data';
+import {
+  BOSS_INTROS, BOSS_VICTORY, CINEMATIC_INTRO, COMPANION_JOIN_STORIES, QUALITY_META,
+  REST_STORY, VIP_CUSTOMERS, WAVE_STORY_LINES,
+} from '../src/content/story';
 import { runBot } from '../src/sim/bot';
 import {
-  BODY_Y, MAX_CARRY, command, computeGrenadeThrow, damageMul, effectiveRange, isOnPorch, isOnRoof, meatPrice, newRun, step, turretBuildCost, turretUpgradeCost,
+  BODY_Y, MAX_CARRY, command, computeGrenadeThrow, damageMul, effectiveRange,
+  isOnPorch, isOnRoof, meatPrice, newRun, step, turretBuildCost, turretRefundCoins, turretUpgradeCost,
 } from '../src/sim/sim';
 import { DOOR_X, GROUND_Y, HOUSE_WALL_X, IN_STATIONS, NO_INPUT, PORCH_MAX_X, PORCH_Y, ROOF_Y, WALL_X, type RunState } from '../src/sim/types';
 
@@ -156,8 +161,9 @@ describe('2D 小屋实体碰撞、阶梯跳台与元气骑士式手动开火锁�
 });
 
 describe('武器升星、可控抛物线手雷、护甲与商店', () => {
-  test('捡到新武器进武器栏，捡到已有的升星，满星转废铁', () => {
+  test('移除废铁双货币：捡到新武器进武器栏，已有升星，满星直接折算金币', () => {
     const r = quiet(); r.player.x = 280; r.player.y = 0;
+    expect('scrap' in r).toBe(false);
     r.crates.push({ id: 900, x: 280, weapon: 'smg' });
     expect(step(r, NO_INPUT).some((e) => e.t === 'pickup' && e.isNew)).toBe(true);
     expect(r.player.weapons.map((w) => w.id)).toEqual(['pistol', 'smg']);
@@ -165,7 +171,7 @@ describe('武器升星、可控抛物线手雷、护甲与商店', () => {
     expect(step(r, NO_INPUT).some((e) => e.t === 'star' && e.star === 2)).toBe(true);
     r.player.weapons[0].star = 5;
     r.crates.push({ id: 902, x: 280, weapon: 'pistol' }); step(r, NO_INPUT);
-    expect(r.scrap).toBe(4);
+    expect(r.coins).toBe(45);
   });
 
   test('随身最多 3 把武器：超出时替换手中武器', () => {
@@ -220,23 +226,37 @@ describe('武器升星、可控抛物线手雷、护甲与商店', () => {
   });
 });
 
-describe('酒馆室内、深夜小食堂食客招待、4 炮塔与堡垒路障升级', () => {
-  test('选完天赋自动进酒馆屋内，可招待 3 位堂食熟客赢取满堂打赏、留私房特餐并现炒鲜肉', () => {
+describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金币升级', () => {
+  test('选完天赋自动进酒馆并触发初开张剧情，可铁板炒菜招待 VIP 拿声望粉丝/点评/热搜加成并留特餐', () => {
     const r = quiet(); r.phase = 'perk'; r.perkChoices = ['rooftop'];
-    command(r, { t: 'pickPerk', id: 'rooftop' });
+    const perkEvs = command(r, { t: 'pickPerk', id: 'rooftop' })!;
+    expect(perkEvs.some((e) => e.t === 'dinerStory' && e.eventKey === 'firstOpen')).toBe(true);
     expect(r.phase).toBe('camp');
     expect(r.inside).toBe(true);
     expect(r.guests.length).toBe(3);
 
-    r.meat = 10;
-    for (const g of r.guests) {
-      const ev = command(r, { t: 'serveGuest', guestId: g.id });
-      expect(ev).not.toBeNull();
+    r.meat = 12;
+    const serveEv = command(r, { t: 'serveGuest', guestId: r.guests[0].id, quality: 'legendary' })!;
+    expect(serveEv).not.toBeNull();
+    const evData = serveEv.find((e) => e.t === 'serve');
+    expect(evData && evData.t === 'serve' ? evData.firstMeet : false).toBe(true);
+    expect(r.diner.fans).toBeGreaterThanOrEqual(QUALITY_META.legendary.fans);
+    expect(r.diner.rep).toBeGreaterThanOrEqual(QUALITY_META.legendary.rep);
+    expect(r.diner.reviews.length).toBe(1);
+    expect(r.diner.metVips.length).toBe(1);
+
+    for (let i = 1; i < r.guests.length; i++) {
+      expect(command(r, { t: 'serveGuest', guestId: r.guests[i].id, quality: 'perfect' })).not.toBeNull();
     }
     expect(r.guests.every((g) => g.served)).toBe(true);
-    expect(r.coins).toBeGreaterThan(60);
+    expect(r.coins).toBeGreaterThan(85);
 
-    command(r, { t: 'pickMeal', id: 'spicy_skewer' });
+    // 6 道食谱随天数解锁，第 1 天不可做第 7 天才解锁的终章末日大餐
+    expect(unlockedMeals(1).length).toBe(1);
+    expect(unlockedMeals(7).length).toBe(6);
+    expect(command(r, { t: 'pickMeal', id: 'apocalypse_feast' })).toBeNull();
+
+    command(r, { t: 'pickMeal', id: 'spicy_skewer', quality: 'legendary' });
     expect(r.meal).toBe('spicy_skewer');
     if (r.meat > 0) command(r, { t: 'cookSell', count: r.meat });
     expect(r.meat).toBe(0);
@@ -245,10 +265,10 @@ describe('酒馆室内、深夜小食堂食客招待、4 炮塔与堡垒路障�
     step(r, { ...NO_INPUT, interact: true });
     expect(r.inside).toBe(false);
     expect(r.player.x).toBe(DOOR_X);
-    // 次日特餐转为战斗伤害加成
+    // 次日特餐（含传说火候加成）转为战斗伤害加成
     command(r, { t: 'nextDay' });
     expect(r.inside).toBe(false);
-    expect(r.buff.dmgMul).toBeCloseTo(MEALS.spicy_skewer.dmgMul);
+    expect(r.buff.dmgMul).toBeCloseTo(MEALS.spicy_skewer.dmgMul * QUALITY_META.legendary.buffMul);
     expect(damageMul(r)).toBeGreaterThan(1.5); // 房顶居高 + 特餐
   });
 
@@ -258,17 +278,58 @@ describe('酒馆室内、深夜小食堂食客招待、4 炮塔与堡垒路障�
     expect(meatPrice('chef')).toBeGreaterThan(meatPrice('gunner'));
     const c = newRun(9, ['revolver', 'smg'], 'chef');
     c.phase = 'camp'; c.meat = 3;
-    command(c, { t: 'pickMeal', id: 'spicy_skewer' });
+    command(c, { t: 'pickMeal', id: 'spicy_skewer', quality: 'good' });
     command(c, { t: 'nextDay' });
     expect(c.buff.dmgMul).toBeCloseTo(MEALS.spicy_skewer.dmgMul * 1.5);
   });
 
-  test('4 个炮塔位（冰霜减速、电弧跳跃、重炮爆炸）与 3 级路障/堡垒均生效', () => {
-    const r = quiet(); r.phase = 'camp'; r.scrap = 60; r.coins = 300;
+  test('全剧情文案与 15 位 VIP 档案齐备，且 2/4/6/8 天战友加入正确提供永久增益', () => {
+    expect(CINEMATIC_INTRO.length).toBeGreaterThanOrEqual(5);
+    expect(VIP_CUSTOMERS.length).toBe(15);
+    for (let d = 1; d <= LAST_DAY; d++) expect(WAVE_STORY_LINES[d]?.length).toBeGreaterThanOrEqual(2);
+    expect(BOSS_INTROS.length).toBe(3);
+    expect(BOSS_VICTORY.length).toBe(3);
+    expect(Object.keys(COMPANION_JOIN_STORIES)).toEqual(['2', '4', '6', '8']);
+    expect(REST_STORY.firstOpen.lines.length).toBeGreaterThanOrEqual(5);
+
+    // 验证第 2/4/6/8 天选完天赋招募战友及增益
+    const r = quiet();
+    const baseDmg = damageMul(r);
+    r.day = 2; r.phase = 'perk'; r.perkChoices = ['overclock'];
+    const e2 = command(r, { t: 'pickPerk', id: 'overclock' })!;
+    expect(e2.some((e) => e.t === 'allyJoin' && e.ally === 'zhang')).toBe(true);
+    expect(damageMul(r)).toBeCloseTo(baseDmg * 1.1);
+
+    const wallBefore = r.wall.maxHp;
+    const buildBefore = turretBuildCost('mg', r.cls, false);
+    r.day = 6; r.phase = 'perk'; r.perkChoices = ['vanguard'];
+    const e6 = command(r, { t: 'pickPerk', id: 'vanguard' })!;
+    expect(e6.some((e) => e.t === 'allyJoin' && e.ally === 'qiang')).toBe(true);
+    expect(r.wall.maxHp).toBe(wallBefore + 50);
+    expect(turretBuildCost('mg', r.cls, true)).toBeLessThan(buildBefore);
+
+    // 验证声望里程碑触发 rep10 剧情事件
+    r.diner.rep = 9; r.meat = 5;
+    rollSafeServe(r);
+    function rollSafeServe(st: RunState) {
+      const g = st.guests.find((o) => !o.served);
+      if (!g) return;
+      const se = command(st, { t: 'serveGuest', guestId: g.id, quality: 'legendary' })!;
+      expect(se.some((e) => e.t === 'dinerStory' && e.eventKey === 'rep10')).toBe(true);
+    }
+  });
+
+  test('全金币建造 4 个炮塔位（冰霜/电弧/重炮）与拆塔退金币，以及 3 级路障/堡垒升级', () => {
+    const r = quiet(); r.phase = 'camp'; r.coins = 1200;
     expect(command(r, { t: 'buildTurret', slot: 0, kind: 'frost' })).not.toBeNull();
     expect(command(r, { t: 'buildTurret', slot: 2, kind: 'tesla' })).not.toBeNull();
     expect(command(r, { t: 'buildTurret', slot: 3, kind: 'cannon' })).not.toBeNull();
     expect(command(r, { t: 'upgradeTurret', slot: 0 })).not.toBeNull();
+    const beforeSell = r.coins;
+    expect(command(r, { t: 'sellTurret', slot: 3 })).not.toBeNull();
+    expect(r.coins).toBe(beforeSell + turretRefundCoins('cannon', 1, r.cls));
+    expect(command(r, { t: 'buildTurret', slot: 3, kind: 'cannon' })).not.toBeNull();
+
     expect(command(r, { t: 'upgradeWall' })).not.toBeNull();
     expect(r.wall.level).toBe(2);
     expect(r.wall.maxHp).toBe(WALL_LEVELS[1].maxHp);
@@ -292,7 +353,7 @@ describe('酒馆室内、深夜小食堂食客招待、4 炮塔与堡垒路障�
   });
 
   test('堡垒 3 级夜间自动修墙 30%', () => {
-    const r = quiet(); r.phase = 'camp'; r.coins = 400; r.scrap = 40;
+    const r = quiet(); r.phase = 'camp'; r.coins = 500;
     command(r, { t: 'upgradeFort' });
     command(r, { t: 'upgradeFort' });
     expect(r.fort.level).toBe(3);

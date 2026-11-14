@@ -1,4 +1,5 @@
 import type { ClassId, MealId, PerkId, TurretType, WeaponId, ZombieKind } from '../content/data';
+import type { AllyId, DishQuality, VipTierId } from '../content/story';
 
 /** 世界尺寸（逻辑像素）。画面高 310，室外地面线在 222，下面留给石墙地基与手指按键。 */
 export const VIEW_H = 310;
@@ -80,6 +81,8 @@ export interface TurretSlotState { type: TurretType | null; level: number; cd: n
 
 export interface DinerGuest {
   id: string;
+  vipId: string;
+  tier: VipTierId;
   name: string;
   role: string;
   sprite: string;
@@ -88,9 +91,38 @@ export interface DinerGuest {
   dishName: string;
   meatCost: number;
   pay: number;
+  trendMatch: boolean;
   orderQuote: string;
   thanksQuote: string;
   served: boolean;
+  qualityServed?: DishQuality;
+  reactionQuote?: string;
+}
+
+export interface DinerReview {
+  id: number;
+  author: string;
+  tierName: string;
+  dishName: string;
+  quality: DishQuality;
+  text: string;
+  fansDelta: number;
+}
+
+export interface DinerState {
+  rep: number;
+  fans: number;
+  trendId: string;
+  trendTag: string;
+  trendTitle: string;
+  servedTotal: number;
+  metVips: string[];
+  reviews: DinerReview[];
+}
+
+export interface StoryProgress {
+  allies: AllyId[];
+  seenEvents: string[];
 }
 
 /** 一局的全部状态。能直接 JSON 序列化：存档就是存它。 */
@@ -105,9 +137,12 @@ export interface RunState {
   home: { hp: number; maxHp: number };
   fort: { level: number; cd: number; aim: number };
   spawn: { left: number; timer: number; total: number; killed: number; crateAt: number; bossKind: ZombieKind | null; bossSpawned: boolean };
-  coins: number; scrap: number; meat: number; kills: number;
+  coins: number; meat: number; kills: number;
   meal: MealId | null;
+  mealQuality: DishQuality;
   guests: DinerGuest[];
+  diner: DinerState;
+  story: StoryProgress;
   buff: { dmgMul: number; haste: number };
   shop: WeaponId[];
   perks: PerkId[]; perkChoices: PerkId[];
@@ -136,7 +171,7 @@ export type Command =
   | { t: 'buyStar'; weapon: WeaponId }
   | { t: 'buildTurret'; slot: number; kind: TurretType }
   | { t: 'upgradeTurret'; slot: number }
-  | { t: 'scrapTurret'; slot: number }
+  | { t: 'sellTurret'; slot: number }
   | { t: 'upgradeWall' }
   | { t: 'repairWall' }
   | { t: 'upgradeFort' }
@@ -145,9 +180,9 @@ export type Command =
   | { t: 'buySupply'; item: 'grenade' | 'armor' | 'medkit' }
   | { t: 'rerollShop' }
   | { t: 'salvageWeapon'; index: number }
-  | { t: 'serveGuest'; guestId: string }
+  | { t: 'serveGuest'; guestId: string; quality?: DishQuality }
   | { t: 'cookSell'; count: number }
-  | { t: 'pickMeal'; id: MealId }
+  | { t: 'pickMeal'; id: MealId; quality?: DishQuality }
   | { t: 'focusTarget'; x: number }
   | { t: 'enterHouse' }
   | { t: 'exitHouse' }
@@ -173,10 +208,13 @@ export type GameEvent =
   | { t: 'star'; weapon: WeaponId; star: number }
   | { t: 'build'; kind: 'turret' | 'wall' | 'fort' }
   | { t: 'shop'; item: string }
-  | { t: 'serve'; guestId: string; name: string; dishName: string; coins: number; quote: string; allServed?: boolean }
+  | { t: 'serve'; guestId: string; vipId: string; name: string; dishName: string; quality: DishQuality; coins: number; fans: number; rep: number; quote: string; allServed?: boolean; firstMeet?: boolean; trendMatch?: boolean; rankUp?: string }
   | { t: 'cook'; meat: number; coins: number }
-  | { t: 'meal'; id: MealId }
+  | { t: 'meal'; id: MealId; quality: DishQuality }
+  | { t: 'dinerStory'; eventKey: 'firstOpen' | 'rep10' | 'rep25' | 'rep40' }
+  | { t: 'allyJoin'; ally: AllyId; day: number }
   | { t: 'inside'; inside: boolean }
   | { t: 'roof'; onRoof: boolean }
   | { t: 'bossAppear'; kind: ZombieKind }
+  | { t: 'bossDead'; kind: ZombieKind; bossIdx: 0 | 1 | 2 }
   | { t: 'dayStart'; day: number } | { t: 'dayClear'; day: number } | { t: 'dead' } | { t: 'won' };

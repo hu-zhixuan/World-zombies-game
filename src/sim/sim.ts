@@ -1,10 +1,14 @@
 // 规则层：纯计算，不碰浏览器。固定每秒 60 步；随机数带种子；同样的种子和输入一定得到同样的结果。
 import {
-  CLASSES, CRIT_CHANCE, CRIT_MUL, DAY_HEAL, DINER_GUESTS, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
+  CLASSES, CRIT_CHANCE, CRIT_MUL, DAY_HEAL, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
   MEALS, MEAT_SELL_PRICE, PERKS, RARITY_WEIGHT, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST, STAR_COST, TURRETS,
-  WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES, bossForDay, dayZombieCount, extraBullets, magSize, starMul, zombieHp,
-  type ClassId, type PerkId, type TurretType, type WeaponId, type ZombieKind,
+  WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES, bossForDay, dayZombieCount, extraBullets, magSize, starMul, unlockedMeals, zombieHp,
+  type ClassId, type MealId, type PerkId, type TurretType, type WeaponId, type ZombieKind,
 } from '../content/data';
+import {
+  COMPANION_JOIN_STORIES, DAILY_TRENDS, DINER_REVIEW_POOL, QUALITY_META, VIP_CUSTOMERS, VIP_TIERS, getFansRank, getRepTier,
+  type AllyId, type DishQuality, type VipDef,
+} from '../content/story';
 import {
   DINER_SEAT_X, DOOR_X, GROUND_Y, HOME_X, HOUSE_WALL_X, IN_MAX_X, IN_MIN_X, IN_STATIONS, LADDER_X, PLAYER_MAX_X, PLAYER_MIN_X,
   PORCH_MAX_X, PORCH_MIN_X, PORCH_Y, ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, SPAWN_X,
@@ -40,18 +44,20 @@ export function turretWorldPos(slot: number) {
 }
 
 const has = (run: RunState, id: PerkId) => run.perks.includes(id);
+export const hasAlly = (run: RunState, id: AllyId) => run.story.allies.includes(id);
 export const curWeapon = (run: RunState) => run.player.weapons[run.player.cur];
 const skillActive = (run: RunState, cls: ClassId) => run.cls === cls && run.skill.t > 0;
 export const isOnRoof = (run: RunState) => !run.inside && run.player.y <= ROOF_Y + 2 && run.player.x >= ROOF_MIN_X && run.player.x <= ROOF_MAX_X;
 export const isOnPorch = (run: RunState) => !run.inside && Math.abs(run.player.y - PORCH_Y) <= 2 && run.player.x >= PORCH_MIN_X && run.player.x <= PORCH_MAX_X;
 
-export const turretBuildCost = (kind: TurretType, cls: ClassId) => Math.ceil(TURRETS[kind].buildScrap * (cls === 'engineer' ? 0.75 : 1));
-export const turretUpgradeCost = (kind: TurretType, level: number, cls: ClassId) =>
-  Math.ceil((TURRETS[kind].upgradeScrap[level] ?? 0) * (cls === 'engineer' ? 0.75 : 1));
-export const turretRefundScrap = (kind: TurretType, level: number, cls: ClassId) => {
-  let spent = turretBuildCost(kind, cls);
-  for (let l = 1; l < level; l++) spent += turretUpgradeCost(kind, l, cls);
-  return Math.max(2, Math.floor(spent * 0.5));
+export const turretBuildCost = (kind: TurretType, cls: ClassId, hasQiang = false) =>
+  Math.ceil(TURRETS[kind].buildCoins * (cls === 'engineer' ? 0.75 : 1) * (hasQiang ? 0.9 : 1));
+export const turretUpgradeCost = (kind: TurretType, level: number, cls: ClassId, hasQiang = false) =>
+  Math.ceil((TURRETS[kind].upgradeCoins[level] ?? 0) * (cls === 'engineer' ? 0.75 : 1) * (hasQiang ? 0.9 : 1));
+export const turretRefundCoins = (kind: TurretType, level: number, cls: ClassId, hasQiang = false) => {
+  let spent = turretBuildCost(kind, cls, hasQiang);
+  for (let l = 1; l < level; l++) spent += turretUpgradeCost(kind, l, cls, hasQiang);
+  return Math.max(20, Math.floor(spent * 0.5));
 };
 export const meatPrice = (cls: ClassId) => Math.round(MEAT_SELL_PRICE * (cls === 'chef' ? 1.35 : 1));
 export const weaponDamage = (id: WeaponId, star: number) => WEAPONS[id].damage * starMul(star);
@@ -67,10 +73,11 @@ export function effectiveRange(run: RunState, id: WeaponId = curWeapon(run).id):
   return Math.round(WEAPONS[id].range * m);
 }
 
-/** 伤害倍率：天赋 × 特餐 × 房顶高低差。 */
+/** 伤害倍率：天赋 × 特餐 × 房顶高低差 × 战友。 */
 export function damageMul(run: RunState): number {
   const p = run.player;
   let m = 1 + run.buff.dmgMul;
+  if (hasAlly(run, 'zhang')) m *= 1.1;
   if (isOnRoof(run) && has(run, 'rooftop')) m *= 1.3;
   if (has(run, 'glasscannon')) m *= 2.2;
   if (has(run, 'bloodfrenzy')) m *= 1 + (1 - p.hp / p.maxHp) * 0.8;
@@ -122,22 +129,112 @@ function rollShopOffers(run: RunState) {
   run.shop = picks;
 }
 
-function rollDinerGuests(run: RunState) {
-  const pool = [...DINER_GUESTS];
-  const picked: DinerGuest[] = [];
-  const chefMul = run.cls === 'chef' ? 1.35 : 1;
-  for (let i = 0; i < 3 && pool.length > 0; i++) {
-    const idx = Math.floor(rand(run) * pool.length);
-    const g = pool.splice(idx, 1)[0];
-    const pay = Math.round((g.basePay + run.day * 2) * chefMul);
-    picked.push({
-      id: g.id, name: g.name, role: g.role, sprite: g.sprite,
-      x: DINER_SEAT_X[i] ?? 300,
-      dish: g.dish, dishName: g.dishName, meatCost: g.meatCost, pay,
-      orderQuote: g.orderQuote, thanksQuote: g.thanksQuote, served: false,
-    });
+function rollDailyTrend(run: RunState) {
+  const availableMeals = unlockedMeals(Math.max(1, run.day));
+  const allTags = new Set(availableMeals.flatMap((m) => m.tags));
+  const pool = DAILY_TRENDS.filter((t) => t.unlockDay <= Math.max(1, run.day) && allTags.has(t.tag) && t.id !== run.diner.trendId);
+  const src = pool.length ? pool : DAILY_TRENDS.filter((t) => t.unlockDay <= 1);
+  const picked = src[Math.floor(rand(run) * src.length)] ?? DAILY_TRENDS[0];
+  run.diner.trendId = picked.id;
+  run.diner.trendTag = picked.tag;
+  run.diner.trendTitle = picked.title;
+}
+
+const VIP_ORDER_LINES: Record<string, string> = {
+  agou: '老板，求给我留一口热乎肉串就行，我扫地洗碗都行！',
+  laobao: '连守七十二小时防线了，来份最够劲的热菜提提神！',
+  qijie: '刚拧完一天螺栓，上最扎实管饱的菜，少敷衍我！',
+  niqiu: '掌柜的，把招牌菜端上来，好吃明天再给你带稀罕门路！',
+  gaolaotou: '确定没装窃听器吧？给我盛份热腾腾又干净的菜！',
+  guying: '高热量。五分钟内上菜。不废话。',
+  huanyin: '废土老铁们看好了！今天探店避难所米其林招牌！',
+  tongshu: '仿生胃效能下跌，需要高油脂与热蛋白料理补充燃料。',
+  dashan: '大山……大山饿了，想吃热乎乎的大块肉肉……',
+  baishi: '太棒了！请务必做一份刺激风味料理做实验对照！',
+  jinlaoban: '净水生意刚谈完，端上你们店最拿手的菜色试试成色。',
+  wumingke: '风沙太大……在角落安静吃一碗热菜便走。',
+  yanlao: '百年前这里曾是中央大酒店……能请我尝一口战前风味吗？',
+  kuangya: '哈哈哈！闻到香味了！拿最扎实的硬菜上来！',
+  guancezhe: '15 波围城宵夜系统测试中——随便来道菜看看成色吧！',
+};
+
+function pickGuestMeal(run: RunState, vip: VipDef, forceTrend: boolean): MealId {
+  const list = unlockedMeals(Math.max(1, run.day));
+  if (forceTrend) {
+    const tHit = list.find((m) => m.tags.includes(run.diner.trendTag));
+    if (tHit) return tHit.id;
   }
-  run.guests = picked;
+  const prefMap: Record<string, MealId[]> = {
+    cheap: ['spicy_skewer'],
+    stimulating: ['spicy_skewer', 'mixed_grill', 'elite_hotpot'],
+    mechanical: ['iron_steak', 'mixed_grill'],
+    tactical: ['iron_steak', 'apocalypse_feast'],
+    dark: ['elite_hotpot', 'apocalypse_feast'],
+    mutant: ['elite_hotpot', 'apocalypse_feast'],
+    soup: ['hearty_stew'],
+    french: ['apocalypse_feast', 'hearty_stew'],
+    premium: ['apocalypse_feast', 'iron_steak'],
+  };
+  const prefs = prefMap[vip.preferredDishPref] ?? [];
+  const prefHit = prefs.find((id) => list.some((m) => m.id === id));
+  if (prefHit && rand(run) < 0.72) return prefHit;
+  return list[Math.floor(rand(run) * list.length)].id;
+}
+
+function rollDinerGuests(run: RunState) {
+  const unlocked = VIP_CUSTOMERS.filter((v) => v.unlockFans <= run.diner.fans);
+  const chosen: VipDef[] = [];
+  const usedIds = new Set<string>();
+
+  // 优先让刚解锁且还没初遇过的 VIP 先来坐镇
+  const unmet = unlocked.filter((v) => !run.diner.metVips.includes(v.id));
+  for (const v of unmet) {
+    if (chosen.length >= 2) break;
+    chosen.push(v);
+    usedIds.add(v.id);
+  }
+  // 剩下座位从已解锁 VIP 中按权重抽取不重复食客
+  while (chosen.length < 3) {
+    const pool = unlocked.filter((v) => !usedIds.has(v.id));
+    const src = pool.length > 0 ? pool : VIP_CUSTOMERS.filter((v) => !usedIds.has(v.id));
+    if (src.length === 0) break;
+    let roll = rand(run) * src.reduce((s, v) => s + v.weight, 0);
+    let pick = src[0];
+    for (const v of src) {
+      roll -= v.weight;
+      if (roll < 0) { pick = v; break; }
+    }
+    chosen.push(pick);
+    usedIds.add(pick.id);
+  }
+
+  const repTier = getRepTier(run.diner.rep);
+  const chefMul = run.cls === 'chef' ? 1.35 : 1;
+  const guests: DinerGuest[] = chosen.map((vip, idx) => {
+    const dishId = pickGuestMeal(run, vip, idx === 0);
+    const meal = MEALS[dishId];
+    const trendMatch = meal.tags.includes(run.diner.trendTag);
+    const shortName = vip.name.includes('·') ? vip.name.split('·').pop()! : vip.name;
+    const pay = Math.round((meal.basePay + run.day * 2) * chefMul * vip.tipBonus * (1 + repTier.bonusMul) * (trendMatch ? 1.35 : 1));
+    return {
+      id: `${vip.id}_${run.day}_${idx}`,
+      vipId: vip.id,
+      tier: vip.tier,
+      name: shortName,
+      role: vip.name.includes('·') ? vip.name.split('·')[0] : VIP_TIERS[vip.tier].name,
+      sprite: vip.sprite,
+      x: DINER_SEAT_X[idx] ?? 300,
+      dish: dishId,
+      dishName: meal.name,
+      meatCost: meal.meatCost,
+      pay,
+      trendMatch,
+      orderQuote: VIP_ORDER_LINES[vip.id] ?? vip.bg,
+      thanksQuote: vip.reactions.good,
+      served: false,
+    };
+  });
+  run.guests = guests;
 }
 
 /** 开一局。pool 是这一局能掉落/进货的武器（局外解锁的那些）。 */
@@ -156,13 +253,15 @@ export function newRun(seed = 1, pool: WeaponId[] = ['revolver', 'smg'], cls: Cl
     home: { hp: FORT_LEVELS[0].maxHp, maxHp: FORT_LEVELS[0].maxHp },
     fort: { level: 1, cd: 0, aim: 0 },
     spawn: { left: 0, timer: 0, total: 0, killed: 0, crateAt: 0, bossKind: null, bossSpawned: false },
-    coins: 0, scrap: 0, meat: 0, kills: 0,
-    meal: null, guests: [], buff: { dmgMul: 0, haste: 0 }, shop: [],
+    coins: 0, meat: 0, kills: 0,
+    meal: null, mealQuality: 'good', guests: [],
+    diner: { rep: 0, fans: 0, trendId: DAILY_TRENDS[0].id, trendTag: DAILY_TRENDS[0].tag, trendTitle: DAILY_TRENDS[0].title, servedTotal: 0, metVips: [], reviews: [] },
+    story: { allies: [], seenEvents: [] },
+    buff: { dmgMul: 0, haste: 0 }, shop: [],
     perks: [], perkChoices: [], targetId: null, priorityId: null,
     pool: [...pool], chain: { n: 0, t: 0 }, vanguardT: 0, cls, skill: { t: 0, cd: 0 },
   };
   rollShopOffers(run);
-  rollDinerGuests(run);
   startDay(run, []);
   return run;
 }
@@ -177,14 +276,16 @@ function startDay(run: RunState, ev: GameEvent[]) {
   run.spawn = { left: total, timer: 80, total, killed: 0, crateAt, bossKind, bossSpawned: false };
   run.bullets = []; run.grenades = []; run.enemyProjs = [];
   run.chain = { n: 0, t: 0 }; run.vanguardT = 0; run.skill = { t: 0, cd: 0 };
+  rollDailyTrend(run);
 
-  // 将昨晚烹饪的战前特餐转为今天的战斗增益
-  const mealBoost = run.cls === 'chef' ? 1.5 : 1;
+  // 将昨晚烹饪的战前特餐转为今天的战斗增益（含手操火候倍率加成）
+  const mealBoost = (run.cls === 'chef' ? 1.5 : 1) * QUALITY_META[run.mealQuality ?? 'good'].buffMul;
   if (run.meal) {
     const m = MEALS[run.meal];
     run.buff = { dmgMul: m.dmgMul * mealBoost, haste: m.haste * mealBoost };
     run.player.armor = Math.min(run.player.maxArmor, run.player.armor + Math.round(m.armor * mealBoost));
     run.meal = null;
+    run.mealQuality = 'good';
   } else {
     run.buff = { dmgMul: 0, haste: 0 };
   }
@@ -272,14 +373,15 @@ function damageZombie(
 
   const def = ZOMBIES[z.kind];
   run.coins += def.coins; run.kills++; run.spawn.killed++;
-  const scrapChance = def.boss ? 1 : 0.34;
-  if (rand(run) < scrapChance) run.scrap += def.boss ? 5 : 1;
   const chef = run.cls === 'chef';
-  const meatDrop = def.meat > 1 ? def.meat + (chef ? 1 : 0) : (rand(run) < (chef ? 0.85 : 0.5) ? 1 : 0);
+  const meatDrop = def.meat > 1 ? def.meat + (chef ? 1 : 0) : (rand(run) < (chef ? 0.9 : 0.65) ? 1 : 0);
   run.meat += meatDrop;
 
   if (has(run, 'chainkill')) run.chain = { n: Math.min(8, run.chain.n + 1), t: 180 };
   ev.push({ t: 'kill', id: z.id, x: z.x, kind: z.kind, coins: def.coins, meat: meatDrop });
+  if (def.boss) {
+    ev.push({ t: 'bossDead', kind: z.kind, bossIdx: run.day <= 5 ? 0 : run.day <= 10 ? 1 : 2 });
+  }
 
   if (z.carriesCrate) {
     const pool: WeaponId[] = ['pistol', ...run.pool];
@@ -301,7 +403,7 @@ function collectCrate(run: RunState, weapon: WeaponId, ev: GameEvent[]) {
   const owned = p.weapons.find((w) => w.id === weapon);
   if (!owned) {
     const fresh = { id: weapon, star: 1, ammo: magSize(weapon, 1) };
-    if (p.weapons.length >= MAX_CARRY) { p.weapons[p.cur] = fresh; run.scrap += 3; }
+    if (p.weapons.length >= MAX_CARRY) { p.weapons[p.cur] = fresh; run.coins += 40; }
     else { p.weapons.push(fresh); p.cur = p.weapons.length - 1; }
     p.reloadT = 0;
     ev.push({ t: 'pickup', weapon, star: 1, isNew: true });
@@ -310,7 +412,7 @@ function collectCrate(run: RunState, weapon: WeaponId, ev: GameEvent[]) {
     ev.push({ t: 'pickup', weapon, star: owned.star, isNew: false });
     ev.push({ t: 'star', weapon, star: owned.star });
   } else {
-    run.scrap += 4;
+    run.coins += 45;
     ev.push({ t: 'pickup', weapon, star: owned.star, isNew: false });
   }
 }
@@ -876,6 +978,8 @@ export function step(run: RunState, input: Input): GameEvent[] {
   return ev;
 }
 
+const qiangWallBonus = (run: RunState) => (hasAlly(run, 'qiang') ? 50 : 0);
+
 /** 面板和按钮的指令。成功返回事件，不满足条件（钱不够、时机不对）返回 null。 */
 export function command(run: RunState, cmd: Command): GameEvent[] | null {
   const ev: GameEvent[] = [];
@@ -885,12 +989,31 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       run.perks.push(cmd.id); run.perkChoices = []; run.phase = 'camp';
       if (cmd.id === 'glasscannon') { const p = run.player; p.maxHp = Math.round(p.maxHp / 2); p.hp = Math.min(p.hp, p.maxHp); }
       if (cmd.id === 'fortify') {
-        const nextWallMax = Math.round(WALL_LEVELS[run.wall.level - 1].maxHp * 1.4);
-        const nextHomeMax = Math.round(FORT_LEVELS[run.fort.level - 1].maxHp * 1.4);
+        const nextWallMax = Math.round(WALL_LEVELS[run.wall.level - 1].maxHp * 1.4) + qiangWallBonus(run);
+        const nextHomeMax = Math.round(FORT_LEVELS[run.fort.level - 1].maxHp * 1.4) + qiangWallBonus(run);
         run.wall.hp += nextWallMax - run.wall.maxHp; run.wall.maxHp = nextWallMax;
         run.home.hp += nextHomeMax - run.home.maxHp; run.home.maxHp = nextHomeMax;
         run.player.armor = Math.min(run.player.maxArmor, run.player.armor + 25);
       }
+
+      // 关键夜晚（第 2/4/6/8 天清场）战友慕名加入据点，立即赋予永久增益并触发入伙剧情
+      const join = COMPANION_JOIN_STORIES[run.day];
+      if (join && !run.story.allies.includes(join.ally)) {
+        run.story.allies.push(join.ally);
+        if (join.ally === 'qiang') {
+          run.wall.maxHp += 50; run.wall.hp += 50;
+          run.home.maxHp += 50; run.home.hp += 50;
+        }
+        if (join.ally === 'lin') {
+          run.player.hp = Math.min(run.player.maxHp, run.player.hp + 18);
+        }
+        ev.push({ t: 'allyJoin', ally: join.ally, day: run.day });
+      }
+      if (run.day === 1 && !run.story.seenEvents.includes('firstOpen')) {
+        run.story.seenEvents.push('firstOpen');
+        ev.push({ t: 'dinerStory', eventKey: 'firstOpen' });
+      }
+
       // 晚上自动回到酒馆屋里招待食客、做饭、逛工坊
       run.inside = true; run.player.x = IN_STATIONS.kitchen + 40; run.player.y = 0; run.player.vy = 0;
       rollShopOffers(run);
@@ -900,7 +1023,7 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
     }
     case 'nextDay':
       if (run.phase !== 'camp') return null;
-      run.player.hp = Math.min(run.player.maxHp, Math.round(run.player.hp + run.player.maxHp * DAY_HEAL));
+      run.player.hp = Math.min(run.player.maxHp, Math.round(run.player.hp + run.player.maxHp * DAY_HEAL + (hasAlly(run, 'lin') ? 18 : 0)));
       run.crates = [];
       for (const w of run.player.weapons) w.ammo = magSize(w.id, w.star);
       startDay(run, ev);
@@ -935,9 +1058,9 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
     case 'buildTurret': {
       const slot = run.turrets[cmd.slot];
       if (!slot || slot.type !== null) return null;
-      const cost = turretBuildCost(cmd.kind, run.cls);
-      if (run.scrap < cost) return null;
-      run.scrap -= cost;
+      const cost = turretBuildCost(cmd.kind, run.cls, hasAlly(run, 'qiang'));
+      if (run.coins < cost) return null;
+      run.coins -= cost;
       slot.type = cmd.kind; slot.level = 1; slot.cd = 0; slot.aim = 0;
       ev.push({ t: 'build', kind: 'turret' });
       return ev;
@@ -945,26 +1068,26 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
     case 'upgradeTurret': {
       const slot = run.turrets[cmd.slot];
       if (!slot || !slot.type || slot.level >= TURRETS[slot.type].levels.length) return null;
-      const cost = turretUpgradeCost(slot.type, slot.level, run.cls);
-      if (run.scrap < cost) return null;
-      run.scrap -= cost; slot.level++;
+      const cost = turretUpgradeCost(slot.type, slot.level, run.cls, hasAlly(run, 'qiang'));
+      if (run.coins < cost) return null;
+      run.coins -= cost; slot.level++;
       ev.push({ t: 'build', kind: 'turret' });
       return ev;
     }
-    case 'scrapTurret': {
+    case 'sellTurret': {
       const slot = run.turrets[cmd.slot];
       if (!slot || !slot.type) return null;
-      run.scrap += turretRefundScrap(slot.type, slot.level, run.cls);
+      run.coins += turretRefundCoins(slot.type, slot.level, run.cls, hasAlly(run, 'qiang'));
       slot.type = null; slot.level = 0; slot.cd = 0;
       return ev;
     }
     case 'upgradeWall': {
       if (run.wall.level >= MAX_WALL_LEVEL) return null;
       const next = WALL_LEVELS[run.wall.level];
-      if (run.coins < next.coins || run.scrap < next.scrap) return null;
-      run.coins -= next.coins; run.scrap -= next.scrap;
+      if (run.coins < next.coins) return null;
+      run.coins -= next.coins;
       run.wall.level++;
-      run.wall.maxHp = Math.round(next.maxHp * (has(run, 'fortify') ? 1.4 : 1));
+      run.wall.maxHp = Math.round(next.maxHp * (has(run, 'fortify') ? 1.4 : 1)) + qiangWallBonus(run);
       run.wall.hp = run.wall.maxHp;
       ev.push({ t: 'build', kind: 'wall' });
       return ev;
@@ -977,10 +1100,10 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
     case 'upgradeFort': {
       if (run.fort.level >= MAX_FORT_LEVEL) return null;
       const next = FORT_LEVELS[run.fort.level];
-      if (run.coins < next.coins || run.scrap < next.scrap) return null;
-      run.coins -= next.coins; run.scrap -= next.scrap;
+      if (run.coins < next.coins) return null;
+      run.coins -= next.coins;
       run.fort.level++;
-      const newMax = Math.round(next.maxHp * (has(run, 'fortify') ? 1.4 : 1));
+      const newMax = Math.round(next.maxHp * (has(run, 'fortify') ? 1.4 : 1)) + qiangWallBonus(run);
       run.home.hp = Math.min(newMax, run.home.hp + (newMax - run.home.maxHp) + 40);
       run.home.maxHp = newMax;
       ev.push({ t: 'build', kind: 'fort' });
@@ -1003,7 +1126,7 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       if (run.coins < def.price) return null;
       run.coins -= def.price;
       const fresh = { id: cmd.weapon, star: 1, ammo: magSize(cmd.weapon, 1) };
-      if (run.player.weapons.length >= MAX_CARRY) { run.player.weapons[run.player.cur] = fresh; run.scrap += 3; }
+      if (run.player.weapons.length >= MAX_CARRY) { run.player.weapons[run.player.cur] = fresh; run.coins += 40; }
       else { run.player.weapons.push(fresh); run.player.cur = run.player.weapons.length - 1; }
       run.player.reloadT = 0;
       ev.push({ t: 'shop', item: def.name });
@@ -1042,25 +1165,80 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       if (list.length <= 1 || cmd.index < 0 || cmd.index >= list.length) return null;
       const [removed] = list.splice(cmd.index, 1);
       run.player.cur = Math.min(run.player.cur, list.length - 1);
-      run.coins += 25 + removed.star * 15; run.scrap += 3;
+      run.coins += 45 + removed.star * 20;
       return ev;
     }
     case 'serveGuest': {
       if (run.phase !== 'camp') return null;
       const g = run.guests.find((o) => o.id === cmd.guestId && !o.served);
       if (!g || run.meat < g.meatCost) return null;
+      const quality: DishQuality = cmd.quality ?? 'good';
+      const qMeta = QUALITY_META[quality];
+      const vip = VIP_CUSTOMERS.find((v) => v.id === g.vipId);
+
       run.meat -= g.meatCost;
       g.served = true;
-      run.coins += g.pay;
+      g.qualityServed = quality;
+      g.reactionQuote = vip?.reactions[quality] ?? g.thanksQuote;
+
+      const beforeRank = getFansRank(run.diner.fans).cur.grade;
+      const finalCoins = Math.round(g.pay * qMeta.payMul);
+      const zhaoMul = hasAlly(run, 'zhao') ? 1.3 : 1;
+      const chefFans = run.cls === 'chef' ? 1.25 : 1;
+      const trendFans = g.trendMatch ? 2 : 1;
+      const tierFans = g.tier === 'bronze' ? 1 : g.tier === 'silver' ? 1.2 : g.tier === 'gold' ? 1.4 : g.tier === 'platinum' ? 1.7 : 2.1;
+      const fansGain = Math.round(qMeta.fans * trendFans * zhaoMul * chefFans * tierFans);
+      const repGain = qMeta.rep + (g.trendMatch ? 1 : 0);
+
+      run.coins += finalCoins;
+      run.diner.fans += fansGain;
+      run.diner.rep += repGain;
+      run.diner.servedTotal++;
+      const firstMeet = !run.diner.metVips.includes(g.vipId);
+      if (firstMeet) run.diner.metVips.push(g.vipId);
+
+      const pool = DINER_REVIEW_POOL[quality];
+      const revText = pool[Math.floor(rand(run) * pool.length)] ?? g.reactionQuote;
+      run.diner.reviews.unshift({
+        id: run.nextId++,
+        author: g.name,
+        tierName: VIP_TIERS[g.tier].name,
+        dishName: g.dishName,
+        quality,
+        text: revText,
+        fansDelta: fansGain,
+      });
+      if (run.diner.reviews.length > 12) run.diner.reviews.length = 12;
+
       const allServed = run.guests.length > 0 && run.guests.every((o) => o.served);
-      let totalCoins = g.pay;
+      let totalCoins = finalCoins;
       if (allServed) {
-        const tip = run.cls === 'chef' ? 24 : 16;
+        const tip = run.cls === 'chef' ? 28 : 18;
         run.coins += tip;
         totalCoins += tip;
+        run.diner.fans += 8;
+        run.diner.rep += 1;
         run.player.hp = Math.min(run.player.maxHp, run.player.hp + 15);
       }
-      ev.push({ t: 'serve', guestId: g.id, name: g.name, dishName: g.dishName, coins: totalCoins, quote: g.thanksQuote, allServed });
+
+      const afterRank = getFansRank(run.diner.fans).cur;
+      const rankUp = afterRank.grade !== beforeRank ? `${afterRank.grade}级·${afterRank.name}` : undefined;
+      ev.push({
+        t: 'serve', guestId: g.id, vipId: g.vipId, name: g.name, dishName: g.dishName,
+        quality, coins: totalCoins, fans: fansGain + (allServed ? 8 : 0), rep: repGain + (allServed ? 1 : 0),
+        quote: g.reactionQuote, allServed, firstMeet, trendMatch: g.trendMatch, rankUp,
+      });
+
+      if (run.diner.rep >= 10 && !run.story.seenEvents.includes('rep10')) {
+        run.story.seenEvents.push('rep10');
+        ev.push({ t: 'dinerStory', eventKey: 'rep10' });
+      } else if (run.diner.rep >= 25 && !run.story.seenEvents.includes('rep25')) {
+        run.story.seenEvents.push('rep25');
+        ev.push({ t: 'dinerStory', eventKey: 'rep25' });
+      } else if (run.diner.rep >= 40 && !run.story.seenEvents.includes('rep40')) {
+        run.story.seenEvents.push('rep40');
+        ev.push({ t: 'dinerStory', eventKey: 'rep40' });
+      }
       return ev;
     }
     case 'cookSell': {
@@ -1074,13 +1252,17 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
     case 'pickMeal': {
       if (run.phase !== 'camp' || run.meal !== null) return null;
       const m = MEALS[cmd.id];
-      if (run.meat < m.meatCost) return null;
-      run.meat -= m.meatCost; run.meal = cmd.id;
-      if (cmd.id === 'hearty_stew') {
-        const heal = Math.round(40 * (run.cls === 'chef' ? 1.5 : 1));
+      if (!m || m.unlockDay > Math.max(1, run.day) || run.meat < m.meatCost) return null;
+      const quality: DishQuality = cmd.quality ?? 'good';
+      run.meat -= m.meatCost;
+      run.meal = cmd.id;
+      run.mealQuality = quality;
+      if (m.heal > 0) {
+        const heal = Math.round(m.heal * (run.cls === 'chef' ? 1.5 : 1) * QUALITY_META[quality].buffMul);
         run.player.hp = Math.min(run.player.maxHp, run.player.hp + heal);
       }
-      ev.push({ t: 'meal', id: cmd.id });
+      run.diner.fans += 8;
+      ev.push({ t: 'meal', id: cmd.id, quality });
       return ev;
     }
   }

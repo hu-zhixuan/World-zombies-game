@@ -83,31 +83,31 @@ export interface ZombieDef {
 export const ZOMBIES: Record<ZombieKind, ZombieDef> = {
   roamer: {
     kind: 'roamer', name: zombieText('roamer')?.name ?? '游荡腐尸', sprites: ['z_swamp', 'z_clothed', 'z_skeleton'],
-    baseHp: 78, speed: 0.82, damage: 8, attackEvery: 50, coins: 4, meat: 1, firstDay: 1, fps: 9, weight: 8, scale: 1.0,
+    baseHp: 78, speed: 0.82, damage: 8, attackEvery: 50, coins: 5, meat: 1, firstDay: 1, fps: 9, weight: 8, scale: 1.0,
   },
   crawler: {
     kind: 'crawler', name: '噬魂黑猫', sprites: ['z_gato'],
-    baseHp: 60, speed: 1.32, damage: 7, attackEvery: 40, coins: 5, meat: 1, firstDay: 2, fps: 11, weight: 4, scale: 1.0,
+    baseHp: 60, speed: 1.32, damage: 7, attackEvery: 40, coins: 6, meat: 1, firstDay: 2, fps: 11, weight: 4, scale: 1.0,
   },
   sprinter: {
     kind: 'sprinter', name: '地狱猎犬', sprites: ['z_hound'],
-    baseHp: 62, speed: 1.68, damage: 8, attackEvery: 34, coins: 6, meat: 1, firstDay: 3, fps: 13, weight: 4, scale: 1.05,
+    baseHp: 62, speed: 1.68, damage: 8, attackEvery: 34, coins: 7, meat: 1, firstDay: 3, fps: 13, weight: 4, scale: 1.05,
   },
   bruiser: {
     kind: 'bruiser', name: '焦骨巨尸', sprites: ['z_ghoul'],
-    baseHp: 265, speed: 0.62, damage: 15, attackEvery: 58, coins: 10, meat: 2, firstDay: 4, fps: 9, weight: 3, scale: 1.15,
+    baseHp: 265, speed: 0.62, damage: 15, attackEvery: 58, coins: 12, meat: 2, firstDay: 4, fps: 9, weight: 3, scale: 1.15,
   },
   ghoul: {
     kind: 'ghoul', name: '提灯怨灵', sprites: ['z_wraith'],
-    baseHp: 140, speed: 0.85, damage: 12, attackEvery: 76, coins: 13, meat: 2, firstDay: 6, fps: 9, weight: 3, scale: 1.05, ranged: true,
+    baseHp: 140, speed: 0.85, damage: 12, attackEvery: 76, coins: 15, meat: 2, firstDay: 6, fps: 9, weight: 3, scale: 1.05, ranged: true,
   },
   boss_beast: {
     kind: 'boss_beast', name: '地狱巨兽·暴君', sprites: ['boss_beast'],
-    baseHp: 1100, speed: 0.44, damage: 24, attackEvery: 64, coins: 85, meat: 6, firstDay: 5, fps: 9, weight: 0, scale: 1.5, boss: true, ranged: true,
+    baseHp: 1100, speed: 0.44, damage: 24, attackEvery: 64, coins: 110, meat: 6, firstDay: 5, fps: 9, weight: 0, scale: 1.5, boss: true, ranged: true,
   },
   boss_demon: {
     kind: 'boss_demon', name: '深渊魔王·尸皇', sprites: ['boss_demon'],
-    baseHp: 2100, speed: 0.38, damage: 32, attackEvery: 58, coins: 180, meat: 10, firstDay: 15, fps: 8, weight: 0, scale: 0.96, boss: true, ranged: true,
+    baseHp: 2100, speed: 0.38, damage: 32, attackEvery: 58, coins: 220, meat: 10, firstDay: 15, fps: 8, weight: 0, scale: 0.96, boss: true, ranged: true,
   },
 };
 
@@ -120,52 +120,52 @@ export const newZombieOn = (day: number) => {
   return Object.values(ZOMBIES).find((z) => !z.boss && z.firstDay === day && day > 1);
 };
 
-// ── 炮塔体系（4 种塔：机枪 / 电弧 / 冰霜 / 重炮）──
+// ── 炮塔体系（4 种塔：机枪 / 电弧 / 冰霜 / 重炮，全军工建设统一只消耗金币）──
 export type TurretType = 'mg' | 'tesla' | 'frost' | 'cannon';
 export interface TurretLevel { damage: number; cooldown: number; aoe?: number; chain?: number }
 export interface TurretDef {
   type: TurretType; name: string; desc: string; icon: string; sprite: string;
-  range: number; buildScrap: number; upgradeScrap: [number, number, number];
+  range: number; buildCoins: number; upgradeCoins: [number, number, number];
   levels: [TurretLevel, TurretLevel, TurretLevel];
 }
 export const TURRETS: Record<TurretType, TurretDef> = {
   mg: {
     type: 'mg', name: '机枪塔', desc: '速射单体，造价便宜压制力强', icon: 'ic_turret', sprite: 'turret',
-    range: 340, buildScrap: 6, upgradeScrap: [0, 7, 13],
+    range: 340, buildCoins: 55, upgradeCoins: [0, 70, 130],
     levels: [{ damage: 11, cooldown: 18 }, { damage: 21, cooldown: 12 }, { damage: 38, cooldown: 8 }],
   },
   frost: {
     type: 'frost', name: '冰霜塔', desc: '冰弹范围减速 45%，掩护输出', icon: 'ic_turret_frost', sprite: 'turret_frost',
-    range: 330, buildScrap: 8, upgradeScrap: [0, 8, 15],
+    range: 330, buildCoins: 75, upgradeCoins: [0, 90, 160],
     levels: [{ damage: 12, cooldown: 34, aoe: 52 }, { damage: 22, cooldown: 25, aoe: 64 }, { damage: 36, cooldown: 17, aoe: 78 }],
   },
   tesla: {
     type: 'tesla', name: '电弧塔', desc: '高压电弧连续跳跃 3~5 名敌人', icon: 'ic_turret_tesla', sprite: 'turret_tesla',
-    range: 320, buildScrap: 10, upgradeScrap: [0, 10, 18],
+    range: 320, buildCoins: 100, upgradeCoins: [0, 115, 195],
     levels: [{ damage: 24, cooldown: 40, chain: 3 }, { damage: 42, cooldown: 28, chain: 4 }, { damage: 72, cooldown: 19, chain: 5 }],
   },
   cannon: {
     type: 'cannon', name: '重炮塔', desc: '榴弹爆炸轰击大群僵尸并击退', icon: 'ic_turret_cannon', sprite: 'turret_cannon',
-    range: 390, buildScrap: 12, upgradeScrap: [0, 12, 20],
+    range: 390, buildCoins: 120, upgradeCoins: [0, 135, 230],
     levels: [{ damage: 48, cooldown: 62, aoe: 68 }, { damage: 88, cooldown: 45, aoe: 86 }, { damage: 150, cooldown: 32, aoe: 108 }],
   },
 };
 // 保留 TURRET 别名以便兼容基础属性访问
 export const TURRET = TURRETS.mg;
 
-// ── 路障与堡垒房子升级（Lv1..3）──
+// ── 路障与堡垒房子升级（Lv1..3，统一仅消耗金币）──
 export const MAX_WALL_LEVEL = 3;
 export const WALL_LEVELS = [
-  { level: 1, name: '铁丝木障', maxHp: 240, coins: 0, scrap: 0, reflect: 0 },
-  { level: 2, name: '石砌壁垒', maxHp: 440, coins: 40, scrap: 4, reflect: 3 },
-  { level: 3, name: '高压电网墙', maxHp: 720, coins: 85, scrap: 8, reflect: 8 },
+  { level: 1, name: '铁丝木障', maxHp: 240, coins: 0, reflect: 0 },
+  { level: 2, name: '石砌壁垒', maxHp: 440, coins: 85, reflect: 3 },
+  { level: 3, name: '高压电网墙', maxHp: 720, coins: 175, reflect: 8 },
 ];
 
 export const MAX_FORT_LEVEL = 3;
 export const FORT_LEVELS = [
-  { level: 1, name: '木石酒馆', maxHp: 120, coins: 0, scrap: 0, desc: '屋顶2个塔位，二层木台视野' },
-  { level: 2, name: '石堡要塞', maxHp: 240, coins: 60, scrap: 6, desc: '屋顶守卫轻炮自动开火 · 大屋耐久翻倍' },
-  { level: 3, name: '哥特铁堡', maxHp: 420, coins: 120, scrap: 12, desc: '屋顶双联火炮 · 屋顶射程+15% · 每夜自动修墙' },
+  { level: 1, name: '木石酒馆', maxHp: 120, coins: 0, desc: '屋顶2个塔位，二层木台视野' },
+  { level: 2, name: '石堡要塞', maxHp: 240, coins: 120, desc: '屋顶守卫轻炮自动开火 · 大屋耐久翻倍' },
+  { level: 3, name: '哥特铁堡', maxHp: 420, coins: 240, desc: '屋顶双联火炮 · 屋顶射程+15% · 每夜自动修墙' },
 ];
 
 // ── 消耗品 & 商店售价 ──
@@ -177,17 +177,23 @@ export const SHOP_MEDKIT_COST = 30;
 export const SHOP_REROLL_COST = 15;
 export const MAX_GRENADES = 5;
 
-// ── 深夜小食堂：幸存者食客点单 & 明日私房特餐 ──
-export type MealId = 'spicy_skewer' | 'hearty_stew' | 'iron_steak';
+// ── 深夜小食堂：6 道递进菜单（兼作堂食招牌菜 & 明日战前私房特餐）──
+export type MealId = 'spicy_skewer' | 'hearty_stew' | 'iron_steak' | 'mixed_grill' | 'elite_hotpot' | 'apocalypse_feast';
 export interface MealDef {
   id: MealId; name: string; icon: string; desc: string;
-  meatCost: number; dmgMul: number; armor: number; haste: number;
+  unlockDay: number; meatCost: number; basePay: number; tags: string[];
+  dmgMul: number; armor: number; haste: number; heal: number;
 }
 export const MEALS: Record<MealId, MealDef> = {
-  spicy_skewer: { id: 'spicy_skewer', name: '炭烤香辣肉串', icon: 'ic_dish_skewer', desc: '明天所有武器伤害 +22%', meatCost: 2, dmgMul: 0.22, armor: 0, haste: 0 },
-  hearty_stew:  { id: 'hearty_stew',  name: '浓汤热炖肉锅', icon: 'ic_dish_stew',   desc: '立即回 40 血 + 明天开局 +35 护甲', meatCost: 2, dmgMul: 0, armor: 35, haste: 0 },
-  iron_steak:   { id: 'iron_steak',   name: '秘制铁板厚排', icon: 'ic_dish_steak',  desc: '明天角色与炮塔攻速 +20% 且伤害 +10%', meatCost: 3, dmgMul: 0.1, armor: 15, haste: 0.2 },
+  spicy_skewer:     { id: 'spicy_skewer',     name: '炭烤香辣肉串', icon: 'ic_dish_skewer', desc: '明日所有武器伤害 +22%',                   unlockDay: 1, meatCost: 1, basePay: 22,  tags: ['辣', '家常'],                 dmgMul: 0.22, armor: 0,  haste: 0,    heal: 0 },
+  hearty_stew:      { id: 'hearty_stew',      name: '末世暖胃肉汤', icon: 'ic_dish_stew',   desc: '立即回 35 血 + 明日开局 +35 护甲',          unlockDay: 2, meatCost: 2, basePay: 36,  tags: ['鲜嫩', '饱腹'],               dmgMul: 0,    armor: 35, haste: 0,    heal: 35 },
+  iron_steak:       { id: 'iron_steak',       name: '铁板滋滋厚排', icon: 'ic_dish_steak',  desc: '明日攻速 +20% 且伤害 +12%',                unlockDay: 3, meatCost: 2, basePay: 46,  tags: ['高蛋白', '烟熏'],             dmgMul: 0.12, armor: 15, haste: 0.2,  heal: 0 },
+  mixed_grill:      { id: 'mixed_grill',      name: '碳火三拼盛宴', icon: 'ic_dish_skewer', desc: '回 15 血 · 明日伤害 +28% 且攻速 +15%',     unlockDay: 4, meatCost: 3, basePay: 64,  tags: ['辣', '重口', '高蛋白'],       dmgMul: 0.28, armor: 15, haste: 0.15, heal: 15 },
+  elite_hotpot:     { id: 'elite_hotpot',     name: '地狱异变火锅', icon: 'ic_dish_stew',   desc: '回 20 血 · 明日伤害 +36% 且护甲 +25',      unlockDay: 5, meatCost: 4, basePay: 88,  tags: ['辣', '异变'],                 dmgMul: 0.36, armor: 25, haste: 0.1,  heal: 20 },
+  apocalypse_feast: { id: 'apocalypse_feast', name: '终章末日大餐', icon: 'ic_dish_steak',  desc: '回 45 血 · 伤害 +42% · 攻速 +25% · 护甲 +45', unlockDay: 7, meatCost: 5, basePay: 120, tags: ['鲜嫩', '烟熏', '饱腹', '异变'], dmgMul: 0.42, armor: 45, haste: 0.25, heal: 45 },
 };
+export const MEAL_ORDER: MealId[] = ['spicy_skewer', 'hearty_stew', 'iron_steak', 'mixed_grill', 'elite_hotpot', 'apocalypse_feast'];
+export const unlockedMeals = (day: number): MealDef[] => MEAL_ORDER.map((id) => MEALS[id]).filter((m) => m.unlockDay <= day);
 export const MEAT_SELL_PRICE = 14; // 每块鲜肉现炒出锅可得 14 金币
 
 export interface DinerGuestDef {
@@ -198,26 +204,26 @@ export interface DinerGuestDef {
 export const DINER_GUESTS: DinerGuestDef[] = [
   {
     id: 'agou', name: '阿狗', role: '拾荒新丁', sprite: 'npc_hat', fps: 6,
-    dish: 'spicy_skewer', dishName: '炭烤香辣肉串', meatCost: 1, basePay: 18,
+    dish: 'spicy_skewer', dishName: '炭烤香辣肉串', meatCost: 1, basePay: 22,
     orderQuote: '老板，刚从废墟摸回来，来串冒油的辣肉串暖暖身子！',
     thanksQuote: '嘶哈——焦香麻辣，明天守城我帮你多盯紧东墙！',
   },
   {
     id: 'qijie', name: '七姐', role: '夜巡猎手', sprite: 'npc_woman', fps: 7,
-    dish: 'hearty_stew', dishName: '浓汤热炖肉锅', meatCost: 1, basePay: 20,
+    dish: 'hearty_stew', dishName: '末世暖胃肉汤', meatCost: 2, basePay: 36,
     orderQuote: '夜风太冷了，给我盛碗滚烫的肉汤，撒点黑胡椒。',
     thanksQuote: '这口热汤下肚，浑身的寒气都散了，多谢掌柜！',
   },
   {
-    id: 'laobao', name: '老包', role: '焊枪老匠', sprite: 'npc_bearded', fps: 6,
-    dish: 'iron_steak', dishName: '铁板滋滋厚排', meatCost: 2, basePay: 36,
-    orderQuote: '修了一整天炮塔，切块最厚的铁板肉排，要七分熟！',
+    id: 'laobao', name: '老包', role: '防线夜巡者', sprite: 'npc_bearded', fps: 6,
+    dish: 'iron_steak', dishName: '铁板滋滋厚排', meatCost: 2, basePay: 46,
+    orderQuote: '连着值完夜班快扛不住了，切块最厚的铁板肉排！',
     thanksQuote: '够劲！满口肉汁，待会儿我顺手给你把屋顶支架紧一紧！',
   },
   {
-    id: 'niqiu', name: '泥鳅', role: '黑市倒爷', sprite: 'npc_oldman', fps: 7,
-    dish: 'spicy_skewer', dishName: '秘制下酒双拼', meatCost: 2, basePay: 40,
-    orderQuote: '掌柜的，把你压箱底的招牌卤肉端上来，赏金少不了你的！',
+    id: 'niqiu', name: '泥鳅', role: '黑市游商', sprite: 'npc_oldman', fps: 7,
+    dish: 'spicy_skewer', dishName: '炭烤香辣肉串', meatCost: 1, basePay: 26,
+    orderQuote: '掌柜的，把你压箱底的招牌烤肉端上来，赏金少不了你的！',
     thanksQuote: '绝了！全废土就数你这小酒馆最有人情味，赏金拿好！',
   },
 ];
@@ -255,8 +261,8 @@ export interface ClassDef {
 }
 export const CLASSES: Record<ClassId, ClassDef> = {
   gunner:   { id: 'gunner', name: '枪手', role: '主角输出', icon: 'wp_rifle', passive: '暴击率 +15%', skill: '鹰眼', skillDesc: '5 秒全穿透 + 必暴', dur: 300, cd: 1080 },
-  engineer: { id: 'engineer', name: '工程师', role: '塔防建设', icon: 'ic_turret', passive: '建塔/升塔 -25% 废铁，塔伤害 +20%', skill: '过载', skillDesc: '所有炮塔 6 秒攻速 ×2', dur: 360, cd: 1080 },
-  chef:     { id: 'chef', name: '主厨', role: '厨房经营', icon: 'ic_chef', passive: '僵尸多掉 1 块肉，卖肉 +35% 金币，菜品效果 +50%', skill: '战地大餐', skillDesc: '回 40% 血 + 8 秒攻速 ×1.4', dur: 480, cd: 1080 },
+  engineer: { id: 'engineer', name: '工程师', role: '塔防建设', icon: 'ic_turret', passive: '建塔/升塔 -25% 金币，塔伤害 +20%', skill: '过载', skillDesc: '所有炮塔 6 秒攻速 ×2', dur: 360, cd: 1080 },
+  chef:     { id: 'chef', name: '主厨', role: '厨房经营', icon: 'ic_chef', passive: '僵尸多掉肉，卖菜/现炒 +35% 金币，特餐效果 +50%', skill: '战地大餐', skillDesc: '回 40% 血 + 8 秒攻速 ×1.4', dur: 480, cd: 1080 },
 };
 export const CRIT_CHANCE = 0.15;
 export const CRIT_MUL = 2;

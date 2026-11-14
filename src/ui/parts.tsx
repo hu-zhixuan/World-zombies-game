@@ -5,6 +5,12 @@ import { MAX_STAR } from '../content/data';
 
 export const Icon = (p: { k: string; cls?: string }) => <img class={`icon ${p.cls ?? ''}`} src={assetUrl(p.k)} alt="" draggable={false} />;
 
+export const NpcPortrait = (p: { avatar: string; initial?: string; cls?: string }) => (
+  <span class={`portrait ${p.cls ?? ''}`} data-avatar={p.avatar}>
+    {(p.avatar === 'radio' || p.avatar === 'heli') && <b>{p.initial ?? (p.avatar === 'radio' ? '广' : '机')}</b>}
+  </span>
+);
+
 export const Stars = (p: { n: number }) => (
   <span class="stars">{'★'.repeat(p.n)}<i>{'★'.repeat(MAX_STAR - p.n)}</i></span>
 );
@@ -29,6 +35,6 @@ export const Panel = (p: { id: string; title: string; sub?: string; cls?: string
   </div>
 );
 
-export const Btn = (p: { id?: string; kind?: 'primary' | 'danger' | 'small' | 'ghost'; disabled?: boolean; onClick: () => void; children: ComponentChildren }) => (
-  <button id={p.id} class={`btn ${p.kind ?? ''}`} disabled={p.disabled} onClick={p.onClick}>{p.children}</button>
+export const Btn = (p: { id?: string; cls?: string; kind?: 'primary' | 'danger' | 'small' | 'ghost'; disabled?: boolean; onClick: () => void; children: ComponentChildren }) => (
+  <button id={p.id} class={`btn ${p.kind ?? ''} ${p.cls ?? ''}`} disabled={p.disabled} onClick={p.onClick}>{p.children}</button>
 );

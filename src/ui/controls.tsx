@@ -294,6 +294,8 @@ export function bindKeyboard() {
     else if (k === 'd' || k === 'arrowright') { dirs.right = down; sync(); }
     else if (k === 'j') { game.held.fire = down; }
     else if (down && !e.repeat) {
+      const curPanel = game.panel();
+      if (curPanel === 'story' && (k === ' ' || k === 'enter' || k === 'f')) { game.nextStory(); return; }
       if (k === 'w' || k === 'arrowup' || k === ' ') game.press('jump');
       else if (k === 'k' || k === 'shift') game.press('dodge');
       else if (k === 'r') game.press('reload');
@@ -302,9 +304,8 @@ export function bindKeyboard() {
       else if (k === 'u') game.press('skill');
       else if (k === 'f' || k === 'enter') game.press('interact');
       else if (k === 'escape') {
-        const p = game.panel();
-        if (p === null) game.open('pause');
-        else if (p === 'pause' || p === 'shop' || p === 'build' || p === 'kitchen') game.close();
+        if (curPanel === null) game.open('pause');
+        else if (curPanel === 'pause' || curPanel === 'shop' || curPanel === 'build' || curPanel === 'kitchen' || curPanel === 'lore') game.close();
       }
     }
   };

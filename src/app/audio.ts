@@ -300,6 +300,38 @@ class SoundEngine {
     this.tone(620, 0.045, 'triangle', 0.13, { slide: 840 });
   }
 
+  cookSizzle() {
+    if (this.muted) return;
+    this.noise(0.18, 0.09, 3600, { highpass: true });
+    this.noise(0.16, 0.06, 2600, { highpass: true, delay: 0.1 });
+    this.tone(320, 0.06, 'triangle', 0.08, { slide: 460 });
+  }
+
+  cookResult(q: 'poor' | 'good' | 'perfect' | 'legendary') {
+    if (this.muted) return;
+    if (q === 'legendary') {
+      [587.33, 739.99, 880, 1174.66, 1318.51].forEach((f, i) => this.tone(f, 0.16, 'sine', 0.14, { delay: i * 0.055 }));
+    } else if (q === 'perfect') {
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, 0.14, 'triangle', 0.14, { delay: i * 0.055 }));
+    } else if (q === 'good') {
+      this.tone(523.25, 0.09, 'triangle', 0.14);
+      this.tone(659.25, 0.12, 'triangle', 0.14, { delay: 0.06 });
+    } else {
+      this.tone(240, 0.11, 'triangle', 0.12, { slide: 185 });
+    }
+  }
+
+  storyBlip(npc: string) {
+    if (this.muted) return;
+    if (npc === 'radio' || npc === 'heli') {
+      this.tone(1180, 0.035, 'square', 0.06, { cutoff: 2000 });
+      this.noise(0.03, 0.04, 2800, { highpass: true });
+      return;
+    }
+    const pitch = npc.startsWith('boss') ? 160 : npc === 'zhang' ? 280 : npc === 'lin' ? 560 : npc === 'qiang' ? 320 : npc === 'zhao' ? 480 : 420;
+    this.tone(pitch, 0.045, 'triangle', 0.09, { slide: pitch * 1.12 });
+  }
+
   aimTick() {
     if (this.muted) return;
     const now = performance.now();
@@ -388,10 +420,15 @@ class SoundEngine {
         this.tone(440, 0.04, 'triangle', 0.12);
         this.tone(680, 0.05, 'triangle', 0.13, { delay: 0.09 });
         break;
+      case 'serve':
+        this.cookResult(e.quality);
+        break;
+      case 'allyJoin':
+        [440, 554.37, 659.25, 880].forEach((f, i) => this.tone(f, 0.16, 'triangle', 0.14, { delay: i * 0.065 }));
+        break;
       case 'pickup':
       case 'star':
       case 'shop':
-      case 'serve':
         this.tone(523.25, 0.08, 'triangle', 0.15);
         this.tone(659.25, 0.08, 'triangle', 0.15, { delay: 0.06 });
         this.tone(783.99, 0.14, 'triangle', 0.16, { delay: 0.12 });

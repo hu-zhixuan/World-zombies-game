@@ -197,10 +197,11 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .box { display: flex; flex-direction: column; gap: 4px; }
 .item { display: flex; align-items: center; gap: 6px; padding: 4px 6px; background: color-mix(in srgb, var(--leather) 92%, transparent);
   border: 1.5px solid var(--wood-dark); border-radius: var(--r1); font-size: 11px; }
-.item.diner-card { border-color: var(--copper); background: linear-gradient(180deg, color-mix(in srgb, var(--wood) 38%, var(--leather)), var(--leather)); }
-.item.diner-card.served { border-color: var(--gold); opacity: .88; }
+.item.diner-card { border-color: var(--copper); background: linear-gradient(180deg, color-mix(in srgb, var(--wood) 38%, var(--leather)), var(--leather)); flex-direction: column; align-items: stretch; gap: 4px; padding: 5px 7px; }
+.item.diner-card.served { border-color: var(--gold); opacity: .9; }
 .item small.quote { white-space: normal; line-height: 1.25; color: var(--gold); font-style: italic; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.item.kitchen-footer { margin-top: 4px; padding: 3px 6px; }
+.item small.wrap { white-space: normal; line-height: 1.3; overflow: visible; }
+.item.kitchen-footer { margin-top: 4px; padding: 4px 7px; }
 #panel-build .item { padding: 3px 6px; gap: 5px; }
 #panel-build .icon.x2 { width: 20px; height: 20px; }
 #panel-build .icon.gun { width: 24px; height: 14px; }
@@ -216,8 +217,127 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .note { display: inline-flex; align-items: center; gap: var(--s1); margin: 0; padding: 4px var(--s3); background: var(--wood-dark); border-radius: var(--r2); font-size: var(--f1); font-weight: 700; }
 .note b { color: var(--gold); }
 
+/* ── 角色立绘框（单帧精灵表裁切 + 广/机徽章） ── */
+.portrait { width: 36px; height: 40px; flex: none; border: 2px solid var(--copper); border-radius: var(--r1);
+  background-color: var(--ink); background-repeat: no-repeat; background-position: 0 0; image-rendering: pixelated;
+  display: grid; place-items: center; overflow: hidden; box-shadow: 0 2px 0 var(--ink); }
+.portrait.xs { width: 22px; height: 24px; border-width: 1.5px; }
+.portrait.sm { width: 32px; height: 36px; }
+.portrait.lg { width: 68px; height: 74px; border-width: 3px; border-color: var(--gold); }
+.portrait[data-avatar='hero_idle'] { background-image: url('../assets/hero_idle.png'); background-size: 600% 100%; }
+.portrait[data-avatar='npc_hat'] { background-image: url('../assets/npc_hat.png'); background-size: 400% 100%; }
+.portrait[data-avatar='npc_bearded'] { background-image: url('../assets/npc_bearded.png'); background-size: 500% 100%; }
+.portrait[data-avatar='npc_woman'] { background-image: url('../assets/npc_woman.png'); background-size: 700% 100%; }
+.portrait[data-avatar='npc_oldman'] { background-image: url('../assets/npc_oldman.png'); background-size: 800% 100%; }
+.portrait[data-avatar='boss_beast'] { background-image: url('../assets/boss_beast.png'); background-size: 600% 100%; }
+.portrait[data-avatar='boss_demon'] { background-image: url('../assets/boss_demon.png'); background-size: 600% 100%; }
+.portrait[data-avatar='radio'] { background: radial-gradient(circle at 35% 30%, var(--electric), var(--plum) 80%); border-color: var(--electric); }
+.portrait[data-avatar='heli'] { background: radial-gradient(circle at 35% 30%, var(--lamp), var(--copper) 80%); border-color: var(--gold); }
+.portrait b { color: var(--paper); font: 900 var(--f2) var(--font); text-shadow: 0 1px 0 var(--ink); }
+.portrait.lg b { font-size: var(--f4); }
+
+/* ── 顶部非阻塞无线电短对白条 ── */
+.radio-bar { position: absolute; top: 36px; left: 50%; transform: translateX(-50%); z-index: var(--z-hud);
+  display: flex; align-items: center; gap: 8px; max-width: min(82vw, 490px); padding: 4px 10px 4px 6px;
+  border: 2px solid var(--copper); border-radius: var(--r2); background: color-mix(in srgb, var(--ink) 92%, transparent);
+  box-shadow: 0 3px 0 var(--ink), 0 0 12px color-mix(in srgb, var(--lamp) 24%, transparent);
+  color: var(--paper); text-align: left; font: inherit; cursor: pointer; animation: veilIn .15s ease-out; }
+.radio-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.radio-body b { font-size: 11px; color: var(--gold); line-height: 1.1; }
+.radio-body span { font-size: 11.5px; color: var(--paper); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.radio-next { font-style: normal; font-size: 10px; font-weight: 800; color: var(--lamp); padding: 2px 6px; border: 1px solid var(--copper); border-radius: var(--r1); flex: none; }
+
+/* ── 沉浸剧情对话弹窗 & 废土档案馆 ── */
+.story-panel { max-width: min(92vw, 660px); }
+.story-step { font-size: 11px; font-weight: 800; color: var(--gold); padding: 2px 8px; border-radius: var(--r1); background: var(--leather); border: 1.5px solid var(--copper); }
+.story-stage { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 4px 0 8px; text-align: left;
+  background: color-mix(in srgb, var(--ink) 78%, var(--leather)); border: 2px solid var(--copper); border-radius: var(--r2); min-height: 104px; }
+.story-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.story-speaker { display: flex; align-items: center; gap: 8px; }
+.story-speaker strong { font-size: var(--f3); color: var(--gold); }
+.story-speaker em { font-style: normal; font-size: 11px; font-weight: 800; padding: 1px 6px; border-radius: var(--r1); background: var(--plum); color: var(--paper); border: 1px solid var(--haze); }
+.story-text { margin: 0; font-size: var(--f2); line-height: 1.48; color: var(--paper); }
+.story-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
+
+.diner-tabs { display: flex; align-items: center; gap: 5px; margin: 4px 0 6px; flex-wrap: nowrap; }
+.tab-btn { padding: 4px 9px; border-radius: var(--r1); border: 1.5px solid var(--wood); background: var(--leather); color: var(--paper); font: 800 11px var(--font); cursor: pointer; white-space: nowrap; }
+.tab-btn.on { background: var(--gold); color: var(--ink); border-color: var(--paper); }
+.tab-right { margin-left: auto; }
+.tab-stat { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--lamp); white-space: nowrap; }
+
+.lore-intro { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.scene-pills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.scene-pill { padding: 5px 8px; border-radius: var(--r1); border: 1.5px solid var(--wood-dark); background: var(--leather); color: var(--paper); font: 700 11px var(--font); cursor: pointer; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scene-pill.on { border-color: var(--gold); background: var(--wood); color: var(--paper); }
+.lore-scene-box { padding: 10px 12px; border-radius: var(--r2); border: 2px solid var(--copper); background: color-mix(in srgb, var(--ink) 80%, var(--leather)); min-height: 108px; }
+.lore-scene-box strong { display: block; font-size: var(--f2); color: var(--gold); margin-bottom: 4px; }
+.lore-scene-box p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--paper); }
+.lore-grid { gap: 6px; }
+.lore-card { align-items: flex-start; padding: 6px 8px; }
+.lore-card.on { border-color: var(--gold); }
+.card-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.card-top em { font-style: normal; font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: var(--r1); background: var(--plum); color: var(--paper); flex: none; }
+.lore-tip { display: block; text-align: center; font-size: 11px; color: var(--haze); }
+
+/* ── 深夜食堂：热搜条、熟客堂食、铁板 QTE、6 道特餐、15 位 VIP 图鉴与点评墙 ── */
+.diner-meta { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; flex-wrap: nowrap; overflow: hidden; }
+.meta-pill { flex: 1; min-width: 0; padding: 2px 6px; border-radius: var(--r1); border: 1.5px solid var(--wood-dark); background: color-mix(in srgb, var(--ink) 74%, var(--leather)); font-size: 10.5px; font-weight: 700; color: var(--paper); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.meta-pill b { color: var(--gold); }
+.meta-pill.trend { flex: 1.45; border-color: var(--ember); color: var(--lamp); }
+.diner-cols { align-items: stretch; }
+.guest-top { display: flex; align-items: center; gap: 6px; }
+.tier-badge[data-tier='silver'] { background: var(--frost); color: var(--ink); }
+.tier-badge[data-tier='gold'] { background: var(--gold); color: var(--ink); }
+.tier-badge[data-tier='platinum'] { background: var(--electric); color: var(--ink); }
+.tier-badge[data-tier='diamond'] { background: var(--rose); color: var(--paper); }
+.mini-story-btn { padding: 2px 6px; border-radius: var(--r1); border: 1px solid var(--gold); background: var(--plum); color: var(--gold); font: 800 10px var(--font); cursor: pointer; flex: none; }
+.guest-dish { display: flex; align-items: center; gap: 4px; padding: 2px 5px; border-radius: var(--r1); background: color-mix(in srgb, var(--ink) 55%, transparent); font-size: 11px; }
+.guest-dish small { margin-left: auto; color: var(--gold); }
+.trend-hit { text-decoration: none; font-size: 9.5px; font-weight: 900; padding: 0 4px; border-radius: var(--r1); background: var(--ember); color: var(--ink); }
+.full-btn { width: 100%; }
+
+.cook-qte { padding: 12px 14px; border-radius: var(--r2); border: 2px solid var(--gold); background: color-mix(in srgb, var(--ink) 86%, var(--leather)); text-align: left; margin-top: 4px; }
+.qte-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+.qte-head strong { font-size: var(--f3); color: var(--gold); }
+.qte-head span { font-size: 11px; color: var(--lamp); font-weight: 700; }
+.qte-tip { margin: 0 0 10px; font-size: 11px; color: var(--paper); opacity: .9; }
+.qte-track { position: relative; height: 28px; border-radius: var(--r2); border: 2.5px solid var(--copper); overflow: hidden; margin-bottom: 12px;
+  background: linear-gradient(90deg, var(--leather) 0%, var(--wood-dark) 22%, var(--wood-dark) 78%, var(--leather) 100%); box-shadow: inset 0 2px 6px var(--ink); }
+.qte-zone { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); }
+.qte-zone.z-good { width: 56%; background: color-mix(in srgb, var(--ember) 40%, transparent); }
+.qte-zone.z-perf { width: 24%; background: color-mix(in srgb, var(--lamp) 55%, transparent); }
+.qte-zone.z-leg { width: 9%; background: var(--gold); box-shadow: 0 0 10px var(--gold); }
+.qte-needle { position: absolute; top: -2px; bottom: -2px; width: 6px; margin-left: -3px; left: calc(var(--needle, 0.5) * 100%);
+  background: var(--paper); border: 1.5px solid var(--ink); border-radius: 3px; box-shadow: 0 0 8px var(--paper); }
+.qte-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.meal-grid { gap: 5px; }
+.meal-card { flex-direction: column; align-items: stretch; gap: 3px; padding: 5px 6px; }
+.meal-card.locked { opacity: .65; }
+.meal-head { display: flex; align-items: center; gap: 5px; }
+.tag-row { display: flex; gap: 3px; margin-top: 2px; }
+.dish-tag { font-style: normal; font-size: 9.5px; font-weight: 800; padding: 0 4px; border-radius: var(--r1); background: var(--wood-dark); color: var(--paper); }
+.dish-tag.hit { background: var(--ember); color: var(--ink); }
+
+.vip-split { gap: 8px; align-items: stretch; }
+.vip-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.vip-cell { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 2px; border-radius: var(--r1); border: 1.5px solid var(--wood-dark);
+  background: color-mix(in srgb, var(--ink) 78%, var(--leather)); color: var(--paper); font: inherit; cursor: pointer; }
+.vip-cell.met { border-color: var(--gold); background: color-mix(in srgb, var(--wood) 42%, var(--leather)); }
+.vip-cell.open { border-color: var(--frost); }
+.vip-cell.lock { opacity: .55; cursor: default; }
+.vip-cell b { font-size: 10px; line-height: 1.1; white-space: nowrap; }
+.vip-cell small { font-size: 9px; color: var(--lamp); line-height: 1.1; }
+.fans-box { display: flex; flex-direction: column; gap: 4px; padding: 5px 7px; border-radius: var(--r1); border: 1.5px solid var(--copper); background: color-mix(in srgb, var(--ink) 72%, var(--leather)); font-size: 11px; }
+.fans-box .bar { width: 100%; height: 8px; }
+.milestone-pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.review-list { display: flex; flex-direction: column; gap: 4px; }
+.review-item { padding: 4px 6px; border-radius: var(--r1); border: 1px solid var(--wood-dark); background: color-mix(in srgb, var(--leather) 88%, transparent); font-size: 10.5px; }
+.review-item em { font-style: normal; font-size: 10px; font-weight: 800; color: var(--gold); }
+
 /* ── 提示和飘字 ── */
-.toasts { position: absolute; top: 38px; left: 0; right: 0; z-index: var(--z-toast); display: flex; flex-direction: column; align-items: center; gap: var(--s1); pointer-events: none; }
+.toasts { position: absolute; top: 38px; left: 0; right: 0; z-index: var(--z-toast); display: flex; flex-direction: column; align-items: center; gap: var(--s1); pointer-events: none; transition: top .15s; }
+.toasts.has-radio { top: 88px; }
 .toast { max-width: min(88vw, 480px); text-align: center; line-height: 1.35; padding: 4px var(--s3); background: var(--paper); color: var(--ink); border: 2px solid var(--wood-dark); border-radius: var(--r2); font-size: var(--f1); font-weight: 800;
   box-shadow: 0 2px 0 var(--wood-dark); animation: toast 2.4s forwards; }
 .toast.big { font-size: var(--f2); border-color: var(--gold); box-shadow: 0 2px 0 var(--gold); }

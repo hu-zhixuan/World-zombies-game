@@ -1,6 +1,6 @@
 {
   "name": "world-zombies-game",
-  "version": "57.2.0",
+  "version": "57.3.0",
   "private": true,
   "type": "module",
   "description": "十五波围城：最后据点 —— v57 重做版（TypeScript + Phaser + Preact，打包成单个 HTML）",
