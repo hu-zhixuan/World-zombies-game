@@ -122,7 +122,7 @@ function StoryPanel() {
   );
 }
 
-/** 废土档案馆：序章前情 / 四章总览 / 四位战友档案 */
+/** 酒馆传闻录：序章前情 / 四章总览 / 四位战友档案 */
 function LorePanel() {
   const [tab, setTab] = useState<'intro' | 'chapters' | 'allies'>('intro');
   const [sceneIdx, setSceneIdx] = useState(0);
@@ -130,13 +130,13 @@ function LorePanel() {
   const scene = STORY_SCENES[sceneIdx] ?? STORY_SCENES[0];
 
   return (
-    <Panel id="panel-lore" cls="wide" title="废土剧情档案" head={<Btn id="btn-close" kind="primary" onClick={() => game.close()}>返回</Btn>}>
+    <Panel id="panel-lore" cls="wide" title="酒馆传闻录" head={<Btn id="btn-close" kind="primary" onClick={() => game.close()}>返回</Btn>}>
       <div class="diner-tabs">
         <button id="tab-lore-intro" class={`tab-btn ${tab === 'intro' ? 'on' : ''}`} onClick={() => setTab('intro')}>序章前情</button>
         <button id="tab-lore-chapters" class={`tab-btn ${tab === 'chapters' ? 'on' : ''}`} onClick={() => setTab('chapters')}>章节脉络</button>
         <button id="tab-lore-allies" class={`tab-btn ${tab === 'allies' ? 'on' : ''}`} onClick={() => setTab('allies')}>并肩战友 ({run.story.allies.length}/4)</button>
         {tab === 'intro' && game.started && (
-          <Btn id="btn-replay-intro" kind="small" cls="tab-right" onClick={() => { game.close(); game.enqueueStory('序幕 · 十五波围城', CINEMATIC_INTRO, true); }}>
+          <Btn id="btn-replay-intro" kind="small" cls="tab-right" onClick={() => { game.close(); game.enqueueStory('序幕 · 暮夜酒馆', CINEMATIC_INTRO, true); }}>
             重温开场动画
           </Btn>
         )}
@@ -155,7 +155,7 @@ function LorePanel() {
             <strong>{scene.chapter} · {scene.title}</strong>
             <p>{scene.text}</p>
           </div>
-          {!game.started && <small class="lore-tip">点击「开始守城」选择职业出战后，将立即播放开场全剧情</small>}
+          {!game.started && <small class="lore-tip">点击「开始守夜」选择职业出战后，将立即播放开场全剧情</small>}
         </div>
       )}
 
@@ -230,7 +230,7 @@ function PerkPanel() {
 function ClassPanel() {
   const stars = game.meta.stars;
   return (
-    <Panel id="panel-class" title="选择出战职业" sub="一位英雄守在酒馆屋顶，迎战十五波尸潮">
+    <Panel id="panel-class" title="选择出战职业" sub="一位守夜人守在暮夜酒馆屋顶，迎战十五夜黑雾尸潮">
       <div class="row">
         {Object.values(CLASSES).map((c) => {
           const need = classUnlockStars(c.id) ?? 0;
@@ -260,7 +260,7 @@ function qteQuality(pos: number): DishQuality {
   return 'poor';
 }
 
-/** 深夜小食堂：今日热搜 + 铁板火候 QTE + 15 位 VIP 图鉴/点评 + 6 道特餐 + 现炒卖钱 */
+/** 深夜小食堂：今夜热门 + 铁板火候 QTE + 15 位熟客图鉴/食评 + 6 道特餐 + 现炒赚金 */
 function KitchenPanel() {
   const run = game.run, price = meatPrice(run.cls);
   const [tab, setTab] = useState<'dine' | 'menu' | 'vip'>('dine');
@@ -387,7 +387,7 @@ function KitchenPanel() {
               <div class="item kitchen-footer">
                 <Icon k="ic_meat" />
                 <span class="grow">
-                  <b>{allServed ? `今夜满堂尽兴！已赠打赏与 +15 生命` : `富余鲜肉现炒（+${price} 金币/肉${run.cls === 'chef' ? ' · 主厨加成' : ''}）`}</b>
+                  <b>{allServed ? `今夜满堂尽兴！已赠打赏与 +15 生命` : `富余鲜肉现炒（+${price} 金币/肉${run.cls === 'chef' ? ' · 厨师加成' : ''}）`}</b>
                 </span>
                 <Btn kind="small" id="btn-cook-one" disabled={run.meat < 1} onClick={() => game.send({ t: 'cookSell', count: 1 })}>现炒 1 份 (+{price}金)</Btn>
                 <Btn kind="small" id="btn-cook-all" disabled={run.meat < 1} onClick={() => game.send({ t: 'cookSell', count: run.meat })}>全部现炒 (+{run.meat * price}金)</Btn>
@@ -427,7 +427,7 @@ function KitchenPanel() {
           {tab === 'vip' && (
             <div class="cols2 vip-split">
               <div class="box">
-                <div class="section-title"><span>15 位废土熟客图鉴（点已初遇回看剧情）</span></div>
+                <div class="section-title"><span>15 位酒馆熟客图鉴（点已初遇回看剧情）</span></div>
                 <div class="vip-grid">
                   {VIP_CUSTOMERS.map((v) => {
                     const met = run.diner.metVips.includes(v.id);
@@ -449,7 +449,7 @@ function KitchenPanel() {
                 <div class="fans-box">
                   <div class="card-top">
                     <b>{fansRank.cur.grade}级 · {fansRank.cur.name}</b>
-                    <small>{fansRank.next ? `距 ${fansRank.next.grade}级 差 ${fansRank.next.minFans - run.diner.fans} 粉` : '废土美食传说'}</small>
+                    <small>{fansRank.next ? `距 ${fansRank.next.grade}级 差 ${fansRank.next.minFans - run.diner.fans} 粉` : '长夜美食传说'}</small>
                   </div>
                   <Bar cls="fort" v={fansProgress} />
                   {run.story.seenEvents.length > 0 && (
@@ -462,10 +462,10 @@ function KitchenPanel() {
                     </div>
                   )}
                 </div>
-                <div class="section-title"><span>末世食评墙</span></div>
+                <div class="section-title"><span>酒馆食评墙</span></div>
                 <div class="review-list">
                   {run.diner.reviews.length === 0 ? (
-                    <small class="lore-tip">招待今晚堂食客人后，废土热评与打赏将展示于此</small>
+                    <small class="lore-tip">招待今晚堂食客人后，食客热评与打赏将展示于此</small>
                   ) : run.diner.reviews.slice(0, 3).map((rv) => (
                     <div class="review-item" key={rv.id}>
                       <div class="card-top">
@@ -485,11 +485,11 @@ function KitchenPanel() {
   );
 }
 
-/** 酒馆军火商店：购买特色新枪 / 升星 / 购买手雷护甲医疗包 / 刷货 / 拆解旧枪 */
+/** 酒馆军械行商：购买特色兵器 / 升星 / 购买爆炎弹铁甲秘药 / 刷货 / 拆解旧兵 */
 function ShopPanel() {
   const run = game.run, p = run.player;
   return (
-    <Panel id="panel-shop" cls="wide" title="酒馆军火商店"
+    <Panel id="panel-shop" cls="wide" title="军械行商"
       head={<><Btn kind="small" id="btn-reroll" disabled={run.coins < SHOP_REROLL_COST} onClick={() => game.send({ t: 'rerollShop' })}>换一批 {SHOP_REROLL_COST}金</Btn><Purse /><Btn id="btn-close" kind="primary" onClick={() => game.close()}>关门</Btn></>}>
       <div class="row">
         {run.shop.map((id) => {
@@ -513,19 +513,19 @@ function ShopPanel() {
 
       <div class="supply-row">
         <Btn kind="small" id="btn-buy-grenade" disabled={p.grenades >= MAX_GRENADES || run.coins < SHOP_GRENADE_COST} onClick={() => game.send({ t: 'buySupply', item: 'grenade' })}>
-          <Icon k="ic_grenade" />手雷 +2 ({SHOP_GRENADE_COST}金) · {p.grenades}/{MAX_GRENADES}
+          <Icon k="ic_grenade" />爆炎弹 +2 ({SHOP_GRENADE_COST}金) · {p.grenades}/{MAX_GRENADES}
         </Btn>
         <Btn kind="small" id="btn-buy-armor" disabled={p.armor >= p.maxArmor || run.coins < SHOP_ARMOR_COST} onClick={() => game.send({ t: 'buySupply', item: 'armor' })}>
-          <Icon k="ic_armor" />护甲 +40 ({SHOP_ARMOR_COST}金) · {p.armor}/{p.maxArmor}
+          <Icon k="ic_armor" />铁甲 +40 ({SHOP_ARMOR_COST}金) · {p.armor}/{p.maxArmor}
         </Btn>
         <Btn kind="small" id="btn-buy-medkit" disabled={p.hp >= p.maxHp || run.coins < SHOP_MEDKIT_COST} onClick={() => game.send({ t: 'buySupply', item: 'medkit' })}>
-          <Icon k="ic_hp" />急救 +45 ({SHOP_MEDKIT_COST}金) · {Math.ceil(p.hp)}/{p.maxHp}
+          <Icon k="ic_hp" />秘药 +45 ({SHOP_MEDKIT_COST}金) · {Math.ceil(p.hp)}/{p.maxHp}
         </Btn>
       </div>
 
       {p.weapons.length > 1 && (
         <div class="salvage-row">
-          <small>随身武器（最多 {MAX_CARRY} 把）：</small>
+          <small>随身兵器（最多 {MAX_CARRY} 把）：</small>
           {p.weapons.map((w, idx) => (
             <Btn kind="small" key={w.id} id={`btn-salvage-${w.id}`} onClick={() => game.send({ t: 'salvageWeapon', index: idx })}>
               拆解 {WEAPONS[w.id].name} (+{45 + w.star * 20}金)
@@ -537,7 +537,9 @@ function ShopPanel() {
   );
 }
 
-/** 防线工坊：4 个炮塔位建造/升级、3 级路障壁垒、3 级堡垒大屋与武器强化（统一仅消耗金币） */
+const TURRET_SHORT: Record<TurretType, string> = { mg: '火铳', frost: '寒晶', tesla: '雷炮', cannon: '重炮' };
+
+/** 防线工坊：4 个炮塔位建造/升级、3 级路障壁垒、3 级堡垒大屋与兵器强化（统一仅消耗金币） */
 function BuildPanel() {
   const run = game.run;
   const qiang = hasAlly(run, 'qiang');
@@ -553,14 +555,14 @@ function BuildPanel() {
             const slotMeta = TURRET_SLOTS[i];
             if (!sl.type) {
               return (
-                <div class="item" key={i}>
+                <div class="item build-empty" key={i}>
                   <span class="grow"><b>{slotMeta.name}</b><small>选塔安装（消耗金币）</small></span>
                   <div class="mini-btns">
                     {(['mg', 'frost', 'tesla', 'cannon'] as TurretType[]).map((kind) => {
                       const c = turretBuildCost(kind, run.cls, qiang);
                       return (
                         <Btn kind="small" key={kind} id={`btn-build-${i}-${kind}`} disabled={run.coins < c} onClick={() => game.send({ t: 'buildTurret', slot: i, kind })}>
-                          {TURRETS[kind].name.replace('塔', '')} {c}金
+                          {TURRET_SHORT[kind]} {c}金
                         </Btn>
                       );
                     })}
@@ -586,12 +588,12 @@ function BuildPanel() {
         </div>
 
         <div class="box">
-          <div class="section-title"><span>前线路障 · 屋顶守炮 · 随身武器升星</span></div>
+          <div class="section-title"><span>前线路障 · 屋顶守炮 · 随身兵器升星</span></div>
           <div class="item">
             <Icon k="ic_wall" cls="x2" />
             <span class="grow">
               <b>{WALL_LEVELS[run.wall.level - 1].name} Lv.{run.wall.level}</b>
-              <small>耐久 {run.wall.hp}/{run.wall.maxHp}{nextWall ? ` · 下级(${nextWall.name}+反伤)：${nextWall.coins}金` : ' · 高压电网反伤生效中'}</small>
+              <small>耐久 {run.wall.hp}/{run.wall.maxHp}{nextWall ? ` · 下级(${nextWall.name}+反伤)：${nextWall.coins}金` : ' · 雷纹铁壁反伤生效中'}</small>
             </span>
             <Btn kind="small" id="btn-repair" disabled={run.wall.hp >= run.wall.maxHp || run.coins < WALL_REPAIR_COST} onClick={() => game.send({ t: 'repairWall' })}>修 {WALL_REPAIR_COST}金</Btn>
             <Btn kind="small" id="btn-wall-up" disabled={!nextWall || run.coins < nextWall.coins} onClick={() => game.send({ t: 'upgradeWall' })}>{nextWall ? `升 ${nextWall.coins}金` : '满级'}</Btn>
@@ -635,10 +637,10 @@ function Toasts() {
       setTimeout(() => setItems((list) => list.filter((t) => t.id !== id)), 2400);
     };
     if (e.t === 'dayStart') pushToast(`第 ${e.day} 天 · 跃上屋顶迎战尸潮！`, true);
-    else if (e.t === 'bossAppear') pushToast(`警报！Boss ${ZOMBIES[e.kind].name} 现身！`, true);
+    else if (e.t === 'bossAppear') pushToast(`警报！首领 ${ZOMBIES[e.kind].name} 现身！`, true);
     else if (e.t === 'bossDead') pushToast(`击溃首领 ${ZOMBIES[e.kind].name}！`, true);
     else if (e.t === 'dayClear') pushToast('本波清场！战利品已清点');
-    else if (e.t === 'pickup' && e.isNew) pushToast(`获得新武器：${WEAPONS[e.weapon].name}（${WEAPONS[e.weapon].trait}）`, true);
+    else if (e.t === 'pickup' && e.isNew) pushToast(`获得新兵器：${WEAPONS[e.weapon].name}（${WEAPONS[e.weapon].trait}）`, true);
     else if (e.t === 'star') pushToast(`${WEAPONS[e.weapon].name} 升至 ${'★'.repeat(e.star)}${STAR_PERKS[e.star] ? ' · ' + STAR_PERKS[e.star] : ''}`, true);
     else if (e.t === 'skill') pushToast(`${CLASSES[e.cls].skill}发动！${CLASSES[e.cls].skillDesc}`, true);
     else if (e.t === 'allyJoin') pushToast(`战友「${ALLIES[e.ally].name}」入伙！（${ALLIES[e.ally].buffDesc}）`, true);
@@ -679,12 +681,12 @@ export function App() {
       <Toasts />
       {panel === 'title' && (
         <Panel id="panel-title" cls="title" title="">
-          <h1>十五波围城</h1>
-          <p>跃上黄昏酒馆二层屋顶迎战十五波尸潮，夜归温馨食堂做热饭招待十五路熟客、集结四位并肩战友！</p>
+          <h1>暮夜酒馆：守夜人</h1>
+          <p>跃上暮夜酒馆二楼屋顶守住十五夜尸潮，夜归灶台煮热饭招待十五路熟客、集结四位并肩战友！</p>
           <Progress />
           <div class="row">
             <Btn id="btn-lore" kind="ghost" onClick={() => game.open('lore')}>前情提要</Btn>
-            <Btn id="btn-start" kind="primary" onClick={() => game.chooseClass()}>开始守城</Btn>
+            <Btn id="btn-start" kind="primary" onClick={() => game.chooseClass()}>开始守夜</Btn>
           </div>
         </Panel>
       )}
@@ -705,13 +707,13 @@ export function App() {
         </Panel>
       )}
       {panel === 'dead' && (
-        <Panel id="panel-dead" title="据点失守" sub={`坚持到了第 ${run.day} 天，消灭 ${run.kills} 只感染者 · 食堂 ${fansRank.grade}级 (${run.diner.servedTotal}客)`}>
+        <Panel id="panel-dead" title="酒馆失守" sub={`坚持到了第 ${run.day} 天，消灭 ${run.kills} 只魔物 · 食堂 ${fansRank.grade}级 (${run.diner.servedTotal}客)`}>
           <Progress gain={game.lastGain} />
           <Btn id="btn-again" kind="primary" onClick={() => game.chooseClass()}>重返防线</Btn>
         </Panel>
       )}
       {panel === 'won' && (
-        <Panel id="panel-won" title="守住了最后据点！" sub={`守住全部 ${LAST_DAY} 个日夜，击杀 ${run.kills} 只丧尸魔物 · 食堂达成 ${fansRank.grade}级·${fansRank.name}！`}>
+        <Panel id="panel-won" title="守住了暮夜酒馆！" sub={`守住全部 ${LAST_DAY} 个日夜，击杀 ${run.kills} 只深渊魔物 · 食堂达成 ${fansRank.grade}级·${fansRank.name}！`}>
           <Progress gain={game.lastGain} />
           <Btn id="btn-again" kind="primary" onClick={() => game.chooseClass()}>再战一局</Btn>
         </Panel>

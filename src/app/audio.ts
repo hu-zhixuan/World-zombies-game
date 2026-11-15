@@ -323,7 +323,7 @@ class SoundEngine {
 
   storyBlip(npc: string) {
     if (this.muted) return;
-    if (npc === 'radio' || npc === 'heli') {
+    if (npc === 'watch' || npc === 'dawn' || npc === 'radio' || npc === 'heli') {
       this.tone(1180, 0.035, 'square', 0.06, { cutoff: 2000 });
       this.noise(0.03, 0.04, 2800, { highpass: true });
       return;

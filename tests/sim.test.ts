@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
-  CLASSES, CRIT_MUL, FORT_LEVELS, LAST_DAY, MEALS, WALL_LEVELS, WEAPONS,
+  CLASSES, CRIT_MUL, DINER_GUESTS, FORT_LEVELS, LAST_DAY, MEALS, PERKS, TURRETS, WALL_LEVELS, WEAPONS,
   nextUnlock, sustainedDps, unlockedClasses, unlockedMeals, unlockedWeapons, zombieHp,
 } from '../src/content/data';
 import {
@@ -19,7 +21,7 @@ const zombie = (r: RunState, x: number, hp = 100000, kind: 'roamer' | 'bruiser' 
   const z = { id: r.nextId++, kind, x, hp, maxHp: hp, atkCd: 999, kb: 0, burnT: 0, slowT: 0, stunT: 0, freezeT: 0, carriesCrate: false };
   r.zombies.push(z); return z;
 };
-/** 一个没有刷怪的安静场地，默认关闭屋顶 1 号初始机枪塔以便测纯主角规则 */
+/** 一个没有刷怪的安静场地，默认关闭屋顶 1 号初始火铳塔以便测纯主角规则 */
 const quiet = (keepTurret = false) => {
   const r = newRun(7);
   r.spawn.left = 0; r.spawn.timer = 1e9;
@@ -27,20 +29,31 @@ const quiet = (keepTurret = false) => {
   return r;
 };
 
-describe('手感曲线与枪械特色', () => {
-  test('开局手枪打第 1 天的普通僵尸不超过 4 枪', () => {
+describe('手感曲线与兵器特色', () => {
+  test('开局双铳打第 1 天的游荡腐尸不超过 4 击', () => {
     expect(Math.ceil(zombieHp('roamer', 1) / WEAPONS.pistol.damage)).toBeLessThanOrEqual(4);
   });
-  test('不同定位武器：突击步枪高于自卫手枪，且每把武器皆有鲜明特色标签与说明', () => {
-    expect(sustainedDps(WEAPONS.assault)).toBeGreaterThan(sustainedDps(WEAPONS.pistol) * 1.4);
+  test('不同定位兵器：价格与持续输出阶梯合理，且每把兵器皆有鲜明特色标签与说明', () => {
+    expect(sustainedDps(WEAPONS.pistol)).toBeLessThan(sustainedDps(WEAPONS.revolver));
+    expect(sustainedDps(WEAPONS.revolver)).toBeLessThan(sustainedDps(WEAPONS.smg));
+    expect(sustainedDps(WEAPONS.smg)).toBeLessThan(sustainedDps(WEAPONS.shotgun));
+    expect(sustainedDps(WEAPONS.shotgun)).toBeLessThan(sustainedDps(WEAPONS.assault));
+    expect(sustainedDps(WEAPONS.assault)).toBeLessThan(sustainedDps(WEAPONS.rifle));
+    expect(sustainedDps(WEAPONS.assault)).toBeLessThan(sustainedDps(WEAPONS.rocket));
+    expect(sustainedDps(WEAPONS.rifle)).toBeLessThan(sustainedDps(WEAPONS.rocket));
+    expect(sustainedDps(WEAPONS.tesla)).toBeGreaterThan(sustainedDps(WEAPONS.pistol) * 2.5);
+    const turretDps = (t: keyof typeof TURRETS) => (TURRETS[t].levels[0].damage * 60) / TURRETS[t].levels[0].cooldown;
+    expect(turretDps('frost')).toBeLessThan(turretDps('mg'));
+    expect(turretDps('mg')).toBeLessThan(turretDps('tesla'));
+    expect(turretDps('tesla')).toBeLessThan(turretDps('cannon'));
     for (const id of Object.keys(WEAPONS) as (keyof typeof WEAPONS)[]) {
       expect(sustainedDps(WEAPONS[id], 1)).toBeGreaterThan(30);
       expect(WEAPONS[id].trait.length).toBeGreaterThanOrEqual(4);
       expect(WEAPONS[id].desc.length).toBeGreaterThanOrEqual(10);
     }
   });
-  test('全 8 把武器差异化机制：手枪二连回膛、左轮穿甲跳弹震慑、加特林蓄热炽弹、霰弹贴脸爆燃、急冻深冻碎冰、磁轨破甲、电弧元素超载、追踪焦土火箭', () => {
-    // 1. 猎手双发手枪：1 发扳机打出 2 颗子弹 + 击杀立即回膛 +2 发子弹
+  test('全 8 把兵器差异化机制：双铳二连回膛、左轮穿甲跳弹震慑、连珠火铳蓄热炽弹、龙息铳轰退爆燃、寒霜连铳深冻碎冰、圣铳破甲、法杖元素超载、追踪爆炎炮', () => {
+    // 1. 猎手双铳：1 发扳机打出 2 颗弹丸 + 击杀立即回膛 +2 发弹药
     const rPis = quiet(); rPis.player.x = 300; rPis.player.y = 0; rPis.autoFire = false;
     rPis.player.weapons = [{ id: 'pistol', star: 1, ammo: 5 }];
     const zWeak = zombie(rPis, 350, 20);
@@ -59,7 +72,7 @@ describe('手感曲线与枪械特色', () => {
     expect(z4.hp).toBe(500);
     expect(z1.stunT).toBeGreaterThan(0);
 
-    // 3. 暴风加特林：持续按住开火蓄热飙射速并射出灼烧穿甲火弹 (hot)
+    // 3. 连珠火铳：持续按住开火蓄热飙射速并射出灼烧穿甲火弹 (hot)
     const rSmg = quiet(); rSmg.player.x = 300; rSmg.player.y = 0; rSmg.autoFire = false;
     rSmg.player.weapons = [{ id: 'smg', star: 1, ammo: 44 }];
     zombie(rSmg, 380, 5000);
@@ -70,15 +83,15 @@ describe('手感曲线与枪械特色', () => {
     expect(rSmg.player.smgHeat).toBeGreaterThanOrEqual(0.65);
     expect(sawHotShot).toBe(true);
 
-    // 4. 双管龙息霰弹：近距离 1.5x 增伤并点燃目标
+    // 4. 双管龙息铳：近距离 1.5x 增伤并点燃目标
     const rSg = quiet(); rSg.player.x = 300; rSg.player.y = 0; rSg.autoFire = false;
     rSg.player.weapons = [{ id: 'shotgun', star: 1, ammo: 6 }];
     const zClose = zombie(rSg, 360, 500);
     for (let i = 0; i < 12; i++) step(rSg, { ...NO_INPUT, fire: i === 0 });
-    expect(500 - zClose.hp).toBeGreaterThanOrEqual(WEAPONS.shotgun.damage * 7 * 1.4);
+    expect(500 - zClose.hp).toBeGreaterThanOrEqual(WEAPONS.shotgun.damage * (WEAPONS.shotgun.pellets ?? 6) * 1.4);
     expect(zClose.burnT).toBeGreaterThan(0);
 
-    // 5. 极地冰暴步枪：命中已减速目标触发深冻定身 + 碎冰范围溅射
+    // 5. 寒霜连铳：命中已减速目标触发深冻定身 + 碎冰范围溅射
     const rIce = quiet(); rIce.player.x = 300; rIce.player.y = 0; rIce.autoFire = false;
     rIce.player.weapons = [{ id: 'assault', star: 1, ammo: 32 }];
     const zSlow = zombie(rIce, 360, 500); zSlow.slowT = 60;
@@ -91,7 +104,7 @@ describe('手感曲线与枪械特色', () => {
     expect(zSlow.freezeT).toBeGreaterThan(0);
     expect(zNear.hp).toBeLessThan(500);
 
-    // 6. 猩红磁轨激光：全屏 hitscan 光束，对重甲(bruiser)/Boss 额外 +35% 破甲伤害
+    // 6. 猩红圣铳：全屏 hitscan 光束，对重甲(bruiser)/Boss 额外 +35% 破甲伤害
     const rRifle = quiet(); rRifle.player.x = 300; rRifle.player.y = 0; rRifle.autoFire = false;
     rRifle.player.weapons = [{ id: 'rifle', star: 1, ammo: 6 }];
     const norm = zombie(rRifle, 420, 5000, 'roamer');
@@ -100,7 +113,7 @@ describe('手感曲线与枪械特色', () => {
     expect(evs.some((e) => e.t === 'railbeam')).toBe(true);
     expect(5000 - brute.hp).toBeGreaterThan(5000 - norm.hp);
 
-    // 7. 特斯拉雷暴线圈：多段连锁麻痹 + 命中燃烧目标触发元素超载 (+35%)
+    // 7. 秘蓝法杖：多段连锁麻痹 + 命中燃烧目标触发元素超载 (+35%)
     const rTes = quiet(); rTes.player.x = 300; rTes.player.y = 0; rTes.autoFire = false;
     rTes.player.weapons = [{ id: 'tesla', star: 1, ammo: 16 }];
     const zBurn = zombie(rTes, 360, 1000); zBurn.burnT = 90;
@@ -110,7 +123,7 @@ describe('手感曲线与枪械特色', () => {
     expect(zBurn.stunT).toBeGreaterThan(0);
     expect(zChain.hp).toBeLessThan(1000);
 
-    // 8. 焦土蜂巢火箭：轻度追踪飞弹炸裂并留下地面持续灼烧火海
+    // 8. 焦土爆炎炮：轻度追踪重弹炸裂并留下地面持续灼烧火海
     const rRoc = quiet(); rRoc.player.x = 300; rRoc.player.y = 0; rRoc.autoFire = false;
     rRoc.player.weapons = [{ id: 'rocket', star: 1, ammo: 4 }];
     zombie(rRoc, 440, 2000);
@@ -251,8 +264,8 @@ describe('2D 小屋实体碰撞、阶梯跳台与元气骑士式手动开火锁�
   });
 });
 
-describe('武器升星、可控抛物线手雷、护甲与商店', () => {
-  test('移除废铁双货币：捡到新武器进武器栏，已有升星，满星直接折算金币', () => {
+describe('兵器升星、可控抛物线爆炎弹、铁甲与军械行商', () => {
+  test('仅保留金币货币：捡到新兵器进兵器栏，已有升星，满星直接折算金币', () => {
     const r = quiet(); r.player.x = 280; r.player.y = 0;
     expect('scrap' in r).toBe(false);
     r.crates.push({ id: 900, x: 280, weapon: 'smg' });
@@ -265,7 +278,7 @@ describe('武器升星、可控抛物线手雷、护甲与商店', () => {
     expect(r.coins).toBe(45);
   });
 
-  test('随身最多 3 把武器：超出时替换手中武器', () => {
+  test('随身最多 3 把兵器：超出时替换手中兵器', () => {
     const r = quiet(); r.player.x = 280; r.player.y = 0;
     r.player.weapons.push({ id: 'smg', star: 1, ammo: 10 }, { id: 'revolver', star: 1, ammo: 6 });
     r.player.cur = 1;
@@ -274,7 +287,7 @@ describe('武器升星、可控抛物线手雷、护甲与商店', () => {
     expect(r.player.weapons.length).toBe(MAX_CARRY);
   });
 
-  test('金币商店可购买武器、补给（手雷/护甲/绷带）、刷货与拆解', () => {
+  test('军械行商可购买兵器、补给（爆炎弹/铁甲/秘药）、刷货与拆解', () => {
     const r = quiet(); r.phase = 'camp'; r.inside = true; r.coins = 500;
     expect(command(r, { t: 'buyWeapon', weapon: 'revolver' })).not.toBeNull();
     expect(r.player.weapons.some((w) => w.id === 'revolver')).toBe(true);
@@ -291,7 +304,7 @@ describe('武器升星、可控抛物线手雷、护甲与商店', () => {
     expect(r.player.weapons.length).toBe(1);
   });
 
-  test('手雷可拖拽控制抛物线远近与高低弧度，且越过前排命中精准爆区，护甲优先抵扣伤害', () => {
+  test('爆炎弹可拖拽控制抛物线远近与高低弧度，且越过前排命中精准爆区，铁甲优先抵扣伤害', () => {
     const r = quiet();
     const highFar = computeGrenadeThrow(r, { dx: 1, dy: -1 });
     const lowClose = computeGrenadeThrow(r, { dx: -0.4, dy: 0.9 });
@@ -299,7 +312,7 @@ describe('武器升星、可控抛物线手雷、护甲与商店', () => {
     expect(highFar.vx).toBeGreaterThan(lowClose.vx);
     expect(highFar.vy).toBeLessThan(lowClose.vy); // 更强向上抛射弧线
 
-    // 远距离高抛：跳过近处的 front，越过头顶精准炸毁远端 walking 过来的 back 僵尸
+    // 远距离高抛：跳过近处的 front，越过头顶精准炸毁远端逼近的 back 魔物
     const front = zombie(r, 340, 300);
     const back = zombie(r, 690, 300);
     step(r, { ...NO_INPUT, grenade: true, grenadeAim: { dx: 1, dy: -0.9 } });
@@ -308,7 +321,7 @@ describe('武器升星、可控抛物线手雷、护甲与商店', () => {
     expect(back.hp).toBeLessThan(200);
     expect(GROUND_Y).toBeGreaterThan(200);
 
-    // 护甲先扣伤
+    // 铁甲先扣伤
     r.player.armor = 30; r.player.hp = 100; r.player.y = 0; r.player.x = 500;
     const melee = zombie(r, 505, 500); melee.atkCd = 0;
     step(r, NO_INPUT);
@@ -342,7 +355,7 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     expect(r.guests.every((g) => g.served)).toBe(true);
     expect(r.coins).toBeGreaterThan(85);
 
-    // 6 道食谱随天数解锁，第 1 天不可做第 7 天才解锁的终章末日大餐
+    // 6 道食谱随天数解锁，第 1 天不可做第 7 天才解锁的长夜全宴
     expect(unlockedMeals(1).length).toBe(1);
     expect(unlockedMeals(7).length).toBe(6);
     expect(command(r, { t: 'pickMeal', id: 'apocalypse_feast' })).toBeNull();
@@ -363,7 +376,7 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     expect(damageMul(r)).toBeGreaterThan(1.5); // 房顶居高 + 特餐
   });
 
-  test('主厨全部解锁：掉肉更多、卖肉多 +35%、特餐效果 +50%', () => {
+  test('厨师全部解锁：掉肉更多、卖肉多 +35%、特餐效果 +50%', () => {
     expect(unlockedClasses(4)).toEqual(['gunner', 'engineer', 'chef']);
     expect(CLASSES.chef.comingSoon).toBeUndefined();
     expect(meatPrice('chef')).toBeGreaterThan(meatPrice('gunner'));
@@ -399,12 +412,17 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     expect(r.wall.maxHp).toBe(wallBefore + 50);
     expect(turretBuildCost('mg', r.cls, true)).toBeLessThan(buildBefore);
 
-    // 校验所有剧情文案完全契合暮色酒馆哥特末日世界观，无现代校园/杂物/出戏网梗词汇
+    // 校验所有剧情、数据表、UI 与模拟文本完全契合「暮夜酒馆：守夜人」暗黑奇幻风格，无现代科幻/末日废土/出戏词汇
+    const forbidden = /十五波|短波|电台|直升机|运输机|螺旋桨|废土|加特林|磁轨|特斯拉|左轮炮|步枪|霰弹|手雷|防弹|电网|机枪塔|冰霜塔|电弧塔|重炮塔|避难所|米其林|异变|变异|主厨|工程师|枪手|护士|天线|狙击枪|高蛋白|发报箱|收音机|话筒|废机油|白大褂|试剂|人体实验|盖革|锡箔|辐射|网红|打卡|探店|老铁|绝绝子|家人们|避雷|摆pose|补光灯|仿生胃|电子合成音|疯批|摄像头|策划偷懒|DLC|Bug|数值曲线|电子宠物|格子衬衫|高维生物|洗脑电波|消防栓|期末考试|地雷|微波炉|酸液史莱姆|Wastegram|废品改造狂|卖的废铁|卖废铁|热搜|末世|感染者/;
     const storyBlob = JSON.stringify({
       CINEMATIC_INTRO, CHAPTER_CARDS, STORY_SCENES, WAVE_STORY_LINES, COMPANION_JOIN_STORIES,
       BOSS_INTROS, BOSS_VICTORY, REST_STORY, VIP_CUSTOMERS, VIP_TIERS, FANS_RANKS, REP_TIERS, DAILY_TRENDS,
+      WEAPONS, TURRETS, WALL_LEVELS, FORT_LEVELS, CLASSES, MEALS, DINER_GUESTS, PERKS,
     });
-    expect(storyBlob).not.toMatch(/消防栓|期末考试|地雷|微波炉|酸液史莱姆|Wastegram|废品改造狂|卖的废铁|卖废铁|米其林|网红|打卡|探店|老铁|绝绝子|家人们|避雷|摆pose|补光灯|仿生胃|电子合成音|疯批|摄像头|策划偷懒|DLC|Bug|数值曲线|电子宠物|格子衬衫|高维生物|洗脑电波|避难所/);
+    expect(storyBlob).not.toMatch(forbidden);
+    for (const rel of ['src/ui/App.tsx', 'src/ui/controls.tsx', 'src/sim/sim.ts', 'src/app/game.ts']) {
+      expect(readFileSync(join(__dirname, '..', rel), 'utf8'), rel).not.toMatch(forbidden);
+    }
 
     // 验证声望里程碑触发 rep10 剧情事件
     r.diner.rep = 9; r.meat = 5;
@@ -417,7 +435,7 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     }
   });
 
-  test('全金币建造 4 个炮塔位（冰霜/电弧/重炮）与拆塔退金币，以及 3 级路障/堡垒升级', () => {
+  test('全金币建造 4 个炮塔位（寒霜/雷鸣/黑铁重炮）与拆塔退金币，以及 3 级路障/堡垒升级', () => {
     const r = quiet(); r.phase = 'camp'; r.coins = 1200;
     expect(command(r, { t: 'buildTurret', slot: 0, kind: 'frost' })).not.toBeNull();
     expect(command(r, { t: 'buildTurret', slot: 2, kind: 'tesla' })).not.toBeNull();
@@ -437,7 +455,7 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     expect(turretBuildCost('mg', 'engineer')).toBeLessThan(turretBuildCost('mg', 'gunner'));
     expect(turretUpgradeCost('mg', 1, 'engineer')).toBeLessThan(turretUpgradeCost('mg', 1, 'gunner'));
 
-    // 触发路障 Lv2 反伤 + 电弧/冰霜炮塔协同
+    // 触发路障 Lv2 反伤 + 雷鸣/寒霜炮塔协同
     command(r, { t: 'nextDay' });
     r.spawn.left = 0; r.spawn.timer = 1e9;
     r.autoFire = false;
@@ -462,7 +480,7 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
 });
 
 describe('职业与天赋', () => {
-  test('枪手「鹰眼」：全穿透 + 必暴；「贯穿」不穿透对比', () => {
+  test('猎手「鹰眼」：全穿透 + 必暴；无贯穿对比', () => {
     const r = newRun(7, ['revolver', 'smg'], 'gunner');
     r.spawn.left = 0; r.spawn.timer = 1e9; r.turrets.forEach((t) => { t.type = null; t.level = 0; });
     r.player.x = 300; r.player.y = 0; r.autoFire = false;
@@ -503,8 +521,8 @@ describe('职业与天赋', () => {
   });
 });
 
-describe('15 天完整流程与 Boss', () => {
-  test('第 5 / 10 / 15 天会刷出 Boss，机器人 3 个职业均可通关 15 天', () => {
+describe('15 天完整流程与首领', () => {
+  test('第 5 / 10 / 15 天会刷出首领，机器人 3 个职业均可通关 15 天', () => {
     for (const cls of ['gunner', 'engineer', 'chef'] as const) {
       const r = newRun(11, ['revolver', 'smg', 'shotgun', 'assault', 'rifle', 'tesla', 'rocket'], cls);
       const rep = runBot(r);
@@ -515,24 +533,27 @@ describe('15 天完整流程与 Boss', () => {
     }
   });
 
-  test('零操作/不开火只靠 1 座 1 级初始机枪塔无法活过前几天；完全不建造购买也无法打通 15 天', () => {
+  test('零操作/不开火只靠 1 座 1 级初始火铳塔无法活过前几天；消极站屋顶或平地不建造购买也无法打通 15 天', () => {
     const r = newRun(3);
     r.autoFire = false;
     for (let i = 0; i < 60 * 60 * 6 && r.phase === 'fight'; i++) step(r, NO_INPUT);
     expect(r.phase).toBe('dead');
 
-    const passive = newRun(1, ['revolver', 'smg'], 'gunner');
-    for (let i = 0; i < 60 * 60 * 15; i++) {
-      if (passive.phase === 'perk') { command(passive, { t: 'pickPerk', id: passive.perkChoices[0] }); continue; }
-      if (passive.phase === 'camp') { command(passive, { t: 'nextDay' }); continue; }
-      if (passive.phase === 'dead' || passive.phase === 'won') break;
-      step(passive, { ...NO_INPUT, fire: passive.targetId !== null });
+    for (const ground of [false, true]) {
+      const passive = newRun(2, ['revolver', 'smg'], 'gunner');
+      for (let i = 0; i < 60 * 60 * 15; i++) {
+        if (passive.phase === 'perk') { command(passive, { t: 'pickPerk', id: passive.perkChoices[0] }); continue; }
+        if (passive.phase === 'camp') { command(passive, { t: 'nextDay' }); continue; }
+        if (passive.phase === 'dead' || passive.phase === 'won') break;
+        const move = ground && passive.player.x < 300 ? 1 : 0;
+        step(passive, { ...NO_INPUT, move, fire: passive.targetId !== null });
+      }
+      expect(passive.phase, ground ? 'ground' : 'roof').toBe('dead');
+      expect(passive.day, ground ? 'ground' : 'roof').toBeLessThan(LAST_DAY);
     }
-    expect(passive.phase).toBe('dead');
-    expect(passive.day).toBeLessThan(LAST_DAY);
   });
 
-  test('多个随机种子下基础解锁池（仅左轮+冲锋枪）机器人也能稳定打通 15 天', () => {
+  test('多个随机种子下基础解锁池（仅重锤左轮+连珠火铳）机器人也能稳定打通 15 天', () => {
     for (const seed of [1, 2, 3]) {
       const r = newRun(seed, ['revolver', 'smg']);
       const rep = runBot(r);

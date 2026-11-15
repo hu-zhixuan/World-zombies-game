@@ -6,11 +6,12 @@
 这个脚本只做裁切和拼条，不改像素。
 """
 import io, json, os, re, struct, sys, urllib.request, zipfile, zlib
-from PIL import Image
+from PIL import Image, ImageDraw
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
 CACHE = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, '.asset_cache')
 OUT = os.path.join(ROOT, 'src', 'assets')
+ANDROID_RES = os.path.join(ROOT, 'android', 'app', 'src', 'main', 'res')
 
 ZIP_PACKS = {  # 缓存子目录 -> OpenGameArt 页面
     'gotthicvania-swamp': 'gotthicvania-swamp',
@@ -23,13 +24,15 @@ ZIP_PACKS = {  # 缓存子目录 -> OpenGameArt 页面
     'bridge': 'gothicvania-bridge-expansion-pack-1',
     'church': 'gothicvania-church-pack',
     'patreons': 'gothicvania-patreons-collection',
-    'warped2': 'warped-city-2',
+    'artillery': 'pixel-art-cannon-and-artillery-lpc',
+    'magic9': 'gothicvania-magic-pack-9',
 }
 
-FILE_PACKS = {  # 单图下载 -> OpenGameArt 页面
+FILE_PACKS = {  # 单图下载 -> OpenGameArt 页面（或 (页面, 文件名片段)）
     'cannon_wire.png': 'cannon-and-barbed-wire',
-    'turret_body.png': 'pixel-turret-animation',
     'medieval_interior.png': 'medieval-tileset',
+    'crystal_sheet.png': ('ancient-crystal-2d-pixel-art', 'spritesheet_32.png'),
+    'blue_staff.png': ('16x16-pixel-art-staff', 'Blue%20Staff.png'),
 }
 
 UA = {'User-Agent': 'Mozilla/5.0'}
@@ -46,12 +49,15 @@ def fetch_zip(pack, slug):
     os.makedirs(d, exist_ok=True)
     zipfile.ZipFile(io.BytesIO(data)).extractall(d)
 
-def fetch_file(fname, slug):
+def fetch_file(fname, spec):
     extras = os.path.join(CACHE, 'extras')
     dst = os.path.join(extras, fname)
     if os.path.isfile(dst): return
+    slug, match = spec if isinstance(spec, tuple) else (spec, None)
     page = urllib.request.urlopen(urllib.request.Request('https://opengameart.org/content/' + slug, headers=UA), timeout=60).read().decode('utf8', 'ignore')
     imgs = re.findall(r'https://opengameart\.org/sites/default/files/[^"]+\.png', page)
+    if match:
+        imgs = [u for u in imgs if match in u]
     if not imgs: raise SystemExit('no png found for ' + slug)
     print('download', imgs[0])
     os.makedirs(extras, exist_ok=True)
@@ -306,14 +312,57 @@ def build_tavern_interior(house, house_b, wall_a, wall_b, left_roof, roof_t, rig
         room.paste(h_beam.crop((0, 0, w, 10)), (x, FLOOR_Y - 2), h_beam.crop((0, 0, w, 10)))
     return room
 
+def build_android_icons(sky, town, ground_wall, fort_house, roof_deck, hero_idle, hero_arm, rifle, flash, lamp):
+    """全部选用人画开源 Gothicvania 原图整数倍合成 432x432 安卓自适应图标与全密度圆/方图标。"""
+    if not os.path.isdir(ANDROID_RES):
+        return
+    # 1. 背景层（144x144 整数 3x -> 432x432）：暮紫夜空 + 哥特城镇暗影剪影 + 底层石砖墙
+    bg_1x = Image.new('RGBA', (144, 144))
+    bg_1x.paste(sky.crop((80, 0, 224, 144)), (0, 0))
+    bg_1x.alpha_composite(town.crop((32, 108, 176, 252)), (0, 0))
+    for x in range(0, 144, ground_wall.width):
+        bg_1x.paste(ground_wall, (x, 122))
+    bg = bg_1x.resize((432, 432), Image.NEAREST)
+
+    # 2. 前景层（144x144 整数 3x -> 432x432）：满幅温暖拱窗酒馆正立面 + 二层木屋顶平台 + 屋顶开火猎人 + 路灯（主角与亮窗均居于自适应安全圈内）
+    fg_1x = Image.new('RGBA', (144, 144), (0, 0, 0, 0))
+    tavern_facade = fort_house.crop((62, 56, 206, 152))  # 144x96: 满幅瓦檐 + 木门 + 暖橙大拱窗
+    fg_1x.alpha_composite(tavern_facade, (0, 52))
+    fg_1x.alpha_composite(roof_deck.crop((0, 0, 64, 12)), (26, 62))
+    fg_1x.alpha_composite(hero_idle, (20, 16))
+    fg_1x.alpha_composite(hero_arm, (42, 33))
+    fg_1x.alpha_composite(rifle, (52, 34))
+    fb = flash.getbbox()
+    muzzle = (flash.crop(fb) if fb else flash).resize((16, 16), Image.NEAREST)
+    fg_1x.alpha_composite(muzzle, (68, 27))
+    fg_1x.alpha_composite(lamp.crop((0, 0, lamp.width, 48)), (98, 74))
+    fg = fg_1x.resize((432, 432), Image.NEAREST)
+
+    nodpi = os.path.join(ANDROID_RES, 'drawable-nodpi')
+    os.makedirs(nodpi, exist_ok=True)
+    bg.save(os.path.join(nodpi, 'ic_launcher_bg.png'), optimize=True)
+    fg.save(os.path.join(nodpi, 'ic_launcher_fg.png'), optimize=True)
+
+    full = Image.alpha_composite(bg, fg)
+    for bucket, sz in [('mdpi', 48), ('hdpi', 72), ('xhdpi', 96), ('xxhdpi', 144), ('xxxhdpi', 192)]:
+        d = os.path.join(ANDROID_RES, 'mipmap-' + bucket)
+        os.makedirs(d, exist_ok=True)
+        sq = full.resize((sz, sz), Image.NEAREST)
+        sq.save(os.path.join(d, 'ic_launcher.png'), optimize=True)
+        mask = Image.new('L', (sz, sz), 0)
+        ImageDraw.Draw(mask).ellipse((0, 0, sz - 1, sz - 1), fill=255)
+        rd = Image.new('RGBA', (sz, sz), (0, 0, 0, 0))
+        rd.paste(sq, (0, 0), mask)
+        rd.save(os.path.join(d, 'ic_launcher_round.png'), optimize=True)
+
 def main():
     for pack, slug in ZIP_PACKS.items(): fetch_zip(pack, slug)
-    for fname, slug in FILE_PACKS.items(): fetch_file(fname, slug)
+    for fname, spec in FILE_PACKS.items(): fetch_file(fname, spec)
     os.makedirs(OUT, exist_ok=True)
 
-    # 清理废弃的异风格僵尸贴图，确保包体干净且画风 100% 统一为 ansimuz 哥特像素风
+    # 清理废弃或异画风旧贴图，确保包体干净且画风 100% 统一
     for old in ['z_hat', 'z_bearded', 'z_oldman', 'z_woman', 'z_roamer',
-                'z_roamer_a', 'z_roamer_b', 'z_roamer_c', 'z_crawler', 'z_bruiser', 'z_collapse']:
+                'z_roamer_a', 'z_roamer_b', 'z_roamer_c', 'z_crawler', 'z_bruiser', 'z_collapse', 'ic_scrap']:
         p = os.path.join(OUT, old + '.png')
         if os.path.exists(p): os.remove(p)
 
@@ -341,21 +390,29 @@ def main():
                       ('npc_bearded', 'bearded-idle', 5), ('npc_oldman', 'oldman-idle', 8)]:
         strip(key, [img('gothicvania-town', 'sprites', d, f'{d}-{i}.png') for i in range(1, n + 1)])
 
-    # ── 特效：火球、爆炸、灶台炉火 ──
+    # ── 特效：火球、暗黑奇幻火焰爆炸（Magic Pack 9 FireBomb）、灶台炉火 ──
     strip('fx_fireball', [img('church', 'fx', 'fireball', 'fireball-sprites', f'fireball{i}.png') for i in range(1, 4)])
-    strip('fx_boom', [img('warped2', 'Sprites', 'explosion-a', f'explosion-a{i}.png') for i in range(1, 9)])
+    strip('fx_boom', [img('magic9', 'sprites', 'FireBomb', f'Fire-bomb{i}.png') for i in range(8, 15)])
     strip('fx_stove', [img('church', 'fx', 'fireball', 'fireball-sprites', f'fireball{i}.png').transpose(Image.ROTATE_270) for i in range(1, 4)])
 
-    # ── 炮塔、铁丝网、子弹、命中 ──
-    strip('turret', [img('warped-city', 'misc', 'turret', f'turret-{i}.png') for i in range(1, 7)])
-    save('ic_turret', img('warped-city', 'misc', 'turret', 'turret-1.png'))
-    tb = img('extras', 'turret_body.png')
-    strip('turret_tesla', [tb.crop((8, 12, 44, 42)), tb.crop((62, 12, 98, 42))])
-    save('ic_turret_tesla', tb.crop((8, 12, 44, 42)))
-    strip('turret_frost', [img('warped2', 'egg turret', 'Shoot', f'shoot{i}.png') for i in range(1, 5)])
-    save('ic_turret_frost', img('warped2', 'egg turret', 'Idle', 'idle1.png'))
+    # ── 炮塔、铁丝网、子弹、命中（全部统一暗黑冷兵器/铁铳/秘晶/重炮像素风格，且全员天然朝右！） ──
+    mg_raw = img('artillery', 'ShotGun.png')
+    mg_turret = mg_raw.crop((3, 3, 52, 41))
+    save('turret', mg_turret)
+    save('ic_turret', mg_turret)
+
+    crystal_sheet = img('extras', 'crystal_sheet.png')
+    crystal_frames = [crystal_sheet.crop((i * 64 + 1, 12, i * 64 + 62, 112)) for i in range(7)]
+    strip('turret_frost', crystal_frames)
+    save('ic_turret_frost', crystal_sheet.crop((12, 11, 52, 74)))
+
+    thunder_raw = img('artillery', 'ThunderMortar.png')
+    thunder_turret = thunder_raw.crop((2, 2, 46, 50))
+    save('turret_tesla', thunder_turret)
+    save('ic_turret_tesla', thunder_turret)
+
     cw = img('extras', 'cannon_wire.png')
-    cannon_im = cw.crop((0, 4, 34, 32)).transpose(Image.FLIP_LEFT_RIGHT)
+    cannon_im = cw.crop((0, 4, 34, 32))
     save('turret_cannon', cannon_im)
     save('ic_turret_cannon', cannon_im)
     save('barbed_wire', cw.crop((24, 30, 74, 64)))
@@ -364,8 +421,10 @@ def main():
     strip('shot_hit', [img('warped-city', 'misc', 'shot-hit', f'shot-hit-{i}.png') for i in range(1, 4)])
 
     # ── 场景与立体堡垒酒馆（Gothicvania Town + Bridge Expansion）──
-    save('bg_sky', img('gothicvania-town', 'PNG', 'environment', 'layers', 'background.png'))
-    save('bg_town', img('gothicvania-town', 'PNG', 'environment', 'layers', 'middleground.png'))
+    bg_sky = img('gothicvania-town', 'PNG', 'environment', 'layers', 'background.png')
+    bg_town = img('gothicvania-town', 'PNG', 'environment', 'layers', 'middleground.png')
+    save('bg_sky', bg_sky)
+    save('bg_town', bg_town)
     for key, f in [('house_a', 'house-a'), ('house_b', 'house-b'), ('house_c', 'house-c'), ('crate_stack', 'crate-stack'),
                    ('crate', 'crate'), ('barrel', 'barrel'), ('wagon', 'wagon'), ('lamp', 'street-lamp'), ('well', 'well'), ('sign', 'sign')]:
         save(key, img('gothicvania-town', 'props-sliced', f + '.png'))
@@ -392,9 +451,11 @@ def main():
     barrel = img('gothicvania-town', 'props-sliced', 'barrel.png')
     sign = img('gothicvania-town', 'props-sliced', 'sign.png')
     lamp = img('gothicvania-town', 'props-sliced', 'street-lamp.png')
+    ground_wall = img('gothicvania-town', 'sliced-tileset', 'ground-wall.png')
     mi = img('extras', 'medieval_interior.png')
 
-    save('roof_deck', build_roof_deck(top_l, top_m, top_r))
+    roof_deck = build_roof_deck(top_l, top_m, top_r)
+    save('roof_deck', roof_deck)
     save('porch_deck', build_porch_deck(top_l, top_r, legs, g_legs))
     save('prop_ladder', mi.crop((208, 0, 224, 64)))
     save('tavern_interior', build_tavern_interior(
@@ -409,13 +470,13 @@ def main():
                          ('ui_round', 1, 3, 1), ('ui_round_lit', 0, 3, 1), ('ui_banner', 4, 3, 3)]:
         save(key, cell(c, r, w))
 
-    # ── 图标：Kyrise V1.2 16x16 + 食堂菜品小图标 ──
+    # ── 图标：Kyrise V1.2 16x16 + 食堂菜品/主厨盘 ──
     ic = img('kyrise', 'spritesheet', 'spritesheet_16x16.png')
-    for key, c, r in [('ic_coin', 8, 6), ('ic_scrap', 0, 10), ('ic_hp', 1, 13), ('ic_wall', 6, 15), ('ic_zombie', 8, 9),
+    for key, c, r in [('ic_coin', 8, 6), ('ic_hp', 1, 13), ('ic_wall', 6, 15), ('ic_zombie', 8, 9),
                       ('ic_crate', 14, 8), ('ic_pierce', 8, 0), ('ic_ricochet', 13, 11), ('ic_overkill', 1, 8),
                       ('ic_lifesteal', 9, 12), ('ic_incendiary', 4, 8), ('ic_overclock', 0, 12),
                       ('ic_frostbite', 0, 8), ('ic_chainkill', 1, 11), ('ic_vanguard', 9, 15), ('ic_bloodfrenzy', 8, 12),
-                      ('ic_glasscannon', 1, 7), ('ic_secondwind', 11, 12), ('ic_star', 15, 7), ('ic_chef', 9, 7),
+                      ('ic_glasscannon', 1, 7), ('ic_secondwind', 11, 12), ('ic_star', 15, 7),
                       ('ic_armor', 7, 15), ('ic_fort', 10, 15), ('ic_grenade', 14, 11),
                       ('ic_rooftop', 11, 0), ('ic_shrapnel', 12, 11), ('ic_fortify', 13, 15), ('ic_shock', 2, 7)]:
         save(key, ic.crop((c * 16, r * 16, c * 16 + 16, r * 16 + 16)))
@@ -429,23 +490,33 @@ def main():
         return c
 
     save('ic_meat', mi.crop((224, 224, 240, 240)))
+    save('ic_chef', mi.crop((224, 208, 240, 224)))
     save('ic_kitchen', mi.crop((192, 208, 208, 224)))
     save('ic_dish_skewer', center16(mi.crop((240, 224, 256, 240))))   # 炭烤香辣肉串
-    save('ic_dish_stew', center16(mi.crop((208, 224, 224, 240))))     # 末世暖胃肉汤
+    save('ic_dish_stew', center16(mi.crop((208, 224, 224, 240))))     # 暖胃肉汤
     save('ic_dish_steak', center16(mi.crop((192, 208, 208, 224))))    # 铁板滋滋厚排
     save('ic_dish_grill', center16(mi.crop((225, 136, 239, 144))))    # 碳火三拼盛宴
-    save('ic_dish_hotpot', center16(mi.crop((225, 151, 239, 161))))   # 地狱异变火锅
-    save('ic_dish_feast', center16(mi.crop((192, 224, 208, 240))))    # 终章末日大餐
+    save('ic_dish_hotpot', center16(mi.crop((225, 151, 239, 161))))   # 深渊秘辣锅
+    save('ic_dish_feast', center16(mi.crop((192, 224, 208, 240))))    # 长夜全宴
     save('ic_shop', mi.crop((176, 288, 192, 304)))
     save('ic_anvil', mi.crop((192, 240, 208, 256)))
 
-    # ── 枪械图标（Sogomn Tiny Gun Icons, CC0）──
-    for k, fname in [('wp_pistol', 'desert_hawk.png'), ('wp_revolver', 'jb007.png'), ('wp_smg', 'md5.png'),
-                     ('wp_shotgun', 'sg1.png'), ('wp_assault', 'poshlinov.png'), ('wp_rifle', 'hitpro.png'),
-                     ('wp_tesla', 'gh55b.png'), ('wp_rocket', 'mg6000.png')]:
+    # ── 8 把高对比哥特枪械与法杖（Sogomn Tiny Gun Icons CC0 + 16x16 Pixel Art Staff CC-BY 3.0）──
+    for k, fname in [('wp_pistol', 'piecemarker.png'), ('wp_revolver', 'jb007.png'), ('wp_smg', 'pow9.png'),
+                     ('wp_shotgun', 'poshlinov.png'), ('wp_assault', 'hitpro.png'), ('wp_rifle', 'snp6plus.png'),
+                     ('wp_rocket', 'mg5000.png')]:
         save(k, img('guns', fname))
+    staff_rot = img('extras', 'blue_staff.png').rotate(-90, expand=True)
+    staff_crop = staff_rot.crop(staff_rot.getbbox())
+    save('wp_tesla', staff_crop)
+
+    # ── 安卓发射器图标（严格使用上述开源人画哥特像素素材拼成，零手绘代码像素）──
+    rifle_im = img('guns', 'snp6plus.png')
+    flash_im = img('magic9', 'sprites', 'FireBomb', 'Fire-bomb10.png')
+    build_android_icons(bg_sky, bg_town, ground_wall, house_full, roof_deck, bodies['idle'][0], hero_arm, rifle_im, flash_im, lamp)
 
     json.dump(manifest, open(os.path.join(OUT, 'manifest.json'), 'w'), indent=1, sort_keys=True)
     print('wrote', len(manifest), 'images to', os.path.relpath(OUT, ROOT))
 
 if __name__ == '__main__': main()
+

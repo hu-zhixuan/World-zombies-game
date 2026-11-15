@@ -7,7 +7,9 @@ export const Icon = (p: { k: string; cls?: string }) => <img class={`icon ${p.cl
 
 export const NpcPortrait = (p: { avatar: string; initial?: string; cls?: string }) => (
   <span class={`portrait ${p.cls ?? ''}`} data-avatar={p.avatar}>
-    {(p.avatar === 'radio' || p.avatar === 'heli') && <b>{p.initial ?? (p.avatar === 'radio' ? '广' : '机')}</b>}
+    {(p.avatar === 'watch' || p.avatar === 'dawn' || p.avatar === 'radio' || p.avatar === 'heli') && (
+      <b>{p.initial ?? (p.avatar === 'watch' || p.avatar === 'radio' ? '号' : '曙')}</b>
+    )}
   </span>
 );
 

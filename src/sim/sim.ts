@@ -168,19 +168,19 @@ function rollDailyTrend(run: RunState) {
 }
 
 const VIP_ORDER_LINES: Record<string, string> = {
-  agou: '老板，求给我留一口热乎肉串就行，我扫地洗碗都行！',
-  laobao: '连守七十二小时防线了，来份最够劲的热菜提提神！',
-  qijie: '刚拧完一天螺栓，上最扎实管饱的菜，少敷衍我！',
+  agou: '掌柜，求给我留一口热乎肉串就行，我扫地洗碗都行！',
+  laobao: '连守三夜防线了，来份最够劲的热菜提提神！',
+  qijie: '刚锻完一批铜齿轮与炮架，上最扎实管饱的菜，少敷衍我！',
   niqiu: '掌柜的，把招牌菜端上来，好吃明天再给你带稀罕门路！',
-  gaolaotou: '确定没藏窃听机关吧？给我盛份热腾腾又干净的菜！',
+  gaolaotou: '确定没藏窃听符印吧？给我盛份热腾腾又干净的菜！',
   guying: '高热量。五分钟内上菜。不废话。',
-  huanyin: '短波频道正播着哩——上你们暮色酒馆最拿手的招牌硬菜！',
+  huanyin: '整条长街都在传暮夜里的故事啦——上你们暮色酒馆最拿手的招牌硬菜！',
   tongshu: '发条铁胃涩滞，需要滚烫油脂与烈性热肉润滑机件。',
   dashan: '大山……大山饿了，想吃热乎乎的大块肉肉……',
   baishi: '妙极了！请务必上一份辛烈浓菜，助我印证今夜秘药方！',
   jinlaoban: '净水生意刚谈完，端上你们酒馆最拿手的菜色试试成色。',
-  wumingke: '风沙太大……在角落安静吃一碗热汤便走。',
-  yanlao: '百年前这里曾是老城区最好的大酒店……能请我尝一口战前风味吗？',
+  wumingke: '风雪太大……在角落安静吃一碗热汤便走。',
+  yanlao: '百年前这里曾是老城区最体面的大旅店……能请我尝一口昔日宫廷风味吗？',
   kuangya: '哈哈哈！闻到香味了！拿最扎实的硬菜上来！',
   guancezhe: '十五夜星象正往酒馆汇聚——莫掌柜，来道招牌让我尝尝今夜火候。',
 };
@@ -240,7 +240,7 @@ function rollDinerGuests(run: RunState) {
     const meal = MEALS[dishId];
     const trendMatch = meal.tags.includes(run.diner.trendTag);
     const shortName = vip.name.includes('·') ? vip.name.split('·').pop()! : vip.name;
-    const pay = Math.round((meal.basePay * 0.8 + run.day * 1.1) * chefMul * (0.8 + vip.tipBonus * 0.22) * (1 + repTier.bonusMul) * (trendMatch ? 1.35 : 1));
+    const pay = Math.round((meal.basePay * 0.62 + run.day * 0.55) * chefMul * (0.8 + vip.tipBonus * 0.22) * (1 + repTier.bonusMul) * (trendMatch ? 1.35 : 1));
     return {
       id: `${vip.id}_${run.day}_${idx}`,
       vipId: vip.id,
@@ -367,7 +367,7 @@ function applyPlayerDamage(run: RunState, rawDmg: number, ev: GameEvent[], fromR
   p.armor -= blocked;
   const hpDmg = finalDmg - blocked;
   p.hp -= hpDmg;
-  p.hurtT = 30;
+  p.hurtT = 18;
   ev.push({ t: 'hurt', dmg: finalDmg, blocked, cover: covered > 0 ? covered : undefined });
 }
 
@@ -405,7 +405,7 @@ function damageZombie(
   }
   if (z.hp > 0) return;
 
-  // 猎手双发手枪特色：击杀立即回膛 2 发子弹
+  // 猎手双铳特色：击杀立即回膛 2 发弹药
   if (opts.byPlayer && opts.weaponId === 'pistol') {
     const pw = run.player.weapons.find((w) => w.id === 'pistol');
     if (pw) pw.ammo = Math.min(magSize('pistol', pw.star), pw.ammo + 2);
@@ -414,7 +414,7 @@ function damageZombie(
   const def = ZOMBIES[z.kind];
   run.coins += def.coins; run.kills++; run.spawn.killed++;
   const chef = run.cls === 'chef';
-  const meatDrop = def.meat > 1 ? def.meat + (chef ? 1 : 0) : (rand(run) < (chef ? 0.56 : 0.38) ? 1 : 0);
+  const meatDrop = def.meat > 1 ? def.meat + (chef ? 1 : 0) : (rand(run) < (chef ? 0.42 : 0.28) ? 1 : 0);
   run.meat += meatDrop;
 
   if (has(run, 'chainkill')) run.chain = { n: Math.min(8, run.chain.n + 1), t: 180 };
@@ -515,7 +515,7 @@ function explodeAt(run: RunState, x: number, y: number, r: number, dmg: number, 
   }
 }
 
-/** 向目标发射一发/一组实体弹丸（也供双发手枪二连补射复用）。 */
+/** 向目标发射一发/一组实体弹丸（也供猎手双铳二连补射复用）。 */
 function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[], consumeAmmo: boolean) {
   const p = run.player, ow = curWeapon(run), def = WEAPONS[ow.id];
   const mx = p.x + p.facing * 26, my = MUZZLE_Y + p.y;
@@ -536,7 +536,7 @@ function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[],
   if (ow.id === 'smg') p.smgShots++;
   const hotSmg = ow.id === 'smg' && p.smgHeat >= 0.65 && p.smgShots % 3 === 0;
 
-  // 1. 猩红磁轨激光：扣扳机瞬间全屏 hitscan 穿透整列敌军 + 对重甲/Boss +35%（★5 +50%）破甲伤
+  // 1. 猩红圣铳：扣扳机瞬间全屏瞬发穿透整列敌军 + 对重甲/首领 +35%（★5 +50%）破甲伤
   if (def.hitscan) {
     const x2 = mx + dx * range, y2 = my + dy * range;
     ev.push({ t: 'railbeam', x1: mx, y1: my, x2, y2, crit });
@@ -568,7 +568,7 @@ function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[],
     return;
   }
 
-  // 2. 特斯拉雷暴线圈：多段电弧链 + 麻痹定身 + 元素超载
+  // 2. 秘蓝法杖：多段雷链 + 麻痹定身 + 元素超载
   if (def.chain) {
     if (target) {
       const jumps = def.chain + (ow.star >= 3 ? 1 : 0) + (ow.star >= 5 ? 1 : 0) + (has(run, 'shock') ? 2 : 0);
@@ -581,10 +581,10 @@ function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[],
     return;
   }
 
-  // 3. 实体弹丸组（双发手枪 / 跳弹左轮 / 蓄热机炮 / 龙息霰弹 / 冰暴步枪 / 追踪焦土火箭）
+  // 3. 实体弹丸组（猎手双铳 / 重锤左轮 / 连珠火铳 / 双管龙息铳 / 寒霜连铳 / 焦土爆炎炮）
   const bonusAt5 = def.burst ? 0 : extraBullets(ow.id, ow.star);
   const count = (def.pellets ?? 1) + bonusAt5;
-  const rocketSplitScale = def.aoe && count > 1 ? 0.68 : 1;
+  const rocketSplitScale = def.aoe && count > 1 ? 0.56 : 1;
   for (let i = 0; i < count; i++) {
     const spreadRad = def.aoe && count > 1 ? (i % 2 ? 0.16 : -0.16)
       : def.spread ? (rand(run) - 0.5) * 2 * def.spread
@@ -627,16 +627,16 @@ function fire(run: RunState, target: Zombie | null, ev: GameEvent[]) {
   if (ow.ammo <= 0) { startReload(run, ev); return; }
   ow.ammo--;
 
-  // 暴风加特林蓄热变速（按住越久射速越快，interval 从 8 步一路缩至 3 步）
+  // 连珠火铳蓄热变速（按住越久射速越快，interval 从 9 步一路缩至 4 步）
   const baseInt = ow.id === 'smg'
-    ? Math.max(3, Math.round(def.interval * (1 - 0.62 * p.smgHeat)))
+    ? Math.max(4, Math.round(def.interval * (1 - 0.55 * p.smgHeat)))
     : def.interval;
-  p.fireCd = Math.max(2, Math.round((baseInt * (has(run, 'pierce') ? 1.2 : 1)) / playerHaste(run)));
+  p.fireCd = Math.max(2, Math.round((baseInt * (has(run, 'pierce') ? 1.08 : 1)) / playerHaste(run)));
   p.shootT = 10;
 
-  // 猎手双发手枪：一发扳机排队二连点射（★5 时三连射）
+  // 猎手双铳：一发扳机排队二连点射
   if (def.burst && def.burst > 1) {
-    p.burstLeft = (def.burst - 1) + (ow.star >= 5 ? 1 : 0);
+    p.burstLeft = def.burst - 1;
     p.burstCd = 4;
   }
   launchWeaponShot(run, target, ev, true);
@@ -651,7 +651,7 @@ function startReload(run: RunState, ev: GameEvent[]) {
 }
 
 /**
- * 计算手榴弹投掷初速度与起点（支持拖拽控曲线，或未拖拽时智能抛向最近尸群）：
+ * 计算爆炎弹投掷初速度与起点（支持拖拽控曲线，或未拖拽时智能抛向最近尸群）：
  * - dx 控制投掷远近/正反方向；dy 上拉抬高高抛曲线、下拉压低快速平抛。
  */
 export function computeGrenadeThrow(run: RunState, aim?: { dx: number; dy: number } | null) {
@@ -800,7 +800,7 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
   if (wantFire && target) p.facing = target.x >= p.x ? 1 : -1;
   else if (move !== 0 && p.dodgeT === 0) p.facing = move > 0 ? 1 : -1;
 
-  // 处理二连点射待发队列（手枪二连）
+  // 处理二连点射待发队列（猎手双铳二连）
   if (p.burstLeft > 0) {
     if (--p.burstCd <= 0) {
       p.burstLeft--;
@@ -825,14 +825,14 @@ function stepZombies(run: RunState, ev: GameEvent[]) {
   for (const z of run.zombies) {
     const def = ZOMBIES[z.kind];
     if (z.atkCd > 0) z.atkCd--;
-    if (z.burnT > 0) { z.burnT--; if (z.burnT % 30 === 0) damageZombie(run, z, 6 + Math.floor(run.day * 0.6), ev, { byPlayer: false, burn: true }); }
+    if (z.burnT > 0) { z.burnT--; if (z.burnT % 30 === 0) damageZombie(run, z, 9 + Math.floor(run.day * 1.4 + Math.min(40, z.maxHp * 0.015)), ev, { byPlayer: false, burn: true }); }
     if (z.hp <= 0) continue;
     if (z.slowT > 0) z.slowT--;
     if (z.freezeT > 0) z.freezeT--;
     if (z.stunT > 0) { z.stunT--; continue; }
     if (z.kb > 0) { z.x += z.kb; z.kb *= 0.7; if (z.kb < 0.2) z.kb = 0; continue; }
 
-    // 远程僵尸（提灯怨灵、暴君、深渊魔王）进入可交火射程后停止前压，抛射高弧火球打击主角或前线路障
+    // 远程魔物（提灯怨灵、暴君、深渊魔王）进入可交火射程后停止前压，抛射高弧幽火打击主角或前线路障
     const rangedStopX = def.boss ? WALL_X + 245 : WALL_X + 215;
     if (def.ranged && z.x <= rangedStopX && z.x >= WALL_X + 24) {
       if (z.atkCd === 0) {
@@ -852,7 +852,7 @@ function stepZombies(run: RunState, ev: GameEvent[]) {
       }
     }
 
-    const nearPlayer = !run.inside && Math.abs(p.x - z.x) <= ZOMBIE_REACH && p.y > -24;
+    const nearPlayer = !run.inside && p.dodgeT === 0 && Math.abs(p.x - z.x) <= ZOMBIE_REACH && p.y > -24;
     const atWall = run.wall.hp > 0 && z.x <= WALL_X + 16 && z.x >= WALL_X - 8;
     const atHome = z.x <= HOME_X + 8;
     if (nearPlayer || atWall || atHome) {
@@ -977,7 +977,7 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
   const out: Bullet[] = [];
   const spawned: Bullet[] = [];
   for (const b of run.bullets) {
-    // 蜂巢追踪火箭在半空柔和转向锁定前方尸群
+    // 焦土爆炎炮追踪火弹在半空柔和转向锁定前方尸群
     if (b.homing && b.life > 2) {
       const steerTarget = run.zombies.filter((z) => z.hp > 0 && !b.hit.includes(z.id) && Math.abs(z.x - b.x) <= 220)
         .sort((a, c) => Math.abs(a.x - b.x) - Math.abs(c.x - b.x))[0];
@@ -1029,7 +1029,7 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
           if (z.hp > 0) z.burnT = Math.max(z.burnT, b.burn ?? 120);
         }
 
-        // 极地急冻步枪特色：命中已减速目标深冻定身并引爆碎冰溅射
+        // 寒霜连铳特色：命中已减速目标深冻定身并引爆碎冰溅射
         if (byPlayer && b.shatter && wasSlowed) {
           const shatterR = curWeapon(run).id === 'assault' && curWeapon(run).star >= 5 ? 58 : 48;
           ev.push({ t: 'frost', x: z.x, y: BODY_Y, r: shatterR });
@@ -1077,7 +1077,7 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
         }
       }
     }
-    // 火箭弹/重炮落到地面直接爆开并铺设焦土火海
+    // 爆炎重弹/黑铁重炮落到地面直接爆开并铺设焦土火海
     if (!alive && b.life > 0 && b.y >= GROUND_Y + 2 && (b.kind === 'rocket' || b.kind === 'cannon') && b.aoe && b.hit.length === 0) {
       explodeAt(run, b.x, GROUND_Y - 12, b.aoe, b.dmg, ev, b.from === 'player', b.kind === 'rocket', b.kind === 'rocket');
     }
@@ -1348,19 +1348,19 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       if (cmd.item === 'grenade') {
         if (p.grenades >= MAX_GRENADES || run.coins < SHOP_GRENADE_COST) return null;
         run.coins -= SHOP_GRENADE_COST; p.grenades = Math.min(MAX_GRENADES, p.grenades + 2);
-        ev.push({ t: 'shop', item: '破片手雷 ×2' });
+        ev.push({ t: 'shop', item: '爆炎弹 ×2' });
         return ev;
       }
       if (cmd.item === 'armor') {
         if (p.armor >= p.maxArmor || run.coins < SHOP_ARMOR_COST) return null;
         run.coins -= SHOP_ARMOR_COST; p.armor = Math.min(p.maxArmor, p.armor + 40);
-        ev.push({ t: 'shop', item: '防弹护甲 +40' });
+        ev.push({ t: 'shop', item: '镶铁护甲 +40' });
         return ev;
       }
       if (cmd.item === 'medkit') {
         if (p.hp >= p.maxHp || run.coins < SHOP_MEDKIT_COST) return null;
         run.coins -= SHOP_MEDKIT_COST; p.hp = Math.min(p.maxHp, p.hp + 45);
-        ev.push({ t: 'shop', item: '急救绷带 +45' });
+        ev.push({ t: 'shop', item: '秘药汤剂 +45' });
         return ev;
       }
       return null;

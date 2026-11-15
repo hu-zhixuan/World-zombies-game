@@ -74,7 +74,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}
-          name: 十五波围城 ${{ env.TAG }}
+          name: 暮夜酒馆 ${{ env.TAG }}
           generate_release_notes: true
           prerelease: ${{ contains(env.TAG, 'preview') }}
           body: |

@@ -24,7 +24,7 @@ const WEAPON_GRIP: Record<string, { ox: number; oy: number; reach: number; gyOff
   shotgun:  { ox: 0.26, oy: 0.50, reach: 10.0, gyOff: 1.0, muzzle: 13, scale: 1.12, kick: 0.42, recoil: 7.4, shake: 0.0038 },
   assault:  { ox: 0.30, oy: 0.52, reach: 10.0, gyOff: 1.0, muzzle: 11, scale: 1.08, kick: 0.18, recoil: 4.2, shake: 0.0012 },
   rifle:    { ox: 0.22, oy: 0.52, reach: 10.0, gyOff: 1.0, muzzle: 15, scale: 1.16, kick: 0.46, recoil: 8.0, shake: 0.0044 },
-  tesla:    { ox: 0.28, oy: 0.52, reach: 10.0, gyOff: 1.0, muzzle: 12, scale: 1.08, kick: 0.2,  recoil: 4.4, shake: 0.0016 },
+  tesla:    { ox: 0.34, oy: 0.55, reach: 10.0, gyOff: 1.0, muzzle: 14, scale: 0.72, kick: 0.2,  recoil: 4.4, shake: 0.0016 },
   rocket:   { ox: 0.32, oy: 0.56, reach: 9.5,  gyOff: 0.5, muzzle: 13, scale: 1.15, kick: 0.5,  recoil: 8.4, shake: 0.0052 },
 };
 
@@ -93,9 +93,9 @@ export class GameScene extends Phaser.Scene {
     for (const z of Object.values(ZOMBIES)) for (const key of z.sprites) anim(key, z.fps);
     for (const [key, fps] of [['npc_hat', 6], ['npc_bearded', 6], ['npc_woman', 7], ['npc_oldman', 7]] as const) anim(key, fps);
     anim('z_death', 14, 0);
-    anim('fx_fireball', 14); anim('fx_boom', 20, 0);
+    anim('fx_fireball', 14); anim('fx_boom', 16, 0);
     anim('shot', 18); anim('shot_hit', 22, 0);
-    anim('turret', 18, 0); anim('turret_frost', 14, 0); anim('turret_tesla', 10);
+    anim('turret_frost', 8, -1);
 
     // ── 远景背景（室外与室内共用夜色天空基底） ──
     this.sky = this.add.tileSprite(0, 0, 768, 288, 'bg_sky').setOrigin(0).setScrollFactor(0).setDepth(D.sky);
@@ -108,7 +108,7 @@ export class GameScene extends Phaser.Scene {
       return im;
     };
 
-    // ── 室外：黄昏堡垒酒馆 + 阶梯木跳台 + 二层房顶阵地 + 3 级路障 + 街道背景 ──
+    // ── 室外：暮夜酒馆要塞 + 阶梯木跳台 + 二层房顶阵地 + 3 级壁垒 + 街道背景 ──
     ext(this.add.tileSprite(0, GROUND_Y - 13, WORLD_W, 48, 'ground').setOrigin(0).setDepth(D.ground));
     ext(this.add.tileSprite(0, GROUND_Y + 35, WORLD_W, VIEW_H - GROUND_Y - 35, 'ground_wall').setOrigin(0).setDepth(D.ground));
 
@@ -123,8 +123,8 @@ export class GameScene extends Phaser.Scene {
     // 二层屋顶木栈道防守平台 (y = GROUND_Y + ROOF_Y) 与中层门廊起跳木台 (y = GROUND_Y + PORCH_Y)
     ext(this.add.image((ROOF_MIN_X + ROOF_MAX_X) / 2, GROUND_Y + ROOF_Y + 26, 'roof_deck').setOrigin(0.5, 1).setDepth(D.prop));
     ext(this.add.image((PORCH_MIN_X + PORCH_MAX_X) / 2, GROUND_Y + PORCH_Y + 48, 'porch_deck').setOrigin(0.5, 1).setDepth(D.prop));
-    // 堡垒 Lv.2+ 自带屋顶守卫火炮（稳稳架在房顶木栈平台底座上）
-    this.fortCannon = ext(this.add.image(FORT_GUN_X, GROUND_Y + ROOF_Y - 4, 'turret_cannon').setOrigin(0.5, 1).setDepth(D.prop + 0.2).setFlipX(true));
+    // 堡垒 Lv.2+ 自带屋顶守卫火炮（稳稳架在房顶木栈平台底座上，天然朝右）
+    this.fortCannon = ext(this.add.image(FORT_GUN_X, GROUND_Y + ROOF_Y - 4, 'turret_cannon').setOrigin(0.5, 1).setDepth(D.prop + 0.2));
 
     // 大屋门廊灯、拱窗暖光、街头路灯
     for (const [lx, ly, r, it] of [
@@ -148,7 +148,7 @@ export class GameScene extends Phaser.Scene {
         .setOrigin(0.5, 1).setDepth(D.ground + 0.5).setScale(pos.roof ? 0.62 : 0.64));
     }
 
-    // 3 级路障壁垒（Lv1 铁丝木障 → Lv2 武装战车木箱壁垒 → Lv3 双层重装电网壁垒）
+    // 3 级路障壁垒（Lv1 荆棘木障 → Lv2 武装马车木箱壁垒 → Lv3 双层雷纹铁壁）
     const wPush = (minLv: number, key: string, x: number, y = GROUND_Y, scale = 1, depth = D.prop) => {
       const im = prop(key, x, y, depth, undefined, scale);
       this.wallTierObjs.push({ minLv, obj: im });
@@ -271,10 +271,10 @@ export class GameScene extends Phaser.Scene {
         this.turretSprites[i]?.destroy();
         const pos = turretWorldPos(i);
         let sp: Phaser.GameObjects.Sprite | Phaser.GameObjects.Image;
-        if (slot.type === 'mg') sp = this.add.sprite(pos.x, pos.baseY - 4, 'turret', 0).setFlipX(true);
-        else if (slot.type === 'frost') sp = this.add.sprite(pos.x, pos.baseY - 4, 'turret_frost', 0).setFlipX(true).setScale(0.65);
-        else if (slot.type === 'tesla') sp = this.add.sprite(pos.x, pos.baseY - 4, 'turret_tesla', 0).play('turret_tesla').setScale(0.88);
-        else sp = this.add.image(pos.x, pos.baseY - 4, 'turret_cannon').setFlipX(true);
+        if (slot.type === 'mg') sp = this.add.image(pos.x, pos.baseY - 4, 'turret').setScale(0.66);
+        else if (slot.type === 'frost') sp = this.add.sprite(pos.x, pos.baseY - 2, 'turret_frost', 0).play('turret_frost').setScale(0.42);
+        else if (slot.type === 'tesla') sp = this.add.image(pos.x, pos.baseY - 4, 'turret_tesla').setScale(0.66);
+        else sp = this.add.image(pos.x, pos.baseY - 4, 'turret_cannon').setScale(1);
         sp.setOrigin(0.5, 1).setDepth(D.prop + 0.2);
         this.turretSprites[i] = sp;
         this.turretTypes[i] = slot.type;
@@ -392,7 +392,7 @@ export class GameScene extends Phaser.Scene {
     this.town.tilePositionX = cam.scrollX * 0.25;
 
     // ── 主角 + 分层独立手臂 + 手持枪械贴图 + 闪避残影 ──
-    const want = p.dodgeT > 0 ? 'hero_crouch' : p.hurtT > 22 ? 'hero_hurt' : p.vy < -0.2 ? 'hero_jump' : p.vy > 0.4 ? 'hero_fall'
+    const want = p.dodgeT > 0 ? 'hero_crouch' : p.hurtT > 10 ? 'hero_hurt' : p.vy < -0.2 ? 'hero_jump' : p.vy > 0.4 ? 'hero_fall'
       : p.shootT > 0 && Math.abs(p.vx) < 0.1 ? 'hero_shoot' : Math.abs(p.vx) > 0.1 ? 'hero_run' : 'hero_idle';
     if (this.hero.anims.currentAnim?.key !== want) this.hero.play(want);
     this.heroSquash *= 0.8;
@@ -524,7 +524,7 @@ export class GameScene extends Phaser.Scene {
     }
     for (const [id, im] of this.crates) if (!seenCrates.has(id)) { im.destroy(); this.crates.delete(id); }
 
-    // ── 子弹、手雷与敌方火球 ──
+    // ── 子弹、爆炎弹与敌方火球 ──
     while (this.bullets.length < run.bullets.length) this.bullets.push(this.add.sprite(0, 0, 'shot').setDepth(D.fx).play('shot'));
     this.bullets.forEach((s, i) => {
       const b = run.bullets[i];
@@ -596,7 +596,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    // 拖拽手榴弹时绘制真实物理解算出的抛物线曲线与落地爆区预警圈
+    // 拖拽爆炎弹时绘制真实物理解算出的抛物线曲线与落地爆区预警圈
     if (game.grenadeAim && run.phase === 'fight' && p.grenades > 0) {
       const traj = computeGrenadeThrow(run, game.grenadeAim);
       let px = traj.sx, py = traj.sy, vx = traj.vx, vy = traj.vy;
@@ -625,7 +625,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // 焦土火箭残余火海地面特效
+    // 焦土爆炎炮残余火海地面特效
     for (const f of run.fires) {
       const fade = Math.min(1, f.t / 45);
       const flick = 0.85 + Math.sin(now * 0.03 + f.x) * 0.15;
@@ -653,7 +653,7 @@ export class GameScene extends Phaser.Scene {
       g.lineStyle(1.4, col, 0.78).strokeEllipse(p.x, py - 1, 28, 7);
     }
 
-    // 特色子弹拖尾（左轮金痕 / 加特林过热火弹 / 急冻冰晶痕）
+    // 特色子弹拖尾（左轮金痕 / 连珠火铳炽焰弹 / 寒霜冰晶痕）
     for (const b of run.bullets) {
       if (b.kind === 'firebolt') {
         g.lineStyle(2.4, C.ember, 0.82).lineBetween(b.x - b.vx * 1.3, b.y - b.vy * 1.3, b.x, b.y);
@@ -677,7 +677,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // 室外电弧、狙击磁轨光束与 Lv.3 电网壁垒火花
+    // 室外电弧、圣铳符文光束与 Lv.3 雷纹铁壁火花
     this.bolts = this.bolts.filter((bf) => bf.until > now);
     for (const bf of this.bolts) {
       const alpha = Math.min(1, (bf.until - now) / 140);
@@ -829,8 +829,11 @@ export class GameScene extends Phaser.Scene {
           if (e.from === 'turret') {
             for (let i = 0; i < this.turretSprites.length; i++) {
               const sp = this.turretSprites[i];
-              if (sp && sp instanceof Phaser.GameObjects.Sprite && (this.turretTypes[i] === 'mg' || this.turretTypes[i] === 'frost') && Math.abs(sp.x - (e.x - 10)) < 4) {
-                sp.play(this.turretTypes[i]!);
+              const ox = turretWorldPos(i).x;
+              if (sp && (this.turretTypes[i] === 'mg' || this.turretTypes[i] === 'tesla' || this.turretTypes[i] === 'cannon') && Math.abs(ox - (e.x - 10)) < 2) {
+                if (!this.tweens.isTweening(sp)) {
+                  this.tweens.add({ targets: sp, x: ox - 2, duration: 45, yoyo: true, onComplete: () => sp.setX(ox) });
+                }
               }
             }
           }

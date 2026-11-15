@@ -1,4 +1,4 @@
-// 触屏按键与键盘：左下元气骑士式浮动摇杆，右下主攻击键（按住开火 + 自动锁敌）+ 弧形战术键（跳/闪/可拖拽控抛物线手雷/技能）。
+// 触屏按键与键盘：左下元气骑士式浮动摇杆，右下主攻击键（按住开火 + 自动锁敌）+ 弧形战术键（跳/闪/可拖拽控抛物线爆炎弹/技能）。
 import { useRef } from 'preact/hooks';
 import { audio } from '../app/audio';
 import { game } from '../app/game';
@@ -113,7 +113,7 @@ function FanKey(props: {
   );
 }
 
-/** 可拖拽手榴弹轮盘键：按住拖动实时改变抛物线远近/高低弧度，松手投出（快点也能直接智能投向敌群） */
+/** 可拖拽爆炎弹轮盘键：按住拖动实时改变抛物线远近/高低弧度，松手投出（快点也能直接智能投向敌群） */
 function GrenadeKey(props: { count: number }) {
   const centerRef = useRef<{ x: number; y: number } | null>(null);
   const lastCellRef = useRef('');
@@ -175,7 +175,7 @@ function GrenadeKey(props: { count: number }) {
     <button id="key-grenade" class={`fkey fkey-nade ${props.count <= 0 ? 'empty' : ''}`}
       onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel}>
       <Icon k="ic_grenade" />
-      <span>手雷</span>
+      <span>爆炎弹</span>
       <b>{props.count}</b>
       <i class="nade-knob" />
     </button>
@@ -190,7 +190,7 @@ export function InteractHint() {
   if (run.inside) {
     const st = nearbyStation(run);
     if (st === 'kitchen') label = '深夜食堂';
-    else if (st === 'shop') label = '军火商店';
+    else if (st === 'shop') label = '军械行商';
     else if (st === 'workshop') label = '防线工坊';
     else if (st === 'door') label = '走出木门';
   } else {
@@ -203,7 +203,7 @@ export function InteractHint() {
   );
 }
 
-/** 右下角元气骑士式弧形战术键区：大号主攻击键（按住自动锁敌开火，不按绝不乱打）+ 跳/闪/拖曳抛物线手雷/技能 */
+/** 右下角元气骑士式弧形战术键区：大号主攻击键（按住自动锁敌开火，不按绝不乱打）+ 跳/闪/拖曳抛物线爆炎弹/技能 */
 export function Keys() {
   const run = game.run, p = run.player, clsDef = CLASSES[run.cls];
   const w = curWeapon(run), def = WEAPONS[w.id];
@@ -242,7 +242,7 @@ export function Keys() {
   );
 }
 
-/** 底部中间：当前武器、星级、弹药/加特林蓄热 + 独立换弹键 */
+/** 底部中间：当前武器、星级、弹药/连珠火铳蓄热 + 独立换弹键 */
 export function WeaponChip() {
   const run = game.run, p = run.player, w = curWeapon(run), def = WEAPONS[w.id];
   const reloading = p.reloadT > 0, mag = magSize(w.id, w.star);
@@ -276,7 +276,7 @@ export function CampDock() {
         <Icon k="ic_kitchen" />深夜食堂{unserved > 0 ? `(${unserved}客)` : run.meat > 0 ? `(${run.meat}肉)` : ''}
       </button>
       <button id="btn-shop" class={`camp-btn ${near === 'shop' ? 'near' : ''}`} onClick={() => game.open('shop')}>
-        <Icon k="ic_shop" />军火商店
+        <Icon k="ic_shop" />军械行商
       </button>
       <button id="btn-build" class={`camp-btn ${near === 'workshop' ? 'near' : ''}`} onClick={() => game.open('build')}>
         <Icon k="ic_anvil" />防线工坊
