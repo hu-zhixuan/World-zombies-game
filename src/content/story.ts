@@ -1,4 +1,4 @@
-// 剧情脚本、角色台词、战友羁绊与深夜食堂 15 位 VIP 档案：100% 契合「暮色酒馆要塞 × 深夜食堂 × 15波尸潮」世界观。
+// 剧情脚本、角色台词、战友羁绊与深夜食堂 15 位 VIP 档案：100% 契合「暮夜酒馆：守夜人 × 深夜食堂 × 15波尸潮」哥特暗黑风世界观。
 import legacyRest from './legacy/restaurant.json';
 
 const EMOJI_RE = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/gu;
@@ -7,18 +7,23 @@ const clean = (s: string) =>
     .replace(EMOJI_RE, '')
     .replace(/Wastegram粉丝暴涨\+15/g, '当晚食客慕名暴涨 +15 粉')
     .replace(/废品改造狂/g, '机巧匠师')
-    .replace(/疯批学者/g, '狂想医者')
+    .replace(/疯批学者/g, '狂想炼金师')
     .replace(/破壁人·观测者/g, '夜幕先知·观测者')
-    .replace(/废土电台主播/g, '短波主播')
+    .replace(/废土电台主播/g, '江湖歌伶')
     .replace(/义体化狂人/g, '发条械身')
     .replace(/外面的废铁质量/g, '镇外铁铺锻的生铁质量')
     .replace(/卖的废铁/g, '贩的劣铁')
     .replace(/卖废铁的/g, '贩劣铁的')
     .replace(/坦克炮管/g, '重炮炮管')
     .replace(/开军工厂/g, '开军械工坊')
-    .replace(/微波炉/g, '旧烤炉')
+    .replace(/微波炉/g, '旧火炉')
     .replace(/酸液史莱姆/g, '腐爪腐尸')
+    .replace(/变异鼠/g, '腐鼠')
+    .replace(/酸烟/g, '黑雾毒气')
     .replace(/进口子弹/g, '稀罕银弹')
+    .replace(/狙击枪/g, '圣铳')
+    .replace(/枪都快提不动了/g, '火铳都快提不动了')
+    .replace(/全酒馆客人都拔出了枪|满酒馆客人瞬间拔枪/g, '满堂夜客瞬间按住腰间火铳')
     .replace(/避难所的水管/g, '镇西水塔的送水闸')
     .replace(/你避难所的水/g, '镇西酒馆的水')
     .replace(/半个避难所/g, '半条街的口粮')
@@ -26,25 +31,45 @@ const clean = (s: string) =>
     .replace(/避难所的小孩/g, '镇里的孩子们')
     .replace(/避难所米其林|废土米其林/g, '长夜名馆')
     .replace(/避难点/g, '栖身屋')
+    .replace(/废土文化/g, '如今世道')
+    .replace(/废土上的一切/g, '这长夜里的一切')
+    .replace(/废土上/g, '长夜里')
+    .replace(/废土/g, '长夜')
     .replace(/仿生胃/g, '发条铁胃')
     .replace(/电子合成音/g, '金属颤音')
     .replace(/伺服电机/g, '铜制齿轮')
     .replace(/发射洗脑电波/g, '暗藏迷魂阵法')
     .replace(/高维生物的阴谋！他们用病毒削弱人类意志，好方便殖民！/g, '黑雾教团的阴谋！他们散播尸疫动摇人心，好霸占暮色镇！')
-    .replace(/摄像头/g, '窃听眼')
+    .replace(/摄像头/g, '窃听符')
     .replace(/那是灯泡。/g, '那是普通煤油灯。')
     .replace(/发表论文/g, '写进秘药手札')
-    .replace(/全餐厅/g, '全酒馆')
-    .replace(/满餐厅/g, '满酒馆')
-    .replace(/整餐厅/g, '整间酒馆')
-    .replace(/这餐厅/g, '这酒馆')
+    .replace(/全餐厅|满餐厅|整餐厅|这餐厅/g, '这酒馆')
     .replace(/你的餐厅/g, '你的小酒馆')
     .replace(/都市传说般的存在/g, '长夜传说般的存在')
     .replace(/有头有脸的人物打卡/g, '有头有脸的常客寻味')
     .replace(/第二波就出装甲尸/g, '第四波就撞见焦骨巨尸')
+    .replace(/一台没有感情的机器/g, '一具毫无情绪波动的铁石躯壳')
+    .replace(/精英变异体/g, '深渊巨尸')
+    .replace(/变异体头颅/g, '巨尸头颅')
+    .replace(/半变异巨汉/g, '铁臂巨汉')
+    .replace(/三米高变异体格/g, '三米高天生神力体格')
+    .replace(/异兽共生者/g, '驯兽狂徒')
+    .replace(/变异地狱犬/g, '炼狱魔犬')
+    .replace(/下波防御\+1塔/g, '下波守门协防')
+    .replace(/大酒店/g, '大旅店')
+    .replace(/交响乐团/g, '弦乐坊')
+    .replace(/法式大餐/g, '宫廷大餐')
+    .replace(/肉体早已在辐射中腐朽/g, '肉体早已在寒霜长夜中腐朽')
+    .replace(/满是弹孔的旧防风衣|穿着弹孔旧防风衣/g, '满是战痕的旧斗篷')
+    .replace(/风沙/g, '风雪')
+    .replace(/传说级道具/g, '稀世护符')
+    .replace(/黑桃子弹/g, '黑桃纹章弹丸')
+    .replace(/特殊子弹/g, '秘银弹丸')
+    .replace(/这子弹/g, '这枚弹丸')
+    .replace(/72小时|七十二小时/g, '三天三夜')
     .trim();
 
-export type NpcId = 'ming' | 'zhang' | 'lin' | 'qiang' | 'zhao' | 'radio' | 'boss1' | 'boss2' | 'boss3' | 'heli';
+export type NpcId = 'ming' | 'zhang' | 'lin' | 'qiang' | 'zhao' | 'watch' | 'boss1' | 'boss2' | 'boss3' | 'dawn';
 export type AllyId = 'zhang' | 'lin' | 'qiang' | 'zhao';
 export type VipTierId = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond';
 
@@ -57,16 +82,16 @@ export interface SpeakerMeta {
 }
 
 export const SPEAKERS: Record<string, SpeakerMeta> = {
-  ming:  { id: 'ming',  name: '莫老板',   initial: '莫', desc: '暮色酒馆守夜人兼掌勺', avatar: 'hero_idle' },
-  zhang: { id: 'zhang', name: '老兵张',   initial: '张', desc: '退伍神枪手 · 屋顶瞭望', avatar: 'npc_bearded' },
-  lin:   { id: 'lin',   name: '护士小林', initial: '林', desc: '战地医护 · 伤员照料',   avatar: 'npc_woman' },
+  ming:  { id: 'ming',  name: '莫老板',   initial: '莫', desc: '暮夜酒馆守夜人兼掌勺', avatar: 'hero_idle' },
+  zhang: { id: 'zhang', name: '老兵张',   initial: '张', desc: '退伍神枪 · 屋顶瞭望',   avatar: 'npc_bearded' },
+  lin:   { id: 'lin',   name: '药师小林', initial: '林', desc: '随行药师 · 伤员照料',   avatar: 'npc_woman' },
   qiang: { id: 'qiang', name: '铁匠阿强', initial: '强', desc: '锻造与炮塔技师',       avatar: 'npc_hat' },
-  zhao:  { id: 'zhao',  name: '电台小赵', initial: '赵', desc: '短波通信兵 · 救援频道', avatar: 'npc_oldman' },
+  zhao:  { id: 'zhao',  name: '哨兵小赵', initial: '赵', desc: '哨塔信使 · 守夜号角',   avatar: 'npc_oldman' },
   boss1: { id: 'boss1', name: '地狱巨兽·暴君', initial: '暴', desc: '第5天首领 · 拆墙狂兽', avatar: 'boss_beast' },
   boss2: { id: 'boss2', name: '血月暴君·狂怒领主', initial: '怒', desc: '第10天首领 · 烈焰督军', avatar: 'boss_beast' },
   boss3: { id: 'boss3', name: '深渊魔王·尸皇', initial: '皇', desc: '第15天终极首领', avatar: 'boss_demon' },
-  radio: { id: 'radio', name: '短波电台', initial: '电', desc: '联合救援频道 142.8MHz', avatar: 'radio' },
-  heli:  { id: 'heli',  name: '黎明运输机', initial: '机', desc: '北部撤离编队', avatar: 'heli' },
+  watch: { id: 'watch', name: '守夜号角', initial: '号', desc: '北方灯塔哨站 · 烽火传讯', avatar: 'watch' },
+  dawn:  { id: 'dawn',  name: '破晓救援队', initial: '曙', desc: '北方黎明猎团与马车编队', avatar: 'dawn' },
 };
 
 export interface StoryLine {
@@ -88,7 +113,7 @@ function mapGuestLines(
   override: { vipId: string; vipName: string; vipAvatar: string },
 ): StoryLine[] {
   return arr.map((raw) => {
-    const npcKey = raw.npc ?? '';
+    const npcKey = raw.npc ?? (raw.speaker && SPEAKERS[raw.speaker] ? raw.speaker : '');
     if (npcKey && SPEAKERS[npcKey]) {
       const sp = SPEAKERS[npcKey];
       return { npc: npcKey, name: sp.name, initial: sp.initial, role: sp.desc, avatar: sp.avatar, text: clean(raw.text) };
@@ -105,31 +130,31 @@ function mapGuestLines(
   });
 }
 
-// ── 开场序幕：完全贴合暮色酒馆要塞 × 屋顶猎手 × 深夜食堂 ──
+// ── 开场序幕：100% 贴合「暮夜酒馆：守夜人 × 屋顶守城 × 深夜食堂」 ──
 export const CINEMATIC_INTRO: StoryLine[] = [
-  line('ming', '暮色彻底沉下来了。镇口路灯只剩这几盏还亮着，门前的木石路障刚重新钉紧。'),
+  line('ming', '暮色彻底沉下来了。镇口火把只剩这几盏还亮着，门前的拒马木障刚重新钉紧。'),
   line('ming', '踏着大门旁的木挑台就能跃上二楼屋顶——居高临下既能借矮墙躲开地面的扑咬，还能多打出几成狠劲。'),
-  line('radio', '滋……这里是北部联合救援频道。撤离运输编队将在十五轮尸潮后掠过暮色镇上空，请沿路灯烟火坚持十五夜！'),
-  line('ming', '十五夜……屋顶上已经架好第一座机枪哨塔，屋里砖窑炉火也一直温着。'),
-  line('ming', '白天守在屋顶打退尸潮、捡回鲜肉与金币；入夜进堂开灶喂饱过路生还者、修墙买枪——这间小酒馆绝不熄灯！'),
+  line('watch', '呜——北方灯塔哨站传来守夜号角！黎明猎团将在十五轮尸潮后沿驿道驰援暮色镇，请举灯守住这十五夜！'),
+  line('ming', '十五夜……屋顶上已经架好第一座火铳哨塔，屋里砖窑灶火也一直温着。'),
+  line('ming', '白天守在屋顶打退尸潮、捡回鲜肉与金币；入夜进堂开灶喂饱过路生还者、修墙铸炮买神兵——这间暮夜酒馆绝不熄灯！'),
 ];
 
 export interface StorySceneCard { chapter: string; title: string; text: string }
 export const STORY_SCENES: StorySceneCard[] = [
   {
     chapter: '前情一',
-    title: '暮色酒馆防线',
-    text: '灾变席卷老街后，镇西两层木石酒馆凭厚实砖墙和屋顶高台成了唯一能守的据点。前院立起木石路障与四座炮塔基座，踏上木挑台再跃屋顶，便能俯射整条长街。',
+    title: '暮夜酒馆防线',
+    text: '黑雾席卷老街后，镇西两层木石酒馆凭厚实砖墙和屋顶高台成了唯一能守的堡垒。前院立起拒马木障与四座炮塔基座，踏上木挑台再跃屋顶，便能俯射整条长街。',
   },
   {
     chapter: '前情二',
     title: '不熄的砖窑灶火',
-    text: '只要退回屋里，红砖烤炉的余温总能把战场带回的兽肉煎得滋滋冒香。拾荒者、夜巡老兵与江湖怪客循香而来，一碗热肉汤既换来金币与口碑，也为明天的守城注满底气。',
+    text: '只要退回屋里，红砖烤炉的余温总能把战场带回的兽肉煎得滋滋冒香。拾荒客、夜巡老兵与江湖怪客循香而来，一碗热肉汤既换来金币与口碑，也为明天的守城注满底气。',
   },
   {
     chapter: '前情三',
     title: '十五夜之约',
-    text: '屋顶天线的短波电台传来倒计时：十五波腐潮之后，黎明救援机群会降落镇东。第 5、10、15 夜更有深渊首领叩关——集结四位战友、升满堡垒火炮，活到天亮。',
+    text: '北塔哨站的守夜号角与烽火传来约期：十五夜腐潮之后，黎明猎团与马车编队会驰援镇东。第 5、10、15 夜更有深渊首领叩关——集结四位战友、升满堡垒火炮，活到天亮。',
   },
 ];
 
@@ -147,7 +172,7 @@ export const CHAPTER_CARDS: ChapterCard[] = [
     chapter: '第二章',
     title: '暴君叩关',
     sub: '第 5～9 天',
-    text: '第 5 天首领「地狱巨兽·暴君」携火球与兽群碾压防线；第 6 天会飘在半空吐幽火的「提灯怨灵」登场。老兵张、护士小林、铁匠阿强与小赵也将在此期间陆续入伙！',
+    text: '第 5 天首领「地狱巨兽·暴君」携火球与兽群碾压防线；第 6 天会飘在半空吐幽火的「提灯怨灵」登场。老兵张、药师小林、铁匠阿强与哨兵小赵也将在此期间陆续入伙！',
     minDay: 5,
     maxDay: 9,
   },
@@ -155,7 +180,7 @@ export const CHAPTER_CARDS: ChapterCard[] = [
     chapter: '第三章',
     title: '血月死斗',
     sub: '第 10～14 天',
-    text: '第 10 天狂怒领主二度逼近酒馆。此时正是改建石堡、架设屋顶双联火炮与冰冻/电弧/重炮联动的高潮，别忘了在食堂给大伙留一顿终章硬菜。',
+    text: '第 10 天狂怒领主二度逼近酒馆。此时正是改建石堡、架设屋顶双联火炮与寒晶/雷鸣/黑铁重炮联动的高潮，别忘了在食堂给大伙留一顿长夜全宴。',
     minDay: 10,
     maxDay: 14,
   },
@@ -163,7 +188,7 @@ export const CHAPTER_CARDS: ChapterCard[] = [
     chapter: '终章',
     title: '深渊黎明',
     sub: '第 15 天',
-    text: '终极首领「深渊魔王·尸皇」亲率黑潮压境。守住这最后一夜的屋顶与高墙，击溃魔王便能听见天边螺旋桨的轰鸣！',
+    text: '终极首领「深渊魔王·尸皇」亲率黑潮压境。守住这最后一夜的屋顶与高墙，击溃魔王便能听见天边破晓号角与马蹄奔雷！',
     minDay: 15,
     maxDay: 15,
   },
@@ -172,16 +197,16 @@ export const CHAPTER_CARDS: ChapterCard[] = [
 // ── 第 1～15 波战前/战后节奏精准对齐（无任何冲突设定）──
 export const WAVE_STORY_LINES: Record<number, StoryLine[]> = {
   1: [
-    line('ming', '第 1 夜。先试试手中手枪的点射节奏，别浪费屋顶矮墙的高低差优势。'),
+    line('ming', '第 1 夜。先试试手中猎手双铳的点射节奏，别浪费屋顶矮墙的高低差优势。'),
     line('ming', '路障撑不住时就花金币修一修，掉在院里的武器箱清完怪顺手下去捡回来。'),
   ],
   2: [
     line('ming', '雾里蹿出来不少黑影……第 2 夜会有速度飞快的噬魂黑猫贴地突进！'),
-    line('ming', '站高一点能躲开它们的扑咬，要是攒够金币，可以考虑换把左轮或霰弹了。'),
+    line('ming', '站高一点能躲开它们的扑咬，要是攒够金币，可以考虑换把重锤左轮或双管龙息铳了。'),
   ],
   3: [
     line('ming', '第 3 夜！巷尾传出成群嚎叫——地狱猎犬顺着街灯冲过来了！'),
-    line('ming', '高射速加特林或冰暴步枪最克制疯跑的狗群，路障别忘了盯紧血线。'),
+    line('ming', '连珠火铳或寒霜连铳最克制疯跑的狗群，路障别忘了盯紧血线。'),
   ],
   4: [
     line('ming', '地面在震……第 4 夜会出现浑身焦黑的重甲大块头「焦骨巨尸」，硬啃路障很疼。'),
@@ -189,7 +214,7 @@ export const WAVE_STORY_LINES: Record<number, StoryLine[]> = {
   ],
   5: [
     line('ming', '红雾压过房檐了——第 5 天首领「地狱巨兽·暴君」就在这波尸潮里！'),
-    line('ming', '站稳二楼屋顶能借墙垛挡掉不少火球伤害，大群扑壁垒时毫不犹豫甩颗手雷过去！'),
+    line('ming', '站稳二楼屋顶能借墙垛挡掉不少火球伤害，大群扑壁垒时毫不犹豫甩颗爆炎弹过去！'),
   ],
   6: [
     line('ming', '第 6 夜刚过第一道关口，半空又飘出青光——「提灯怨灵」会隔着墙抛幽火打屋顶！'),
@@ -201,7 +226,7 @@ export const WAVE_STORY_LINES: Record<number, StoryLine[]> = {
   ],
   8: [
     line('ming', '第 8 夜尸群更密了，前排巨尸配后排怨灵是最麻烦的组合。'),
-    line('ming', '趁换弹间隙用磁场激光或特斯拉电弧清掉后排怨灵，别让它们把屋顶烤热了。'),
+    line('ming', '趁换弹间隙用猩红圣铳或秘蓝法杖清掉后排怨灵，别让它们把屋顶烤热了。'),
   ],
   9: [
     line('ming', '第 9 夜。远处的吼声比第 5 天那头还要狂暴，暴君的同伙明天多半要扑上来了。'),
@@ -209,27 +234,27 @@ export const WAVE_STORY_LINES: Record<number, StoryLine[]> = {
   ],
   10: [
     line('ming', '第 10 天血月当头！第二头首领「血月暴君·狂怒领主」带着漫街腐潮碾压过来了！'),
-    line('ming', '电弧塔配冰霜塔能把狂奔护卫定死在壁垒外，剩下的交给屋顶火力和暴击瞄准！'),
+    line('ming', '雷鸣臼炮配寒霜水晶塔能把狂奔护卫定死在壁垒外，剩下的交给屋顶火力和暴击瞄准！'),
   ],
   11: [
     line('ming', '撑过第十夜只剩最后五关！第 11 夜起，每夜冲墙的频率都比之前凶一截。'),
     line('ming', '手里的主力兵器尽量升到高星，星级带来的弹匣与爆发在残局里最救命。'),
   ],
   12: [
-    line('ming', '第 12 夜，街尾路灯半明半灭，几座炮塔要是还没升满，今晚过后一定要补齐！'),
+    line('ming', '第 12 夜，街尾火把半明半灭，几座炮塔要是还没升满，今晚过后一定要补齐！'),
     line('ming', '真守到哥特铁堡三级，夜里还能自己修补三成路障，能省出大把修墙金币。'),
   ],
   13: [
-    line('ming', '第 13 夜——倒数第三场死守。小赵刚刚捕捉到北部运输编队接近的加密微弱信号。'),
-    line('ming', '手雷和护甲都塞满，只要壁垒和屋子都在，咱们就能耗死所有扑上来的怪物。'),
+    line('ming', '第 13 夜——倒数第三场死守。小赵刚刚捕捉到北塔哨站传来的救援烽火信号。'),
+    line('ming', '爆炎弹和镶铁护甲都备足，只要壁垒和屋子都在，咱们就能耗死所有扑上来的怪物。'),
   ],
   14: [
-    line('ming', '第 14 夜！明天就是最后一战，今天切忌省弹药、省手雷，能保住满血防线过夜就是大胜！'),
+    line('ming', '第 14 夜！明天就是最后一战，今天切忌省弹药、省爆炎弹，能保住满血防线过夜就是大胜！'),
     line('ming', '今晚回堂把能喝的汤、能烤的排全都做了，明天见红！'),
   ],
   15: [
     line('ming', '第 15 夜——最后一夜！天空彻底裂成赤紫，深渊魔王·尸皇正踏碎街砖走来！'),
-    line('radio', '救援机队距暮色镇仅剩一轮航程！击溃深渊魔王、肃清最后一波尸潮，我们立刻降落接应！'),
+    line('watch', '破晓救援队距暮色镇仅剩一程快马！击溃深渊魔王、肃清最后一波尸潮，城门外即刻接应！'),
   ],
 };
 
@@ -246,15 +271,15 @@ export const COMPANION_JOIN_STORIES: Record<number, { ally: AllyId; lines: Story
   4: {
     ally: 'lin',
     lines: [
-      line('lin', '掌柜的！刚才替街口几个伤员包扎时看见你的灯还亮着……我叫小林，以前在战地医疗站待过。'),
+      line('lin', '掌柜的！刚才替街口几个伤员煎药包扎时看见你的灯还亮着……我叫小林，以前在义诊药铺待过。'),
       line('ming', '屋里正好缺药箱。肯留下，晚上烤炉边永远有你的热汤位置。'),
-      line('lin', '一言为定！每天迎战前我都会帮大家换好纱布与镇痛汤剂，每夜开战前额外多稳回 18 点生命！'),
+      line('lin', '一言为定！每天迎战前我都会帮大家换好纱布与秘药汤剂，每夜开战前额外多稳回 18 点生命！'),
     ],
   },
   6: {
     ally: 'qiang',
     lines: [
-      line('qiang', '好家伙，这木石路障焊得真硬实！我是铁匠阿强——只要金币到位，我能把这屋前四座炮塔基座和铁壁全再锻厚一圈！'),
+      line('qiang', '好家伙，这木石壁垒铆得真硬实！我是铁匠阿强——只要金币到位，我能把这屋前四座炮塔基座和铁壁全再锻厚一圈！'),
       line('ming', '右角落那台旧铁砧正缺主事的师傅。欢迎进屋！'),
       line('qiang', '妥妥的！路障与大屋上限立刻再加 50 点，往后造塔升塔全按九折收费，绝不坑自家掌柜！'),
     ],
@@ -262,9 +287,9 @@ export const COMPANION_JOIN_STORIES: Record<number, { ally: AllyId; lines: Story
   8: {
     ally: 'zhao',
     lines: [
-      line('zhao', '报告莫掌柜！我是通信兵小赵，刚顺着你们屋顶的天线频率爬上院墙！'),
-      line('ming', '救援编队那边的频道还稳吗？'),
-      line('zhao', '一直锁着呢！顺道我还帮你的「深夜小食堂」在短波里打了波免费吆喝——从今往后，食堂名气和涨粉速度再加三成！'),
+      line('zhao', '报告莫掌柜！我是哨兵小赵，刚顺着北塔烽火传令线翻进院墙！'),
+      line('ming', '黎明救援队那边还稳吗？'),
+      line('zhao', '号角一直没断！顺道我还替你的「深夜食堂」向驿道行商和守夜旅人吆喝了一圈——从今往后，食堂名气和涨粉速度再加三成！'),
     ],
   },
 };
@@ -277,11 +302,11 @@ export const BOSS_INTROS: StoryLine[][] = [
   ],
   [
     line('boss2', '吼——！！（第 10 夜的狂怒领主顶碎街灯，烈焰顺着它脊背滚烫翻涌）'),
-    line('ming', '暴君二号压境！冰霜塔与电弧塔全力拖住它，屋顶重炮对准胸口轰！'),
+    line('ming', '暴君二号压境！寒霜水晶塔与雷鸣臼炮全力拖住它，屋顶重炮对准胸口轰！'),
   ],
   [
     line('boss3', '……微弱的灶火，也敢在长夜尽头耀武扬威？（深渊魔王·尸皇拔高遮住半片暮色天空）'),
-    line('ming', '最后十五步了！为了这间酒馆、为了屋里还在喝汤的所有人——把子弹和炮火全倾泻过去！'),
+    line('ming', '最后十五步了！为了这间酒馆、为了屋里还在喝汤的所有人——把火药和秘法全倾泻过去！'),
   ],
 ];
 
@@ -294,11 +319,11 @@ export const BOSS_VICTORY: StoryLine[][] = [
   ],
   [
     line('boss3', '不可……思议……凡人的灯火，竟烧穿了深渊长夜……'),
-    line('heli', '这里是北部救援运输编队！暮色镇上空的红雾散了——下方酒馆屋顶灯火清晰可见，我们正在降落！'),
-    line('zhang', '哈哈哈哈！听见桨声没！十五个夜晚，咱们一砖一瓦都守下来了！'),
-    line('lin', '所有人的生命体征都稳定，连那只烤炉的余温都还烫着！'),
-    line('qiang', '伙计们，收枪！这一锅全镇最传奇的「末日大餐」，咱带上去跟机组成员一起分！'),
-    line('ming', '暮色散去，天终于亮了。感谢各位老伙计——这间十五波不灭的小酒馆，我们守住了！'),
+    line('dawn', '这里是北方破晓救援队！暮色镇上空的红雾散了——前方酒馆屋顶灯火清晰可见，马车与火炬队正在开进长街！'),
+    line('zhang', '哈哈哈哈！听见破晓号角和马蹄声没！十五个夜晚，咱们一砖一瓦都守下来了！'),
+    line('lin', '所有人的伤势都稳住了，连那只烤炉的余温都还烫着！'),
+    line('qiang', '伙计们，收兵器！这一锅全镇最传奇的「长夜全宴」，咱端出去分给远道而来的弟兄们！'),
+    line('ming', '暮色散去，天终于亮了。感谢各位老伙计——这间十五夜不灭的暮夜酒馆，我们守住了！'),
   ],
 ];
 
@@ -308,8 +333,8 @@ export const REST_STORY: Record<RestStoryKey, { title: string; lines: StoryLine[
     title: '深夜食堂 · 炉火开张',
     lines: [
       line('ming', '墙外的嘶吼声总算暂时退潮。回到屋里，先把红砖烤炉的碳火拨旺吧。'),
-      line('ming', '从尸群里捡回来的鲜肉别囤着发酸：既可以上铁板现炒直接换金币买枪、建炮塔，也能留着招待深夜来客。'),
-      line('ming', '门外那几位夜行幸存者已经闻到香味了——照着今晚食客的点单和街头热门口味下锅，拿金币的同时还能攒口碑涨粉！'),
+      line('ming', '从魔物身上寻回来的鲜肉别囤着发酸：既可以上铁板现炒直接换金币买神兵、建炮塔，也能留着招待深夜来客。'),
+      line('ming', '门外那几位夜行旅人已经闻到香味了——照着今晚食客的点单和街头热门口味下锅，拿金币的同时还能攒口碑涨粉！'),
       line('ming', '下锅时盯紧铁板上的游标指针：落在中央金焰区就能打出完美乃至传说火候，名气越响，后续来的稀客赏金越高。'),
       line('ming', '最后别忘了给自己留一份「战前私房特餐」再上屋顶！明夜迎战时伤害、攻速和护甲都会明显涨一截。'),
     ],
@@ -317,21 +342,21 @@ export const REST_STORY: Record<RestStoryKey, { title: string; lines: StoryLine[
   rep10: {
     title: '街头口碑 · 老兵传香',
     lines: [
-      line('zhang', '掌柜的，听说隔壁街区逃难过来的幸存者都在打听你这间「暮色小酒馆」呢！'),
+      line('zhang', '掌柜的，听说隔壁街区逃难过来的幸存者都在打听你这间「暮夜酒馆」呢！'),
       line('ming', '能让他们趁夜喝口热汤再接着活下去，这灶台就没白支起来。'),
     ],
   },
   rep25: {
-    title: '名震废土 · 八方寻味',
+    title: '名震暮夜 · 八方寻味',
     lines: [
-      line('zhao', '短波频道里全是人在问路！都说穿过鬼雾往西看见两扇暖光拱窗，推门进去就能尝到战前大酒店级别的炉火手艺！'),
+      line('zhao', '北塔哨站和驿道旅人全在打听这儿！都说穿过鬼雾往西看见两扇暖光拱窗，推门进去就能尝到昔日王都大旅店般的炉火手艺！'),
       line('ming', '名声响了更好——往后常客赏金再涨两成，连各地奇人怪客都会陆续找上门。'),
     ],
   },
   rep40: {
     title: '传奇名馆 · 长夜暖灯',
     lines: [
-      line('lin', '整座暮色镇都流传着这里的故事了——墙外是十五夜死斗，墙里却是比和平年代还温暖的夜宵馆。'),
+      line('lin', '整座暮色镇都流传着这里的故事了——墙外是十五夜死斗，墙里却是比和平年代还温暖的深夜酒馆。'),
       line('ming', '来吧，灶火越旺、枪声越稳。不管来的是什么客人，今夜管够！'),
     ],
   },
@@ -348,14 +373,14 @@ export interface AllyDef {
 }
 
 export const ALLIES: Record<AllyId, AllyDef> = {
-  zhang: { id: 'zhang', joinDay: 2, name: '老兵张', role: '前特战老兵', initial: '张', sprite: 'npc_bearded', buffDesc: '全武器伤害 +10%' },
-  lin:   { id: 'lin',   joinDay: 4, name: '护士小林', role: '战地医护', initial: '林', sprite: 'npc_woman', buffDesc: '每夜额外恢复 +18 生命' },
+  zhang: { id: 'zhang', joinDay: 2, name: '老兵张', role: '前神射老兵', initial: '张', sprite: 'npc_bearded', buffDesc: '全武器伤害 +10%' },
+  lin:   { id: 'lin',   joinDay: 4, name: '药师小林', role: '随行药师', initial: '林', sprite: 'npc_woman', buffDesc: '每夜额外恢复 +18 生命' },
   qiang: { id: 'qiang', joinDay: 6, name: '铁匠阿强', role: '结构锻工', initial: '强', sprite: 'npc_hat', buffDesc: '墙与大屋耐久 +50 · 造/升塔 -10% 金' },
-  zhao:  { id: 'zhao',  joinDay: 8, name: '电台小赵', role: '通信兵', initial: '赵', sprite: 'npc_oldman', buffDesc: '食堂增粉 +30% · 锁定撤离频道' },
+  zhao:  { id: 'zhao',  joinDay: 8, name: '哨兵小赵', role: '哨塔信使', initial: '赵', sprite: 'npc_oldman', buffDesc: '食堂增粉 +30% · 联络破晓救援' },
 };
 export const ALLY_ORDER: AllyId[] = ['zhang', 'lin', 'qiang', 'zhao'];
 
-// ── 深夜食堂：VIP 阶级、15 位 VIP 档案、每日热搜、点评与声望评级 ──
+// ── 深夜食堂：VIP 阶级、15 位 VIP 档案、每日风向、点评与声望评级 ──
 const SCALED_VIP_FANS: Record<string, number> = {
   agou: 0,
   laobao: 0,
@@ -425,25 +450,88 @@ export interface VipDef {
 }
 
 const VIP_OVERRIDES: Partial<Record<string, Partial<Omit<VipDef, 'id' | 'tier' | 'unlockFans' | 'sprite'>>>> = {
-  huanyin: {
-    name: '短波主播·幻音',
-    personality: '戏感十足的夜波红伶',
-    personalityDesc: '无论长夜多黑暗都要端起端正播音腔，举手投足讲究排场，总爱把小酒馆的灶火香气传遍全镇短波频道。',
-    bg: '拎着旧电瓶驱动的便携短波话筒闯进酒馆，对着空气广播：「各位夜行听众，今晚带大伙走近暮色镇尽头最香的酒馆！」',
+  gaolaotou: {
+    name: '古怪术士·高老头',
+    personality: '疑神疑鬼的老占卜客',
+    personalityDesc: '怀疑长街每一缕雾气里都藏着邪教眼线，用膳前总要先念三遍清心咒、用铜罗盘测遍碗筷才肯下咽。',
+    bg: '头上顶着折成尖顶的黄符斗笠，进门先掏出咔哒作响的破旧测瘴罗盘把桌椅扫了一遍。',
     firstMeet: [
-      line('ming', '（一个拎着老式短波话筒的年轻女人风风火火推门而入，肩头斜挎着嗡嗡作响的铜壳发报箱）'),
-      { npc: 'huanyin', name: '幻音', initial: '幻', role: '短波主播', avatar: 'npc_woman', text: clean('各位暮色电台的夜行听众！幻音今晚带大伙走近长夜里名声最响的暮色酒馆！听说这间灶台什么奇珍硬肉都能上桌！') },
-      line('ming', '……你那发报箱电瓶快冒烟了。吃点什么？'),
-      { npc: 'huanyin', name: '幻音', initial: '幻', role: '短波主播', avatar: 'npc_woman', text: clean('（依然端着字正腔圆的播音腔）掌柜！给我上一道最摄人心魄的暗夜浓菜！我要让半条街外抱收音机的人都跟着咽口水！') },
-      line('ming', '（端上一份泛着幽绿微光的深渊炙肉排）……就这一份，趁热吃。'),
-      { npc: 'huanyin', name: '幻音', initial: '幻', role: '短波主播', avatar: 'npc_woman', text: clean('（对着话筒赞叹）听众们，瞧这焦糖色泽与烟熏香气！（咬了一口，声音差点露馅）嗯……真香！！——（关掉开关凑近低声）掌柜，下回还是换正常烤排吧，差点没演住！') },
+      line('ming', '（一个戴着符纸斗笠的老头鬼鬼祟祟推门进来，手举铜制测瘴罗盘对着桌椅嘀嗒转了一圈）'),
+      { npc: 'gaolaotou', name: '高老头', initial: '高', role: '古怪术士', avatar: 'npc_oldman', text: clean('嗯……瘴气还算正常，没沾窃听符印。（斜眼看你）掌柜，你墙角那只八音盒……是不是暗藏迷魂阵法？') },
+      line('ming', '那是坏掉的旧八音盒。不吃别乱摸。'),
+      { npc: 'gaolaotou', name: '高老头', initial: '高', role: '古怪术士', avatar: 'npc_oldman', text: clean('（落座，拿麻布擦了三遍木筷）哼……尸疫诅咒？那都是黑雾教团的阴谋！他们散播邪祟动摇人心，好霸占暮色镇！（压低声）你头顶这盏吊灯——该不会也藏了窥视邪眼吧？') },
+      line('ming', '那是普通煤油灯。（端上一份清炖暖胃肉汤）吃吧，没毒。'),
+      { npc: 'gaolaotou', name: '高老头', initial: '高', role: '古怪术士', avatar: 'npc_oldman', text: clean('（小心啜了一口，浑身突然松弛下来）……嗯，温热干净。（又连喝两大口）确实没下咒。掌柜，你算个可信人，这顶避邪符帽的做法我抄你一份！') },
+      line('ming', '……不必了，谢谢。'),
+    ],
+    reactions: {
+      legendary: clean('警惕地四下张望：「这滋味……太不对劲了，香得离奇！莫非加了灵草？」'),
+      perfect: clean('满意颔首：「嗯，干净无毒。掌柜你暂时还算靠谱。」'),
+      good: clean('小声嘀咕：「味道一般。不过至少没沾黑雾瘴气。」'),
+      poor: clean('皱眉捂鼻：「这肉……确定不是腐雾里熏出来的？我得再用罗盘测测。」'),
+    },
+  },
+  huanyin: {
+    name: '江湖歌伶·幻音',
+    personality: '戏感十足的夜街游吟伶',
+    personalityDesc: '无论长夜多黑暗都要端起字正腔圆的说书腔，举手投足讲究排场，总爱挂着铜传声筒把酒馆灶火香气唱遍半条长街。',
+    bg: '挎着旧风铃琴与铜制传声筒风风火火闯进酒馆，朝夜色吟唱：「诸位提灯夜行客，今夜带大伙走进暮色镇最香的小馆！」',
+    firstMeet: [
+      line('ming', '（一个斜挎风铃琴与铜制传声筒的年轻女子风风火火推门而入，袖口还沾着长街夜露）'),
+      { npc: 'huanyin', name: '幻音', initial: '幻', role: '江湖歌伶', avatar: 'npc_woman', text: clean('各位暮夜里的赶路人！幻音今夜唱到长街尽头最暖的一盏灯——听说这间暮夜酒馆什么奇珍硬肉都能上桌！') },
+      line('ming', '……你那铜筒再喊下去，街口的腐尸都要听见了。吃点什么？'),
+      { npc: 'huanyin', name: '幻音', initial: '幻', role: '江湖歌伶', avatar: 'npc_woman', text: clean('（依然端着字正腔圆的说书腔）掌柜！给我上一道最摄人心魄的暗夜浓菜！我要让半条街外提灯巡夜的人都跟着咽口水！') },
+      line('ming', '（端上一份泛着香料炭火光泽的深渊炙肉排）……就这一份，趁热吃。'),
+      { npc: 'huanyin', name: '幻音', initial: '幻', role: '江湖歌伶', avatar: 'npc_woman', text: clean('（对着风铃琴咏叹）诸位听看这焦糖色泽与烟熏香气！（咬了一口，腔调差点破功）嗯……真香！！——（压低真声凑近）掌柜，下回还是换正常烤排吧，差点没演住！') },
       line('ming', '……不是你自己非要点暗夜浓菜的么。'),
     ],
     reactions: {
-      legendary: clean('对着话筒高呼：「各位夜行听众！！此等火候绝世难逢，今夜务必循灯而来！！」当晚慕名新客暴涨 +15 粉'),
-      perfect: clean('满意收拢话筒：「火候精妙绝伦！今晚短波频道我定替小店美言几句。」'),
+      legendary: clean('扬起铜传声筒高歌：「诸位夜行客听好！！此等火候绝世难逢，今夜务必循灯而来！！」当晚慕名新客暴涨 +15 粉'),
+      perfect: clean('满意收拢风铃琴：「火候精妙绝伦！明日走过各条长街，我定替小馆美言几曲。」'),
       good: clean('礼貌微笑：「滋味不赖……（压低声）掌柜下回摆盘若再齐整些便更体面了。」'),
-      poor: clean('啪地关掉发报机：「……唔，这段不播了，下回重开嗓门。」'),
+      poor: clean('啪地合上曲本：「……唔，这段唱词先歇了，下回重开嗓门。」'),
+    },
+  },
+  tongshu: {
+    name: '发条械身·铜叔',
+    personality: '崇尚齿轮与绝对理性的老巧匠',
+    personalityDesc: '厌倦人类血肉的无常脆败，深信「血肉苦弱，齿轮永恒」。说话带有铜簧共振般的金属颤音，一丝不苟按刻度行事。',
+    bg: '半边身躯改造自黄铜发条与齿轮巧构，「发条铁胃」咬合涩滞，急需滚烫烈酒与松脂厚肉润滑。',
+    firstMeet: [
+      line('ming', '（一个半边身躯镶满黄铜齿轮的男人迈进屋门，关节每动一下便发出清脆的发条咬合声）'),
+      { npc: 'tongshu', name: '铜叔', initial: '铜', role: '发条巧匠', avatar: 'npc_bearded', text: clean('（金属颤音）凡人。我的发条铁胃出现涩滞。寻常清汤难以承压。需要高度烈酒与炽热松脂油脂调和。能做？') },
+      line('ming', '……你是来用饭的，还是来给齿轮上油的？'),
+      { npc: 'tongshu', name: '铜叔', initial: '铜', role: '发条巧匠', avatar: 'npc_bearded', text: clean('（冷静分析）血肉进食是低效的能量汲取。但发条铁胃必须润滑。据我推算，烈酒浸烤配七分焦油厚排可恢复九成运转效能。') },
+      line('ming', '（端上一份烈酒炽烤厚肉排）……这种吃法我还是头一回做。'),
+      { npc: 'tongshu', name: '铜叔', initial: '铜', role: '发条巧匠', avatar: 'npc_bearded', text: clean('（一口吞下烈酒厚排）……发条铁胃运转恢复至九成二。（颔首）你的火候合乎工艺刻度。往后我会定期前来维护。（起身离开，齿轮咔哒轻鸣）') },
+      line('ming', '……成吧。记得结清酒钱。'),
+    ],
+    reactions: {
+      legendary: clean('金属颤音微微泛响：「……检测到罕见芳醇共鸣。发条铁胃已刻录此配方。」额外支付 3 倍金币'),
+      perfect: clean('颔首：「契合工艺刻度。发条运转顺滑如初。」'),
+      good: clean('面无表情：「……尚可驱动。下次烈酒火候可再添一分。」'),
+      poor: clean('齿轮咔哒卡响：「配比失衡。铁胃运转仅恢复四成。」'),
+    },
+  },
+  baishi: {
+    name: '狂想炼金师·怪医白石',
+    personality: '沉迷药理异象的狂热怪医',
+    personalityDesc: '眼里只有秘药配方与奇异体征，对深渊魔物的魔性变化有着近乎病态的好奇，常把常人避之唯恐不及的药材当成宝贝。',
+    bg: '穿着被酸雾蚀出洞眼的褪色亚麻实验袍，兴冲冲掏出一小瓶冒着绿泡的炼金原液要混进热菜里。',
+    firstMeet: [
+      line('ming', '（一个亚麻实验袍满是灼痕的男人两眼放光冲进酒馆，手里晃着一小瓶冒绿泡的玻璃药瓶）'),
+      { npc: 'baishi', name: '白石', initial: '白', role: '怪医炼金师', avatar: 'npc_oldman', text: clean('妙极了！妙极了！听说你这掌柜什么奇肉都敢掌勺？（把玻璃药瓶拍在木桌上）替我把这瓶魔药原液拌进菜里，看看会生出什么异象！') },
+      line('ming', '……这里头装的是什么鬼东西？'),
+      { npc: 'baishi', name: '白石', initial: '白', role: '怪医炼金师', avatar: 'npc_oldman', text: clean('（低笑）我也说不清！这正是迷人之处！或许是强心秘药，或许是蚀骨毒露——在药炉里熬一百次，都不如活体试药一遭来得痛快！') },
+      line('ming', '（……这人简直是个疯子。）（端上一份深渊魔兽厚排，假装往上滴了一滴药水）行了，你的「试药菜」好了。'),
+      { npc: 'baishi', name: '白石', initial: '白', role: '怪医炼金师', avatar: 'npc_oldman', text: clean('（迫不及待大嚼几口，眼里闪光）精彩！肺腑微暖，瞳仁清亮了几分！（飞快在羊皮手札记下一笔）掌柜，下回我带更猛的药草来！') },
+      line('ming', '……其实那滴原液我全倒进炉灰里了。随他高兴吧，至少赏金给得痛快。'),
+    ],
+    reactions: {
+      legendary: clean('狂喜拍桌：「太绝妙了！前所未见的炼金异象！我要写进秘药手札！」额外奉上五倍酬金与一瓶秘炼强效药水'),
+      perfect: clean('兴奋地奋笔疾书：「药性相辅相成！极有深究的价值！」'),
+      good: clean('点头：「成色尚可。待我再留心观察几夜。」'),
+      poor: clean('皱眉摇头：「反应微弱。下回记得火头更猛些。」'),
     },
   },
   guancezhe: {
@@ -453,7 +541,7 @@ const VIP_OVERRIDES: Partial<Record<string, Partial<Omit<VipDef, 'id' | 'tier' |
     bg: '身披缀满星纹的黑绒长斗篷，手提青铜星灯静静推门而入，外头的寒霜与尸雾竟绕着他衣摆退散。',
     firstMeet: [
       line('ming', '（一个身披星纹斗篷、手提青铜古灯的旅人无声步入酒馆，门外风雪竟在他肩头绕开）'),
-      { npc: 'guancezhe', name: '观测者', initial: '观', role: '夜幕先知', avatar: 'npc_hat', text: clean('（拂去斗篷霜花，环顾两层橡木梁柱与暖黄油灯）暮色酒馆，最后一座不熄灯的堡垒。屋里炉火正旺……只是这菜单，刚重新开张不久吧？') },
+      { npc: 'guancezhe', name: '观测者', initial: '观', role: '夜幕先知', avatar: 'npc_hat', text: clean('（拂去斗篷霜花，环顾两层橡木梁柱与暖黄油灯）暮夜酒馆，最后一座不熄灯的堡垒。屋里炉火正旺……只是这菜单，刚重新开张不久吧？') },
       line('ming', '……夜路冷，客人想喝碗热汤还是吃块烤排？'),
       { npc: 'guancezhe', name: '观测者', initial: '观', role: '夜幕先知', avatar: 'npc_hat', text: clean('（轻声叹息）第 4 夜焦骨巨尸会撞响外墙，第 10 夜血月压境檐角，第 15 夜深渊魔王更将倾巢而出……别慌，掌柜的，屋顶高台与灶火会撑到天亮。') },
       line('ming', '（端上一碗冒着白气的滚烫肉汤）阁下倒像算命先生。喝口汤暖暖再说吧。'),
@@ -497,10 +585,10 @@ export const VIP_CUSTOMERS: VipDef[] = legacyRest.VIP_CUSTOMERS.map((v) => {
 export interface FansRankDef { grade: string; name: string; minFans: number; unlock: string }
 export const FANS_RANKS: FansRankDef[] = [
   { grade: 'E', name: '据点小灶', minFans: 0, unlock: '开启深夜食堂堂食与青铜熟客' },
-  { grade: 'D', name: '暮色风味摊', minFans: 60, unlock: '吸引白银级江湖客来访' },
+  { grade: 'D', name: '暮夜风味摊', minFans: 60, unlock: '吸引白银级江湖客来访' },
   { grade: 'C', name: '酒馆名厨坊', minFans: 180, unlock: '解锁黄金级特邀常客' },
   { grade: 'B', name: '要塞星级厨', minFans: 400, unlock: '全镇守夜人闻香而来' },
-  { grade: 'A', name: '暮色名厨阁', minFans: 700, unlock: '解锁铂金势力人物' },
+  { grade: 'A', name: '暮夜名厨阁', minFans: 700, unlock: '解锁铂金势力人物' },
   { grade: 'S', name: '长夜传奇食堂', minFans: 1000, unlock: '吸引传说人物与全图鉴朝圣' },
 ];
 
@@ -519,10 +607,10 @@ export function getFansRank(fans: number) {
 export interface RepTierDef { name: string; minRep: number; bonusMul: number; desc: string }
 export const REP_TIERS: RepTierDef[] = [
   { name: '门可罗雀', minRep: -999, bonusMul: 0, desc: '刚挂上招牌，只有熟面孔上门' },
-  { name: '初闻烟火', minRep: 0, bonusMul: 0, desc: '一锅热肉香飘出暮色长街' },
-  { name: '废土名店', minRep: 10, bonusMul: 0.1, desc: '口碑渐起，食客打赏 +10%' },
+  { name: '初闻烟火', minRep: 0, bonusMul: 0, desc: '一锅热肉香飘出暮夜长街' },
+  { name: '镇西名馆', minRep: 10, bonusMul: 0.1, desc: '口碑渐起，食客打赏 +10%' },
   { name: '要塞名馆', minRep: 25, bonusMul: 0.2, desc: '夜夜满座，食客打赏 +20%' },
-  { name: '长夜传奇名馆', minRep: 40, bonusMul: 0.35, desc: '暮色传奇酒馆，食客打赏 +35%' },
+  { name: '长夜传奇名馆', minRep: 40, bonusMul: 0.35, desc: '暮夜传奇酒馆，食客打赏 +35%' },
 ];
 
 export function getRepTier(rep: number): RepTierDef {
@@ -537,9 +625,9 @@ export const DAILY_TRENDS: TrendDef[] = [
   { id: 'homestyle', tag: '家常', title: '想念家的味道，来点家常的', desc: '【家常】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 1 },
   { id: 'tender', tag: '鲜嫩', title: '嫩一点，暖汤炖肉最治愈', desc: '【鲜嫩】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 2 },
   { id: 'hearty', tag: '饱腹', title: '大口吃肉，饱腹才守得住防线', desc: '【饱腹】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 2 },
-  { id: 'protein', tag: '高蛋白', title: '守墙老兵最爱厚肉补给', desc: '【高蛋白】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 3 },
+  { id: 'protein', tag: '厚肉', title: '守墙老兵最爱厚肉补给', desc: '【厚肉】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 3 },
   { id: 'smoky', tag: '烟熏', title: '铁板碳烤，烟熏焦香夜宵', desc: '【烟熏】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 3 },
-  { id: 'exotic', tag: '异变', title: '异变风味挑战，短波里都在问', desc: '【异变】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 5 },
+  { id: 'exotic', tag: '奇味', title: '奇味秘菜挑战，满镇夜客都在问', desc: '【奇味】风味菜品 +35% 金币 · ×2 粉丝', unlockDay: 5 },
 ];
 
 export const QUALITY_META = {
@@ -554,12 +642,12 @@ export const DINER_REVIEW_POOL: Record<DishQuality, readonly string[]> = {
   legendary: [
     '救命！这是什么神仙手艺！吃完连明夜守墙的底气都满出来了。',
     '我愿意用半个月的口粮换掌柜这一口铁板火候！',
-    '老板你战前是不是五星大酒店主厨？暮色酒馆之光实至名归！',
+    '掌柜手艺宛如昔日王都御厨！暮夜酒馆之光实至名归！',
     '这口肉香让我想起了街灯还通宵亮着的和平夜晚。',
   ],
   perfect: [
     '手艺扎实、火候刚到点，明天上屋顶守城又有力气了！',
-    '分量足味道稳，整片废墟里最实在的良心小馆。',
+    '分量足味道稳，整条长街里最实在的良心小馆。',
     '比昨晚还香！明天拉几个镇民一起赶夜路过来吃。',
     '掌柜用心了，这一口厚排能回味到天亮。',
   ],
@@ -571,7 +659,7 @@ export const DINER_REVIEW_POOL: Record<DishQuality, readonly string[]> = {
   ],
   poor: [
     '火候稍急了一丁点，但这年头能吃上刚出炉的热菜已经知足。',
-    '今晚灶头有点偏旺，老板下一锅稳一下准更绝。',
+    '今晚灶头有点偏旺，掌柜下一锅稳一下准更绝。',
     '味道清淡些，不过填饱肚子上阵完全顶用。',
   ],
 };

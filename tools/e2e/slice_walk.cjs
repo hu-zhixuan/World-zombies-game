@@ -24,9 +24,10 @@ const L = require('./lib.cjs');
     check(r, sel + ' 整个面板都在屏幕里');
   };
 
-  // 1. 标题与全屏检查 + 废土剧情档案（3页签）
+  // 1. 标题与全屏检查 + 酒馆传闻录（3页签）
   await g.shot('01-title');
   await fits('#panel-title');
+  check(await g.page.evaluate(() => /暮夜酒馆：守夜人/.test(document.querySelector('#panel-title h1').innerText)), '标题页展示「暮夜酒馆：守夜人」');
   check(await g.page.evaluate(() => /星星/.test(document.querySelector('#meta-progress').innerText)), '标题页显示星星和下一个解锁');
   check((await g.state()).panel === 'title', '打开是标题页');
   check(await g.page.evaluate(() => !document.querySelector('#hud-scrap')), '顶部 HUD 已彻底移除废铁显示');
@@ -34,7 +35,7 @@ const L = require('./lib.cjs');
   check(fill.w === fill.vw && fill.h === fill.vh, `画面铺满屏幕，没有黑边 (${fill.w}x${fill.h} / ${fill.vw}x${fill.vh})`);
 
   await g.tap('#btn-lore');
-  check((await g.state()).panel === 'lore', '从标题可打开废土剧情档案');
+  check((await g.state()).panel === 'lore', '从标题可打开酒馆传闻录');
   await fits('#panel-lore');
   await g.tap('#tab-lore-chapters');
   await fits('#panel-lore');
@@ -45,9 +46,9 @@ const L = require('./lib.cjs');
 
   // 2. 选职业 -> 播放序幕剧情 -> 跳过或推进入第 1 天房顶
   await g.tap('#btn-start');
-  check((await g.state()).panel === 'class', '点「开始」先选职业');
+  check((await g.state()).panel === 'class', '点「开始守夜」先选职业');
   await g.shot('01b-class'); await fits('#panel-class');
-  check(await g.page.evaluate(() => document.querySelector('#panel-class [data-class=engineer]').disabled && document.querySelector('#panel-class [data-class=chef]').disabled), '0星时工程师/主厨正确锁定');
+  check(await g.page.evaluate(() => document.querySelector('#panel-class [data-class=engineer]').disabled && document.querySelector('#panel-class [data-class=chef]').disabled), '0星时铸匠/厨师正确锁定');
   await g.tap('#panel-class [data-class=gunner]');
 
   let s = await g.state();
@@ -89,8 +90,8 @@ const L = require('./lib.cjs');
   });
   check(noOverlap === 'ok', '右下角按钮、武器条与屋顶增益条互不重叠 (' + noOverlap + ')');
 
-  // 3. 元气骑士式手感：不按攻击键绝不乱开枪；按住攻击键才自动锁敌射杀 + 可拖拽控抛物线手雷
-  check(await until((st) => st.zombies >= 2 && st.target !== null, 30000, '等僵尸进射程出现锁定框'), '僵尸进入射程出现锁定准星');
+  // 3. 元气骑士式手感：不按攻击键绝不乱开枪；按住攻击键才自动锁敌射杀 + 可拖拽控抛物线爆炎弹
+  check(await until((st) => st.zombies >= 2 && st.target !== null, 30000, '等魔物进射程出现锁定框'), '魔物进入射程出现锁定准星');
   const idleAmmo = await g.page.evaluate(() => ({ auto: window.__game.run.autoFire, ammo: window.__game.run.player.weapons[0].ammo }));
   check(!idleAmmo.auto && idleAmmo.ammo === 10, `默认不自动开枪 (autoFire=${idleAmmo.auto}, ammo=${idleAmmo.ammo})`);
 
@@ -98,24 +99,24 @@ const L = require('./lib.cjs');
   await g.touch('touchStart', fireBtn.x, fireBtn.y);
   await wait(240);
   await g.shot('02-rooftop-fight');
-  check(await until((st) => st.kills >= 2, 30000, '按住攻击键自动锁敌击杀僵尸'), '按住攻击键能稳定自动锁敌杀敌');
+  check(await until((st) => st.kills >= 2, 30000, '按住攻击键自动锁敌击杀魔物'), '按住攻击键能稳定自动锁敌杀敌');
   await g.touch('touchEnd');
   await wait(120);
 
   await g.tap('#key-skill');
   check(await g.page.evaluate(() => window.__game.run.skill.cd > 0), '扇形技能键正常释放');
 
-  // 拖拽手雷轮盘向右上拉出高抛抛物线预览并投出
+  // 拖拽爆炎弹轮盘向右上拉出高抛抛物线预览并投出
   const nadeBtn = await g.center('#key-grenade');
   await g.touch('touchStart', nadeBtn.x, nadeBtn.y);
   await wait(60);
   await g.touch('touchMove', nadeBtn.x + 20, nadeBtn.y - 26);
   await wait(200);
-  check(await g.page.evaluate(() => !!window.__game.grenadeAim && window.__game.grenadeAim.dx > 0.3 && window.__game.grenadeAim.dy < -0.35), '按住手雷拖拽能实时调出抛物线方向与高低弧度');
+  check(await g.page.evaluate(() => !!window.__game.grenadeAim && window.__game.grenadeAim.dx > 0.3 && window.__game.grenadeAim.dy < -0.35), '按住爆炎弹拖拽能实时调出抛物线方向与高低弧度');
   await g.shot('02c-grenade-aim');
   await g.touch('touchEnd');
   await wait(260);
-  check((await g.state()).grenades === 1, '拖拽手雷松手后精准按设定抛物线投出');
+  check((await g.state()).grenades === 1, '拖拽爆炎弹松手后精准按设定抛物线投出');
   await g.shot('02b-skill-grenade');
 
   // 4. 在左下半屏热区外围用浮动摇杆向右走下房顶，测一楼砖墙碰撞，再二段跳跳回二楼房顶
@@ -168,11 +169,12 @@ const L = require('./lib.cjs');
   await g.touch('touchStart', pad.x - 36, pad.y); await wait(700); await g.touch('touchEnd');
   check((await g.state()).x < inX0 - 20, '推摇杆能在酒馆屋内向左走到小厨房');
 
-  // 7. 深夜小食堂（今夜热门 + 铁板火候 QTE 招待 + 6道特餐 + 15位VIP图鉴与点评墙 + 炒肉）、商店、纯金币工坊
+  // 7. 深夜小食堂（今夜热门 + 铁板火候 QTE 招待 + 6道特餐 + 15位VIP图鉴与点评墙 + 炒肉）、军械行商、纯金币工坊
   await g.page.evaluate(() => { window.__game.run.meat = 8; window.__game.run.coins = 700; window.__game.notify(); });
+  const forbiddenReSrc = '十五波|短波|电台|直升机|运输机|螺旋桨|废土|加特林|磁轨|特斯拉|左轮炮|步枪|霰弹|手雷|防弹|电网|机枪塔|冰霜塔|电弧塔|重炮塔|避难所|米其林|异变|变异|主厨|工程师|枪手|护士|废品改造狂|卖的废铁|卖废铁|热搜|末世|感染者';
   await g.tap('#btn-kitchen');
   check((await g.state()).panel === 'kitchen', '能打开深夜小食堂');
-  check(await g.page.evaluate(() => !/废品改造狂|米其林|消防栓|期末考试|地雷|微波炉|热搜/.test(document.querySelector('#panel-kitchen').innerText)), '深夜食堂界面无出戏或过时设定文案');
+  check(await g.page.evaluate((src) => !new RegExp(src).test(document.querySelector('#panel-kitchen').innerText), forbiddenReSrc), '深夜食堂界面无出戏或过时设定文案');
   await g.shot('06-kitchen'); await fits('#panel-kitchen');
 
   await g.tap('#btn-serve-0');
@@ -200,24 +202,47 @@ const L = require('./lib.cjs');
   await g.tap('#btn-close');
 
   await g.tap('#btn-shop');
-  check((await g.state()).panel === 'shop', '能打开酒馆军火商店');
+  check((await g.state()).panel === 'shop', '能打开军械行商');
+  check(await g.page.evaluate((src) => !new RegExp(src).test(document.querySelector('#panel-shop').innerText), forbiddenReSrc), '军械行商界面无科幻或现代出戏词汇');
   await g.shot('07-shop'); await fits('#panel-shop');
   await g.tap('#btn-shop-revolver');
   await g.tap('#btn-buy-armor');
   s = await g.state();
-  check(s.weapons.includes('revolver') && s.armor >= 40, '商店能购入左轮手枪并购买护甲');
+  check(s.weapons.includes('revolver') && s.armor >= 40, '军械行商能购入重锤左轮并购买铁甲');
   await g.tap('#btn-close');
 
   await g.tap('#btn-build');
   check((await g.state()).panel === 'build', '能打开防线工坊（纯金币建设，无废铁文字）');
-  check(await g.page.evaluate(() => !/废铁/.test(document.querySelector('#panel-build').innerText)), '工坊文案不再提及废铁');
+  check(await g.page.evaluate((src) => !/废铁/.test(document.querySelector('#panel-build').innerText) && !new RegExp(src).test(document.querySelector('#panel-build').innerText), forbiddenReSrc), '工坊文案不再提及废铁或现代兵器名');
+  await fits('#panel-build');
+  const buildEmptyOk = await g.page.evaluate(() => {
+    const empties = [...document.querySelectorAll('#panel-build .build-empty')];
+    if (empties.length === 0) return 'no-empty-slots';
+    for (const row of empties) {
+      const rr = row.getBoundingClientRect();
+      const btns = [...row.querySelectorAll('.mini-btns .btn')];
+      if (btns.length !== 4) return 'btn-count-' + btns.length;
+      const rects = btns.map((b) => b.getBoundingClientRect());
+      for (let i = 0; i < rects.length; i++) {
+        const a = rects[i];
+        if (a.width < 32 || a.height < 18) return 'squashed-' + Math.round(a.width) + 'x' + Math.round(a.height);
+        if (a.left < rr.left - 1 || a.right > rr.right + 1 || a.top < rr.top - 1 || a.bottom > rr.bottom + 1) return 'btn-out-of-row';
+        for (let j = i + 1; j < rects.length; j++) {
+          const b = rects[j];
+          if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1) return 'btn-overlap';
+        }
+      }
+    }
+    return 'ok';
+  });
+  check(buildEmptyOk === 'ok', '防线工坊空炮塔槽位 4 按钮宽高充足且不重叠不溢出 (' + buildEmptyOk + ')');
   await g.tap('#btn-build-0-frost');
   await g.tap('#btn-build-2-tesla');
   await g.tap('#btn-wall-up');
   await g.tap('#btn-fort-up');
   await g.shot('08-build'); await fits('#panel-build');
   s = await g.state();
-  check(s.turrets >= 3 && s.wallLv === 2 && s.fortLv === 2, `纯金币能建冰霜/电弧塔并升级壁垒与堡垒 (turrets=${s.turrets}, wall=${s.wallLv}, fort=${s.fortLv})`);
+  check(s.turrets >= 3 && s.wallLv === 2 && s.fortLv === 2, `纯金币能建寒霜/雷鸣炮塔并升级壁垒与堡垒 (turrets=${s.turrets}, wall=${s.wallLv}, fort=${s.fortLv})`);
   await g.tap('#btn-close');
 
   // 8. 出门查看升级后的哥特石堡与炮塔防线，随后迎战第 2 天
@@ -257,6 +282,7 @@ const L = require('./lib.cjs');
   await g.page.evaluate(() => { window.__game.run.player.hp = 0; });
   check(await until((st) => st.panel === 'dead', 3000, '等死亡面板'), '血量归零弹出结算');
   await g.shot('11-dead'); await fits('#panel-dead');
+  check(await g.page.evaluate((src) => !new RegExp(src).test(document.querySelector('#panel-dead').innerText), forbiddenReSrc), '死亡结算文案无现代出戏词');
   await g.tap('#btn-again');
   check((await g.state()).panel === 'class', '再来一局先选职业');
   await g.tap('#panel-class [data-class=gunner]');

@@ -32,7 +32,7 @@ class Game {
   private eventListeners = new Set<EventListener>();
   /** 持续按住的输入（左摇杆 / 攻击键） */
   held = { move: 0, fire: false };
-  /** 实时拖拽手榴弹瞄准向量（画面层据此画抛物线预览） */
+  /** 实时拖拽爆炎弹瞄准向量（画面层据此画抛物线预览） */
   grenadeAim: { dx: number; dy: number } | null = null;
   /** 这一步刚按下的输入，被规则层读走一次就清掉 */
   private pressed = { fire: false, jump: false, dodge: false, reload: false, swap: false, skill: false, grenade: false, interact: false };
@@ -127,7 +127,7 @@ class Game {
     this.immediateStory = false;
     this.started = true;
     this.releaseAll();
-    this.enqueueStory('序幕 · 十五波围城', CINEMATIC_INTRO);
+    this.enqueueStory('序幕 · 暮夜酒馆', CINEMATIC_INTRO);
     this.emit({ t: 'dayStart', day: 1 });
     this.syncBgm();
     this.notify();
@@ -229,7 +229,7 @@ class Game {
 
   private emit(e: GameEvent) {
     if (e.t === 'bossDead' && e.bossIdx === 2) {
-      this.enqueueStory('终章 · 直升机撤离', BOSS_VICTORY[2] ?? []);
+      this.enqueueStory('终章 · 破晓归途', BOSS_VICTORY[2] ?? []);
     } else if (e.t === 'allyJoin') {
       const join = COMPANION_JOIN_STORIES[e.day];
       if (join) this.enqueueStory(`${ALLIES[e.ally].name} 加入据点`, join.lines);

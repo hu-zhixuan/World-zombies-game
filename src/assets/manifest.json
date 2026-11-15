@@ -55,9 +55,9 @@
   "fw": 96
  },
  "fx_boom": {
-  "fh": 48,
-  "frames": 8,
-  "fw": 48
+  "fh": 64,
+  "frames": 7,
+  "fw": 64
  },
  "fx_fireball": {
   "fh": 26,
@@ -284,11 +284,6 @@
   "frames": 1,
   "fw": 16
  },
- "ic_scrap": {
-  "fh": 16,
-  "frames": 1,
-  "fw": 16
- },
  "ic_secondwind": {
   "fh": 16,
   "frames": 1,
@@ -315,9 +310,9 @@
   "fw": 16
  },
  "ic_turret": {
-  "fh": 23,
+  "fh": 38,
   "frames": 1,
-  "fw": 25
+  "fw": 49
  },
  "ic_turret_cannon": {
   "fh": 28,
@@ -325,14 +320,14 @@
   "fw": 34
  },
  "ic_turret_frost": {
-  "fh": 62,
+  "fh": 63,
   "frames": 1,
-  "fw": 44
+  "fw": 40
  },
  "ic_turret_tesla": {
-  "fh": 30,
+  "fh": 48,
   "frames": 1,
-  "fw": 36
+  "fw": 44
  },
  "ic_vanguard": {
   "fh": 16,
@@ -410,9 +405,9 @@
   "fw": 560
  },
  "turret": {
-  "fh": 23,
-  "frames": 6,
-  "fw": 25
+  "fh": 38,
+  "frames": 1,
+  "fw": 49
  },
  "turret_cannon": {
   "fh": 28,
@@ -420,14 +415,14 @@
   "fw": 34
  },
  "turret_frost": {
-  "fh": 62,
-  "frames": 4,
-  "fw": 44
+  "fh": 100,
+  "frames": 7,
+  "fw": 61
  },
  "turret_tesla": {
-  "fh": 30,
-  "frames": 2,
-  "fw": 36
+  "fh": 48,
+  "frames": 1,
+  "fw": 44
  },
  "ui_banner": {
   "fh": 32,
@@ -480,12 +475,12 @@
   "fw": 65
  },
  "wp_assault": {
-  "fh": 7,
+  "fh": 5,
   "frames": 1,
-  "fw": 15
+  "fw": 17
  },
  "wp_pistol": {
-  "fh": 10,
+  "fh": 8,
   "frames": 1,
   "fw": 13
  },
@@ -505,19 +500,19 @@
   "fw": 17
  },
  "wp_shotgun": {
-  "fh": 5,
-  "frames": 1,
-  "fw": 16
- },
- "wp_smg": {
-  "fh": 8,
+  "fh": 7,
   "frames": 1,
   "fw": 15
  },
- "wp_tesla": {
-  "fh": 7,
+ "wp_smg": {
+  "fh": 6,
   "frames": 1,
   "fw": 16
+ },
+ "wp_tesla": {
+  "fh": 11,
+  "frames": 1,
+  "fw": 32
  },
  "z_clothed": {
   "fh": 52,

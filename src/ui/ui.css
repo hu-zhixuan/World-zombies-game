@@ -71,7 +71,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
   transform: translate(calc(var(--x, 0) * 34px), calc(var(--y, 0) * 34px)); pointer-events: none; }
 .pad.active > i { background: radial-gradient(circle at 32% 30%, var(--gold), var(--copper) 82%); border-color: var(--paper); }
 
-/* ── 右下角：元气骑士式弧形战术键区（82px 主攻击键 + 四周圆弧副键，手雷键支持拖拽控曲线） ── */
+/* ── 右下角：元气骑士式弧形战术键区（82px 主攻击键 + 四周圆弧副键，爆炎弹键支持拖拽控曲线） ── */
 .keys-fan { position: absolute; z-index: var(--z-hud); right: max(12px, env(safe-area-inset-right)); bottom: 8px; width: 176px; height: 178px; pointer-events: none; }
 .keys-fan > * { position: absolute; pointer-events: auto; }
 
@@ -104,7 +104,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .fkey-dodge::before { content: ''; position: absolute; inset: 3px; border-radius: 50%;
   background: radial-gradient(circle at 35% 28%, var(--wood), var(--leather) 86%); z-index: 0; }
 
-/* 可拖拽控抛物线的手雷轮盘键（与闪避/技能保持宽裕净空，四向拖拽不误触） */
+/* 可拖拽控抛物线的爆炎弹轮盘键（与闪避/技能保持宽裕净空，四向拖拽不误触） */
 .fkey-nade  { right: 60px; bottom: 118px; width: 52px; height: 52px; }
 .fkey-nade .nade-knob { display: none; position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px; border-radius: 50%;
   background: var(--gold); border: 2px solid var(--paper); box-shadow: 0 0 8px var(--gold); pointer-events: none; z-index: 3;
@@ -126,7 +126,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 /* 冷却蒙层（闪避等扇形副键） */
 .fkey.cooling { border-color: var(--grey); color: var(--grey); opacity: .78; }
 
-/* 上下文交互浮动按钮（进酒馆 / 深夜食堂 / 军火商店 / 防线工坊 / 出门） */
+/* 上下文交互浮动按钮（进酒馆 / 深夜食堂 / 军械行商 / 防线工坊 / 出门） */
 .btn-act { position: absolute; z-index: var(--z-hud); left: 50%; bottom: 64px; transform: translateX(-50%);
   padding: 6px var(--s3); border-radius: 999px; border: 2px solid var(--paper);
   background: linear-gradient(180deg, var(--gold), var(--copper)); color: var(--ink);
@@ -217,21 +217,25 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .item small.wrap { white-space: normal; line-height: 1.3; overflow: visible; }
 .item.kitchen-footer { margin-top: 6px; padding: 5px 8px; }
 #panel-build .item { padding: 3px 6px; gap: 5px; }
+#panel-build .item.build-empty { flex-direction: column; align-items: stretch; gap: 4px; }
+#panel-build .item.build-empty .grow { flex: 0 0 auto; flex-direction: row; align-items: baseline; justify-content: space-between; gap: 6px; }
 #panel-build .icon.x2 { width: 20px; height: 20px; }
 #panel-build .icon.gun { width: 24px; height: 14px; }
 .item .grow { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .item small { font-size: 10.5px; opacity: .92; color: var(--paper); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item .icon.gun { width: 32px; height: 18px; }
 .mini-btns { display: flex; flex-wrap: wrap; gap: 3px; }
+#panel-build .mini-btns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+#panel-build .mini-btns .btn { width: 100%; padding: 3px 2px; font-size: 10.5px; white-space: nowrap; }
 .supply-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); margin-top: 5px; }
 .salvage-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 5px; justify-content: center; }
 
 .purse { display: flex; gap: var(--s1); justify-content: center; align-items: center; }
-.title h1 { margin: 2px 0; font-size: 36px; letter-spacing: 5px; color: var(--gold); text-shadow: 0 3px 0 var(--wood-dark), 0 5px 0 var(--ink); }
+.title h1 { margin: 2px 0; font-size: 30px; letter-spacing: 3px; color: var(--gold); text-shadow: 0 3px 0 var(--wood-dark), 0 5px 0 var(--ink); white-space: nowrap; }
 .note { display: inline-flex; align-items: center; gap: var(--s1); margin: 0; padding: 4px var(--s3); background: var(--wood-dark); border-radius: var(--r2); font-size: var(--f1); font-weight: 700; }
 .note b { color: var(--gold); }
 
-/* ── 角色立绘框（单帧精灵表裁切 + 广/机徽章） ── */
+/* ── 角色立绘框（单帧精灵表裁切 + 号/曙徽章） ── */
 .portrait { width: 36px; height: 40px; flex: none; border: 2px solid var(--copper); border-radius: var(--r1);
   background-color: var(--ink); background-repeat: no-repeat; background-position: 0 0; image-rendering: pixelated;
   display: grid; place-items: center; overflow: hidden; box-shadow: 0 2px 0 var(--ink); }
@@ -245,13 +249,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .portrait[data-avatar='npc_oldman'] { background-image: url('../assets/npc_oldman.png'); background-size: 800% 100%; }
 .portrait[data-avatar='boss_beast'] { background-image: url('../assets/boss_beast.png'); background-size: 600% 100%; }
 .portrait[data-avatar='boss_demon'] { background-image: url('../assets/boss_demon.png'); background-size: 600% 100%; }
-.portrait[data-avatar='radio'] { background: radial-gradient(circle at 35% 30%, var(--electric), var(--plum) 80%); border-color: var(--electric); }
-.portrait[data-avatar='heli'] { background: radial-gradient(circle at 35% 30%, var(--lamp), var(--copper) 80%); border-color: var(--gold); }
+.portrait[data-avatar='watch'], .portrait[data-avatar='radio'] { background: radial-gradient(circle at 35% 30%, var(--electric), var(--plum) 80%); border-color: var(--electric); }
+.portrait[data-avatar='dawn'], .portrait[data-avatar='heli'] { background: radial-gradient(circle at 35% 30%, var(--lamp), var(--copper) 80%); border-color: var(--gold); }
 .portrait b { color: var(--paper); font: 900 var(--f2) var(--font); text-shadow: 0 1px 0 var(--ink); }
 .portrait.lg b { font-size: var(--f4); }
 
 
-/* ── 沉浸剧情对话弹窗 & 废土档案馆 ── */
+/* ── 沉浸剧情对话弹窗 & 酒馆传闻录 ── */
 .story-panel { max-width: min(92vw, 660px); }
 .story-step { font-size: 11px; font-weight: 800; color: var(--gold); padding: 2px 8px; border-radius: var(--r1); background: var(--leather); border: 1.5px solid var(--copper); }
 .story-stage { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 4px 0 8px; text-align: left;
