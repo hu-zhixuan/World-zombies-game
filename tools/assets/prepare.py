@@ -20,7 +20,10 @@ ZIP_PACKS = {  # 缓存子目录 -> OpenGameArt 页面
     'warped-city': 'warped-city',
     'kenneyui': 'ui-pack-pixel-adventure',
     'kyrise': 'kyrises-free-16x16-rpg-icon-pack',
-    'guns': 'tiny-gun-icons-16x16',
+    'ghostbyte': 'ghostbyte-dev-weapons-pack-v10-32x32',
+    'snoops': 'bows-and-guns-cc0',
+    'bat': 'bat-rework',
+    'foodicons': 'pixel-food-icons',
     'bridge': 'gothicvania-bridge-expansion-pack-1',
     'church': 'gothicvania-church-pack',
     'patreons': 'gothicvania-patreons-collection',
@@ -32,7 +35,7 @@ FILE_PACKS = {  # 单图下载 -> OpenGameArt 页面（或 (页面, 文件名片
     'cannon_wire.png': 'cannon-and-barbed-wire',
     'medieval_interior.png': 'medieval-tileset',
     'crystal_sheet.png': ('ancient-crystal-2d-pixel-art', 'spritesheet_32.png'),
-    'blue_staff.png': ('16x16-pixel-art-staff', 'Blue%20Staff.png'),
+    'aqua_staff.png': ('16x16-pixel-art-staff', 'Aqua%20Staff.png'),
 }
 
 UA = {'User-Agent': 'Mozilla/5.0'}
@@ -362,7 +365,7 @@ def main():
 
     # 清理废弃或异画风旧贴图，确保包体干净且画风 100% 统一
     for old in ['z_hat', 'z_bearded', 'z_oldman', 'z_woman', 'z_roamer',
-                'z_roamer_a', 'z_roamer_b', 'z_roamer_c', 'z_crawler', 'z_bruiser', 'z_collapse', 'ic_scrap']:
+                'z_roamer_a', 'z_roamer_b', 'z_roamer_c', 'z_crawler', 'z_bruiser', 'z_collapse', 'z_wraith', 'ic_scrap']:
         p = os.path.join(OUT, old + '.png')
         if os.path.exists(p): os.remove(p)
 
@@ -373,17 +376,35 @@ def main():
     save('hero_arm', hero_arm)
     save('hero_arm_rest', hero_arm_rest)
 
-    # ── 统一画风的僵尸与魔物大军（全部出自 ansimuz 的 Gothicvania 系列，天然朝左迎战）──
+    # ── 统一画风的僵尸与魔物大军（全部出自 ansimuz 的 Gothicvania 系列 + AntumDeluge 蝙蝠，天然朝左迎战）──
     strip('z_swamp', [img('gotthicvania-swamp', 'walk thing', f'thing{i}.png') for i in range(1, 5)])
     strip('z_clothed', [img('cemetery', 'Sprites', 'skeleton-clothed', f'skeleton-clothed-{i}.png') for i in range(1, 9)])
     strip('z_skeleton', [img('cemetery', 'Sprites', 'skeleton', f'skeleton-{i}.png') for i in range(1, 9)])
     strip('z_gato', [img('cemetery', 'Sprites', 'hell-gato', f'hell-gato-{i}.png') for i in range(1, 5)])
     strip('z_hound', slice_grid(img('patreons', 'Hell-Hound-Files', 'PNG', 'hell-hound-run.png'), 5, 67, 0, 56, flip=False))
     strip('z_ghoul', [img('church', 'burning-ghoul', 'sprites', 'v1', f'burning-ghoul-{i}.png') for i in range(1, 9)])
-    strip('z_wraith', [img('cemetery', 'Sprites', 'ghost-halo', f'ghost-halo-{i}.png') for i in range(1, 5)])
+    bat_sheet = img('bat', 'PNG', '48x64', 'bat-NESW.png')
+    strip('z_bat', slice_grid(bat_sheet.crop((0, 192 + 18, 144, 192 + 45)), 3, 48, 0, 26, flip=False))
+    strip('z_ghost', [img('gotthicvania-swamp', 'Sprites', 'Ghost', 'Flying', f'Ghost{i}.png') for i in range(1, 5)])
     strip('boss_beast', slice_grid(img('patreons', 'Hell-Beast-Files', 'PNG', 'with-stroke', 'hell-beast-idle.png'), 6, 55, 0, 58, flip=False))
     strip('boss_demon', slice_grid(img('patreons', 'demon-Files', 'PNG', 'demon-idle.png'), 6, 160, 0, 150, flip=False))
     strip('z_death', [img('cemetery', 'Sprites', 'enemy-death', f'enemy-death-{i}.png') for i in range(1, 6)])
+
+    # ── 4 位并肩作战战友（全部重建为 Gothicvania 独立战斗角色：待机 + 攻击双动画，同款脊柱重心对齐绝不抖脚）──
+    def place_bottom(src, dx, top_y, out_w, out_h):
+        cv = Image.new('RGBA', (out_w, out_h), (0, 0, 0, 0))
+        sub = src.crop((0, top_y, src.width, src.height))
+        cv.alpha_composite(sub, (dx, out_h - sub.height))
+        return cv
+
+    strip('ally_zhang', [img('cemetery', 'Sprites', 'hero', 'hero-idle', f'hero-idle-{i}.png').transpose(Image.FLIP_LEFT_RIGHT).crop((22, 12, 90, 59)) for i in range(1, 5)])
+    strip('ally_zhang_atk', [place_bottom(img('cemetery', 'Sprites', 'hero', 'hero-attack', f'hero-attack-{i}.png'), 13, 12, 112, 47) for i in range(1, 6)])
+    strip('ally_lin', [img('church', 'wizard', 'idle-sprites', f'wizard-idle-{i}.png').crop((11, 16, 67, 66)) for i in range(1, 6)])
+    strip('ally_lin_atk', [img('church', 'wizard', 'fire-sprites', f'fire{i}.png').crop((11, 16, 67, 66)) for i in range(1, 7)])
+    save('ally_qiang', img('patreons', 'Gothic-hero-Files', 'PNG', 'gothic-hero-idle.png'), frames=4)
+    save('ally_qiang_atk', img('patreons', 'Gothic-hero-Files', 'PNG', 'gothic-hero-attack.png'), frames=6)
+    strip('ally_zhao', [img('church', 'player', 'sprites', f'idle{i}.png').crop((19, 12, 63, 60)) for i in range(1, 5)])
+    strip('ally_zhao_atk', [img('church', 'player', 'sprites', f'punch{i}.png').crop((0, 12, 82, 60)) for i in range(1, 7)])
 
     # ── 深夜小食堂的幸存者食客 NPC（Gothicvania Town, ansimuz）──
     for key, d, n in [('npc_hat', 'hat-man-idle', 4), ('npc_woman', 'woman-idle', 7),
@@ -470,7 +491,7 @@ def main():
                          ('ui_round', 1, 3, 1), ('ui_round_lit', 0, 3, 1), ('ui_banner', 4, 3, 3)]:
         save(key, cell(c, r, w))
 
-    # ── 图标：Kyrise V1.2 16x16 + 食堂菜品/主厨盘 ──
+    # ── 图标：Kyrise V1.2 16x16 + Pixel Food Icons + Medieval Tileset 清晰菜肴 ──
     ic = img('kyrise', 'spritesheet', 'spritesheet_16x16.png')
     for key, c, r in [('ic_coin', 8, 6), ('ic_hp', 1, 13), ('ic_wall', 6, 15), ('ic_zombie', 8, 9),
                       ('ic_crate', 14, 8), ('ic_pierce', 8, 0), ('ic_ricochet', 13, 11), ('ic_overkill', 1, 8),
@@ -491,27 +512,37 @@ def main():
 
     save('ic_meat', mi.crop((224, 224, 240, 240)))
     save('ic_chef', mi.crop((224, 208, 240, 224)))
-    save('ic_kitchen', mi.crop((192, 208, 208, 224)))
-    save('ic_dish_skewer', center16(mi.crop((240, 224, 256, 240))))   # 炭烤香辣肉串
-    save('ic_dish_stew', center16(mi.crop((208, 224, 224, 240))))     # 暖胃肉汤
-    save('ic_dish_steak', center16(mi.crop((192, 208, 208, 224))))    # 铁板滋滋厚排
-    save('ic_dish_grill', center16(mi.crop((225, 136, 239, 144))))    # 碳火三拼盛宴
-    save('ic_dish_hotpot', center16(mi.crop((225, 151, 239, 161))))   # 深渊秘辣锅
-    save('ic_dish_feast', center16(mi.crop((192, 224, 208, 240))))    # 长夜全宴
+    save('ic_kitchen', mi.crop((176, 224, 192, 240)))
+    save('ic_dish_skewer', center16(img('foodicons', '1x', 'roasted-chicken-drumstick.png'))) # 炭烤香辣肉串
+    save('ic_dish_stew', center16(img('foodicons', '1x', 'morning-tea-cup.png')))             # 守夜暖胃肉汤
+    save('ic_dish_steak', center16(mi.crop((192, 208, 208, 224))))                          # 铁板滋滋厚排
+    save('ic_dish_grill', center16(img('foodicons', '1x', 'raw-chicken-breast.png')))        # 碳火三拼盛宴
+    save('ic_dish_hotpot', center16(img('foodicons', '1x', 'cold-mug-of-beer.png')))         # 深渊秘辣锅
+    save('ic_dish_feast', center16(mi.crop((192, 224, 208, 240))))                          # 长夜全宴
     save('ic_shop', mi.crop((176, 288, 192, 304)))
     save('ic_anvil', mi.crop((192, 240, 208, 256)))
 
-    # ── 8 把高对比哥特枪械与法杖（Sogomn Tiny Gun Icons CC0 + 16x16 Pixel Art Staff CC-BY 3.0）──
-    for k, fname in [('wp_pistol', 'piecemarker.png'), ('wp_revolver', 'jb007.png'), ('wp_smg', 'pow9.png'),
-                     ('wp_shotgun', 'poshlinov.png'), ('wp_assault', 'hitpro.png'), ('wp_rifle', 'snp6plus.png'),
-                     ('wp_rocket', 'mg5000.png')]:
-        save(k, img('guns', fname))
-    staff_rot = img('extras', 'blue_staff.png').rotate(-90, expand=True)
-    staff_crop = staff_rot.crop(staff_rot.getbbox())
-    save('wp_tesla', staff_crop)
+    # ── 8 把外观与属性高度契合的开源火铳与法杖（Ghostbyte_dev CC-BY 3.0 + SnoopethDuckDuck CC0 + deving100 CC-BY 3.0）──
+    def tight(im):
+        b = im.getbbox()
+        return im.crop(b) if b else im
+
+    rifle_im = tight(img('snoops', 'Extra + Unfinished', 'Extra 3.png').crop((72, 96, 99, 113)))
+    staff_im = tight(img('extras', 'aqua_staff.png').rotate(-90, expand=True))
+    weapons_map = {
+        'wp_pistol': tight(img('ghostbyte', 'weapon_05.png')),
+        'wp_revolver': tight(img('ghostbyte', 'weapon_07.png')),
+        'wp_smg': tight(img('snoops', '1px', '43.png')),
+        'wp_shotgun': tight(img('snoops', '1px', '60.png')),
+        'wp_assault': tight(img('snoops', '1px', '30.png')),
+        'wp_rifle': rifle_im,
+        'wp_tesla': staff_im,
+        'wp_rocket': tight(img('snoops', '1px', '51.png')),
+    }
+    for k, wim in weapons_map.items():
+        save(k, wim)
 
     # ── 安卓发射器图标（严格使用上述开源人画哥特像素素材拼成，零手绘代码像素）──
-    rifle_im = img('guns', 'snp6plus.png')
     flash_im = img('magic9', 'sprites', 'FireBomb', 'Fire-bomb10.png')
     build_android_icons(bg_sky, bg_town, ground_wall, house_full, roof_deck, bodies['idle'][0], hero_arm, rifle_im, flash_im, lamp)
 

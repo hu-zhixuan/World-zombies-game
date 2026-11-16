@@ -64,6 +64,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .pad.active { opacity: 1; border-color: var(--gold); box-shadow: inset 0 2px 8px color-mix(in srgb, var(--ink) 72%, transparent), 0 0 14px color-mix(in srgb, var(--gold) 45%, transparent), 0 4px 10px color-mix(in srgb, var(--ink) 75%, transparent); }
 .pad[data-dir='left'] { border-left-color: var(--lamp); }
 .pad[data-dir='right'] { border-right-color: var(--lamp); }
+.pad[data-down='1'] { border-bottom-color: var(--gold); }
 .pad::before { content: '‹   ›'; font-size: var(--f3); font-weight: 900; letter-spacing: 30px; color: color-mix(in srgb, var(--paper) 34%, transparent); pointer-events: none; }
 .pad > i { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px; border-radius: 50%;
   background: radial-gradient(circle at 32% 30%, var(--copper), var(--wood-dark) 82%);
@@ -71,7 +72,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
   transform: translate(calc(var(--x, 0) * 34px), calc(var(--y, 0) * 34px)); pointer-events: none; }
 .pad.active > i { background: radial-gradient(circle at 32% 30%, var(--gold), var(--copper) 82%); border-color: var(--paper); }
 
-/* ── 右下角：元气骑士式弧形战术键区（82px 主攻击键 + 四周圆弧副键，爆炎弹键支持拖拽控曲线） ── */
+/* ── 右下角：元气骑士式弧形战术键区（82px 主攻击键 + 下方闪避 + 上方跳跃 + 拖拽抛物线爆炎弹 + 技能） ── */
 .keys-fan { position: absolute; z-index: var(--z-hud); right: max(12px, env(safe-area-inset-right)); bottom: 8px; width: 176px; height: 178px; pointer-events: none; }
 .keys-fan > * { position: absolute; pointer-events: auto; }
 
@@ -98,13 +99,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .fkey-fire.lit { background: radial-gradient(circle at 34% 26%, var(--gold), var(--copper) 84%); color: var(--ink); text-shadow: none;
   box-shadow: 0 0 22px color-mix(in srgb, var(--gold) 85%, transparent), 0 2px 0 var(--ink); }
 
-.fkey-jump  { right: 102px; bottom: 6px; width: 52px; height: 52px; }
-.fkey-dodge { right: 108px; bottom: 66px; width: 50px; height: 50px;
+.fkey-dodge { right: 102px; bottom: 6px; width: 52px; height: 52px;
   background: conic-gradient(var(--copper) calc(var(--p, 1) * 360deg), color-mix(in srgb, var(--ink) 82%, transparent) 0); }
 .fkey-dodge::before { content: ''; position: absolute; inset: 3px; border-radius: 50%;
   background: radial-gradient(circle at 35% 28%, var(--wood), var(--leather) 86%); z-index: 0; }
+.fkey-jump  { right: 108px; bottom: 66px; width: 50px; height: 50px; }
 
-/* 可拖拽控抛物线的爆炎弹轮盘键（与闪避/技能保持宽裕净空，四向拖拽不误触） */
+/* 可拖拽控抛物线的爆炎弹轮盘键（与跳跃/技能保持宽裕净空，四向拖拽不误触） */
 .fkey-nade  { right: 60px; bottom: 118px; width: 52px; height: 52px; }
 .fkey-nade .nade-knob { display: none; position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px; border-radius: 50%;
   background: var(--gold); border: 2px solid var(--paper); box-shadow: 0 0 8px var(--gold); pointer-events: none; z-index: 3;
@@ -126,16 +127,18 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 /* 冷却蒙层（闪避等扇形副键） */
 .fkey.cooling { border-color: var(--grey); color: var(--grey); opacity: .78; }
 
-/* 上下文交互浮动按钮（进酒馆 / 深夜食堂 / 军械行商 / 防线工坊 / 出门） */
-.btn-act { position: absolute; z-index: var(--z-hud); left: 50%; bottom: 64px; transform: translateX(-50%);
-  padding: 6px var(--s3); border-radius: 999px; border: 2px solid var(--paper);
-  background: linear-gradient(180deg, var(--gold), var(--copper)); color: var(--ink);
-  font: 900 var(--f2) var(--font); box-shadow: 0 3px 0 var(--ink), 0 0 14px color-mix(in srgb, var(--gold) 70%, transparent);
-  animation: actBob 1.4s ease-in-out infinite; cursor: pointer; }
-@keyframes actBob { 0%, 100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-3px); } }
-.btn-act:active { transform: translateX(-50%) translateY(2px); animation: none; }
+/* 营地夜晚：右下智能交互弧形按键 + 浮标提示 + 底部极简双键 */
+.camp-fan { width: 220px; }
+.fkey-act .icon { width: 26px; height: 26px; }
+.fkey-act span { font-size: 11px; max-width: 72px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fkey-dodge.fkey-camp-jump { background: radial-gradient(circle at 35% 30%, var(--wood), var(--leather) 82%); }
+.fkey-dodge.fkey-camp-jump::before { display: none; }
+.camp-act-tip { right: 0; bottom: 94px; max-width: 240px; padding: 4px 10px; border-radius: var(--r2); border: 1.5px solid var(--wood);
+  background: color-mix(in srgb, var(--ink) 88%, var(--leather)); color: var(--haze); font: 700 11px/1.3 var(--font);
+  text-align: right; box-shadow: 0 2px 0 var(--ink); pointer-events: none; }
+.camp-act-tip.on { border-color: var(--gold); color: var(--paper); box-shadow: 0 2px 0 var(--ink), 0 0 10px color-mix(in srgb, var(--gold) 35%, transparent); }
 
-/* ── 底部中区：武器切换 + 换弹 / 营地快捷功能条 ── */
+/* ── 底部中区：武器切换 + 换弹 / 营地极简功能条 ── */
 .weapon-wrap { position: absolute; z-index: var(--z-hud); left: 48%; bottom: 10px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; }
 .weapon { display: flex; align-items: center; gap: var(--s2);
   padding: 5px var(--s2); background: linear-gradient(180deg, var(--leather), var(--ink)); border: 2px solid var(--copper);
@@ -154,16 +157,32 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .btn-reload:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
 
 .icon.dish { width: 20px; height: 20px; }
-.camp-dock { position: absolute; z-index: var(--z-hud); right: max(14px, env(safe-area-inset-right)); bottom: 12px;
-  display: flex; align-items: center; gap: 6px; padding: 5px 8px;
-  background: color-mix(in srgb, var(--ink) 88%, transparent); border: 2px solid var(--wood); border-radius: var(--r2); box-shadow: 0 3px 0 var(--ink); }
-.camp-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: var(--r1); border: 2px solid var(--wood);
-  background: linear-gradient(180deg, var(--leather), var(--wood-dark)); color: var(--paper); font: 800 var(--f1) var(--font);
+.camp-bar { position: absolute; z-index: var(--z-hud); left: 47%; bottom: 10px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px; padding: 4px 6px;
+  background: color-mix(in srgb, var(--ink) 86%, transparent); border: 2px solid var(--wood); border-radius: var(--r2); box-shadow: 0 3px 0 var(--ink); }
+.camp-btn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: var(--r1); border: 2px solid var(--wood);
+  background: linear-gradient(180deg, var(--leather), var(--wood-dark)); color: var(--paper); font: 800 var(--f1) var(--font); white-space: nowrap;
   box-shadow: 0 2px 0 var(--ink), inset 0 1px 0 color-mix(in srgb, var(--paper) 22%, transparent); cursor: pointer; transition: transform .08s, border-color .15s, box-shadow .15s; }
 .camp-btn.near { border-color: var(--gold); box-shadow: 0 0 10px color-mix(in srgb, var(--gold) 65%, transparent), 0 2px 0 var(--ink); }
 .camp-btn.primary { background: linear-gradient(180deg, var(--gold), var(--copper)); border-color: var(--paper); color: var(--ink); }
-.camp-btn.sub { background: var(--plum); border-color: var(--haze); }
 .camp-btn:active { transform: translateY(2px); box-shadow: none; }
+
+/* 室内红砖灶台实时铁板 QTE 悬浮条 */
+.qte-hud { position: absolute; z-index: var(--z-hud); top: 38px; left: 50%; transform: translateX(-50%);
+  width: min(88vw, 370px); padding: 6px 10px; border-radius: var(--r2); border: 2px solid var(--gold);
+  background: color-mix(in srgb, var(--ink) 92%, var(--leather));
+  box-shadow: 0 4px 0 var(--ink), 0 0 16px color-mix(in srgb, var(--gold) 40%, transparent);
+  display: flex; flex-direction: column; gap: 5px; }
+.qte-hud-top { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.qte-hud-top b { color: var(--gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qte-hud-top span { color: var(--paper); opacity: .9; white-space: nowrap; }
+.qte-live-badge { font-style: normal; font-weight: 900; font-size: 10px; padding: 1px 5px; border-radius: var(--r1); background: var(--plum); color: var(--paper); margin-left: auto; flex: none; }
+.qte-live-badge[data-q='legendary'] { background: var(--gold); color: var(--ink); }
+.qte-live-badge[data-q='perfect'] { background: var(--lamp); color: var(--ink); }
+.qte-live-badge[data-q='good'] { background: var(--ember); color: var(--ink); }
+.qte-close { padding: 2px 6px; border-radius: var(--r1); border: 1px solid var(--wood); background: var(--wood-dark); color: var(--paper); font: 700 10px var(--font); cursor: pointer; flex: none; }
+.qte-hud-row { display: flex; align-items: center; gap: 8px; }
+.qte-track.compact { flex: 1; height: 22px; margin-bottom: 0; }
 
 /* ── 面板弹窗（整数 2x 像素 9-slice 边框 + 弹性入场动效） ── */
 .veil { position: absolute; inset: 0; z-index: var(--z-panel); display: grid; place-items: center;
@@ -216,17 +235,44 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .item small.quote { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--haze); }
 .item small.wrap { white-space: normal; line-height: 1.3; overflow: visible; }
 .item.kitchen-footer { margin-top: 6px; padding: 5px 8px; }
-#panel-build .item { padding: 3px 6px; gap: 5px; }
-#panel-build .item.build-empty { flex-direction: column; align-items: stretch; gap: 4px; }
-#panel-build .item.build-empty .grow { flex: 0 0 auto; flex-direction: row; align-items: baseline; justify-content: space-between; gap: 6px; }
-#panel-build .icon.x2 { width: 20px; height: 20px; }
-#panel-build .icon.gun { width: 24px; height: 14px; }
+/* ── 防线工坊：战区沙盘俯瞰布局（屋顶 2 槽 + 堡垒，庭院 2 槽 + 壁垒，底部兵器升星条） ── */
+.fort-blueprint { display: flex; flex-direction: column; gap: 4px; text-align: left; }
+.blueprint-legend { display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; font-weight: 800; color: var(--gold); padding: 0 2px; }
+.blueprint-legend em { font-style: normal; color: var(--lamp); font-size: 10px; }
+.fort-tier { display: grid; gap: 5px; align-items: stretch; }
+.fort-tier.tier-roof { grid-template-columns: 1fr 1.12fr 1fr; }
+.fort-tier.tier-ground { grid-template-columns: 1fr 1fr 1.12fr; }
+#panel-build .item { padding: 4px 6px; gap: 5px; }
+.item.fort-slot { flex-direction: column; align-items: stretch; justify-content: space-between; gap: 4px; padding: 5px 6px; min-height: 76px; }
+.item.fort-slot.core-card { border-color: var(--copper); background: color-mix(in srgb, var(--wood-dark) 44%, var(--leather)); }
+.item.fort-slot.wall-card { border-color: var(--green); }
+.item.fort-slot.core-card .bar { width: 100%; height: 6px; }
+.slot-head { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.slot-head b { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot-head small { font-size: 10px; color: var(--haze); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot-acts { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 3px; }
+.slot-acts.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.slot-acts .btn { width: 100%; padding: 3px 2px; font-size: 10px; white-space: nowrap; }
+.btn.mode-btn.mode-near { background: var(--plum); color: var(--paper); border-color: var(--copper); }
+.btn.mode-btn.mode-boss { background: var(--rose); color: var(--paper); border-color: var(--gold); }
+.btn.mode-btn.mode-air { background: var(--frost); color: var(--ink); border-color: var(--paper); }
+#panel-build .item.build-empty { flex-direction: column; align-items: stretch; justify-content: space-between; gap: 4px; }
+#panel-build .item.build-empty .slot-head { justify-content: space-between; }
+#panel-build .icon.x2 { width: 22px; height: 22px; }
+#panel-build .icon.gun { width: 26px; height: 15px; }
 .item .grow { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .item small { font-size: 10.5px; opacity: .92; color: var(--paper); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item .icon.gun { width: 32px; height: 18px; }
 .mini-btns { display: flex; flex-wrap: wrap; gap: 3px; }
-#panel-build .mini-btns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
-#panel-build .mini-btns .btn { width: 100%; padding: 3px 2px; font-size: 10.5px; white-space: nowrap; }
+#panel-build .mini-btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; }
+#panel-build .mini-btns .btn { width: 100%; padding: 3px 2px; font-size: 10px; white-space: nowrap; }
+.star-strip { display: flex; align-items: center; gap: 6px; margin-top: 5px; padding-top: 4px; border-top: 1px solid var(--wood-dark); text-align: left; }
+.star-strip-lbl { font-size: 10.5px; font-weight: 800; color: var(--gold); white-space: nowrap; }
+.star-strip-cards { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 5px; min-width: 0; }
+.item.star-mini { padding: 3px 6px; gap: 5px; }
+.item.star-mini .grow { gap: 1px; }
+.item.star-mini b { font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item.star-mini .btn { flex: none; padding: 3px 6px; font-size: 10px; }
 .supply-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s2); margin-top: 5px; }
 .salvage-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 5px; justify-content: center; }
 
@@ -243,6 +289,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .portrait.sm { width: 32px; height: 36px; }
 .portrait.lg { width: 68px; height: 74px; border-width: 3px; border-color: var(--gold); }
 .portrait[data-avatar='hero_idle'] { background-image: url('../assets/hero_idle.png'); background-size: 600% 100%; }
+.portrait[data-avatar='ally_zhang'] { background-image: url('../assets/ally_zhang.png'); background-size: 400% 100%; }
+.portrait[data-avatar='ally_lin'] { background-image: url('../assets/ally_lin.png'); background-size: 500% 100%; }
+.portrait[data-avatar='ally_qiang'] { background-image: url('../assets/ally_qiang.png'); background-size: 400% 100%; }
+.portrait[data-avatar='ally_zhao'] { background-image: url('../assets/ally_zhao.png'); background-size: 400% 100%; }
 .portrait[data-avatar='npc_hat'] { background-image: url('../assets/npc_hat.png'); background-size: 400% 100%; }
 .portrait[data-avatar='npc_bearded'] { background-image: url('../assets/npc_bearded.png'); background-size: 500% 100%; }
 .portrait[data-avatar='npc_woman'] { background-image: url('../assets/npc_woman.png'); background-size: 700% 100%; }

@@ -35,25 +35,35 @@ export const TURRET_SLOTS = [
   { id: 3, x: 364, y: 0,      roof: false, name: '前线堡垒' },
 ] as const;
 
-/** 酒馆室内动线（对应 560x220 哥特木石酒馆剖面图 * 1.12 缩放后的世界坐标，地面均在 GROUND_Y） */
+/** 酒馆室内动线（对应 560x220 哥特木石酒馆剖面图 * 1.12 缩放后的世界坐标，各工位/餐桌/战友彼此错开 >= 40px） */
 export const IN_MIN_X = 76;
 export const IN_MAX_X = 626;
 export const IN_STATIONS = {
-  kitchen: 148,
-  shop: 354,
-  workshop: 520,
-  door: 598,
+  kitchen: 136,
+  shop: 316,
+  workshop: 518,
+  door: 602,
 } as const;
 export type StationId = keyof typeof IN_STATIONS;
 
-/** 酒馆餐桌食客座位世界 X 坐标（对齐两张原木餐桌两侧座椅，三人完全错开） */
-export const DINER_SEAT_X = [272, 358, 468] as const;
+/** 酒馆餐桌食客座位世界 X 坐标（对齐两张原木餐桌两侧座椅，与战友/工位全错开） */
+export const DINER_SEAT_X = [268, 364, 466] as const;
+
+/** 四位战友室外守城位置与室内营地站位（全部彼此保持 >= 40px 间距） */
+export const ALLY_POS: Record<AllyId, { extX: number; extY: number; intX: number; intFlip: boolean }> = {
+  zhang: { extX: 132, extY: ROOF_Y,  intX: 226, intFlip: false },
+  lin:   { extX: 266, extY: PORCH_Y, intX: 186, intFlip: false },
+  qiang: { extX: 342, extY: 0,       intX: 558, intFlip: true },
+  zhao:  { extX: 58,  extY: ROOF_Y,  intX: 412, intFlip: true },
+};
 
 export type Phase = 'fight' | 'clear' | 'perk' | 'camp' | 'dead' | 'won';
+export type TurretTargetMode = 'near' | 'boss' | 'air';
 
 export interface OwnedWeapon { id: WeaponId; star: number; ammo: number }
 export interface Player {
   x: number; y: number; vx: number; vy: number; facing: 1 | -1;
+  dropIgnoreT: number;
   hp: number; maxHp: number; armor: number; maxArmor: number; hurtT: number; healCarry: number;
   dodgeT: number; dodgeCd: number; dodgeDir: 1 | -1;
   fireCd: number; reloadT: number; shootT: number;
@@ -62,14 +72,14 @@ export interface Player {
   weapons: OwnedWeapon[]; cur: number;
 }
 export interface Zombie {
-  id: number; kind: ZombieKind; x: number; hp: number; maxHp: number;
+  id: number; kind: ZombieKind; x: number; y: number; hp: number; maxHp: number;
   atkCd: number; kb: number; burnT: number; slowT: number; stunT: number; freezeT: number; carriesCrate: boolean;
 }
 export interface Bullet {
   x: number; y: number; vx: number; vy: number; dmg: number; life: number;
-  from: 'player' | 'turret' | 'fort'; pierce: boolean; crit: boolean; bounces: number; hit: number[];
+  from: 'player' | 'turret' | 'fort' | 'ally'; allyId?: AllyId; pierce: boolean; crit: boolean; bounces: number; hit: number[];
   aoe?: number; slow?: number; kind?: 'normal' | 'rocket' | 'frost' | 'cannon' | 'firebolt';
-  weaponId?: WeaponId; startX?: number; pierceLeft?: number; ricochetLeft?: number;
+  weaponId?: WeaponId; startX?: number; startY?: number; pierceLeft?: number; ricochetLeft?: number;
   closeBoost?: boolean; shatter?: boolean; homing?: boolean; stun?: number; burn?: number;
 }
 export interface GroundFire { x: number; r: number; t: number; maxT: number; dmg: number }
@@ -80,7 +90,8 @@ export interface EnemyProj {
   x: number; y: number; vx: number; vy: number; dmg: number; life: number;
 }
 export interface Crate { id: number; x: number; weapon: WeaponId }
-export interface TurretSlotState { type: TurretType | null; level: number; cd: number; aim: number }
+export interface TurretSlotState { type: TurretType | null; level: number; cd: number; aim: number; mode: TurretTargetMode }
+export interface AllyRuntime { cd: number; atkT: number; facing: 1 | -1 }
 
 export interface DinerGuest {
   id: string;
@@ -128,6 +139,21 @@ export interface StoryProgress {
   seenEvents: string[];
 }
 
+export interface DinerCookState {
+  guestId: string;
+  dish: MealId;
+  dishName: string;
+  startedTick: number;
+  pos: number;
+}
+
+export interface CarriedDishState {
+  guestId: string;
+  dish: MealId;
+  dishName: string;
+  quality: DishQuality;
+}
+
 /** 一局的全部状态。能直接 JSON 序列化：存档就是存它。 */
 export interface RunState {
   seed: number; rng: number; tick: number; nextId: number;
@@ -136,6 +162,7 @@ export interface RunState {
   autoFire: boolean;
   player: Player; zombies: Zombie[]; bullets: Bullet[]; fires: GroundFire[]; grenades: GrenadeProj[]; enemyProjs: EnemyProj[]; crates: Crate[];
   turrets: TurretSlotState[];
+  allies: Record<AllyId, AllyRuntime>;
   wall: { level: number; hp: number; maxHp: number };
   home: { hp: number; maxHp: number };
   fort: { level: number; cd: number; aim: number };
@@ -144,6 +171,8 @@ export interface RunState {
   meal: MealId | null;
   mealQuality: DishQuality;
   guests: DinerGuest[];
+  dinerCook: DinerCookState | null;
+  carryingDish: CarriedDishState | null;
   diner: DinerState;
   story: StoryProgress;
   buff: { dmgMul: number; haste: number };
@@ -161,11 +190,11 @@ export interface RunState {
 
 /** 这一步玩家按了什么。jump/dodge/reload/swap/skill/grenade/interact 是「这一步刚按下」。 */
 export interface Input {
-  move: number; fire: boolean; jump: boolean; dodge: boolean; reload: boolean; swap: boolean; skill: boolean; grenade: boolean; interact: boolean;
+  move: number; down: boolean; fire: boolean; jump: boolean; dodge: boolean; reload: boolean; swap: boolean; skill: boolean; grenade: boolean; interact: boolean;
   grenadeAim?: { dx: number; dy: number } | null;
 }
 export const NO_INPUT: Input = {
-  move: 0, fire: false, jump: false, dodge: false, reload: false, swap: false, skill: false, grenade: false, interact: false, grenadeAim: null,
+  move: 0, down: false, fire: false, jump: false, dodge: false, reload: false, swap: false, skill: false, grenade: false, interact: false, grenadeAim: null,
 };
 
 /** 面板和按钮发给规则层的指令。 */
@@ -174,6 +203,7 @@ export type Command =
   | { t: 'buyStar'; weapon: WeaponId }
   | { t: 'buildTurret'; slot: number; kind: TurretType }
   | { t: 'upgradeTurret'; slot: number }
+  | { t: 'cycleTurretMode'; slot: number }
   | { t: 'sellTurret'; slot: number }
   | { t: 'upgradeWall' }
   | { t: 'repairWall' }
@@ -184,6 +214,10 @@ export type Command =
   | { t: 'rerollShop' }
   | { t: 'salvageWeapon'; index: number }
   | { t: 'serveGuest'; guestId: string; quality?: DishQuality }
+  | { t: 'startCook'; guestId: string }
+  | { t: 'finishCook'; quick?: boolean }
+  | { t: 'cancelCook' }
+  | { t: 'serveCarried' }
   | { t: 'cookSell'; count: number }
   | { t: 'pickMeal'; id: MealId; quality?: DishQuality }
   | { t: 'focusTarget'; x: number }
@@ -193,14 +227,14 @@ export type Command =
 
 /** 这一步发生了什么，给画面层播特效和音效用。 */
 export type GameEvent =
-  | { t: 'shot'; x: number; y: number; from: 'player' | 'turret' | 'fort'; weapon?: WeaponId; turret?: TurretType; ang?: number; hot?: boolean }
+  | { t: 'shot'; x: number; y: number; from: 'player' | 'turret' | 'fort' | 'ally'; weapon?: WeaponId; turret?: TurretType; ally?: AllyId; ang?: number; hot?: boolean }
   | { t: 'railbeam'; x1: number; y1: number; x2: number; y2: number; crit?: boolean }
   | { t: 'hit'; id: number; x: number; y: number; dmg: number; burn?: boolean; crit?: boolean; slow?: boolean; freeze?: boolean; stun?: boolean; overload?: boolean; dir?: 1 | -1; weapon?: WeaponId; heavy?: boolean }
   | { t: 'lightning'; pts: { x: number; y: number }[]; color?: 'tesla' | 'shock' }
   | { t: 'frost'; x: number; y: number; r: number }
   | { t: 'grenadeThrow' }
   | { t: 'skill'; cls: ClassId }
-  | { t: 'kill'; id: number; x: number; kind: ZombieKind; coins: number; meat: number; dir?: 1 | -1; crit?: boolean; boss?: boolean }
+  | { t: 'kill'; id: number; x: number; y?: number; kind: ZombieKind; coins: number; meat: number; dir?: 1 | -1; crit?: boolean; boss?: boolean }
   | { t: 'boom'; x: number; y: number; r: number }
   | { t: 'hurt'; dmg: number; blocked?: number; cover?: number }
   | { t: 'wallHit'; reflect?: boolean }
@@ -211,6 +245,7 @@ export type GameEvent =
   | { t: 'star'; weapon: WeaponId; star: number }
   | { t: 'build'; kind: 'turret' | 'wall' | 'fort' }
   | { t: 'shop'; item: string }
+  | { t: 'cookDone'; guestId: string; dish: MealId; dishName: string; quality: DishQuality }
   | { t: 'serve'; guestId: string; vipId: string; name: string; dishName: string; quality: DishQuality; coins: number; fans: number; rep: number; quote: string; allServed?: boolean; firstMeet?: boolean; trendMatch?: boolean; rankUp?: string }
   | { t: 'cook'; meat: number; coins: number }
   | { t: 'meal'; id: MealId; quality: DishQuality }

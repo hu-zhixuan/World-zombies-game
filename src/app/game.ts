@@ -2,9 +2,9 @@
 import { ZOMBIES, unlockedWeapons, type ClassId } from '../content/data';
 import {
   ALLIES, BOSS_VICTORY, CINEMATIC_INTRO, COMPANION_JOIN_STORIES,
-  REST_STORY, type StoryLine,
+  REST_STORY, SPEAKERS, type AllyId, type StoryLine,
 } from '../content/story';
-import { command, nearbyExterior, nearbyStation, newRun, step } from '../sim/sim';
+import { command, houseBuff, nearbyCampTarget, nearbyExterior, nearbyStation, newRun, step } from '../sim/sim';
 import { NO_INPUT, type Command, type GameEvent, type Input, type RunState } from '../sim/types';
 import { audio } from './audio';
 import { loadMeta, saveMeta, starsEarned, type MetaState } from './meta';
@@ -30,8 +30,8 @@ class Game {
   private immediateStory = false;
   private listeners = new Set<Listener>();
   private eventListeners = new Set<EventListener>();
-  /** 持续按住的输入（左摇杆 / 攻击键） */
-  held = { move: 0, fire: false };
+  /** 持续按住的输入（左摇杆 / 下穿跳台 / 攻击键） */
+  held = { move: 0, down: false, fire: false };
   /** 实时拖拽爆炎弹瞄准向量（画面层据此画抛物线预览） */
   grenadeAim: { dx: number; dy: number } | null = null;
   /** 这一步刚按下的输入，被规则层读走一次就清掉 */
@@ -148,9 +148,59 @@ class Game {
     this.pressed[k] = true;
   }
 
-  /** 根据主角当前位置自动打开附近交互（室内进厨房/商店/工坊/出门，室外进门/爬梯）。 */
+  /** 根据主角当前位置自动执行或打开附近交互（灶台铁板出锅/端盘上菜/NPC搭话/商店/工坊/进出木门）。 */
   handleInteract(): boolean {
     const r = this.run;
+    const ct = nearbyCampTarget(r);
+    if (ct) {
+      switch (ct.kind) {
+        case 'cookFinish':
+          return this.send({ t: 'finishCook' });
+        case 'cookStart':
+          audio.cookSizzle();
+          return this.send({ t: 'startCook', guestId: ct.guest.id });
+        case 'serveCarried':
+          return this.send({ t: 'serveCarried' });
+        case 'guestTalk': {
+          const g = ct.guest;
+          const sp = SPEAKERS.ming;
+          const quote = g.served
+            ? (g.reactionQuote ?? g.thanksQuote)
+            : `「${g.orderQuote}」——点单：${g.dishName}（${g.meatCost}肉→${g.pay}金${g.trendMatch ? ' · 今夜热门' : ''}）`;
+          const reply = g.served
+            ? '慢用！屋里炉火常亮，明晚还来喝口热汤。'
+            : r.meat >= g.meatCost
+              ? '好嘞，这就到左墙红砖灶台起火开炒，出锅就给您端过来！'
+              : '记下了！明日出门多狩些鲜肉回来再给您现做。';
+          this.enqueueStory(`${g.name} · ${g.role}`, [
+            { npc: g.vipId, name: g.name, initial: g.name[0] ?? '客', role: g.role, avatar: g.sprite, text: quote },
+            { npc: 'ming', name: sp.name, initial: sp.initial, role: sp.desc, avatar: sp.avatar, text: reply },
+          ], true);
+          return true;
+        }
+        case 'allyTalk': {
+          const a = ALLIES[ct.ally];
+          const join = COMPANION_JOIN_STORIES[a.joinDay];
+          const campBanter: Record<AllyId, string> = {
+            zhang: r.inside ? '屋外寒雾越压越低，迎战时我就守在屋顶替你架稳银弩！' : '屋顶风向摸熟了，只要魔物进射程，我这把银弩绝不落空。',
+            lin:   r.inside ? '灶火旁正好温着药罐，战中我也会在门廊扔出炼金冰焰替大家续伤。' : '门廊的秘药瓶都码齐了，我会边控场边替你缓慢回血！',
+            qiang: r.inside ? '右侧铁砧刚淬过火，造塔加固跟我打声招呼就行，一律九折！' : '敢凑近壁垒的家伙吃我一记大锤！战斗间隙我还会抽空修墙。',
+            zhao:  r.inside ? '驿道上的商旅都在传咱们小酒馆的名头，今夜堂食涨粉又快三成！' : '空中那些夜翼魔蝠和提灯怨灵由我优先点射盯死，掌柜放心迎敌！',
+          };
+          const lines: StoryLine[] = [
+            { npc: ct.ally, name: a.name, initial: a.initial, role: `${a.role} · ${a.buffDesc}`, avatar: a.sprite, text: campBanter[ct.ally] },
+            ...(join ? join.lines.slice(-1) : []),
+          ];
+          this.enqueueStory(`${a.name} · ${a.role}`, lines, true);
+          return true;
+        }
+        case 'kitchen': this.open('kitchen'); return true;
+        case 'shop': this.open('shop'); return true;
+        case 'workshop': this.open('build'); return true;
+        case 'doorOut': return this.send({ t: 'exitHouse' });
+        case 'doorIn': return this.send({ t: 'enterHouse' });
+      }
+    }
     if (r.inside) {
       const st = nearbyStation(r);
       if (st === 'kitchen') { this.open('kitchen'); return true; }
@@ -164,7 +214,7 @@ class Game {
     return false;
   }
 
-  releaseAll() { this.held.move = 0; this.held.fire = false; this.grenadeAim = null; this.grenadeAimPayload = null; }
+  releaseAll() { this.held.move = 0; this.held.down = false; this.held.fire = false; this.grenadeAim = null; this.grenadeAimPayload = null; }
 
   send(cmd: Command): boolean {
     audio.unlock();
@@ -181,7 +231,7 @@ class Game {
     if (this.panel() !== null) { this.acc = 0; return; }
 
     this.acc = Math.min(this.acc + dtMs, 100);
-    const beforePhase = this.run.phase, beforeInside = this.run.inside;
+    const beforePhase = this.run.phase, beforeInside = this.run.inside, beforeZone = houseBuff(this.run).zone;
     let urgent = false;
     while (this.acc >= 1000 / 60) {
       this.acc -= 1000 / 60;
@@ -203,7 +253,7 @@ class Game {
       if (this.run.phase !== beforePhase) this.releaseAll();
       this.syncBgm();
     }
-    if (urgent || this.run.tick % 6 === 0 || this.run.phase !== beforePhase || this.run.inside !== beforeInside) {
+    if (urgent || this.run.tick % 6 === 0 || this.run.phase !== beforePhase || this.run.inside !== beforeInside || houseBuff(this.run).zone !== beforeZone) {
       this.syncBgm();
       this.notify();
     }

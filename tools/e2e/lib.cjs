@@ -3,8 +3,13 @@
 const path = require('path');
 const fs = require('fs');
 let chromium;
-try { ({ chromium } = require('playwright')); } catch (e) { ({ chromium } = require('/opt/node-tools/node_modules/playwright')); }
-const CHROME = process.env.CHROME_PATH || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined);
+for (const mod of ['playwright', 'playwright-core', '/opt/node-tools/node_modules/playwright', '/tmp/pw/node_modules/playwright-core']) {
+  try { ({ chromium } = require(mod)); break; } catch { /* try next */ }
+}
+if (!chromium) throw new Error('未找到 playwright / playwright-core');
+const CHROME = process.env.CHROME_PATH
+  || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium'
+    : fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined);
 exports.GAME_URL = 'file://' + path.resolve(__dirname, '..', '..', 'dist', 'index.html');
 exports.SHOTS = path.join(__dirname, 'shots');
 fs.mkdirSync(exports.SHOTS, { recursive: true });
@@ -33,7 +38,20 @@ exports.open = async (opts = {}) => {
     browser, page, errors, center, touch,
     /** 真实触摸点一下 */
     tap: async (sel) => { const c = await center(sel); await touch('touchStart', c.x, c.y); await page.waitForTimeout(60); await touch('touchEnd'); await page.waitForTimeout(250); },
-    state: () => page.evaluate(() => { const g = window.__game, r = g.run; return { panel: g.panel(), phase: r.phase, day: r.day, tick: r.tick, hp: r.player.hp, armor: r.player.armor, grenades: r.player.grenades, x: Math.round(r.player.x), y: Math.round(r.player.y), inside: r.inside, zombies: r.zombies.length, boss: r.zombies.some((z) => z.kind.startsWith('boss_')), kills: r.kills, coins: r.coins, meat: r.meat, fans: r.diner.fans, rep: r.diner.rep, allies: r.story.allies.length, storyLen: g.storyQueue.length, wallLv: r.wall.level, fortLv: r.fort.level, turrets: r.turrets.filter((t) => !!t.type).length, weapons: r.player.weapons.map((w) => w.id + w.star).join(','), target: r.targetId }; }),
+    state: () => page.evaluate(() => {
+      const g = window.__game, r = g.run;
+      return {
+        panel: g.panel(), phase: r.phase, day: r.day, tick: r.tick, hp: r.player.hp, armor: r.player.armor, grenades: r.player.grenades,
+        x: Math.round(r.player.x), y: Math.round(r.player.y), inside: r.inside, zombies: r.zombies.length,
+        flyers: r.zombies.filter((z) => z.y < -10).length,
+        boss: r.zombies.some((z) => z.kind.startsWith('boss_')), kills: r.kills, coins: r.coins, meat: r.meat,
+        fans: r.diner.fans, rep: r.diner.rep, allies: r.story.allies.length, storyLen: g.storyQueue.length,
+        dinerCook: !!r.dinerCook, carryingDish: r.carryingDish ? r.carryingDish.guestId : null,
+        wallLv: r.wall.level, fortLv: r.fort.level, turrets: r.turrets.filter((t) => !!t.type).length,
+        turretModes: r.turrets.map((t) => t.mode).join(','),
+        weapons: r.player.weapons.map((w) => w.id + w.star).join(','), target: r.targetId,
+      };
+    }),
     shot: (name) => page.screenshot({ path: path.join(exports.SHOTS, name + '.png') }),
   };
 };
