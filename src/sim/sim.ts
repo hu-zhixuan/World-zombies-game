@@ -10,9 +10,9 @@ import {
   type AllyId, type DishQuality, type VipDef,
 } from '../content/story';
 import {
-  DINER_SEAT_X, DOOR_X, GROUND_Y, HOME_X, HOUSE_WALL_X, IN_MAX_X, IN_MIN_X, IN_STATIONS, LADDER_X, PLAYER_MAX_X, PLAYER_MIN_X,
+  ALLY_POS, DINER_SEAT_X, DOOR_X, GROUND_Y, HOME_X, HOUSE_WALL_X, IN_MAX_X, IN_MIN_X, IN_STATIONS, LADDER_X, PLAYER_MAX_X, PLAYER_MIN_X,
   PORCH_MAX_X, PORCH_MIN_X, PORCH_Y, ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, SPAWN_X,
-  TURRET_SLOTS, WALL_X, type Bullet, type Command, type DinerGuest, type GameEvent, type Input, type RunState, type StationId, type Zombie,
+  TURRET_SLOTS, WALL_X, type Bullet, type Command, type DinerGuest, type GameEvent, type Input, type RunState, type StationId, type TurretTargetMode, type Zombie,
 } from './types';
 
 export const MAX_CARRY = 3;
@@ -24,10 +24,23 @@ const DODGE_TICKS = 14;
 const DODGE_SPEED = 4.4;
 const DODGE_CD = 60;
 const ZOMBIE_REACH = 18;
-export const BODY_Y = GROUND_Y - 22; // 僵尸身体中心的高度
+export const BODY_Y = GROUND_Y - 22; // 地面僵尸身体中心的高度
 export const MUZZLE_Y = GROUND_Y - 31;
 export const FORT_GUN_X = 166;
 export const FORT_GUN_Y = GROUND_Y + ROOF_Y - 18;
+
+/** 僵尸当前 2D 受击与瞄准中心纵坐标（兼容地面怪、低空夜翼魔蝠与高大首领） */
+export const zombieBodyY = (z: Zombie): number =>
+  GROUND_Y + (z.y ?? 0) - (z.kind === 'bat' ? 14 : ZOMBIES[z.kind].boss ? 34 : 22);
+
+/** 铁板火候 QTE 判定 */
+export function qteQuality(pos: number): DishQuality {
+  const d = Math.abs(pos - 0.5);
+  if (d <= 0.045) return 'legendary';
+  if (d <= 0.12) return 'perfect';
+  if (d <= 0.28) return 'good';
+  return 'poor';
+}
 
 function rand(run: RunState): number { // mulberry32
   let t = (run.rng += 0x6d2b79f5);
@@ -119,10 +132,10 @@ const reloadHaste = (run: RunState) => 1 + run.buff.haste + houseBuff(run).reloa
 /** 清场条件：这一天的僵尸都出完了，而且都死了 */
 export const dayRemaining = (run: RunState) => run.spawn.left + run.zombies.length;
 
-/** 室内靠近的交互点 */
+/** 室内靠近的功能工位 */
 export function nearbyStation(run: RunState): StationId | null {
   if (!run.inside) return null;
-  let best: StationId | null = null, bd = 54;
+  let best: StationId | null = null, bd = 32;
   for (const [k, sx] of Object.entries(IN_STATIONS) as [StationId, number][]) {
     const d = Math.abs(run.player.x - sx);
     if (d <= bd) { bd = d; best = k; }
@@ -137,6 +150,87 @@ export function nearbyExterior(run: RunState): 'door' | 'ladder' | null {
   if (Math.abs(p.x - DOOR_X) <= 32 && p.y > -24) return 'door';
   if (Math.abs(p.x - LADDER_X) <= 36) return 'ladder';
   return null;
+}
+
+export type CampInteractTarget =
+  | { kind: 'cookFinish'; x: number; guest: DinerGuest }
+  | { kind: 'cookStart'; x: number; guest: DinerGuest }
+  | { kind: 'serveCarried'; x: number; guest: DinerGuest }
+  | { kind: 'guestTalk'; x: number; guest: DinerGuest }
+  | { kind: 'allyTalk'; x: number; ally: AllyId }
+  | { kind: 'kitchen'; x: number }
+  | { kind: 'shop'; x: number }
+  | { kind: 'workshop'; x: number }
+  | { kind: 'doorOut'; x: number }
+  | { kind: 'doorIn'; x: number };
+
+/** 营地（室内与室外）走近可交互的对象：灶台 QTE、端盘上菜、与食客/战友交谈、商店、工坊、进出木门 */
+export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
+  if (run.phase !== 'camp') return null;
+  const p = run.player;
+  if (!run.inside) {
+    if (Math.abs(p.x - DOOR_X) <= 32 && p.y > -24) return { kind: 'doorIn', x: DOOR_X };
+    let bestAlly: { score: number; target: CampInteractTarget } | null = null;
+    for (const allyId of run.story.allies) {
+      const pos = ALLY_POS[allyId];
+      const dx = Math.abs(p.x - pos.extX);
+      const dy = Math.abs(p.y - pos.extY);
+      if (dx <= 28 && dy <= 16 && (!bestAlly || dx < bestAlly.score)) {
+        bestAlly = { score: dx, target: { kind: 'allyTalk', x: pos.extX, ally: allyId } };
+      }
+    }
+    return bestAlly?.target ?? null;
+  }
+
+  if (run.dinerCook) {
+    const g = run.guests.find((o) => o.id === run.dinerCook!.guestId && !o.served);
+    if (g && Math.abs(p.x - IN_STATIONS.kitchen) <= 58) {
+      return { kind: 'cookFinish', x: IN_STATIONS.kitchen, guest: g };
+    }
+  }
+
+  const cands: { effD: number; target: CampInteractTarget }[] = [];
+  const push = (effD: number, target: CampInteractTarget) => cands.push({ effD, target });
+
+  const dk = Math.abs(p.x - IN_STATIONS.kitchen);
+  if (dk <= 34) {
+    if (!run.carryingDish) {
+      const nextOrder = run.guests
+        .filter((g) => !g.served && run.meat >= g.meatCost)
+        .sort((a, b) => Number(b.trendMatch) - Number(a.trendMatch))[0];
+      if (nextOrder) push(dk, { kind: 'cookStart', x: IN_STATIONS.kitchen, guest: nextOrder });
+      else push(dk, { kind: 'kitchen', x: IN_STATIONS.kitchen });
+    } else {
+      push(dk + 4, { kind: 'kitchen', x: IN_STATIONS.kitchen });
+    }
+  }
+
+  const ds = Math.abs(p.x - IN_STATIONS.shop);
+  if (ds <= 24) push(ds, { kind: 'shop', x: IN_STATIONS.shop });
+
+  const dw = Math.abs(p.x - IN_STATIONS.workshop);
+  if (dw <= 24) push(dw, { kind: 'workshop', x: IN_STATIONS.workshop });
+
+  const dd = Math.abs(p.x - IN_STATIONS.door);
+  if (dd <= 26) push(dd, { kind: 'doorOut', x: IN_STATIONS.door });
+
+  for (const g of run.guests) {
+    const dg = Math.abs(p.x - g.x);
+    if (run.carryingDish && run.carryingDish.guestId === g.id) {
+      if (dg <= 34) push(dg - 10, { kind: 'serveCarried', x: g.x, guest: g });
+    } else if (dg <= 24) {
+      push(dg, { kind: 'guestTalk', x: g.x, guest: g });
+    }
+  }
+
+  for (const allyId of run.story.allies) {
+    const ax = ALLY_POS[allyId].intX;
+    const da = Math.abs(p.x - ax);
+    if (da <= 24) push(da, { kind: 'allyTalk', x: ax, ally: allyId });
+  }
+
+  cands.sort((a, b) => a.effD - b.effD);
+  return cands[0]?.target ?? null;
 }
 
 function rollShopOffers(run: RunState) {
@@ -264,23 +358,32 @@ function rollDinerGuests(run: RunState) {
 
 /** 开一局。pool 是这一局能掉落/进货的武器（局外解锁的那些）。 */
 export function newRun(seed = 1, pool: WeaponId[] = ['revolver', 'smg'], cls: ClassId = 'gunner'): RunState {
-  const turrets = TURRET_SLOTS.map((_, idx) => (idx === 1 ? { type: 'mg' as const, level: 1, cd: 0, aim: 0 } : { type: null, level: 0, cd: 0, aim: 0 }));
+  const turrets = TURRET_SLOTS.map((_, idx) => (idx === 1
+    ? { type: 'mg' as const, level: 1, cd: 0, aim: 0, mode: 'near' as const }
+    : { type: null, level: 0, cd: 0, aim: 0, mode: 'near' as const }));
   const run: RunState = {
     seed, rng: seed >>> 0, tick: 0, nextId: 1, day: 0, phase: 'camp', phaseT: 0,
     inside: false, autoFire: false,
     player: {
-      x: 194, y: ROOF_Y, vx: 0, vy: 0, facing: 1, hp: 100, maxHp: 100, armor: 0, maxArmor: 80, hurtT: 0, healCarry: 0,
+      x: 238, y: ROOF_Y, vx: 0, vy: 0, facing: 1, dropIgnoreT: 0, hp: 100, maxHp: 100, armor: 0, maxArmor: 80, hurtT: 0, healCarry: 0,
       dodgeT: 0, dodgeCd: 0, dodgeDir: 1, fireCd: 0, reloadT: 0, shootT: 0,
       burstLeft: 0, burstCd: 0, smgHeat: 0, smgShots: 0, grenades: 2,
       weapons: [{ id: 'pistol', star: 1, ammo: WEAPONS.pistol.mag }], cur: 0,
     },
     zombies: [], bullets: [], fires: [], grenades: [], enemyProjs: [], crates: [], turrets,
+    allies: {
+      zhang: { cd: 0, atkT: 0, facing: 1 },
+      lin:   { cd: 0, atkT: 0, facing: 1 },
+      qiang: { cd: 0, atkT: 0, facing: 1 },
+      zhao:  { cd: 0, atkT: 0, facing: 1 },
+    },
     wall: { level: 1, hp: WALL_LEVELS[0].maxHp, maxHp: WALL_LEVELS[0].maxHp },
     home: { hp: FORT_LEVELS[0].maxHp, maxHp: FORT_LEVELS[0].maxHp },
     fort: { level: 1, cd: 0, aim: 0 },
     spawn: { left: 0, timer: 0, total: 0, killed: 0, crateAt: 0, bossKind: null, bossSpawned: false },
     coins: 0, meat: 0, kills: 0,
     meal: null, mealQuality: 'good', guests: [],
+    dinerCook: null, carryingDish: null,
     diner: { rep: 0, fans: 0, trendId: DAILY_TRENDS[0].id, trendTag: DAILY_TRENDS[0].tag, trendTitle: DAILY_TRENDS[0].title, servedTotal: 0, metVips: [], reviews: [] },
     story: { allies: [], seenEvents: [] },
     buff: { dmgMul: 0, haste: 0 }, shop: [],
@@ -295,8 +398,12 @@ export function newRun(seed = 1, pool: WeaponId[] = ['revolver', 'smg'], cls: Cl
 function startDay(run: RunState, ev: GameEvent[]) {
   run.day++;
   run.phase = 'fight'; run.phaseT = 0; run.inside = false;
-  run.player.x = 194; run.player.y = ROOF_Y; run.player.vy = 0; run.player.facing = 1;
+  run.player.x = 238; run.player.y = ROOF_Y; run.player.vy = 0; run.player.dropIgnoreT = 0; run.player.facing = 1;
   run.player.burstLeft = 0; run.player.burstCd = 0; run.player.smgHeat = 0;
+  run.dinerCook = null; run.carryingDish = null;
+  for (const k of ['zhang', 'lin', 'qiang', 'zhao'] as const) {
+    run.allies[k] = { cd: 0, atkT: 0, facing: 1 };
+  }
   const total = dayZombieCount(run.day);
   const crateAt = run.day === 1 || rand(run) < 0.45 ? Math.floor(total / 2) : -1;
   const bossKind = bossForDay(run.day);
@@ -333,25 +440,28 @@ function spawnZombie(run: RunState, forcedKind?: ZombieKind) {
   }
   const hp = zombieHp(kind, run.day);
   const index = run.spawn.total - run.spawn.left;
+  const y = kind === 'bat' ? -(78 + Math.round(rand(run) * 28)) : kind === 'ghoul' ? -(68 + Math.round(rand(run) * 26)) : 0;
   run.zombies.push({
-    id: run.nextId++, kind, x: SPAWN_X + rand(run) * 44, hp, maxHp: hp,
+    id: run.nextId++, kind, x: SPAWN_X + rand(run) * 44, y, hp, maxHp: hp,
     atkCd: 12, kb: 0, burnT: 0, slowT: 0, stunT: 0, freezeT: 0, carriesCrate: !forcedKind && index === run.spawn.crateAt,
   });
 }
 
-/** 自动锁定：优先打玩家点击指定的目标，否则选射程内最近的僵尸。 */
+/** 自动锁定（360° 2D 距离）：优先打玩家点击指定的目标，否则选射程内最近的地面或空中魔物。 */
 function pickTarget(run: RunState): Zombie | null {
   const p = run.player, range = effectiveRange(run);
+  const py = GROUND_Y + p.y - 26;
+  const dist2D = (z: Zombie) => Math.hypot(z.x - p.x, zombieBodyY(z) - py);
   if (run.priorityId !== null) {
     const pri = run.zombies.find((z) => z.id === run.priorityId);
-    if (pri && pri.hp > 0 && Math.abs(pri.x - p.x) <= range * 1.12) return pri;
+    if (pri && pri.hp > 0 && dist2D(pri) <= range * 1.15) return pri;
     if (!pri || pri.hp <= 0) run.priorityId = null;
   }
   const cur = run.zombies.find((z) => z.id === run.targetId);
-  if (cur && cur.hp > 0 && Math.abs(cur.x - p.x) <= range * 1.08) return cur;
+  if (cur && cur.hp > 0 && dist2D(cur) <= range * 1.1) return cur;
   let best: Zombie | null = null, bd = range;
   for (const z of run.zombies) {
-    const d = Math.abs(z.x - p.x);
+    const d = dist2D(z);
     if (d <= bd) { bd = d; best = z; }
   }
   return best;
@@ -371,6 +481,8 @@ function applyPlayerDamage(run: RunState, rawDmg: number, ev: GameEvent[], fromR
   ev.push({ t: 'hurt', dmg: finalDmg, blocked, cover: covered > 0 ? covered : undefined });
 }
 
+const enemyDmg = (raw: number, day: number) => Math.round(raw * (1 + (Math.max(1, day) - 1) * 0.065));
+
 function damageZombie(
   run: RunState,
   z: Zombie,
@@ -384,15 +496,19 @@ function damageZombie(
   if (z.hp <= 0) return;
   const before = z.hp;
   z.hp -= dmg;
-  const bossScale = ZOMBIES[z.kind].boss ? 0.25 : 1;
-  if (opts.kb) z.kb = Math.max(z.kb, opts.kb * bossScale);
+  const isBoss = !!ZOMBIES[z.kind].boss;
+  if (opts.kb) z.kb = Math.max(z.kb, opts.kb * (isBoss ? 0.12 : 1));
   if (opts.slow) z.slowT = Math.max(z.slowT, opts.slow);
-  if (opts.freeze) z.freezeT = Math.max(z.freezeT, Math.round(opts.freeze * (ZOMBIES[z.kind].boss ? 0.4 : 1)));
-  if (opts.stun) z.stunT = Math.max(z.stunT, Math.round(opts.stun * (ZOMBIES[z.kind].boss ? 0.35 : 1)));
+  if (opts.freeze) z.freezeT = Math.max(z.freezeT, Math.round(opts.freeze * (isBoss ? 0.25 : 1)));
+  if (opts.stun) {
+    const s = Math.round(opts.stun * (isBoss ? 0.15 : 1));
+    if (s > 0) z.stunT = Math.max(z.stunT, s);
+  }
   const dir: 1 | -1 = opts.dir ?? (z.x >= run.player.x ? 1 : -1);
   const heavy = opts.heavy || (opts.kb ?? 0) >= 2.5 || opts.weaponId === 'revolver' || opts.weaponId === 'shotgun' || opts.weaponId === 'rifle' || opts.weaponId === 'rocket';
+  const zy = zombieBodyY(z);
   ev.push({
-    t: 'hit', id: z.id, x: z.x, y: BODY_Y, dmg: Math.round(dmg),
+    t: 'hit', id: z.id, x: z.x, y: zy, dmg: Math.round(dmg),
     burn: opts.burn, crit: opts.crit, slow: !!opts.slow, freeze: !!opts.freeze, stun: !!opts.stun, overload: opts.overload,
     dir, weapon: opts.weaponId, heavy,
   });
@@ -418,7 +534,7 @@ function damageZombie(
   run.meat += meatDrop;
 
   if (has(run, 'chainkill')) run.chain = { n: Math.min(8, run.chain.n + 1), t: 180 };
-  ev.push({ t: 'kill', id: z.id, x: z.x, kind: z.kind, coins: def.coins, meat: meatDrop, dir, crit: opts.crit, boss: def.boss });
+  ev.push({ t: 'kill', id: z.id, x: z.x, y: zy, kind: z.kind, coins: def.coins, meat: meatDrop, dir, crit: opts.crit, boss: def.boss });
   if (def.boss) {
     ev.push({ t: 'bossDead', kind: z.kind, bossIdx: run.day <= 5 ? 0 : run.day <= 10 ? 1 : 2 });
   }
@@ -433,8 +549,8 @@ function damageZombie(
   }
   if (opts.byPlayer && has(run, 'overkill') && z.hp < 0) {
     const boom = -z.hp * 1.15, r = 42 * (has(run, 'shrapnel') ? 1.28 : 1);
-    ev.push({ t: 'boom', x: z.x, y: BODY_Y, r });
-    for (const o of run.zombies) if (o !== z && o.hp > 0 && Math.abs(o.x - z.x) <= r) damageZombie(run, o, boom, ev, { byPlayer: false, kb: 2, dir: o.x >= z.x ? 1 : -1, heavy: true });
+    ev.push({ t: 'boom', x: z.x, y: zy, r });
+    for (const o of run.zombies) if (o !== z && o.hp > 0 && Math.hypot(o.x - z.x, zombieBodyY(o) - zy) <= r) damageZombie(run, o, boom, ev, { byPlayer: false, kb: 2, dir: o.x >= z.x ? 1 : -1, heavy: true });
   }
 }
 
@@ -469,7 +585,8 @@ function fireLightning(
   let curDmg = dmg;
   for (let i = 0; i < jumps && cur; i++) {
     hit.add(cur.id);
-    pts.push({ x: cur.x, y: BODY_Y });
+    const cy = zombieBodyY(cur);
+    pts.push({ x: cur.x, y: cy });
     const overloaded = opts.byPlayer && (cur.burnT > 0 || cur.slowT > 0 || cur.freezeT > 0);
     damageZombie(run, cur, curDmg * (overloaded ? 1.35 : 1), ev, {
       byPlayer: opts.byPlayer,
@@ -482,9 +599,9 @@ function fireLightning(
       heavy: overloaded,
     });
     curDmg *= 0.82;
-    const fromX: number = cur.x;
-    cur = run.zombies.filter((o) => o.hp > 0 && !hit.has(o.id) && Math.abs(o.x - fromX) <= 155)
-      .sort((a, b) => Math.abs(a.x - fromX) - Math.abs(b.x - fromX))[0];
+    const fromX: number = cur.x, fromY: number = cy;
+    cur = run.zombies.filter((o) => o.hp > 0 && !hit.has(o.id) && Math.hypot(o.x - fromX, zombieBodyY(o) - fromY) <= 165)
+      .sort((a, b) => Math.hypot(a.x - fromX, zombieBodyY(a) - fromY) - Math.hypot(b.x - fromX, zombieBodyY(b) - fromY))[0];
   }
   if (pts.length >= 2) ev.push({ t: 'lightning', pts, color: opts.color });
 }
@@ -502,7 +619,7 @@ function explodeAt(run: RunState, x: number, y: number, r: number, dmg: number, 
   ev.push({ t: 'boom', x, y, r: finalR });
   for (const z of run.zombies) {
     if (z.hp <= 0) continue;
-    const d = Math.abs(z.x - x);
+    const d = Math.hypot(z.x - x, zombieBodyY(z) - y);
     if (d <= finalR) {
       damageZombie(run, z, finalDmg * (1 - 0.35 * (d / Math.max(1, finalR))), ev, {
         byPlayer, kb: 3.8, burn, weaponId: byPlayer ? 'rocket' : undefined, dir: z.x >= x ? 1 : -1, heavy: true,
@@ -515,15 +632,18 @@ function explodeAt(run: RunState, x: number, y: number, r: number, dmg: number, 
   }
 }
 
-/** 向目标发射一发/一组实体弹丸（也供猎手双铳二连补射复用）。 */
+/** 向目标发射一发/一组 360° 实体弹丸或瞬发射线（支持上下前后全向瞄准、空地打击）。 */
 function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[], consumeAmmo: boolean) {
   const p = run.player, ow = curWeapon(run), def = WEAPONS[ow.id];
-  const mx = p.x + p.facing * 26, my = MUZZLE_Y + p.y;
-  let dx: number = p.facing, dy = 0;
+  const shoulderX = p.x, shoulderY = GROUND_Y + p.y - 31;
+  let dx: number = p.facing, dy = 0, aimLen = 200;
   if (target) {
-    const tx = target.x - mx, ty = BODY_Y - my, len = Math.hypot(tx, ty) || 1;
-    dx = tx / len; dy = ty / len;
+    const tx = target.x - shoulderX, ty = zombieBodyY(target) - shoulderY;
+    aimLen = Math.hypot(tx, ty) || 1;
+    dx = tx / aimLen; dy = ty / aimLen;
   }
+  const muzzleReach = Math.min(20, Math.max(8, aimLen * 0.45));
+  const mx = shoulderX + dx * muzzleReach, my = shoulderY + dy * muzzleReach;
   const ang = Math.atan2(dy, dx);
   const hawkeye = skillActive(run, 'gunner');
   const hb = houseBuff(run);
@@ -536,22 +656,23 @@ function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[],
   if (ow.id === 'smg') p.smgShots++;
   const hotSmg = ow.id === 'smg' && p.smgHeat >= 0.65 && p.smgShots % 3 === 0;
 
-  // 1. 猩红圣铳：扣扳机瞬间全屏瞬发穿透整列敌军 + 对重甲/首领 +35%（★5 +50%）破甲伤
+  // 1. 猩红圣铳：全方向 360° 瞬发穿透整条光路敌军 + 对重甲/首领 +35%（★5 +50%）破甲伤
   if (def.hitscan) {
     const x2 = mx + dx * range, y2 = my + dy * range;
     ev.push({ t: 'railbeam', x1: mx, y1: my, x2, y2, crit });
-    const sorted = [...run.zombies].sort((a, b) => Math.abs(a.x - mx) - Math.abs(b.x - mx));
-    for (const z of sorted) {
+    const byDist = [...run.zombies]
+      .map((z) => ({ z, d: Math.hypot(z.x - mx, zombieBodyY(z) - my) }))
+      .sort((a, b) => a.d - b.d);
+    for (const { z } of byDist) {
       if (z.hp <= 0) continue;
-      if ((z.x - mx) * dx < -10) continue;
-      const distX = Math.abs(z.x - mx);
-      if (distX > range + 20) continue;
-      const t = Math.abs(dx) > 0.06 ? (z.x - mx) / dx : 0;
-      if (t < -10 || t > range + 24) continue;
-      const beamY = my + dy * t;
       const zDef = ZOMBIES[z.kind];
-      const hitTop = zDef.boss ? GROUND_Y - 114 : GROUND_Y - 58;
-      if (beamY < hitTop - 16 || beamY > GROUND_Y + 14) continue;
+      const zcy = zombieBodyY(z);
+      const t = (z.x - mx) * dx + (zcy - my) * dy;
+      if (t < -14 || t > range + 24) continue;
+      const closestX = mx + dx * Math.max(0, t), closestY = my + dy * Math.max(0, t);
+      const hw = zDef.boss ? 26 : z.kind === 'bat' ? 16 : 14;
+      const hh = zDef.boss ? 58 : z.kind === 'bat' ? 16 : 30;
+      if (Math.abs(closestX - z.x) > hw || Math.abs(closestY - zcy) > hh) continue;
       const armorBreaker = zDef.boss || z.kind === 'bruiser' ? (ow.star >= 5 ? 1.5 : 1.35) : 1.0;
       damageZombie(run, z, dmg * armorBreaker, ev, {
         byPlayer: true, crit, kb: 2.8, weaponId: 'rifle', dir: dx >= 0 ? 1 : -1, heavy: true,
@@ -559,8 +680,8 @@ function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[],
       if (has(run, 'incendiary') && z.hp > 0 && rand(run) < 0.25) z.burnT = 180;
       if (has(run, 'frostbite')) z.slowT = Math.max(z.slowT, 135);
       if (has(run, 'shock') && z.hp > 0 && rand(run) < 0.2) {
-        const next = run.zombies.find((o) => o.id !== z.id && o.hp > 0 && Math.abs(o.x - z.x) <= 130);
-        if (next) fireLightning(run, z.x, BODY_Y, next, dmg * 0.45, 2, ev, { byPlayer: true, color: 'shock' });
+        const next = run.zombies.find((o) => o.id !== z.id && o.hp > 0 && Math.hypot(o.x - z.x, zombieBodyY(o) - zcy) <= 145);
+        if (next) fireLightning(run, z.x, zcy, next, dmg * 0.45, 2, ev, { byPlayer: true, color: 'shock' });
       }
     }
     ev.push({ t: 'shot', x: mx, y: my, from: 'player', weapon: ow.id, ang });
@@ -574,7 +695,7 @@ function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[],
       const jumps = def.chain + (ow.star >= 3 ? 1 : 0) + (ow.star >= 5 ? 1 : 0) + (has(run, 'shock') ? 2 : 0);
       fireLightning(run, mx, my, target, dmg, jumps, ev, { byPlayer: true, crit, color: 'tesla', stun: 22 });
     } else {
-      ev.push({ t: 'lightning', pts: [{ x: mx, y: my }, { x: mx + dx * 135, y: my + (rand(run) - 0.5) * 16 }], color: 'tesla' });
+      ev.push({ t: 'lightning', pts: [{ x: mx, y: my }, { x: mx + dx * 135, y: my + dy * 135 + (rand(run) - 0.5) * 16 }], color: 'tesla' });
     }
     ev.push({ t: 'shot', x: mx, y: my, from: 'player', weapon: ow.id, ang });
     if (consumeAmmo && ow.ammo <= 0) startReload(run, ev);
@@ -614,6 +735,7 @@ function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[],
       kind: def.aoe ? 'rocket' : hotSmg ? 'firebolt' : 'normal',
       weaponId: ow.id,
       startX: mx,
+      startY: my,
       closeBoost: ow.id === 'shotgun',
       shatter: ow.id === 'assault',
     });
@@ -704,6 +826,7 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
   if (p.dodgeCd > 0) p.dodgeCd--;
   if (p.fireCd > 0) p.fireCd--;
   if (p.shootT > 0) p.shootT--;
+  if (p.dropIgnoreT > 0) p.dropIgnoreT--;
   if (run.skill.t > 0) run.skill.t--;
   if (run.skill.cd > 0) run.skill.cd--;
   if (input.skill && run.skill.cd === 0 && !CLASSES[run.cls].comingSoon) {
@@ -730,16 +853,29 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
     if (p.y >= 0) { p.y = 0; p.vy = 0; }
     p.x = Math.max(IN_MIN_X, Math.min(IN_MAX_X, p.x + p.vx));
     if (move !== 0 && p.dodgeT === 0) p.facing = move > 0 ? 1 : -1;
+    if (run.dinerCook) {
+      if (Math.abs(p.x - IN_STATIONS.kitchen) > 58) {
+        run.dinerCook = null;
+      } else {
+        const sec = (run.tick - run.dinerCook.startedTick) / 60;
+        run.dinerCook.pos = 0.5 - 0.5 * Math.cos(sec * 3.15);
+      }
+    }
     if (input.interact && nearbyStation(run) === 'door' && run.phase === 'camp') command(run, { t: 'exitHouse' });
     return;
   }
 
-  // 室外与房顶 2D 实体碰撞 + 阶梯跳跃动线（一楼砖墙 -> 中层木制挑台 -> 二层屋顶平台）
+  // 室外与房顶 2D 实体碰撞 + 阶梯跳跃动线（一楼砖墙 -> 中层木制挑台 -> 二层屋顶平台 + 泰拉瑞亚式 ↓ 穿层下跳）
   const prevY = p.y;
   const onGround = Math.abs(p.y) <= 0.5;
-  const onPorch = p.x >= PORCH_MIN_X && p.x <= PORCH_MAX_X && Math.abs(p.y - PORCH_Y) <= 2;
-  const onRoof = p.x >= ROOF_MIN_X && p.x <= ROOF_MAX_X && Math.abs(p.y - ROOF_Y) <= 2;
-  if (input.jump && (onGround || onPorch || onRoof) && p.vy >= 0) {
+  const onPorch = p.x >= PORCH_MIN_X && p.x <= PORCH_MAX_X && Math.abs(p.y - PORCH_Y) <= 2 && p.dropIgnoreT === 0;
+  const onRoof = p.x >= ROOF_MIN_X && p.x <= ROOF_MAX_X && Math.abs(p.y - ROOF_Y) <= 2 && p.dropIgnoreT === 0;
+  const canDropFromRoof = onRoof && p.x >= PORCH_MIN_X - 10;
+  if (input.down && (onPorch || canDropFromRoof) && p.vy >= 0) {
+    p.dropIgnoreT = 9;
+    p.y += 3;
+    p.vy = 1.6;
+  } else if (input.jump && (onGround || onPorch || onRoof) && p.vy >= 0) {
     p.vy = JUMP_V;
     ev.push({ t: 'jump', onRoof });
   }
@@ -749,20 +885,21 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
   else if (p.y <= PORCH_Y + 4) minX = PORCH_MIN_X;
   p.x = Math.max(minX, Math.min(PLAYER_MAX_X, p.x + p.vx));
 
+  const ignorePlatforms = p.dropIgnoreT > 0 || input.down;
   const nowInRoof = p.x >= ROOF_MIN_X && p.x <= ROOF_MAX_X;
   const nowInPorch = p.x >= PORCH_MIN_X && p.x <= PORCH_MAX_X;
-  const standingRoof = nowInRoof && Math.abs(p.y - ROOF_Y) < 0.01 && p.vy === 0;
-  const standingPorch = !standingRoof && nowInPorch && Math.abs(p.y - PORCH_Y) < 0.01 && p.vy === 0;
+  const standingRoof = !ignorePlatforms && nowInRoof && Math.abs(p.y - ROOF_Y) < 0.01 && p.vy === 0;
+  const standingPorch = !ignorePlatforms && !standingRoof && nowInPorch && Math.abs(p.y - PORCH_Y) < 0.01 && p.vy === 0;
 
-  if (!standingRoof && !standingPorch && (p.y < 0 || p.vy < 0)) {
+  if (!standingRoof && !standingPorch && (p.y < 0 || p.vy < 0 || ignorePlatforms)) {
     p.vy += GRAVITY;
     p.y += p.vy;
   }
-  if (nowInRoof && prevY <= ROOF_Y + 6 && p.y >= ROOF_Y && p.vy >= 0) {
+  if (!ignorePlatforms && nowInRoof && prevY <= ROOF_Y + 6 && p.y >= ROOF_Y && p.vy >= 0) {
     p.y = ROOF_Y;
     p.vy = 0;
     if (prevY < ROOF_Y - 1 || prevY > ROOF_Y + 1) ev.push({ t: 'roof', onRoof: true });
-  } else if (nowInPorch && prevY <= PORCH_Y + 6 && p.y >= PORCH_Y && p.vy >= 0) {
+  } else if (!ignorePlatforms && nowInPorch && prevY <= PORCH_Y + 6 && p.y >= PORCH_Y && p.vy >= 0) {
     p.y = PORCH_Y;
     p.vy = 0;
   }
@@ -829,25 +966,55 @@ function stepZombies(run: RunState, ev: GameEvent[]) {
     if (z.hp <= 0) continue;
     if (z.slowT > 0) z.slowT--;
     if (z.freezeT > 0) z.freezeT--;
-    if (z.stunT > 0) { z.stunT--; continue; }
-    if (z.kb > 0) { z.x += z.kb; z.kb *= 0.7; if (z.kb < 0.2) z.kb = 0; continue; }
+    if (z.stunT > 0) { z.stunT--; if (!def.boss) continue; }
+    if (z.kb > 0) { z.x += z.kb; z.kb *= 0.7; if (z.kb < 0.2) z.kb = 0; if (!def.boss) continue; }
+
+    const scaledDmg = enemyDmg(def.damage, run.day);
+
+    // 空中近战魔物（夜翼魔蝠）：越过前院木障，低空盘旋俯冲撕咬屋顶守夜人或酒馆木门
+    if (def.flying && !def.ranged) {
+      const targetY = !run.inside && Math.abs(p.x - z.x) < 420
+        ? Math.max(-118, Math.min(-24, p.y - 16))
+        : -82;
+      const hoverY = targetY + Math.sin(run.tick * 0.14 + z.id) * 6;
+      z.y += (hoverY - z.y) * 0.08;
+      const goalX = !run.inside && p.x < z.x + 120 ? Math.max(PLAYER_MIN_X + 12, p.x) : HOME_X;
+      const nearFlyPlayer = !run.inside && p.dodgeT === 0 && Math.hypot(p.x - z.x, (p.y - 18) - z.y) <= 24;
+      const atHome = z.x <= HOME_X + 12;
+      if (nearFlyPlayer || atHome) {
+        if (z.atkCd === 0) {
+          z.atkCd = def.attackEvery;
+          if (nearFlyPlayer) applyPlayerDamage(run, scaledDmg, ev, false);
+          else { run.home.hp = Math.max(0, run.home.hp - scaledDmg); ev.push({ t: 'homeHit' }); }
+        }
+        continue;
+      }
+      const moveFactor = z.freezeT > 0 ? 0.16 : z.slowT > 0 ? 0.52 : 1;
+      if (z.x > goalX + 6) z.x -= def.speed * moveFactor;
+      else if (z.x < goalX - 6) z.x += def.speed * 0.7 * moveFactor;
+      continue;
+    }
+    if (def.flying && def.ranged) {
+      const hoverY = -74 + Math.sin(run.tick * 0.08 + z.id) * 10;
+      z.y += (hoverY - z.y) * 0.06;
+    }
 
     // 远程魔物（提灯怨灵、暴君、深渊魔王）进入可交火射程后停止前压，抛射高弧幽火打击主角或前线路障
     const rangedStopX = def.boss ? WALL_X + 245 : WALL_X + 215;
     if (def.ranged && z.x <= rangedStopX && z.x >= WALL_X + 24) {
       if (z.atkCd === 0) {
-        z.atkCd = Math.round(def.attackEvery * (def.boss ? 1.2 : 1.38));
+        z.atkCd = Math.round(def.attackEvery * (def.boss ? 1.02 : 1.18));
         const onRoofOrPorch = isOnRoof(run) || isOnPorch(run);
-        const aimPlayer = !run.inside && Math.abs(p.x - z.x) <= 520 && (rand(run) < (onRoofOrPorch ? 0.56 : 0.72));
+        const aimPlayer = !run.inside && Math.abs(p.x - z.x) <= 520 && (rand(run) < (onRoofOrPorch ? 0.58 : 0.74));
         const tx = aimPlayer ? p.x : (run.wall.hp > 0 ? WALL_X : HOME_X);
         const ty = aimPlayer ? (GROUND_Y + p.y - 24) : (GROUND_Y - 14);
-        const sx = z.x - 10, sy = BODY_Y - 10;
+        const sx = z.x - 10, sy = zombieBodyY(z);
         const dx = tx - sx, dist = Math.abs(dx) || 1;
-        const speed = def.boss ? 4.4 : 3.8;
+        const speed = def.boss ? 4.5 : 3.9;
         const frames = Math.max(aimPlayer ? 28 : 16, dist / speed);
         const g = 0.11;
         const vy = (ty - sy) / frames - 0.5 * g * (frames - 1);
-        run.enemyProjs.push({ x: sx, y: sy, vx: Math.sign(dx) * speed, vy, dmg: Math.round(def.damage * 0.85), life: 165 });
+        run.enemyProjs.push({ x: sx, y: sy, vx: Math.sign(dx) * speed, vy, dmg: Math.round(scaledDmg * 0.9), life: 165 });
         continue;
       }
     }
@@ -859,14 +1026,14 @@ function stepZombies(run: RunState, ev: GameEvent[]) {
       if (z.atkCd > 0) continue;
       z.atkCd = def.attackEvery;
       if (nearPlayer) {
-        applyPlayerDamage(run, def.damage, ev, false);
+        applyPlayerDamage(run, scaledDmg, ev, false);
       } else if (atWall) {
-        run.wall.hp = Math.max(0, run.wall.hp - def.damage);
+        run.wall.hp = Math.max(0, run.wall.hp - scaledDmg);
         ev.push({ t: 'wallHit', reflect: reflectDmg > 0 });
         if (has(run, 'vanguard')) run.vanguardT = 300;
         if (reflectDmg > 0) damageZombie(run, z, reflectDmg, ev, { byPlayer: false });
       } else {
-        run.home.hp = Math.max(0, run.home.hp - def.damage);
+        run.home.hp = Math.max(0, run.home.hp - scaledDmg);
         ev.push({ t: 'homeHit' });
       }
       continue;
@@ -883,7 +1050,7 @@ function stepFires(run: RunState, ev: GameEvent[]) {
     if (f.t <= 0) continue;
     if (f.t % 20 === 0) {
       for (const z of run.zombies) {
-        if (z.hp > 0 && Math.abs(z.x - f.x) <= f.r) {
+        if (z.hp > 0 && Math.abs(z.x - f.x) <= f.r && zombieBodyY(z) >= GROUND_Y - 52) {
           damageZombie(run, z, f.dmg, ev, { byPlayer: true, burn: true, weaponId: 'rocket' });
           z.burnT = Math.max(z.burnT, 90);
         }
@@ -907,68 +1074,164 @@ function stepTurrets(run: RunState, ev: GameEvent[]) {
     if (slot.cd > 0) { slot.cd--; continue; }
     const pos = turretWorldPos(i);
     const range = def.range + (pos.roof ? 55 : 0);
-    let best: Zombie | null = null, bd = range;
-    for (const z of run.zombies) {
-      const d = Math.abs(z.x - pos.x);
-      if (z.x >= pos.x - 40 && d <= bd) { bd = d; best = z; }
-    }
-    if (!best) continue;
+    const mode: TurretTargetMode = slot.mode ?? 'near';
+    const inRange = run.zombies
+      .filter((z) => z.hp > 0 && Math.hypot(z.x - pos.x, zombieBodyY(z) - pos.muzzleY) <= range);
+    if (inRange.length === 0) continue;
+
+    inRange.sort((a, b) => {
+      if (mode === 'boss') {
+        const ba = ZOMBIES[a.kind].boss ? 1 : 0, bb = ZOMBIES[b.kind].boss ? 1 : 0;
+        if (ba !== bb) return bb - ba;
+        if (Math.abs(b.maxHp - a.maxHp) > 40) return b.maxHp - a.maxHp;
+      } else if (mode === 'air') {
+        const fa = ZOMBIES[a.kind].flying ? 1 : 0, fb = ZOMBIES[b.kind].flying ? 1 : 0;
+        if (fa !== fb) return fb - fa;
+      }
+      return Math.hypot(a.x - pos.x, zombieBodyY(a) - pos.muzzleY) - Math.hypot(b.x - pos.x, zombieBodyY(b) - pos.muzzleY);
+    });
+    const best = inRange[0];
 
     slot.cd = Math.max(2, Math.round(lv.cooldown / haste));
     const dmg = Math.round(lv.damage * (eng ? 1.2 : 1));
-    const dx = best.x - pos.x, dy = BODY_Y - pos.muzzleY, len = Math.hypot(dx, dy) || 1;
+    const dx = best.x - pos.x, dy = zombieBodyY(best) - pos.muzzleY, len = Math.hypot(dx, dy) || 1;
     slot.aim = Math.atan2(dy, dx);
+    const ox = pos.x + (dx / len) * 10, oy = pos.muzzleY + (dy / len) * 10;
 
     if (slot.type === 'tesla') {
       fireLightning(run, pos.x, pos.muzzleY, best, dmg, lv.chain ?? 3, ev, { byPlayer: false, color: 'tesla', stun: 12 });
     } else if (slot.type === 'frost') {
       run.bullets.push({
-        x: pos.x + 10, y: pos.muzzleY, vx: (dx / len) * 7.5, vy: (dy / len) * 7.5,
+        x: ox, y: oy, vx: (dx / len) * 7.5, vy: (dy / len) * 7.5,
         dmg, life: 60, from: 'turret', pierce: false, crit: false, bounces: 0, hit: [],
         aoe: lv.aoe ?? 56, slow: 150, kind: 'frost',
       });
     } else if (slot.type === 'cannon') {
       run.bullets.push({
-        x: pos.x + 12, y: pos.muzzleY, vx: (dx / len) * 7.2, vy: (dy / len) * 7.2,
+        x: ox, y: oy, vx: (dx / len) * 7.2, vy: (dy / len) * 7.2,
         dmg, life: 70, from: 'turret', pierce: false, crit: false, bounces: 0, hit: [],
         aoe: lv.aoe ?? 70, kind: 'cannon',
       });
     } else {
       run.bullets.push({
-        x: pos.x + 10, y: pos.muzzleY, vx: (dx / len) * 9.5, vy: (dy / len) * 9.5,
-        dmg, life: 45, from: 'turret', pierce: false, crit: false, bounces: 0, hit: [], kind: 'normal',
+        x: ox, y: oy, vx: (dx / len) * 9.5, vy: (dy / len) * 9.5,
+        dmg, life: 48, from: 'turret', pierce: false, crit: false, bounces: 0, hit: [], kind: 'normal',
       });
     }
-    ev.push({ t: 'shot', x: pos.x + 10, y: pos.muzzleY, from: 'turret', turret: slot.type });
+    ev.push({ t: 'shot', x: ox, y: oy, from: 'turret', turret: slot.type, ang: slot.aim });
   }
 
-  // 堡垒 2 级以上屋顶自带守卫火炮
+  // 堡垒 2 级以上屋顶自带守卫火炮（360° 防空防地）
   if (run.fort.level >= 2) {
     if (run.fort.cd > 0) run.fort.cd--;
     else {
-      let best: Zombie | null = null, bd = 385;
+      let best: Zombie | null = null, bd = 400;
       for (const z of run.zombies) {
-        const d = Math.abs(z.x - FORT_GUN_X);
-        if (z.x > FORT_GUN_X && d <= bd) { bd = d; best = z; }
+        const d = Math.hypot(z.x - FORT_GUN_X, zombieBodyY(z) - FORT_GUN_Y);
+        if (d <= bd) { bd = d; best = z; }
       }
       if (best) {
         const lv3 = run.fort.level >= 3;
         run.fort.cd = Math.round((lv3 ? 56 : 92) / (1 + run.buff.haste));
-        const dx = best.x - FORT_GUN_X, dy = BODY_Y - FORT_GUN_Y, len = Math.hypot(dx, dy) || 1;
+        const dx = best.x - FORT_GUN_X, dy = zombieBodyY(best) - FORT_GUN_Y, len = Math.hypot(dx, dy) || 1;
         run.fort.aim = Math.atan2(dy, dx);
         const shots = lv3 ? 2 : 1;
+        const ox = FORT_GUN_X + (dx / len) * 10, oy = FORT_GUN_Y + (dy / len) * 10;
         for (let s = 0; s < shots; s++) {
           const offset = (s - (shots - 1) * 0.5) * 0.06;
           const ca = Math.cos(offset), sa = Math.sin(offset);
           const vx = ((dx / len) * ca - (dy / len) * sa) * 10;
           const vy = ((dx / len) * sa + (dy / len) * ca) * 10;
           run.bullets.push({
-            x: FORT_GUN_X + 10, y: FORT_GUN_Y, vx, vy, dmg: lv3 ? 54 : 38, life: 54,
+            x: ox, y: oy, vx, vy, dmg: lv3 ? 54 : 38, life: 54,
             from: 'fort', pierce: false, crit: false, bounces: 0, hit: [], kind: 'normal',
           });
         }
-        ev.push({ t: 'shot', x: FORT_GUN_X + 10, y: FORT_GUN_Y, from: 'fort' });
+        ev.push({ t: 'shot', x: ox, y: oy, from: 'fort', ang: run.fort.aim });
       }
+    }
+  }
+}
+
+/** 四位驻守战友真实参战：老兵张屋顶银弩穿透、药师小林冰焰减速+战斗慢回血、铁匠阿强前院重击+修墙、哨兵小赵对空速射。 */
+function stepAllies(run: RunState, ev: GameEvent[]) {
+  if (run.inside || (run.phase !== 'fight' && run.phase !== 'clear')) return;
+  const p = run.player;
+  for (const allyId of run.story.allies) {
+    const rt = run.allies[allyId];
+    if (!rt) continue;
+    if (rt.atkT > 0) rt.atkT--;
+    if (rt.cd > 0) rt.cd--;
+
+    if (run.phase === 'fight') {
+      if (allyId === 'lin' && run.tick % 300 === 0 && p.hp > 0 && p.hp < p.maxHp) {
+        p.hp = Math.min(p.maxHp, p.hp + 1);
+      }
+      if (allyId === 'qiang' && run.tick % 240 === 0 && run.wall.hp > 0 && run.wall.hp < run.wall.maxHp) {
+        run.wall.hp = Math.min(run.wall.maxHp, run.wall.hp + 2);
+      }
+    }
+    if (rt.cd > 0) continue;
+
+    const pos = ALLY_POS[allyId];
+    const ax = pos.extX, ay = GROUND_Y + pos.extY - 26;
+
+    if (allyId === 'zhang') {
+      const best = run.zombies
+        .filter((z) => z.hp > 0 && Math.hypot(z.x - ax, zombieBodyY(z) - ay) <= 440)
+        .sort((a, b) => Math.hypot(a.x - ax, zombieBodyY(a) - ay) - Math.hypot(b.x - ax, zombieBodyY(b) - ay))[0];
+      if (!best) continue;
+      rt.cd = 76; rt.atkT = 22; rt.facing = best.x >= ax ? 1 : -1;
+      const dx = best.x - ax, dy = zombieBodyY(best) - ay, len = Math.hypot(dx, dy) || 1;
+      const ox = ax + (dx / len) * 12, oy = ay + (dy / len) * 12;
+      run.bullets.push({
+        x: ox, y: oy, vx: (dx / len) * 13, vy: (dy / len) * 13,
+        dmg: Math.round(12 + run.day * 1.4), life: 42,
+        from: 'ally', allyId: 'zhang', pierce: true, pierceLeft: 2, crit: false, bounces: 0, hit: [], kind: 'normal',
+      });
+      ev.push({ t: 'shot', x: ox, y: oy, from: 'ally', ally: 'zhang', ang: Math.atan2(dy, dx) });
+    } else if (allyId === 'lin') {
+      const best = run.zombies
+        .filter((z) => z.hp > 0 && Math.hypot(z.x - ax, zombieBodyY(z) - ay) <= 360)
+        .sort((a, b) => Math.hypot(a.x - ax, zombieBodyY(a) - ay) - Math.hypot(b.x - ax, zombieBodyY(b) - ay))[0];
+      if (!best) continue;
+      rt.cd = 88; rt.atkT = 24; rt.facing = best.x >= ax ? 1 : -1;
+      const dx = best.x - ax, dy = zombieBodyY(best) - ay, len = Math.hypot(dx, dy) || 1;
+      const ox = ax + (dx / len) * 10, oy = ay + (dy / len) * 10;
+      run.bullets.push({
+        x: ox, y: oy, vx: (dx / len) * 9.5, vy: (dy / len) * 9.5,
+        dmg: Math.round(10 + run.day * 1.1), life: 44,
+        from: 'ally', allyId: 'lin', pierce: false, crit: false, bounces: 0, hit: [], aoe: 42, slow: 110, kind: 'frost',
+      });
+      ev.push({ t: 'shot', x: ox, y: oy, from: 'ally', ally: 'lin', ang: Math.atan2(dy, dx) });
+    } else if (allyId === 'qiang') {
+      const hits = run.zombies.filter((z) => z.hp > 0 && Math.hypot(z.x - ax, zombieBodyY(z) - ay) <= 95);
+      if (hits.length === 0) continue;
+      rt.cd = 78; rt.atkT = 24;
+      rt.facing = hits[0].x >= ax ? 1 : -1;
+      const dmg = Math.round(15 + run.day * 1.6);
+      for (const z of hits) {
+        damageZombie(run, z, dmg, ev, { byPlayer: false, kb: 4.0, dir: z.x >= ax ? 1 : -1, heavy: true });
+      }
+      ev.push({ t: 'shot', x: ax + rt.facing * 24, y: ay, from: 'ally', ally: 'qiang', ang: rt.facing > 0 ? 0 : Math.PI });
+    } else if (allyId === 'zhao') {
+      const best = run.zombies
+        .filter((z) => z.hp > 0 && Math.hypot(z.x - ax, zombieBodyY(z) - ay) <= 470)
+        .sort((a, b) => {
+          const fa = ZOMBIES[a.kind].flying ? 1 : 0, fb = ZOMBIES[b.kind].flying ? 1 : 0;
+          if (fa !== fb) return fb - fa;
+          return Math.hypot(a.x - ax, zombieBodyY(a) - ay) - Math.hypot(b.x - ax, zombieBodyY(b) - ay);
+        })[0];
+      if (!best) continue;
+      rt.cd = 58; rt.atkT = 22; rt.facing = best.x >= ax ? 1 : -1;
+      const dx = best.x - ax, dy = zombieBodyY(best) - ay, len = Math.hypot(dx, dy) || 1;
+      const ox = ax + (dx / len) * 12, oy = ay + (dy / len) * 12;
+      run.bullets.push({
+        x: ox, y: oy, vx: (dx / len) * 14.5, vy: (dy / len) * 14.5,
+        dmg: Math.round(10 + run.day * 1.2), life: 38,
+        from: 'ally', allyId: 'zhao', pierce: false, crit: false, bounces: 0, hit: [], kind: 'normal',
+      });
+      ev.push({ t: 'shot', x: ox, y: oy, from: 'ally', ally: 'zhao', ang: Math.atan2(dy, dx) });
     }
   }
 }
@@ -977,13 +1240,13 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
   const out: Bullet[] = [];
   const spawned: Bullet[] = [];
   for (const b of run.bullets) {
-    // 焦土爆炎炮追踪火弹在半空柔和转向锁定前方尸群
+    // 焦土爆炎炮追踪火弹在半空柔和转向锁定最近 2D 敌群
     if (b.homing && b.life > 2) {
-      const steerTarget = run.zombies.filter((z) => z.hp > 0 && !b.hit.includes(z.id) && Math.abs(z.x - b.x) <= 220)
-        .sort((a, c) => Math.abs(a.x - b.x) - Math.abs(c.x - b.x))[0];
+      const steerTarget = run.zombies.filter((z) => z.hp > 0 && !b.hit.includes(z.id) && Math.hypot(z.x - b.x, zombieBodyY(z) - b.y) <= 230)
+        .sort((a, c) => Math.hypot(a.x - b.x, zombieBodyY(a) - b.y) - Math.hypot(c.x - b.x, zombieBodyY(c) - b.y))[0];
       if (steerTarget) {
         const sp = Math.hypot(b.vx, b.vy) || 8.8;
-        const tx = steerTarget.x - b.x, ty = BODY_Y - b.y, len = Math.hypot(tx, ty) || 1;
+        const tx = steerTarget.x - b.x, ty = zombieBodyY(steerTarget) - b.y, len = Math.hypot(tx, ty) || 1;
         const dvx = (tx / len) * sp, dvy = (ty / len) * sp;
         b.vx += (dvx - b.vx) * 0.14;
         b.vy += (dvy - b.vy) * 0.14;
@@ -991,19 +1254,22 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
     }
 
     b.x += b.vx; b.y += b.vy; b.life--;
-    let alive = b.life > 0 && b.y < GROUND_Y + 4;
+    let alive = b.life > 0 && b.y < GROUND_Y + 4 && b.y > -120 && b.x > -40 && b.x < SPAWN_X + 60;
     if (alive) {
       for (const z of run.zombies) {
         if (z.hp <= 0 || b.hit.includes(z.id)) continue;
-        const hitW = ZOMBIES[z.kind].boss ? 24 : 13;
-        const hitTop = ZOMBIES[z.kind].boss ? GROUND_Y - 108 : GROUND_Y - 56;
-        if (Math.abs(b.x - z.x) > hitW || b.y < hitTop || b.y > GROUND_Y) continue;
+        const defZ = ZOMBIES[z.kind];
+        const zcy = zombieBodyY(z);
+        const hitW = defZ.boss ? 25 : z.kind === 'bat' ? 16 : 14;
+        const hitTop = GROUND_Y + (z.y ?? 0) - (defZ.boss ? 108 : z.kind === 'bat' ? 30 : 56);
+        const hitBot = GROUND_Y + (z.y ?? 0) + (z.kind === 'bat' ? 4 : 2);
+        if (Math.abs(b.x - z.x) > hitW || b.y < hitTop || b.y > hitBot) continue;
         b.hit.push(z.id);
         const byPlayer = b.from === 'player';
 
         if (b.kind === 'frost' && b.aoe) {
-          ev.push({ t: 'frost', x: b.x, y: Math.min(BODY_Y, b.y), r: b.aoe });
-          for (const o of run.zombies) if (o.hp > 0 && Math.abs(o.x - b.x) <= b.aoe) damageZombie(run, o, b.dmg, ev, { byPlayer: false, slow: b.slow ?? 150 });
+          ev.push({ t: 'frost', x: b.x, y: b.y, r: b.aoe });
+          for (const o of run.zombies) if (o.hp > 0 && Math.hypot(o.x - b.x, zombieBodyY(o) - b.y) <= b.aoe) damageZombie(run, o, b.dmg, ev, { byPlayer: false, slow: b.slow ?? 150 });
           alive = false;
           break;
         }
@@ -1014,7 +1280,7 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
         }
 
         const wasSlowed = z.slowT > 0 || z.freezeT > 0;
-        const closeHit = b.closeBoost && b.startX !== undefined && Math.abs(z.x - b.startX) <= 205;
+        const closeHit = b.closeBoost && b.startX !== undefined && Math.hypot(z.x - b.startX, zcy - (b.startY ?? zcy)) <= 205;
         const hitDmg = b.dmg * (closeHit ? 1.5 : 1);
         const kb = closeHit ? 5.6 : b.weaponId === 'revolver' ? 4.6 : byPlayer ? 1.6 : 0.6;
         const dir: 1 | -1 = b.vx >= 0 ? 1 : -1;
@@ -1032,9 +1298,9 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
         // 寒霜连铳特色：命中已减速目标深冻定身并引爆碎冰溅射
         if (byPlayer && b.shatter && wasSlowed) {
           const shatterR = curWeapon(run).id === 'assault' && curWeapon(run).star >= 5 ? 58 : 48;
-          ev.push({ t: 'frost', x: z.x, y: BODY_Y, r: shatterR });
+          ev.push({ t: 'frost', x: z.x, y: zcy, r: shatterR });
           for (const o of run.zombies) {
-            if (o.id !== z.id && o.hp > 0 && Math.abs(o.x - z.x) <= shatterR) {
+            if (o.id !== z.id && o.hp > 0 && Math.hypot(o.x - z.x, zombieBodyY(o) - zcy) <= shatterR) {
               damageZombie(run, o, b.dmg * 0.55, ev, { byPlayer: true, slow: 115, freeze: 36, weaponId: b.weaponId });
             }
           }
@@ -1042,20 +1308,20 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
         if (byPlayer && has(run, 'incendiary') && z.hp > 0 && rand(run) < 0.25) z.burnT = 180;
         if (byPlayer && has(run, 'frostbite')) z.slowT = 135;
         if (byPlayer && has(run, 'shock') && z.hp > 0 && rand(run) < 0.25) {
-          const next = run.zombies.find((o) => o.id !== z.id && o.hp > 0 && Math.abs(o.x - z.x) <= 130);
-          if (next) fireLightning(run, z.x, BODY_Y, next, b.dmg * 0.55, 2, ev, { byPlayer: true, color: 'shock' });
+          const next = run.zombies.find((o) => o.id !== z.id && o.hp > 0 && Math.hypot(o.x - z.x, zombieBodyY(o) - zcy) <= 145);
+          if (next) fireLightning(run, z.x, zcy, next, b.dmg * 0.55, 2, ev, { byPlayer: true, color: 'shock' });
         }
 
-        // 重锤左轮先天跳弹追击 + 弹射天赋叠加（仅在消耗本次弹跳次数且防父弹同体重复命中时生成跳弹）
+        // 重锤左轮先天跳弹追击 + 弹射天赋叠加
         if (byPlayer && ((b.ricochetLeft ?? 0) > 0 || (has(run, 'ricochet') && b.bounces < 3 && rand(run) < 0.55))) {
-          const next = run.zombies.filter((o) => o.hp > 0 && !b.hit.includes(o.id) && Math.abs(o.x - z.x) <= 155)
-            .sort((a, c) => Math.abs(a.x - z.x) - Math.abs(c.x - z.x))[0];
+          const next = run.zombies.filter((o) => o.hp > 0 && !b.hit.includes(o.id) && Math.hypot(o.x - z.x, zombieBodyY(o) - zcy) <= 165)
+            .sort((a, c) => Math.hypot(a.x - z.x, zombieBodyY(a) - zcy) - Math.hypot(c.x - z.x, zombieBodyY(c) - zcy))[0];
           if (next) {
-            const sp = Math.hypot(b.vx, b.vy), nx = next.x - z.x, ny = BODY_Y - b.y, nlen = Math.hypot(nx, ny) || 1;
+            const sp = Math.hypot(b.vx, b.vy), nx = next.x - z.x, ny = zombieBodyY(next) - b.y, nlen = Math.hypot(nx, ny) || 1;
             const useWeaponBounce = (b.ricochetLeft ?? 0) > 0;
             spawned.push({
               ...b,
-              x: z.x, y: BODY_Y,
+              x: z.x, y: zcy,
               vx: (nx / nlen) * sp, vy: (ny / nlen) * sp,
               dmg: b.dmg * 0.78, life: 24,
               bounces: b.bounces + 1,
@@ -1090,7 +1356,12 @@ function stepGrenades(run: RunState, ev: GameEvent[]) {
   const out: typeof run.grenades = [];
   for (const g of run.grenades) {
     g.x += g.vx; g.y += g.vy; g.vy += GRENADE_G;
-    const hitZ = run.zombies.some((z) => z.hp > 0 && Math.abs(g.x - z.x) <= 18 && g.y >= GROUND_Y - 46);
+    const hitZ = run.zombies.some((z) => {
+      if (z.hp <= 0) return false;
+      const top = GROUND_Y + (z.y ?? 0) - (ZOMBIES[z.kind].boss ? 96 : z.kind === 'bat' ? 28 : 48);
+      const bot = GROUND_Y + (z.y ?? 0) + 6;
+      return Math.abs(g.x - z.x) <= 20 && g.y >= top && g.y <= bot;
+    });
     if (hitZ || g.y >= GROUND_Y - 4) {
       explodeAt(run, g.x, Math.min(GROUND_Y - 14, g.y), g.r, g.dmg, ev, true, true, false);
     } else if (g.x >= 0 && g.x <= SPAWN_X) {
@@ -1154,6 +1425,7 @@ export function step(run: RunState, input: Input): GameEvent[] {
   stepZombies(run, ev);
   stepFires(run, ev);
   stepTurrets(run, ev);
+  stepAllies(run, ev);
   stepBullets(run, ev);
   stepGrenades(run, ev);
   stepEnemyProjs(run, ev);
@@ -1226,7 +1498,8 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
         ev.push({ t: 'dinerStory', eventKey: 'firstOpen' });
       }
 
-      run.inside = true; run.player.x = IN_STATIONS.kitchen + 40; run.player.y = 0; run.player.vy = 0;
+      run.inside = true; run.player.x = IN_STATIONS.kitchen + 20; run.player.y = 0; run.player.vy = 0; run.player.facing = -1;
+      run.dinerCook = null; run.carryingDish = null;
       rollShopOffers(run);
       rollDinerGuests(run);
       ev.push({ t: 'inside', inside: true });
@@ -1247,6 +1520,7 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
     case 'exitHouse':
       if (run.phase !== 'camp' || !run.inside) return null;
       run.inside = false; run.player.x = DOOR_X; run.player.y = 0; run.player.vy = 0; run.player.facing = 1;
+      run.dinerCook = null; run.carryingDish = null;
       ev.push({ t: 'inside', inside: false });
       return ev;
     case 'focusTarget': {
@@ -1272,7 +1546,7 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       const cost = turretBuildCost(cmd.kind, run.cls, hasAlly(run, 'qiang'));
       if (run.coins < cost) return null;
       run.coins -= cost;
-      slot.type = cmd.kind; slot.level = 1; slot.cd = 0; slot.aim = 0;
+      slot.type = cmd.kind; slot.level = 1; slot.cd = 0; slot.aim = 0; slot.mode = 'near';
       ev.push({ t: 'build', kind: 'turret' });
       return ev;
     }
@@ -1285,11 +1559,18 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       ev.push({ t: 'build', kind: 'turret' });
       return ev;
     }
+    case 'cycleTurretMode': {
+      const slot = run.turrets[cmd.slot];
+      if (!slot || !slot.type) return null;
+      const order: TurretTargetMode[] = ['near', 'boss', 'air'];
+      slot.mode = order[(order.indexOf(slot.mode ?? 'near') + 1) % order.length];
+      return ev;
+    }
     case 'sellTurret': {
       const slot = run.turrets[cmd.slot];
       if (!slot || !slot.type) return null;
       run.coins += turretRefundCoins(slot.type, slot.level, run.cls, hasAlly(run, 'qiang'));
-      slot.type = null; slot.level = 0; slot.cd = 0;
+      slot.type = null; slot.level = 0; slot.cd = 0; slot.mode = 'near';
       return ev;
     }
     case 'upgradeWall': {
@@ -1380,77 +1661,46 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       run.coins += 45 + removed.star * 20;
       return ev;
     }
+    case 'startCook': {
+      if (run.phase !== 'camp' || !run.inside || run.dinerCook || run.carryingDish) return null;
+      const g = run.guests.find((o) => o.id === cmd.guestId && !o.served);
+      if (!g || run.meat < g.meatCost) return null;
+      run.dinerCook = { guestId: g.id, dish: g.dish, dishName: g.dishName, startedTick: run.tick, pos: 0 };
+      return ev;
+    }
+    case 'finishCook': {
+      if (run.phase !== 'camp' || !run.inside || !run.dinerCook) return null;
+      const cook = run.dinerCook;
+      const g = run.guests.find((o) => o.id === cook.guestId && !o.served);
+      run.dinerCook = null;
+      if (!g || run.meat < g.meatCost) return null;
+      run.meat -= g.meatCost;
+      const quality: DishQuality = cmd.quick ? 'good' : qteQuality(cook.pos);
+      run.carryingDish = { guestId: g.id, dish: cook.dish, dishName: cook.dishName, quality };
+      ev.push({ t: 'cookDone', guestId: g.id, dish: cook.dish, dishName: cook.dishName, quality });
+      return ev;
+    }
+    case 'cancelCook': {
+      if (!run.dinerCook) return null;
+      run.dinerCook = null;
+      return ev;
+    }
+    case 'serveCarried': {
+      if (run.phase !== 'camp' || !run.inside || !run.carryingDish) return null;
+      const carried = run.carryingDish;
+      const g = run.guests.find((o) => o.id === carried.guestId && !o.served);
+      run.carryingDish = null;
+      if (!g) return ev;
+      completeServeGuest(run, g, carried.quality, ev, false);
+      return ev;
+    }
     case 'serveGuest': {
       if (run.phase !== 'camp') return null;
       const g = run.guests.find((o) => o.id === cmd.guestId && !o.served);
       if (!g || run.meat < g.meatCost) return null;
-      const quality: DishQuality = cmd.quality ?? 'good';
-      const qMeta = QUALITY_META[quality];
-      const vip = VIP_CUSTOMERS.find((v) => v.id === g.vipId);
-
-      run.meat -= g.meatCost;
-      g.served = true;
-      g.qualityServed = quality;
-      g.reactionQuote = vip?.reactions[quality] ?? g.thanksQuote;
-
-      const beforeRank = getFansRank(run.diner.fans).cur.grade;
-      const finalCoins = Math.round(g.pay * qMeta.payMul);
-      const zhaoMul = hasAlly(run, 'zhao') ? 1.3 : 1;
-      const chefFans = run.cls === 'chef' ? 1.25 : 1;
-      const trendFans = g.trendMatch ? 2 : 1;
-      const tierFans = g.tier === 'bronze' ? 1 : g.tier === 'silver' ? 1.2 : g.tier === 'gold' ? 1.4 : g.tier === 'platinum' ? 1.7 : 2.1;
-      const fansGain = Math.round(qMeta.fans * trendFans * zhaoMul * chefFans * tierFans);
-      const repGain = qMeta.rep + (g.trendMatch ? 1 : 0);
-
-      run.coins += finalCoins;
-      run.diner.fans += fansGain;
-      run.diner.rep += repGain;
-      run.diner.servedTotal++;
-      const firstMeet = !run.diner.metVips.includes(g.vipId);
-      if (firstMeet) run.diner.metVips.push(g.vipId);
-
-      const pool = DINER_REVIEW_POOL[quality];
-      const revText = pool[Math.floor(rand(run) * pool.length)] ?? g.reactionQuote;
-      run.diner.reviews.unshift({
-        id: run.nextId++,
-        author: g.name,
-        tierName: VIP_TIERS[g.tier].name,
-        dishName: g.dishName,
-        quality,
-        text: revText,
-        fansDelta: fansGain,
-      });
-      if (run.diner.reviews.length > 12) run.diner.reviews.length = 12;
-
-      const allServed = run.guests.length > 0 && run.guests.every((o) => o.served);
-      let totalCoins = finalCoins;
-      if (allServed) {
-        const tip = run.cls === 'chef' ? 28 : 18;
-        run.coins += tip;
-        totalCoins += tip;
-        run.diner.fans += 8;
-        run.diner.rep += 1;
-        run.player.hp = Math.min(run.player.maxHp, run.player.hp + 15);
-      }
-
-      const afterRank = getFansRank(run.diner.fans).cur;
-      const rankUp = afterRank.grade !== beforeRank ? `${afterRank.grade}级·${afterRank.name}` : undefined;
-      ev.push({
-        t: 'serve', guestId: g.id, vipId: g.vipId, name: g.name, dishName: g.dishName,
-        quality, coins: totalCoins, fans: fansGain + (allServed ? 8 : 0), rep: repGain + (allServed ? 1 : 0),
-        quote: g.reactionQuote, allServed, firstMeet, trendMatch: g.trendMatch, rankUp,
-      });
-
-      if (run.diner.rep >= 10 && !run.story.seenEvents.includes('rep10')) {
-        run.story.seenEvents.push('rep10');
-        ev.push({ t: 'dinerStory', eventKey: 'rep10' });
-      } else if (run.diner.rep >= 25 && !run.story.seenEvents.includes('rep25')) {
-        run.story.seenEvents.push('rep25');
-        ev.push({ t: 'dinerStory', eventKey: 'rep25' });
-      } else if (run.diner.rep >= 40 && !run.story.seenEvents.includes('rep40')) {
-        run.story.seenEvents.push('rep40');
-        ev.push({ t: 'dinerStory', eventKey: 'rep40' });
-      }
+      if (run.dinerCook?.guestId === g.id) run.dinerCook = null;
+      if (run.carryingDish?.guestId === g.id) run.carryingDish = null;
+      completeServeGuest(run, g, cmd.quality ?? 'good', ev, true);
       return ev;
     }
     case 'cookSell': {
@@ -1477,5 +1727,73 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       ev.push({ t: 'meal', id: cmd.id, quality });
       return ev;
     }
+  }
+}
+
+function completeServeGuest(run: RunState, g: DinerGuest, quality: DishQuality, ev: GameEvent[], spendMeat: boolean) {
+  const qMeta = QUALITY_META[quality];
+  const vip = VIP_CUSTOMERS.find((v) => v.id === g.vipId);
+  if (spendMeat) run.meat -= g.meatCost;
+  g.served = true;
+  g.qualityServed = quality;
+  g.reactionQuote = vip?.reactions[quality] ?? g.thanksQuote;
+
+  const beforeRank = getFansRank(run.diner.fans).cur.grade;
+  const finalCoins = Math.round(g.pay * qMeta.payMul);
+  const zhaoMul = hasAlly(run, 'zhao') ? 1.3 : 1;
+  const chefFans = run.cls === 'chef' ? 1.25 : 1;
+  const trendFans = g.trendMatch ? 2 : 1;
+  const tierFans = g.tier === 'bronze' ? 1 : g.tier === 'silver' ? 1.2 : g.tier === 'gold' ? 1.4 : g.tier === 'platinum' ? 1.7 : 2.1;
+  const fansGain = Math.round(qMeta.fans * trendFans * zhaoMul * chefFans * tierFans);
+  const repGain = qMeta.rep + (g.trendMatch ? 1 : 0);
+
+  run.coins += finalCoins;
+  run.diner.fans += fansGain;
+  run.diner.rep += repGain;
+  run.diner.servedTotal++;
+  const firstMeet = !run.diner.metVips.includes(g.vipId);
+  if (firstMeet) run.diner.metVips.push(g.vipId);
+
+  const pool = DINER_REVIEW_POOL[quality];
+  const revText = pool[Math.floor(rand(run) * pool.length)] ?? g.reactionQuote;
+  run.diner.reviews.unshift({
+    id: run.nextId++,
+    author: g.name,
+    tierName: VIP_TIERS[g.tier].name,
+    dishName: g.dishName,
+    quality,
+    text: revText,
+    fansDelta: fansGain,
+  });
+  if (run.diner.reviews.length > 12) run.diner.reviews.length = 12;
+
+  const allServed = run.guests.length > 0 && run.guests.every((o) => o.served);
+  let totalCoins = finalCoins;
+  if (allServed) {
+    const tip = run.cls === 'chef' ? 28 : 18;
+    run.coins += tip;
+    totalCoins += tip;
+    run.diner.fans += 8;
+    run.diner.rep += 1;
+    run.player.hp = Math.min(run.player.maxHp, run.player.hp + 15);
+  }
+
+  const afterRank = getFansRank(run.diner.fans).cur;
+  const rankUp = afterRank.grade !== beforeRank ? `${afterRank.grade}级·${afterRank.name}` : undefined;
+  ev.push({
+    t: 'serve', guestId: g.id, vipId: g.vipId, name: g.name, dishName: g.dishName,
+    quality, coins: totalCoins, fans: fansGain + (allServed ? 8 : 0), rep: repGain + (allServed ? 1 : 0),
+    quote: g.reactionQuote, allServed, firstMeet, trendMatch: g.trendMatch, rankUp,
+  });
+
+  if (run.diner.rep >= 10 && !run.story.seenEvents.includes('rep10')) {
+    run.story.seenEvents.push('rep10');
+    ev.push({ t: 'dinerStory', eventKey: 'rep10' });
+  } else if (run.diner.rep >= 25 && !run.story.seenEvents.includes('rep25')) {
+    run.story.seenEvents.push('rep25');
+    ev.push({ t: 'dinerStory', eventKey: 'rep25' });
+  } else if (run.diner.rep >= 40 && !run.story.seenEvents.includes('rep40')) {
+    run.story.seenEvents.push('rep40');
+    ev.push({ t: 'dinerStory', eventKey: 'rep40' });
   }
 }

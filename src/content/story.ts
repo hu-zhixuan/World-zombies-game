@@ -83,10 +83,10 @@ export interface SpeakerMeta {
 
 export const SPEAKERS: Record<string, SpeakerMeta> = {
   ming:  { id: 'ming',  name: '莫老板',   initial: '莫', desc: '暮夜酒馆守夜人兼掌勺', avatar: 'hero_idle' },
-  zhang: { id: 'zhang', name: '老兵张',   initial: '张', desc: '退伍神枪 · 屋顶瞭望',   avatar: 'npc_bearded' },
-  lin:   { id: 'lin',   name: '药师小林', initial: '林', desc: '随行药师 · 伤员照料',   avatar: 'npc_woman' },
-  qiang: { id: 'qiang', name: '铁匠阿强', initial: '强', desc: '锻造与炮塔技师',       avatar: 'npc_hat' },
-  zhao:  { id: 'zhao',  name: '哨兵小赵', initial: '赵', desc: '哨塔信使 · 守夜号角',   avatar: 'npc_oldman' },
+  zhang: { id: 'zhang', name: '老兵张',   initial: '张', desc: '屋顶神射 · 银弩瞭望',   avatar: 'ally_zhang' },
+  lin:   { id: 'lin',   name: '药师小林', initial: '林', desc: '随行炼金 · 秘药照料',   avatar: 'ally_lin' },
+  qiang: { id: 'qiang', name: '铁匠阿强', initial: '强', desc: '重甲斩卫 · 锻造技师',   avatar: 'ally_qiang' },
+  zhao:  { id: 'zhao',  name: '哨兵小赵', initial: '赵', desc: '哨塔斥候 · 对空速射',   avatar: 'ally_zhao' },
   boss1: { id: 'boss1', name: '地狱巨兽·暴君', initial: '暴', desc: '第5天首领 · 拆墙狂兽', avatar: 'boss_beast' },
   boss2: { id: 'boss2', name: '血月暴君·狂怒领主', initial: '怒', desc: '第10天首领 · 烈焰督军', avatar: 'boss_beast' },
   boss3: { id: 'boss3', name: '深渊魔王·尸皇', initial: '皇', desc: '第15天终极首领', avatar: 'boss_demon' },
@@ -164,7 +164,7 @@ export const CHAPTER_CARDS: ChapterCard[] = [
     chapter: '第一章',
     title: '暮色初围',
     sub: '第 1～4 天',
-    text: '游荡腐尸率先沿着暗紫长街涌来，第 2 天噬魂黑猫突袭、第 3 天地狱猎犬成群狂奔、第 4 天铁甲般的焦骨巨尸撞门——尽早升级兵器、修好壁垒并站稳屋顶！',
+    text: '游荡腐尸率先沿着暗紫长街涌来，第 2 天噬魂黑猫突袭、第 3 天地狱猎犬与低空掠袭的夜翼魔蝠齐至、第 4 天铁甲般的焦骨巨尸撞门——尽早升级兵器、修好壁垒并站稳屋顶！',
     minDay: 1,
     maxDay: 4,
   },
@@ -172,7 +172,7 @@ export const CHAPTER_CARDS: ChapterCard[] = [
     chapter: '第二章',
     title: '暴君叩关',
     sub: '第 5～9 天',
-    text: '第 5 天首领「地狱巨兽·暴君」携火球与兽群碾压防线；第 6 天会飘在半空吐幽火的「提灯怨灵」登场。老兵张、药师小林、铁匠阿强与哨兵小赵也将在此期间陆续入伙！',
+    text: '第 5 天首领「地狱巨兽·暴君」携火球与兽群碾压防线；第 6 天会飘在半空吐幽火的「提灯怨灵」登场。老兵张、药师小林、铁匠阿强与哨兵小赵也将在此期间陆续入伙并亲自参战！',
     minDay: 5,
     maxDay: 9,
   },
@@ -205,8 +205,8 @@ export const WAVE_STORY_LINES: Record<number, StoryLine[]> = {
     line('ming', '站高一点能躲开它们的扑咬，要是攒够金币，可以考虑换把重锤左轮或双管龙息铳了。'),
   ],
   3: [
-    line('ming', '第 3 夜！巷尾传出成群嚎叫——地狱猎犬顺着街灯冲过来了！'),
-    line('ming', '连珠火铳或寒霜连铳最克制疯跑的狗群，路障别忘了盯紧血线。'),
+    line('ming', '第 3 夜！巷尾传出成群嚎叫——地狱猎犬顺街疾奔，半空还有夜翼魔蝠掠过屋檐！'),
+    line('ming', '屋顶同样能抬头打飞怪，下跳按↓就能穿回门廊与前院，记得给炮塔切好「对空」或「最近」优先度。'),
   ],
   4: [
     line('ming', '地面在震……第 4 夜会出现浑身焦黑的重甲大块头「焦骨巨尸」，硬啃路障很疼。'),
@@ -373,10 +373,10 @@ export interface AllyDef {
 }
 
 export const ALLIES: Record<AllyId, AllyDef> = {
-  zhang: { id: 'zhang', joinDay: 2, name: '老兵张', role: '前神射老兵', initial: '张', sprite: 'npc_bearded', buffDesc: '全武器伤害 +10%' },
-  lin:   { id: 'lin',   joinDay: 4, name: '药师小林', role: '随行药师', initial: '林', sprite: 'npc_woman', buffDesc: '每夜额外恢复 +18 生命' },
-  qiang: { id: 'qiang', joinDay: 6, name: '铁匠阿强', role: '结构锻工', initial: '强', sprite: 'npc_hat', buffDesc: '墙与大屋耐久 +50 · 造/升塔 -10% 金' },
-  zhao:  { id: 'zhao',  joinDay: 8, name: '哨兵小赵', role: '哨塔信使', initial: '赵', sprite: 'npc_oldman', buffDesc: '食堂增粉 +30% · 联络破晓救援' },
+  zhang: { id: 'zhang', joinDay: 2, name: '老兵张', role: '屋顶神射', initial: '张', sprite: 'ally_zhang', buffDesc: '屋顶银弩助战 · 全武器伤害 +10%' },
+  lin:   { id: 'lin',   joinDay: 4, name: '药师小林', role: '随行炼金', initial: '林', sprite: 'ally_lin', buffDesc: '门廊炼金冰焰助战/慢回血 · 每夜 +18 血' },
+  qiang: { id: 'qiang', joinDay: 6, name: '铁匠阿强', role: '重甲斩卫', initial: '强', sprite: 'ally_qiang', buffDesc: '前院重斩退敌/修墙 · 墙大屋+50 · 造塔-10%' },
+  zhao:  { id: 'zhao',  joinDay: 8, name: '哨兵小赵', role: '斥候对空', initial: '赵', sprite: 'ally_zhao', buffDesc: '屋顶速射优先对空 · 食堂增粉 +30%' },
 };
 export const ALLY_ORDER: AllyId[] = ['zhang', 'lin', 'qiang', 'zhao'];
 

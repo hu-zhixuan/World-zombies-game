@@ -1,14 +1,15 @@
-// 触屏按键与键盘：左下元气骑士式浮动摇杆，右下主攻击键（按住开火 + 自动锁敌）+ 弧形战术键（跳/闪/可拖拽控抛物线爆炎弹/技能）。
+// 触屏按键与键盘：左下元气骑士式浮动摇杆（支持下滑穿层），右下主攻击键 / 营地智能交互键。
 import { useRef } from 'preact/hooks';
 import { audio } from '../app/audio';
 import { game } from '../app/game';
-import { CLASSES, WEAPONS, magSize } from '../content/data';
-import { curWeapon, nearbyExterior, nearbyStation } from '../sim/sim';
+import { CLASSES, MEALS, WEAPONS, magSize } from '../content/data';
+import { ALLIES, QUALITY_META } from '../content/story';
+import { curWeapon, nearbyCampTarget, nearbyStation } from '../sim/sim';
 import { Bar, Icon, Stars } from './parts';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-/** 左下角浮动摇杆：点进热区任意位置都能抓到摇杆，7% 极小死区 + 随指微漂防换向卡顿 */
+/** 左下角浮动摇杆：点进热区任意位置都能抓到摇杆，7% 极小死区 + 下拉穿层下跳 */
 export function Pad() {
   const padRef = useRef<HTMLDivElement>(null);
   const originRef = useRef<{ x: number; y: number } | null>(null);
@@ -20,12 +21,14 @@ export function Pad() {
     if (el) {
       el.classList.remove('active');
       el.removeAttribute('data-dir');
+      el.removeAttribute('data-down');
       el.style.setProperty('--bx', '0px');
       el.style.setProperty('--by', '0px');
       el.style.setProperty('--x', '0');
       el.style.setProperty('--y', '0');
     }
     game.held.move = 0;
+    game.held.down = false;
   };
 
   const apply = (cx: number, cy: number, isDown: boolean) => {
@@ -62,21 +65,25 @@ export function Pad() {
     }
 
     const R = 44;
-    let nx = clamp(dx / R, -1, 1), ny = clamp(dy / R, -1, 1);
+    const nx = clamp(dx / R, -1, 1), ny = clamp(dy / R, -1, 1);
     const mag = Math.hypot(nx, ny);
     const kx = mag > 1 ? nx / mag : nx;
     const ky = mag > 1 ? ny / mag : ny;
     el.classList.add('active');
     el.style.setProperty('--x', kx.toFixed(3));
-    el.style.setProperty('--y', (ky * 0.55).toFixed(3));
+    el.style.setProperty('--y', (ky * 0.72).toFixed(3));
 
     const ax = Math.abs(nx);
     const dead = 0.07;
     const move = ax < dead ? 0 : Math.sign(nx) * Math.min(1, 0.38 + ((ax - dead) / 0.72) * 0.62);
+    const downHeld = ny > 0.58 && ny > ax * 0.9;
     game.held.move = move;
+    game.held.down = downHeld;
     if (move > 0) el.setAttribute('data-dir', 'right');
     else if (move < 0) el.setAttribute('data-dir', 'left');
     else el.removeAttribute('data-dir');
+    if (downHeld) el.setAttribute('data-down', '1');
+    else el.removeAttribute('data-down');
   };
 
   return (
@@ -182,28 +189,90 @@ function GrenadeKey(props: { count: number }) {
   );
 }
 
-/** 靠近室外大门时弹出的情景交互按钮（室内交互统一整合至底部 CampDock 高亮，不重复遮挡屏幕） */
-export function InteractHint() {
+/** 营地右下角：与战斗一致的圆弧握持键位（大号上下文互动键 #key-act + 跳跃键 #key-jump），靠近任意客人/战友/炉灶/工坊一按即达 */
+export function CampKeys() {
   const run = game.run;
-  if (run.inside && run.phase === 'camp') return null;
-  let label = '';
-  if (run.inside) {
-    const st = nearbyStation(run);
-    if (st === 'kitchen') label = '深夜食堂';
-    else if (st === 'shop') label = '军械行商';
-    else if (st === 'workshop') label = '防线工坊';
-    else if (st === 'door') label = '走出木门';
-  } else {
-    const ext = nearbyExterior(run);
-    if (ext === 'door' && run.phase === 'camp') label = '进入酒馆';
+  const ct = nearbyCampTarget(run);
+  let icon = run.inside ? 'ic_kitchen' : 'ic_rooftop';
+  let label = '交互';
+  let tip = run.inside ? '走近灶台 / 食客 / 行商 / 工坊 / 战友' : '走近木门或驻守战友交谈';
+
+  if (ct) {
+    switch (ct.kind) {
+      case 'cookFinish':
+        icon = MEALS[ct.guest.dish].icon;
+        label = '火候出锅';
+        tip = `铁板 ${ct.guest.dishName} · 点击出锅端菜`;
+        break;
+      case 'cookStart':
+        icon = MEALS[ct.guest.dish].icon;
+        label = '开灶烹制';
+        tip = `${ct.guest.name} 要「${ct.guest.dishName}」(${ct.guest.meatCost}肉→${ct.guest.pay}金)`;
+        break;
+      case 'serveCarried':
+        icon = MEALS[ct.guest.dish].icon;
+        label = `上菜·${ct.guest.name}`;
+        tip = `端给 ${ct.guest.name}（${QUALITY_META[run.carryingDish!.quality].label}火候）`;
+        break;
+      case 'guestTalk':
+        icon = MEALS[ct.guest.dish].icon;
+        label = '搭话';
+        tip = ct.guest.served ? `${ct.guest.name}（已用膳）` : `${ct.guest.name} 等「${ct.guest.dishName}」· 点左壁红砖炉做菜`;
+        break;
+      case 'allyTalk':
+        icon = 'ic_star';
+        label = '交谈';
+        tip = `${ALLIES[ct.ally].name} · ${ALLIES[ct.ally].role}`;
+        break;
+      case 'kitchen':
+        icon = 'ic_kitchen';
+        label = '食堂总览';
+        tip = '查看特餐菜单 / 熟客图鉴 / 现炒鲜肉';
+        break;
+      case 'shop':
+        icon = 'ic_shop';
+        label = '军械行商';
+        tip = '购置神兵 / 护甲 / 爆炎弹';
+        break;
+      case 'workshop':
+        icon = 'ic_anvil';
+        label = '防线工坊';
+        tip = '布防俯瞰图 / 炮塔 / 壁垒升星';
+        break;
+      case 'doorOut':
+        icon = 'ic_wall';
+        label = '出门看墙';
+        tip = '走出暮夜酒馆大门巡查防线';
+        break;
+      case 'doorIn':
+        icon = 'ic_kitchen';
+        label = '回酒馆';
+        tip = '进入温暖酒馆大堂';
+        break;
+    }
+  } else if (run.carryingDish) {
+    const dest = run.guests.find((o) => o.id === run.carryingDish!.guestId);
+    icon = MEALS[run.carryingDish.dish].icon;
+    label = '端菜中';
+    tip = `正端着「${run.carryingDish.dishName}」→ 送到 ${dest?.name ?? '客人'} 桌前`;
   }
-  if (!label) return null;
+
   return (
-    <button id="btn-interact" class="btn-act" onPointerDown={() => game.press('interact')}>{label}</button>
+    <div class="keys-fan camp-fan">
+      <div class={`camp-act-tip ${ct || run.carryingDish ? 'on' : ''}`} id="camp-act-tip">{tip}</div>
+      <FanKey id="key-act" cls="fkey-fire fkey-act" lit={!!ct} empty={!ct} onDown={() => game.press('interact')}>
+        <Icon k={icon} />
+        <span>{label}</span>
+      </FanKey>
+      <FanKey id="key-jump" cls="fkey-dodge fkey-camp-jump" onDown={() => game.press('jump')}>
+        <Icon k="ic_rooftop" />
+        <span>跳跃</span>
+      </FanKey>
+    </div>
   );
 }
 
-/** 右下角元气骑士式弧形战术键区：大号主攻击键（按住自动锁敌开火，不按绝不乱打）+ 跳/闪/拖曳抛物线爆炎弹/技能 */
+/** 右下角元气骑士式弧形战术键区：大号主攻击键 + 闪避(下) / 跳跃(上) / 拖拽抛物线爆炎弹 / 技能 */
 export function Keys() {
   const run = game.run, p = run.player, clsDef = CLASSES[run.cls];
   const w = curWeapon(run), def = WEAPONS[w.id];
@@ -265,39 +334,35 @@ export function WeaponChip() {
   );
 }
 
-/** 营地夜晚底栏：可一边走动，靠近功能区时自动微光提示对应按钮，不弹窗不挡视野 */
-export function CampDock() {
+/** 营地夜晚极简底栏：仅保留「食堂/特餐」总览与「迎战第 N 天」触发键，其余全部走近用右下互动键交互 */
+export function CampBar() {
   const run = game.run;
   const near = run.inside ? nearbyStation(run) : null;
   const unserved = run.guests.filter((g) => !g.served).length;
+  const sub = run.meal ? '特餐已备' : unserved > 0 ? `${unserved}客` : '总览';
   return (
-    <div class="camp-dock" id="camp-dock">
+    <div class="camp-bar" id="camp-bar">
       <button id="btn-kitchen" class={`camp-btn ${near === 'kitchen' ? 'near' : ''}`} onClick={() => game.open('kitchen')}>
-        <Icon k="ic_kitchen" />深夜食堂{unserved > 0 ? `(${unserved}客)` : run.meat > 0 ? `(${run.meat}肉)` : ''}
-      </button>
-      <button id="btn-shop" class={`camp-btn ${near === 'shop' ? 'near' : ''}`} onClick={() => game.open('shop')}>
-        <Icon k="ic_shop" />军械行商
-      </button>
-      <button id="btn-build" class={`camp-btn ${near === 'workshop' ? 'near' : ''}`} onClick={() => game.open('build')}>
-        <Icon k="ic_anvil" />防线工坊
-      </button>
-      <button id="btn-inout" class={`camp-btn sub ${near === 'door' ? 'near' : ''}`} onClick={() => game.send({ t: run.inside ? 'exitHouse' : 'enterHouse' })}>
-        {run.inside ? '出门看防线' : '回酒馆'}
+        <Icon k="ic_kitchen" />食堂 · {sub}
       </button>
       <button id="btn-next" class="camp-btn primary" onClick={() => game.send({ t: 'nextDay' })}>
-        迎战第 {run.day + 1} 天
+        <Icon k="ic_rooftop" />迎战第 {run.day + 1} 天
       </button>
     </div>
   );
 }
 
 export function bindKeyboard() {
-  const dirs = { left: false, right: false };
-  const sync = () => { game.held.move = (dirs.right ? 1 : 0) - (dirs.left ? 1 : 0); };
+  const dirs = { left: false, right: false, down: false };
+  const sync = () => {
+    game.held.move = (dirs.right ? 1 : 0) - (dirs.left ? 1 : 0);
+    game.held.down = dirs.down;
+  };
   const onKey = (down: boolean) => (e: KeyboardEvent) => {
     const k = e.key.toLowerCase();
     if (k === 'a' || k === 'arrowleft') { dirs.left = down; sync(); }
     else if (k === 'd' || k === 'arrowright') { dirs.right = down; sync(); }
+    else if (k === 's' || k === 'arrowdown') { dirs.down = down; sync(); }
     else if (k === 'j') { game.held.fire = down; }
     else if (down && !e.repeat) {
       const curPanel = game.panel();
@@ -317,5 +382,5 @@ export function bindKeyboard() {
   };
   window.addEventListener('keydown', onKey(true));
   window.addEventListener('keyup', onKey(false));
-  window.addEventListener('blur', () => { dirs.left = dirs.right = false; game.releaseAll(); });
+  window.addEventListener('blur', () => { dirs.left = dirs.right = dirs.down = false; game.releaseAll(); });
 }

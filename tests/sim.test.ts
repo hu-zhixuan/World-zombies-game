@@ -12,13 +12,16 @@ import {
 import { runBot } from '../src/sim/bot';
 import {
   BODY_Y, MAX_CARRY, command, computeGrenadeThrow, damageMul, effectiveRange, houseBuff,
-  isOnPorch, isOnRoof, meatPrice, newRun, step, turretBuildCost, turretRefundCoins, turretUpgradeCost,
+  isOnPorch, isOnRoof, meatPrice, nearbyCampTarget, newRun, step, turretBuildCost, turretRefundCoins, turretUpgradeCost,
 } from '../src/sim/sim';
-import { DOOR_X, GROUND_Y, HOUSE_WALL_X, IN_STATIONS, NO_INPUT, PORCH_MAX_X, PORCH_Y, ROOF_Y, WALL_X, type RunState } from '../src/sim/types';
+import {
+  ALLY_POS, DOOR_X, GROUND_Y, HOUSE_WALL_X, IN_STATIONS, NO_INPUT, PORCH_MAX_X, PORCH_Y, ROOF_Y, WALL_X, type RunState,
+} from '../src/sim/types';
 
 const clone = (r: RunState): RunState => JSON.parse(JSON.stringify(r));
-const zombie = (r: RunState, x: number, hp = 100000, kind: 'roamer' | 'bruiser' | 'ghoul' | 'boss_beast' = 'roamer') => {
-  const z = { id: r.nextId++, kind, x, hp, maxHp: hp, atkCd: 999, kb: 0, burnT: 0, slowT: 0, stunT: 0, freezeT: 0, carriesCrate: false };
+const zombie = (r: RunState, x: number, hp = 100000, kind: 'roamer' | 'bruiser' | 'bat' | 'ghoul' | 'boss_beast' = 'roamer', y?: number) => {
+  const zy = y ?? (kind === 'bat' ? -84 : kind === 'ghoul' ? -72 : 0);
+  const z = { id: r.nextId++, kind, x, y: zy, hp, maxHp: hp, atkCd: 999, kb: 0, burnT: 0, slowT: 0, stunT: 0, freezeT: 0, carriesCrate: false };
   r.zombies.push(z); return z;
 };
 /** 一个没有刷怪的安静场地，默认关闭屋顶 1 号初始火铳塔以便测纯主角规则 */
@@ -160,6 +163,36 @@ describe('2D 小屋实体碰撞、阶梯跳台与元气骑士式手动开火锁�
     expect(isOnRoof(r)).toBe(true);
     expect(r.player.y).toBe(ROOF_Y);
     expect(r.player.x).toBeLessThan(HOUSE_WALL_X); // 在二楼房顶可以自由走到小屋正上方
+  });
+
+  test('泰拉瑞亚式 ↓ 穿层下跳：轻按落门廊、长按穿落地面；飞行夜翼魔蝠与提灯怨灵可被 360° 上下锁敌击杀', () => {
+    const r = quiet();
+    r.player.x = 248; r.player.y = ROOF_Y;
+    // 轻按 ↓ 穿过屋顶落到中层门廊 (PORCH_Y)
+    step(r, { ...NO_INPUT, down: true });
+    for (let i = 0; i < 25; i++) step(r, NO_INPUT);
+    expect(isOnPorch(r)).toBe(true);
+    expect(r.player.y).toBe(PORCH_Y);
+
+    // 从门廊继续按 ↓ 穿落前院地面 (GROUND)
+    step(r, { ...NO_INPUT, down: true });
+    for (let i = 0; i < 30; i++) step(r, NO_INPUT);
+    expect(r.player.y).toBe(0);
+
+    // 从屋顶边缘持续按住 ↓ 可一口气穿两层直达地面
+    r.player.x = 248; r.player.y = ROOF_Y; r.player.vy = 0;
+    for (let i = 0; i < 40; i++) step(r, { ...NO_INPUT, down: true });
+    expect(r.player.y).toBe(0);
+
+    // 360° 全向作战：玩家站在地面，头顶上方飞行夜翼魔蝠 (bat) 会俯冲并被仰角子弹击落，身后僵尸也能反身全向击中
+    r.player.x = 420; r.player.y = 0; r.player.facing = 1;
+    r.player.weapons = [{ id: 'pistol', star: 1, ammo: 10 }];
+    const bat = zombie(r, 440, 28, 'bat', -96);
+    const ghoul = zombie(r, 700, 100, 'ghoul', -74);
+    for (let i = 0; i < 45; i++) step(r, { ...NO_INPUT, fire: true });
+    expect(r.zombies.find((z) => z.id === bat.id)).toBeUndefined();
+    expect(ghoul.x).toBeLessThanOrEqual(700);
+    expect(ghoul.y).toBeLessThan(-50);
   });
 
   test('元气骑士手感：默认绝不自动开枪，按住攻击键才自动锁敌或朝面朝方向盲射', () => {
@@ -314,7 +347,7 @@ describe('兵器升星、可控抛物线爆炎弹、铁甲与军械行商', () =
 
     // 远距离高抛：跳过近处的 front，越过头顶精准炸毁远端逼近的 back 魔物
     const front = zombie(r, 340, 300);
-    const back = zombie(r, 690, 300);
+    const back = zombie(r, 725, 300);
     step(r, { ...NO_INPUT, grenade: true, grenadeAim: { dx: 1, dy: -0.9 } });
     for (let i = 0; i < 80; i++) step(r, NO_INPUT);
     expect(front.hp).toBe(300);
@@ -476,6 +509,98 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     r.wall.hp = 10;
     command(r, { t: 'nextDay' });
     expect(r.wall.hp).toBe(10 + Math.round(r.wall.maxHp * 0.3));
+  });
+
+  test('四位战友真实参战（银弩穿透/冰焰缓速回血/近战震退修墙/对空速射）与炮塔索敌模式切换（near → boss → air）', () => {
+    // 1. 战友真实参战
+    const r = quiet();
+    r.story.allies = ['zhang', 'lin', 'qiang', 'zhao'];
+    r.player.hp = 70;
+    r.wall.hp = 180;
+    const zNear = zombie(r, WALL_X + 6, 400, 'roamer');
+    const zBat = zombie(r, 460, 120, 'bat', -90);
+    const allyShots = new Set<string>();
+    for (let i = 0; i < 310; i++) {
+      for (const e of step(r, NO_INPUT)) {
+        if (e.t === 'shot' && e.from === 'ally' && e.ally) allyShots.add(e.ally);
+      }
+    }
+    expect(allyShots.has('zhang')).toBe(true);
+    expect(allyShots.has('lin')).toBe(true);
+    expect(allyShots.has('qiang')).toBe(true);
+    expect(allyShots.has('zhao')).toBe(true);
+    expect(r.player.hp).toBeGreaterThan(70); // 小林战斗慢回血
+    expect(r.wall.hp).toBeGreaterThan(180);  // 阿强前院修墙
+    expect(zNear.hp).toBeLessThan(400);
+    expect(zBat.hp).toBeLessThan(120);
+
+    // 2. 炮塔索敌模式切换：boss 模式越过前排先轰首领；air 模式越过地面腐尸先射空中魔蝠
+    const tBoss = quiet();
+    tBoss.phase = 'camp'; tBoss.coins = 500;
+    command(tBoss, { t: 'buildTurret', slot: 0, kind: 'mg' });
+    expect(tBoss.turrets[0].mode).toBe('near');
+    command(tBoss, { t: 'cycleTurretMode', slot: 0 });
+    expect(tBoss.turrets[0].mode).toBe('boss');
+    command(tBoss, { t: 'nextDay' });
+    tBoss.spawn.left = 0; tBoss.spawn.timer = 1e9;
+    const frontGround = zombie(tBoss, 280, 500, 'roamer');
+    const boss = zombie(tBoss, 360, 2000, 'boss_beast');
+    for (let i = 0; i < 30; i++) step(tBoss, NO_INPUT);
+    expect(boss.hp).toBeLessThan(2000);
+    expect(frontGround.hp).toBe(500);
+
+    command(tBoss, { t: 'cycleTurretMode', slot: 0 });
+    expect(tBoss.turrets[0].mode).toBe('air');
+    tBoss.zombies = [frontGround];
+    const flyer = zombie(tBoss, 355, 200, 'bat', -88);
+    for (let i = 0; i < 60; i++) step(tBoss, NO_INPUT);
+    expect(flyer.hp).toBeLessThan(200);
+    expect(frontGround.hp).toBe(500);
+  });
+
+  test('深夜食堂屋内核验玩法：走近红砖炉开炒(QTE) → 端菜至对应食客桌前上菜 → 食客/战友/工位靠近即交互', () => {
+    const r = quiet(); r.phase = 'perk'; r.perkChoices = ['rooftop'];
+    command(r, { t: 'pickPerk', id: 'rooftop' });
+    r.meat = 6;
+    r.story.allies = ['zhang'];
+
+    // 站在厨房红砖灶台旁
+    r.player.x = IN_STATIONS.kitchen;
+    const ct0 = nearbyCampTarget(r);
+    expect(ct0?.kind).toBe('cookStart');
+    if (ct0?.kind !== 'cookStart') throw new Error('expected cookStart');
+    const targetGuest = ct0.guest;
+
+    // 开灶烹制 -> 摆针跑进中央金焰区附近 -> 出锅端菜
+    expect(command(r, { t: 'startCook', guestId: targetGuest.id })).not.toBeNull();
+    expect(r.dinerCook).not.toBeNull();
+    expect(nearbyCampTarget(r)?.kind).toBe('cookFinish');
+    for (let i = 0; i < 60; i++) step(r, NO_INPUT);
+    const doneEvs = command(r, { t: 'finishCook' })!;
+    expect(doneEvs.some((e) => e.t === 'cookDone')).toBe(true);
+    expect(r.carryingDish?.guestId).toBe(targetGuest.id);
+
+    // 端菜走到目标客人桌前上菜，随后再次判定转为与客人搭话
+    r.player.x = targetGuest.x;
+    expect(nearbyCampTarget(r)?.kind).toBe('serveCarried');
+    const serveEvs = command(r, { t: 'serveCarried' })!;
+    expect(serveEvs.some((e) => e.t === 'serve' && e.guestId === targetGuest.id)).toBe(true);
+    expect(r.carryingDish).toBeNull();
+    expect(nearbyCampTarget(r)?.kind).toBe('guestTalk');
+
+    // 走近屋里战友可触发交谈，走远离开灶台会自动收火取消烹制
+    r.player.x = ALLY_POS.zhang.intX;
+    expect(nearbyCampTarget(r)?.kind).toBe('allyTalk');
+    r.player.x = IN_STATIONS.kitchen;
+    const nextCt = nearbyCampTarget(r);
+    if (nextCt?.kind === 'cookStart') {
+      command(r, { t: 'startCook', guestId: nextCt.guest.id });
+      expect(r.dinerCook).not.toBeNull();
+      r.player.x = IN_STATIONS.shop;
+      step(r, NO_INPUT);
+      expect(r.dinerCook).toBeNull();
+      expect(nearbyCampTarget(r)?.kind).toBe('shop');
+    }
   });
 });
 

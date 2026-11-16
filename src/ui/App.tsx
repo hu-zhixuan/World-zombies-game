@@ -12,10 +12,10 @@ import {
   getFansRank, getRepTier, type DishQuality, type RestStoryKey,
 } from '../content/story';
 import {
-  MAX_CARRY, dayRemaining, hasAlly, houseBuff, meatPrice, turretBuildCost, turretRefundCoins, turretUpgradeCost,
+  MAX_CARRY, dayRemaining, hasAlly, houseBuff, meatPrice, qteQuality, turretBuildCost, turretRefundCoins, turretUpgradeCost,
 } from '../sim/sim';
-import { TURRET_SLOTS, type GameEvent } from '../sim/types';
-import { CampDock, InteractHint, Keys, Pad, WeaponChip } from './controls';
+import { TURRET_SLOTS, type GameEvent, type TurretTargetMode } from '../sim/types';
+import { CampBar, CampKeys, Keys, Pad, WeaponChip } from './controls';
 import { Bar, Btn, Chip, Icon, NpcPortrait, Panel, Stars } from './parts';
 
 function Hud() {
@@ -116,7 +116,9 @@ function StoryPanel() {
       </div>
       <div class="story-actions">
         <Btn id="btn-story-skip" kind="ghost" onClick={() => game.skipStory()}>跳过剧情</Btn>
-        <Btn id="btn-story-next" kind="primary" onClick={() => game.nextStory()}>{total > 1 ? '下一句' : '进入战局'}</Btn>
+        <Btn id="btn-story-next" kind="primary" onClick={() => game.nextStory()}>
+          {total > 1 ? '下一句' : game.run.phase === 'camp' ? '好的' : '进入战局'}
+        </Btn>
       </div>
     </Panel>
   );
@@ -251,14 +253,6 @@ function ClassPanel() {
 type CookTarget =
   | { kind: 'guest'; guestId: string; name: string; dishName: string }
   | { kind: 'meal'; mealId: MealId; dishName: string };
-
-function qteQuality(pos: number): DishQuality {
-  const d = Math.abs(pos - 0.5);
-  if (d <= 0.045) return 'legendary';
-  if (d <= 0.12) return 'perfect';
-  if (d <= 0.28) return 'good';
-  return 'poor';
-}
 
 /** 深夜小食堂：今夜热门 + 铁板火候 QTE + 15 位熟客图鉴/食评 + 6 道特餐 + 现炒赚金 */
 function KitchenPanel() {
@@ -538,85 +532,181 @@ function ShopPanel() {
 }
 
 const TURRET_SHORT: Record<TurretType, string> = { mg: '火铳', frost: '寒晶', tesla: '雷炮', cannon: '重炮' };
+const TURRET_MODE_LABEL: Record<TurretTargetMode, string> = { near: '瞄:近敌', boss: '瞄:首领', air: '瞄:对空' };
+const TURRET_MODE_DESC: Record<TurretTargetMode, string> = { near: '优先最近', boss: '集火首领', air: '优先打飞怪' };
 
-/** 防线工坊：4 个炮塔位建造/升级、3 级路障壁垒、3 级堡垒大屋与兵器强化（统一仅消耗金币） */
+/** 屋顶与灶台实时铁板 QTE 浮条（#qte-hud）：同步规则层摆针位置，可点“火候出锅！”或直接按右下 #key-act 出锅 */
+function CookQteHud() {
+  const run = game.run;
+  const cook = run.dinerCook;
+  const needleRef = useRef<HTMLSpanElement>(null);
+  const badgeRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!cook) return;
+    let raf = 0;
+    const tick = () => {
+      const c = game.run.dinerCook;
+      if (c) {
+        needleRef.current?.style.setProperty('--needle', c.pos.toFixed(4));
+        const q = qteQuality(c.pos);
+        if (badgeRef.current) {
+          badgeRef.current.setAttribute('data-q', q);
+          badgeRef.current.textContent = QUALITY_META[q].label;
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [cook?.guestId, cook?.startedTick]);
+
+  if (!cook) return null;
+  const dest = run.guests.find((g) => g.id === cook.guestId);
+  const curQ = qteQuality(cook.pos);
+
+  return (
+    <div class="qte-hud" id="qte-hud">
+      <div class="qte-hud-top">
+        <Icon k={MEALS[cook.dish].icon} />
+        <b>铁板炒「{cook.dishName}」</b>
+        <span>→ {dest?.name ?? '食客'}</span>
+        <em class="qte-live-badge" ref={badgeRef} data-q={curQ}>{QUALITY_META[curQ].label}</em>
+        <button id="btn-world-qte-cancel" class="qte-close" onClick={() => game.send({ t: 'cancelCook' })}>收火</button>
+      </div>
+      <div class="qte-hud-row">
+        <div class="qte-track compact">
+          <span class="qte-zone z-good" />
+          <span class="qte-zone z-perf" />
+          <span class="qte-zone z-leg" />
+          <span class="qte-needle" ref={needleRef} />
+        </div>
+        <Btn id="btn-world-qte-hit" kind="primary" cls="small" onClick={() => game.send({ t: 'finishCook' })}>火候出锅！</Btn>
+      </div>
+    </div>
+  );
+}
+
+/** 防线工坊（战区沙盘俯瞰布局）：上排对应二楼屋顶+酒馆大屋，下排对应庭院+前线路障，底条随身兵器升星 */
 function BuildPanel() {
   const run = game.run;
   const qiang = hasAlly(run, 'qiang');
   const wallMax = run.wall.level >= MAX_WALL_LEVEL, nextWall = wallMax ? null : WALL_LEVELS[run.wall.level];
   const fortMax = run.fort.level >= MAX_FORT_LEVEL, nextFort = fortMax ? null : FORT_LEVELS[run.fort.level];
 
-  return (
-    <Panel id="panel-build" cls="wide" title="防线工坊" head={<><Purse /><Btn id="btn-close" kind="primary" onClick={() => game.close()}>好了</Btn></>}>
-      <div class="cols2">
-        <div class="box">
-          <div class="section-title"><span>4 处自动炮塔（屋顶 2 + 庭院 2{qiang ? ' · 阿强-10%' : ''}）</span></div>
-          {run.turrets.map((sl, i) => {
-            const slotMeta = TURRET_SLOTS[i];
-            if (!sl.type) {
+  const renderSlot = (i: number) => {
+    const sl = run.turrets[i];
+    const slotMeta = TURRET_SLOTS[i];
+    if (!sl.type) {
+      return (
+        <div class="item build-empty fort-slot empty" key={i}>
+          <div class="slot-head">
+            <b>{slotMeta.name}</b>
+            <small>{slotMeta.roof ? '高地+55程' : '前院地面'}</small>
+          </div>
+          <div class="mini-btns">
+            {(['mg', 'frost', 'tesla', 'cannon'] as TurretType[]).map((kind) => {
+              const c = turretBuildCost(kind, run.cls, qiang);
               return (
-                <div class="item build-empty" key={i}>
-                  <span class="grow"><b>{slotMeta.name}</b><small>选塔安装（消耗金币）</small></span>
-                  <div class="mini-btns">
-                    {(['mg', 'frost', 'tesla', 'cannon'] as TurretType[]).map((kind) => {
-                      const c = turretBuildCost(kind, run.cls, qiang);
-                      return (
-                        <Btn kind="small" key={kind} id={`btn-build-${i}-${kind}`} disabled={run.coins < c} onClick={() => game.send({ t: 'buildTurret', slot: i, kind })}>
-                          {TURRET_SHORT[kind]} {c}金
-                        </Btn>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            }
-            const tDef = TURRETS[sl.type];
-            const isMax = sl.level >= tDef.levels.length;
-            const upCost = turretUpgradeCost(sl.type, sl.level, run.cls, qiang);
-            const refund = turretRefundCoins(sl.type, sl.level, run.cls, qiang);
-            return (
-              <div class="item" key={i}>
-                <Icon k={tDef.icon} cls="x2" />
-                <span class="grow"><b>{slotMeta.name} · {tDef.name} Lv.{sl.level}</b><small>{tDef.desc}（伤 {tDef.levels[sl.level - 1].damage}）</small></span>
-                <Btn kind="small" id={`btn-turret-up-${i}`} disabled={isMax || run.coins < upCost} onClick={() => game.send({ t: 'upgradeTurret', slot: i })}>
-                  {isMax ? '满级' : `升 ${upCost}金`}
+                <Btn kind="small" key={kind} id={`btn-build-${i}-${kind}`} disabled={run.coins < c} onClick={() => game.send({ t: 'buildTurret', slot: i, kind })}>
+                  {TURRET_SHORT[kind]} {c}金
                 </Btn>
-                <Btn kind="small" id={`btn-turret-del-${i}`} onClick={() => game.send({ t: 'sellTurret', slot: i })}>拆 +{refund}金</Btn>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+    const tDef = TURRETS[sl.type];
+    const isMax = sl.level >= tDef.levels.length;
+    const upCost = turretUpgradeCost(sl.type, sl.level, run.cls, qiang);
+    const refund = turretRefundCoins(sl.type, sl.level, run.cls, qiang);
+    const mode: TurretTargetMode = sl.mode ?? 'near';
+    return (
+      <div class="item fort-slot built" key={i}>
+        <div class="slot-head">
+          <Icon k={tDef.icon} cls="x2" />
+          <div class="grow">
+            <b>{slotMeta.name} · {tDef.name} Lv.{sl.level}</b>
+            <small>伤{tDef.levels[sl.level - 1].damage} · {TURRET_MODE_DESC[mode]}</small>
+          </div>
+        </div>
+        <div class="slot-acts">
+          <button id={`btn-turret-mode-${i}`} class={`btn small mode-btn mode-${mode}`} onClick={() => game.send({ t: 'cycleTurretMode', slot: i })}>
+            {TURRET_MODE_LABEL[mode]}
+          </button>
+          <Btn kind="small" id={`btn-turret-up-${i}`} disabled={isMax || run.coins < upCost} onClick={() => game.send({ t: 'upgradeTurret', slot: i })}>
+            {isMax ? '满级' : `升${upCost}金`}
+          </Btn>
+          <Btn kind="small" id={`btn-turret-del-${i}`} onClick={() => game.send({ t: 'sellTurret', slot: i })}>
+            拆+{refund}
+          </Btn>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Panel id="panel-build" cls="wide" title="防线工坊 · 要塞沙盘" head={<><Purse /><Btn id="btn-close" kind="primary" onClick={() => game.close()}>好了</Btn></>}>
+      <div class="fort-blueprint">
+        <div class="blueprint-legend">
+          <span>二楼屋顶高地（左后 → 右前）{qiang ? ' · 阿强铸造减耗 10%' : ''}</span>
+          <em>点「瞄:近敌」切换索敌重心</em>
+        </div>
+        <div class="fort-tier tier-roof">
+          {renderSlot(0)}
+          <div class="item fort-slot core-card">
+            <div class="slot-head">
+              <Icon k="ic_fort" cls="x2" />
+              <div class="grow">
+                <b>{FORT_LEVELS[run.fort.level - 1].name} Lv.{run.fort.level}</b>
+                <small>耐久 {run.home.hp}/{run.home.maxHp} · {run.fort.level >= 3 ? '双炮+夜修墙' : run.fort.level >= 2 ? '守炮自动开火' : '屋顶高地+20%伤'}</small>
               </div>
-            );
-          })}
+            </div>
+            <Bar cls="fort" v={run.home.hp / Math.max(1, run.home.maxHp)} />
+            <div class="slot-acts two">
+              <Btn kind="small" id="btn-fort-repair" disabled={run.home.hp >= run.home.maxHp || run.coins < FORT_REPAIR_COST} onClick={() => game.send({ t: 'repairFort' })}>修 {FORT_REPAIR_COST}金</Btn>
+              <Btn kind="small" id="btn-fort-up" disabled={!nextFort || run.coins < nextFort.coins} onClick={() => game.send({ t: 'upgradeFort' })}>{nextFort ? `加固 ${nextFort.coins}金` : '满级'}</Btn>
+            </div>
+          </div>
+          {renderSlot(1)}
         </div>
 
-        <div class="box">
-          <div class="section-title"><span>前线路障 · 屋顶守炮 · 随身兵器升星</span></div>
-          <div class="item">
-            <Icon k="ic_wall" cls="x2" />
-            <span class="grow">
-              <b>{WALL_LEVELS[run.wall.level - 1].name} Lv.{run.wall.level}</b>
-              <small>耐久 {run.wall.hp}/{run.wall.maxHp}{nextWall ? ` · 下级(${nextWall.name}+反伤)：${nextWall.coins}金` : ' · 雷纹铁壁反伤生效中'}</small>
-            </span>
-            <Btn kind="small" id="btn-repair" disabled={run.wall.hp >= run.wall.maxHp || run.coins < WALL_REPAIR_COST} onClick={() => game.send({ t: 'repairWall' })}>修 {WALL_REPAIR_COST}金</Btn>
-            <Btn kind="small" id="btn-wall-up" disabled={!nextWall || run.coins < nextWall.coins} onClick={() => game.send({ t: 'upgradeWall' })}>{nextWall ? `升 ${nextWall.coins}金` : '满级'}</Btn>
+        <div class="blueprint-legend">
+          <span>一楼庭院与前线路障</span>
+          <em>尸潮来袭 ←</em>
+        </div>
+        <div class="fort-tier tier-ground">
+          {renderSlot(2)}
+          {renderSlot(3)}
+          <div class="item fort-slot core-card wall-card">
+            <div class="slot-head">
+              <Icon k="ic_wall" cls="x2" />
+              <div class="grow">
+                <b>{WALL_LEVELS[run.wall.level - 1].name} Lv.{run.wall.level}</b>
+                <small>耐久 {run.wall.hp}/{run.wall.maxHp}{nextWall ? ` · 下级反伤${nextWall.reflect}` : ' · 雷纹反伤10'}</small>
+              </div>
+            </div>
+            <Bar cls="wall" v={run.wall.hp / Math.max(1, run.wall.maxHp)} />
+            <div class="slot-acts two">
+              <Btn kind="small" id="btn-repair" disabled={run.wall.hp >= run.wall.maxHp || run.coins < WALL_REPAIR_COST} onClick={() => game.send({ t: 'repairWall' })}>修 {WALL_REPAIR_COST}金</Btn>
+              <Btn kind="small" id="btn-wall-up" disabled={!nextWall || run.coins < nextWall.coins} onClick={() => game.send({ t: 'upgradeWall' })}>{nextWall ? `升级 ${nextWall.coins}金` : '满级'}</Btn>
+            </div>
           </div>
+        </div>
+      </div>
 
-          <div class="item">
-            <Icon k="ic_fort" cls="x2" />
-            <span class="grow">
-              <b>{FORT_LEVELS[run.fort.level - 1].name} Lv.{run.fort.level}</b>
-              <small>耐久 {run.home.hp}/{run.home.maxHp}{nextFort ? ` · 下级(${nextFort.desc.split(' · ')[0]})：${nextFort.coins}金` : ' · 屋顶双联火炮+每夜修墙'}</small>
-            </span>
-            <Btn kind="small" id="btn-fort-repair" disabled={run.home.hp >= run.home.maxHp || run.coins < FORT_REPAIR_COST} onClick={() => game.send({ t: 'repairFort' })}>修 {FORT_REPAIR_COST}金</Btn>
-            <Btn kind="small" id="btn-fort-up" disabled={!nextFort || run.coins < nextFort.coins} onClick={() => game.send({ t: 'upgradeFort' })}>{nextFort ? `加固 ${nextFort.coins}金` : '满级'}</Btn>
-          </div>
-
+      <div class="star-strip">
+        <span class="star-strip-lbl">兵器升星</span>
+        <div class="star-strip-cards">
           {run.player.weapons.map((w) => {
             const def = WEAPONS[w.id], max = w.star >= MAX_STAR, cost = STAR_COST[w.star];
             return (
-              <div class="item" key={w.id}>
+              <div class="item star-mini" key={w.id}>
                 <Icon k={def.icon} cls="gun" />
-                <span class="grow"><b>{def.name} · {def.trait}</b><Stars n={w.star} /></span>
+                <div class="grow"><b>{def.name}</b><Stars n={w.star} /></div>
                 <Btn kind="small" id={`btn-star-${w.id}`} disabled={max || run.coins < cost} onClick={() => game.send({ t: 'buyStar', weapon: w.id })}>
-                  {max ? '已满星' : <>升星 <Icon k="ic_coin" />{cost}</>}
+                  {max ? '满星' : `★+${cost}金`}
                 </Btn>
               </div>
             );
@@ -644,6 +734,10 @@ function Toasts() {
     else if (e.t === 'star') pushToast(`${WEAPONS[e.weapon].name} 升至 ${'★'.repeat(e.star)}${STAR_PERKS[e.star] ? ' · ' + STAR_PERKS[e.star] : ''}`, true);
     else if (e.t === 'skill') pushToast(`${CLASSES[e.cls].skill}发动！${CLASSES[e.cls].skillDesc}`, true);
     else if (e.t === 'allyJoin') pushToast(`战友「${ALLIES[e.ally].name}」入伙！（${ALLIES[e.ally].buffDesc}）`, true);
+    else if (e.t === 'cookDone') {
+      const dest = game.run.guests.find((g) => g.id === e.guestId);
+      pushToast(`炒好「${e.dishName}·${QUALITY_META[e.quality].label}」！端去给 ${dest?.name ?? '食客'} 上菜`, e.quality === 'legendary' || e.quality === 'perfect');
+    }
     else if (e.t === 'serve') {
       pushToast(`${e.name}「${QUALITY_META[e.quality].label}」：${e.quote}（+${e.coins}金 +${e.fans}粉${e.allServed ? ' · 满堂打赏！' : ''}）`, !!e.allServed || e.quality === 'legendary');
       if (e.rankUp) pushToast(`深夜食堂晋升 ${e.rankUp}！`, true);
@@ -673,9 +767,9 @@ export function App() {
       {panel === null && (
         <>
           <Pad />
-          <InteractHint />
+          {isCamp && run.inside && run.dinerCook && <CookQteHud />}
           {!isCamp && !run.inside && <><WeaponChip /><Keys /></>}
-          {isCamp && <CampDock />}
+          {isCamp && <><CampBar /><CampKeys /></>}
         </>
       )}
       <Toasts />

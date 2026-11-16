@@ -13,21 +13,23 @@ export function botInput(run: RunState): Input {
     const dx = crate.x - p.x;
     move = Math.abs(dx) < 4 ? 0 : Math.sign(dx);
   } else if (!isOnRoof(run)) {
-    const stepTarget = isOnPorch(run) ? ROOF_MAX_X - 8 : PORCH_MAX_X - 20;
+    const stepTarget = isOnPorch(run) ? ROOF_MAX_X - 12 : PORCH_MAX_X - 20;
     move = Math.abs(stepTarget - p.x) < 4 ? -1 : Math.sign(stepTarget - p.x);
     if (p.x <= PORCH_MAX_X && p.vy === 0) jump = true;
   } else {
-    const spot = ROOF_MAX_X - 18; // 站房顶最右侧边缘获得最大向前射程
+    const spot = ROOF_MAX_X - 68; // 留出后撤闪避空间，不从屋檐冲掉下楼
     move = Math.abs(spot - p.x) < 4 ? 0 : Math.sign(spot - p.x);
   }
   const incomingFireball = run.enemyProjs.some((ep) => Math.abs(ep.x - p.x) < 32 && Math.abs(ep.y - (222 + p.y - 20)) < 26);
+  const wantDodge = incomingFireball && p.dodgeCd === 0;
+  if (wantDodge && isOnRoof(run)) move = p.x > 140 ? -1 : 1;
   const crowdNearWall = run.zombies.filter((z) => z.x <= WALL_X + 65).length >= 5 || run.zombies.some((z) => ZOMBIES[z.kind].boss);
   return {
     ...NO_INPUT,
     move,
     jump,
     fire: run.targetId !== null,
-    dodge: incomingFireball && p.dodgeCd === 0,
+    dodge: wantDodge,
     skill: run.zombies.length >= 4 && run.skill.cd === 0,
     grenade: crowdNearWall && p.grenades > 0 && run.zombies.length >= 4,
   };

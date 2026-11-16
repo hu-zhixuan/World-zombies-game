@@ -3,10 +3,10 @@ import Phaser from 'phaser';
 import { game } from '../app/game';
 import { ASSETS } from '../assets';
 import { MEALS, WEAPONS, ZOMBIES } from '../content/data';
-import { ALLIES } from '../content/story';
-import { BODY_Y, FORT_GUN_X, computeGrenadeThrow, curWeapon, houseBuff, nearbyStation, turretWorldPos } from '../sim/sim';
+import { ALLIES, QUALITY_META } from '../content/story';
+import { BODY_Y, FORT_GUN_X, computeGrenadeThrow, curWeapon, houseBuff, nearbyCampTarget, turretWorldPos, zombieBodyY } from '../sim/sim';
 import {
-  DOOR_X, GROUND_Y, IN_STATIONS, LADDER_X, PORCH_MAX_X, PORCH_MIN_X, PORCH_Y,
+  ALLY_POS, DOOR_X, GROUND_Y, IN_STATIONS, LADDER_X, PORCH_MAX_X, PORCH_MIN_X, PORCH_Y,
   ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, TURRET_SLOTS, VIEW_H, WALL_X, WORLD_W, type GameEvent,
 } from '../sim/types';
 import { floaters } from '../ui/floaters';
@@ -16,16 +16,16 @@ export { VIEW_H };
 
 const D = { sky: 0, town: 1, back: 2, ground: 3, prop: 4, actor: 5, fx: 6, mark: 7 };
 
-/** 每把枪精确的握把锚点、前臂伸展距离与枪口前伸量（对齐 15x8 hero_arm 拳头中心） */
+/** 每把枪精确的握把锚点、前臂伸展距离与枪口前伸量（对齐 15x8 hero_arm 拳头中心与紧裁武器轮廓） */
 const WEAPON_GRIP: Record<string, { ox: number; oy: number; reach: number; gyOff: number; muzzle: number; scale: number; kick: number; recoil: number; shake: number }> = {
-  pistol:   { ox: 0.26, oy: 0.56, reach: 10.5, gyOff: 1.0, muzzle: 10, scale: 1.04, kick: 0.2,  recoil: 4.5, shake: 0 },
-  revolver: { ox: 0.22, oy: 0.55, reach: 10.5, gyOff: 1.0, muzzle: 11, scale: 1.05, kick: 0.34, recoil: 6.2, shake: 0.0022 },
-  smg:      { ox: 0.32, oy: 0.50, reach: 10.0, gyOff: 1.0, muzzle: 11, scale: 1.06, kick: 0.14, recoil: 3.4, shake: 0 },
-  shotgun:  { ox: 0.26, oy: 0.50, reach: 10.0, gyOff: 1.0, muzzle: 13, scale: 1.12, kick: 0.42, recoil: 7.4, shake: 0.0038 },
-  assault:  { ox: 0.30, oy: 0.52, reach: 10.0, gyOff: 1.0, muzzle: 11, scale: 1.08, kick: 0.18, recoil: 4.2, shake: 0.0012 },
-  rifle:    { ox: 0.22, oy: 0.52, reach: 10.0, gyOff: 1.0, muzzle: 15, scale: 1.16, kick: 0.46, recoil: 8.0, shake: 0.0044 },
-  tesla:    { ox: 0.34, oy: 0.55, reach: 10.0, gyOff: 1.0, muzzle: 14, scale: 0.72, kick: 0.2,  recoil: 4.4, shake: 0.0016 },
-  rocket:   { ox: 0.32, oy: 0.56, reach: 9.5,  gyOff: 0.5, muzzle: 13, scale: 1.15, kick: 0.5,  recoil: 8.4, shake: 0.0052 },
+  pistol:   { ox: 0.25, oy: 0.55, reach: 11.0, gyOff: 1.5,  muzzle: 14, scale: 0.90, kick: 0.2,  recoil: 4.5, shake: 0 },
+  revolver: { ox: 0.28, oy: 0.42, reach: 11.0, gyOff: -0.2, muzzle: 15, scale: 0.86, kick: 0.34, recoil: 6.2, shake: 0.0022 },
+  smg:      { ox: 0.24, oy: 0.56, reach: 11.5, gyOff: 1.2,  muzzle: 16, scale: 0.94, kick: 0.14, recoil: 3.4, shake: 0 },
+  shotgun:  { ox: 0.28, oy: 0.58, reach: 11.5, gyOff: 1.2,  muzzle: 18, scale: 0.88, kick: 0.42, recoil: 7.4, shake: 0.0038 },
+  assault:  { ox: 0.24, oy: 0.56, reach: 11.5, gyOff: 1.2,  muzzle: 16, scale: 0.90, kick: 0.18, recoil: 4.2, shake: 0.0012 },
+  rifle:    { ox: 0.24, oy: 0.54, reach: 11.5, gyOff: 1.0,  muzzle: 18, scale: 0.94, kick: 0.46, recoil: 8.0, shake: 0.0044 },
+  tesla:    { ox: 0.20, oy: 0.52, reach: 11.0, gyOff: 1.0,  muzzle: 21, scale: 0.82, kick: 0.2,  recoil: 4.4, shake: 0.0016 },
+  rocket:   { ox: 0.28, oy: 0.62, reach: 11.5, gyOff: 1.0,  muzzle: 20, scale: 0.92, kick: 0.5,  recoil: 8.4, shake: 0.0052 },
 };
 
 interface BoltFx { pts: { x: number; y: number }[]; until: number; color: number; straight?: boolean; crit?: boolean }
@@ -39,6 +39,7 @@ export class GameScene extends Phaser.Scene {
   private hero!: Phaser.GameObjects.Sprite;
   private heroArm!: Phaser.GameObjects.Image;
   private heroGun!: Phaser.GameObjects.Image;
+  private carriedDishSprite!: Phaser.GameObjects.Image;
 
   // 室外与室内两组静态舞台物件（随 run.inside 快速切换可见性）
   private extObjs: { setVisible(v: boolean): void }[] = [];
@@ -53,6 +54,7 @@ export class GameScene extends Phaser.Scene {
   private allySprites = new Map<string, Phaser.GameObjects.Sprite>();
   private guestSprites = new Map<string, Phaser.GameObjects.Sprite>();
   private guestDishSprites = new Map<string, Phaser.GameObjects.Image>();
+  private guestBubbleIcons = new Map<string, Phaser.GameObjects.Image>();
   private crates = new Map<number, Phaser.GameObjects.Image>();
   private bullets: Phaser.GameObjects.Sprite[] = [];
   private grenadeSprites: Phaser.GameObjects.Image[] = [];
@@ -92,6 +94,10 @@ export class GameScene extends Phaser.Scene {
     anim('hero_idle', 7); anim('hero_run', 18); anim('hero_shoot', 16); anim('hero_jump', 8); anim('hero_fall', 8); anim('hero_hurt', 10); anim('hero_crouch', 14, 0);
     for (const z of Object.values(ZOMBIES)) for (const key of z.sprites) anim(key, z.fps);
     for (const [key, fps] of [['npc_hat', 6], ['npc_bearded', 6], ['npc_woman', 7], ['npc_oldman', 7]] as const) anim(key, fps);
+    for (const [key, fps] of [['ally_zhang', 6], ['ally_lin', 6], ['ally_qiang', 6], ['ally_zhao', 6]] as const) {
+      anim(key, fps);
+      anim(`${key}_atk`, 15, 0);
+    }
     anim('z_death', 14, 0);
     anim('fx_fireball', 14); anim('fx_boom', 16, 0);
     anim('shot', 18); anim('shot_hit', 22, 0);
@@ -174,11 +180,12 @@ export class GameScene extends Phaser.Scene {
       intAdd(this.add.pointlight(lx, ly, col, r, 0.22, 0.07).setDepth(D.fx));
     }
 
-    // ── 角色、独立瞄准手臂/闲置手臂、手持武器、特效与矢量层 ──
+    // ── 角色、独立瞄准手臂/闲置手臂、手持武器、端菜托盘、特效与矢量层 ──
     this.hero = this.add.sprite(0, GROUND_Y, 'hero_idle').setOrigin(0.5, 1).setDepth(D.actor);
     this.hero.play('hero_idle');
     this.heroGun = this.add.image(0, GROUND_Y - 22, 'wp_pistol').setOrigin(0.26, 0.56).setDepth(D.actor + 0.08).setScale(1.04);
     this.heroArm = this.add.image(0, GROUND_Y - 32, 'hero_arm').setOrigin(0.27, 0.44).setDepth(D.actor + 0.1);
+    this.carriedDishSprite = this.add.image(0, GROUND_Y, 'ic_dish_skewer').setOrigin(0.5, 1).setDepth(D.actor + 0.15).setScale(0.95).setVisible(false);
     this.overlay = this.add.graphics().setDepth(D.mark);
     this.cameras.main.setBounds(0, 0, WORLD_W, VIEW_H).setRoundPixels(true);
 
@@ -286,28 +293,23 @@ export class GameScene extends Phaser.Scene {
   private syncAllies() {
     const run = game.run, inside = run.inside;
     const seen = new Set<string>();
-    const extPos: Record<string, [number, number, boolean]> = {
-      zhang: [132, GROUND_Y + ROOF_Y, false],
-      lin: [266, GROUND_Y + PORCH_Y, false],
-      qiang: [342, GROUND_Y, false],
-      zhao: [58, GROUND_Y + ROOF_Y, false],
-    };
-    const intPos: Record<string, [number, number, boolean]> = {
-      lin: [150, GROUND_Y, false],
-      zhang: [230, GROUND_Y, false],
-      qiang: [548, GROUND_Y, true],
-      zhao: [576, GROUND_Y, true],
-    };
     for (const allyId of run.story.allies) {
       seen.add(allyId);
       const meta = ALLIES[allyId];
+      const pos = ALLY_POS[allyId];
+      const rt = run.allies[allyId];
       let sp = this.allySprites.get(allyId);
       if (!sp) {
         sp = this.add.sprite(0, GROUND_Y, meta.sprite).setOrigin(0.5, 1).setDepth(D.actor - 0.1).setScale(0.92);
         sp.play(meta.sprite);
         this.allySprites.set(allyId, sp);
       }
-      const [x, y, flip] = (inside ? intPos : extPos)[allyId] ?? [200, GROUND_Y, false];
+      const attacking = !inside && !!rt && rt.atkT > 0;
+      const wantAnim = attacking ? `${meta.sprite}_atk` : meta.sprite;
+      if (sp.anims.currentAnim?.key !== wantAnim) sp.play(wantAnim);
+      const x = inside ? pos.intX : pos.extX;
+      const y = inside ? GROUND_Y : GROUND_Y + pos.extY;
+      const flip = inside ? pos.intFlip : (rt ? rt.facing < 0 : false);
       sp.setVisible(true).setPosition(x, y).setFlipX(flip);
     }
     for (const [id, sp] of this.allySprites) {
@@ -321,6 +323,7 @@ export class GameScene extends Phaser.Scene {
   private syncDinerGuests() {
     const run = game.run, inside = run.inside;
     const seen = new Set<string>();
+    const bob = Math.sin(this.time.now / 210) * 1.6;
     // 坐席 0/1 坐在 1 号桌左右两侧，坐席 2 坐在 2 号桌右侧；菜品稳稳摆在桌面正上方
     const dishSpots: [number, number][] = [[298, GROUND_Y - 36], [342, GROUND_Y - 36], [444, GROUND_Y - 36]];
     if (inside) {
@@ -335,14 +338,26 @@ export class GameScene extends Phaser.Scene {
         }
         sp.setVisible(true).setPosition(g.x, GROUND_Y).setFlipX(i >= 1);
 
-        let dishIm = this.guestDishSprites.get(g.id);
         const dishIcon = MEALS[g.dish].icon;
         const [dx, dy] = dishSpots[i] ?? [g.x + 16, GROUND_Y - 36];
+        let dishIm = this.guestDishSprites.get(g.id);
         if (!dishIm) {
           dishIm = this.add.image(dx, dy, dishIcon).setOrigin(0.5, 1).setDepth(D.prop + 0.4).setScale(0.88);
           this.guestDishSprites.set(g.id, dishIm);
         }
         dishIm.setTexture(dishIcon).setVisible(g.served).setPosition(dx, dy);
+
+        let bubbleIm = this.guestBubbleIcons.get(g.id);
+        if (!bubbleIm) {
+          bubbleIm = this.add.image(g.x, GROUND_Y - 62, dishIcon).setOrigin(0.5, 0.5).setDepth(D.mark + 0.1).setScale(0.82);
+          this.guestBubbleIcons.set(g.id, bubbleIm);
+        }
+        const isDeliveryTarget = run.carryingDish?.guestId === g.id;
+        bubbleIm
+          .setTexture(dishIcon)
+          .setVisible(!g.served)
+          .setPosition(g.x, GROUND_Y - 62 + bob)
+          .setScale(isDeliveryTarget ? 0.96 : 0.8);
       }
     }
     for (const [id, sp] of this.guestSprites) {
@@ -351,6 +366,8 @@ export class GameScene extends Phaser.Scene {
         this.guestSprites.delete(id);
         this.guestDishSprites.get(id)?.destroy();
         this.guestDishSprites.delete(id);
+        this.guestBubbleIcons.get(id)?.destroy();
+        this.guestBubbleIcons.delete(id);
       }
     }
   }
@@ -418,24 +435,42 @@ export class GameScene extends Phaser.Scene {
     const aliveVis = run.phase !== 'dead';
     this.heroArm.setVisible(aliveVis);
     this.heroGun.setVisible(!inside && aliveVis);
+    const carrying = inside && aliveVis && !!run.carryingDish;
 
     if (aliveVis) {
       const { shX, shY } = this.heroJoints(now);
       if (inside) {
-        // 室内脱枪，垂手轻松漫步
+        // 室内脱枪，垂手轻松漫步或端盘上菜
         if (this.heroArm.texture.key !== 'hero_arm_rest') this.heroArm.setTexture('hero_arm_rest');
-        const walkSwing = Math.abs(p.vx) > 0.1 ? Math.sin(now / 85) * 0.28 : Math.sin(now / 420) * 0.03;
-        this.heroArm
-          .setOrigin(0.5, 0.16)
-          .setPosition(shX, shY - 1)
-          .setRotation(walkSwing * p.facing)
-          .setFlipX(p.facing < 0)
-          .setFlipY(false)
-          .setScale(1);
+        if (carrying && run.carryingDish) {
+          const bob = Math.abs(p.vx) > 0.1 ? Math.sin(now / 85) * 1.2 : 0;
+          this.heroArm
+            .setOrigin(0.5, 0.16)
+            .setPosition(shX + p.facing * 2, shY - 2)
+            .setRotation(-0.85 * p.facing)
+            .setFlipX(p.facing < 0)
+            .setFlipY(false)
+            .setScale(1);
+          this.carriedDishSprite
+            .setTexture(MEALS[run.carryingDish.dish].icon)
+            .setPosition(p.x + p.facing * 14, GROUND_Y + p.y - 22 + bob)
+            .setVisible(true);
+        } else {
+          const walkSwing = Math.abs(p.vx) > 0.1 ? Math.sin(now / 85) * 0.28 : Math.sin(now / 420) * 0.03;
+          this.heroArm
+            .setOrigin(0.5, 0.16)
+            .setPosition(shX, shY - 1)
+            .setRotation(walkSwing * p.facing)
+            .setFlipX(p.facing < 0)
+            .setFlipY(false)
+            .setScale(1);
+          this.carriedDishSprite.setVisible(false);
+        }
       } else {
-        // 室外持枪：独立袖管拳头连接肩膀与枪身，瞄准角度同步翻转与后坐力退移
+        this.carriedDishSprite.setVisible(false);
+        // 室外持枪：独立袖管拳头连接肩膀与枪身，360° 全向瞄准与后坐力退移
         if (this.heroArm.texture.key !== 'hero_arm') this.heroArm.setTexture('hero_arm');
-        const rawAng = activeTarget ? Math.atan2(BODY_Y - shY, activeTarget.x - shX) : (p.facing > 0 ? 0 : Math.PI);
+        const rawAng = activeTarget ? Math.atan2(zombieBodyY(activeTarget) - shY, activeTarget.x - shX) : (p.facing > 0 ? 0 : Math.PI);
         const flipSign = Math.abs(rawAng) > Math.PI / 2 ? -1 : 1;
         const ang = rawAng + this.gunKick * flipSign;
         const ca = Math.cos(ang), sa = Math.sin(ang);
@@ -459,19 +494,23 @@ export class GameScene extends Phaser.Scene {
           .setFlipY(flipSign < 0)
           .setScale(grip.scale * this.gunPop);
       }
+    } else {
+      this.carriedDishSprite.setVisible(false);
     }
 
-    // ── 僵尸（含微卡肉顿帧、震颤抖动、方向性受击后仰角与水平压缩挤压） ──
+    // ── 僵尸与空中魔物（含微卡肉顿帧、震颤抖动、方向性受击后仰角与水平压缩挤压） ──
     const seen = new Set<number>();
     if (!inside) {
       for (const z of run.zombies) {
         seen.add(z.id);
         const def = ZOMBIES[z.kind];
+        const zy = GROUND_Y + (z.y ?? 0);
         let s = this.zombies.get(z.id);
         if (!s) {
           const key = def.sprites[z.id % def.sprites.length];
-          s = this.add.sprite(z.x, GROUND_Y, key).setOrigin(0.5, 1).setDepth(D.actor).setScale(def.scale);
-          s.play({ key, startFrame: z.id % 4 });
+          s = this.add.sprite(z.x, zy, key).setOrigin(0.5, 1).setDepth(D.actor).setScale(def.scale);
+          const frameCount = Math.max(1, this.anims.get(key)?.frames.length ?? 1);
+          s.play({ key, startFrame: z.id % frameCount });
           this.zombies.set(z.id, s);
         }
         const stopped = (this.hitStopUntil.get(z.id) ?? 0) > now;
@@ -489,7 +528,7 @@ export class GameScene extends Phaser.Scene {
         else this.hitTilt.delete(z.id);
 
         s.setVisible(true)
-          .setPosition(z.x + jit, GROUND_Y)
+          .setPosition(z.x + jit, zy)
           .setRotation(tilt)
           .setScale(def.scale * (sq ? 1.18 : 1), def.scale * (sq ? 0.84 : 1));
         if ((this.flashUntil.get(z.id) ?? 0) > now) s.setTintFill(C.paper);
@@ -577,21 +616,45 @@ export class GameScene extends Phaser.Scene {
     this.stepAndDrawImpacts(g, now);
 
     if (inside) {
-      // 清爽酒馆内部：只保留脚底淡淡的当前站位光晕与餐桌待客极简金点（去掉遮挡窗户的暗盒与跳动大三角）
-      const near = nearbyStation(run);
-      if (near && near !== 'shop') {
-        const sx = IN_STATIONS[near];
-        const barW = near === 'kitchen' ? 76 : near === 'workshop' ? 58 : 38;
-        g.fillStyle(C.gold, 0.34).fillRoundedRect(sx - barW / 2, GROUND_Y - 4, barW, 5, 2);
-        g.lineStyle(1.4, C.lamp, 0.85).strokeRoundedRect(sx - barW / 2, GROUND_Y - 4, barW, 5, 2);
+      // 酒馆沉浸互动：脚底当前站位高亮 + 食客菜品气泡 + 红砖炉世界火候条 + 端菜指引箭头
+      const ct = nearbyCampTarget(run);
+      if (ct) {
+        const sx = ct.x;
+        const barW = ct.kind === 'cookStart' || ct.kind === 'cookFinish' || ct.kind === 'kitchen' ? 76
+          : ct.kind === 'workshop' ? 58 : ct.kind === 'shop' ? 48 : 34;
+        g.fillStyle(C.gold, 0.36).fillRoundedRect(sx - barW / 2, GROUND_Y - 4, barW, 5, 2);
+        g.lineStyle(1.4, C.lamp, 0.9).strokeRoundedRect(sx - barW / 2, GROUND_Y - 4, barW, 5, 2);
       }
       const bob = Math.sin(now / 210) * 1.6;
       for (const guest of run.guests) {
         if (guest.served) continue;
-        const gy = GROUND_Y - 52 + bob;
-        const dotCol = guest.trendMatch ? C.gold : C.lamp;
-        g.fillStyle(C.ink, 0.85).fillCircle(guest.x, gy, 3.6);
-        g.fillStyle(dotCol, 0.96).fillCircle(guest.x, gy, 2.3);
+        const isTarget = run.carryingDish?.guestId === guest.id;
+        const gx = guest.x;
+        const gy = GROUND_Y - 62 + bob;
+        const bw = isTarget ? 24 : 21;
+        const bh = isTarget ? 20 : 18;
+        const borderCol = isTarget ? C.gold : guest.trendMatch ? C.ember : C.copper;
+        g.fillStyle(C.leather, 0.94).fillRoundedRect(gx - bw / 2, gy - bh / 2, bw, bh, 5);
+        g.lineStyle(isTarget ? 2 : 1.4, borderCol, 0.98).strokeRoundedRect(gx - bw / 2, gy - bh / 2, bw, bh, 5);
+        g.fillStyle(C.leather, 0.94).fillTriangle(gx - 3, gy + bh / 2 - 1, gx + 3, gy + bh / 2 - 1, gx, gy + bh / 2 + 4);
+        if (isTarget) {
+          const arrowBob = Math.sin(now / 120) * 2.5;
+          g.fillStyle(C.gold, 0.98).fillTriangle(gx - 5, gy - bh / 2 - 8 + arrowBob, gx + 5, gy - bh / 2 - 8 + arrowBob, gx, gy - bh / 2 - 2 + arrowBob);
+        }
+      }
+      if (run.dinerCook) {
+        const kx = IN_STATIONS.kitchen;
+        const ky = GROUND_Y - 72;
+        const tw = 66, th = 9;
+        const left = kx - tw / 2;
+        g.fillStyle(C.ink, 0.92).fillRoundedRect(left - 2, ky - 2, tw + 4, th + 4, 3);
+        g.fillStyle(C.woodDark, 0.95).fillRoundedRect(left, ky, tw, th, 2);
+        g.fillStyle(C.ember, 0.52).fillRect(kx - tw * 0.28, ky + 1, tw * 0.56, th - 2);
+        g.fillStyle(C.lamp, 0.72).fillRect(kx - tw * 0.12, ky + 1, tw * 0.24, th - 2);
+        g.fillStyle(C.gold, 1).fillRect(kx - tw * 0.045, ky + 1, tw * 0.09, th - 2);
+        const nx = left + Phaser.Math.Clamp(run.dinerCook.pos, 0, 1) * tw;
+        g.fillStyle(C.paper, 1).fillRect(nx - 1.5, ky - 2, 3, th + 4);
+        g.lineStyle(1.4, C.gold, 0.95).strokeRoundedRect(left - 1, ky - 1, tw + 2, th + 2, 2);
       }
       return;
     }
@@ -604,7 +667,9 @@ export class GameScene extends Phaser.Scene {
       for (let f = 0; f < 84; f++) {
         px += vx; py += vy; vy += traj.g;
         landX = px;
-        const hitZ = run.zombies.some((z) => z.hp > 0 && Math.abs(px - z.x) <= 18 && py >= GROUND_Y - 46);
+        const hitZ = run.zombies.some((z) => z.hp > 0 && Math.abs(px - z.x) <= 18
+          && py >= GROUND_Y + (z.y ?? 0) - (ZOMBIES[z.kind].boss ? 96 : z.kind === 'bat' ? 28 : 48)
+          && py <= GROUND_Y + (z.y ?? 0) + 6);
         if (hitZ || py >= GROUND_Y - 4) { landY = Math.min(GROUND_Y - 4, py); break; }
         if (f % 2 === 0 && px >= 0 && px <= WORLD_W) {
           const t = Math.max(0.35, 1 - f / 90);
@@ -621,7 +686,7 @@ export class GameScene extends Phaser.Scene {
         .lineBetween(landX - 7, landY - 5, landX + 7, landY + 5)
         .lineBetween(landX - 7, landY + 5, landX + 7, landY - 5);
       for (const z of run.zombies) {
-        if (Math.abs(z.x - landX) <= 66) g.lineStyle(1.6, C.gold, 0.95).strokeEllipse(z.x, GROUND_Y - 1, 28, 9);
+        if (Math.abs(z.x - landX) <= 66) g.lineStyle(1.6, C.gold, 0.95).strokeEllipse(z.x, GROUND_Y + (z.y ?? 0) - 1, 28, 9);
       }
     }
 
@@ -664,16 +729,18 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // 僵尸深冻冰壳 & 麻痹电弧
+    // 僵尸与空中魔物深冻冰壳 & 麻痹电弧
     for (const z of run.zombies) {
+      const zy = GROUND_Y + (z.y ?? 0);
+      const zh = z.kind === 'bat' ? 26 : 38;
       if (z.freezeT > 0) {
-        g.fillStyle(C.frost, 0.22).fillRoundedRect(z.x - 13, GROUND_Y - 40, 26, 38, 4);
-        g.lineStyle(1.5, C.paper, 0.75).strokeRoundedRect(z.x - 13, GROUND_Y - 40, 26, 38, 4);
+        g.fillStyle(C.frost, 0.22).fillRoundedRect(z.x - 13, zy - zh - 2, 26, zh, 4);
+        g.lineStyle(1.5, C.paper, 0.75).strokeRoundedRect(z.x - 13, zy - zh - 2, 26, zh, 4);
       }
       if (z.stunT > 0 && Math.floor(now / 70 + z.id) % 2 === 0) {
         g.lineStyle(1.4, C.electric, 0.9)
-          .lineBetween(z.x - 10, GROUND_Y - 34, z.x + 2, GROUND_Y - 22)
-          .lineBetween(z.x + 2, GROUND_Y - 22, z.x - 6, GROUND_Y - 10);
+          .lineBetween(z.x - 10, zy - zh * 0.85, z.x + 2, zy - zh * 0.55)
+          .lineBetween(z.x + 2, zy - zh * 0.55, z.x - 6, zy - zh * 0.25);
       }
     }
 
@@ -708,7 +775,7 @@ export class GameScene extends Phaser.Scene {
       g.lineStyle(1.5, C.electric, flick ? 0.85 : 0.4).lineBetween(WALL_X - 4, GROUND_Y - 48, WALL_X + 26, GROUND_Y - 14);
     }
 
-    // 营地夜晚室外标识（房门进屋、4 处炮塔等级点）
+    // 营地夜晚室外标识（房门进屋、战友脚底高亮、4 处炮塔等级点）
     for (let i = 0; i < run.turrets.length; i++) {
       const sl = run.turrets[i], pos = turretWorldPos(i);
       if (sl.type) {
@@ -721,19 +788,26 @@ export class GameScene extends Phaser.Scene {
       const bob = Math.sin(now / 180) * 3;
       g.fillStyle(C.lamp, 0.9).fillTriangle(DOOR_X - 5, GROUND_Y - 54 + bob, DOOR_X + 5, GROUND_Y - 54 + bob, DOOR_X, GROUND_Y - 46 + bob);
       g.fillStyle(C.lamp, 0.9).fillTriangle(LADDER_X - 5, GROUND_Y + PORCH_Y - 42 + bob, LADDER_X + 5, GROUND_Y + PORCH_Y - 42 + bob, LADDER_X, GROUND_Y + PORCH_Y - 34 + bob);
+      const extCt = nearbyCampTarget(run);
+      if (extCt) {
+        const ey = extCt.kind === 'allyTalk' ? GROUND_Y + ALLY_POS[extCt.ally].extY : GROUND_Y;
+        g.fillStyle(C.gold, 0.36).fillRoundedRect(extCt.x - 17, ey - 4, 34, 5, 2);
+        g.lineStyle(1.4, C.lamp, 0.9).strokeRoundedRect(extCt.x - 17, ey - 4, 34, 5, 2);
+      }
     }
 
-    // 元气骑士式锁定准星（四角收缩锁敌框 + 脚底脉动光圈，优先集火目标镶金色外环）
+    // 元气骑士式锁定准星（四角收缩锁敌框 + 脚底/翼底脉动光圈，优先集火目标镶金色外环）
     const target = run.zombies.find((z) => z.id === run.targetId);
     if (target) {
+      const ty = GROUND_Y + (target.y ?? 0);
       const sp = this.zombies.get(target.id);
-      const h = sp?.displayHeight ?? 46;
+      const h = sp?.displayHeight ?? (target.kind === 'bat' ? 28 : 46);
       const w = ZOMBIES[target.kind].boss ? 22 : 13;
       const isPri = target.id === run.priorityId;
       const col = isPri ? C.gold : C.red;
       const pulse = Math.sin(now / 110) * 2;
-      const rx = w + pulse, top = GROUND_Y - h - pulse, bot = GROUND_Y - 2 + pulse * 0.5, arm = 5;
-      g.lineStyle(1.8, col, 0.92).strokeEllipse(target.x, GROUND_Y - 1, (w * 2 + 4) + pulse * 2, 9);
+      const rx = w + pulse, top = ty - h - pulse, bot = ty - 2 + pulse * 0.5, arm = 5;
+      g.lineStyle(1.8, col, 0.92).strokeEllipse(target.x, ty - 1, (w * 2 + 4) + pulse * 2, 9);
       g.lineStyle(2, col, 0.98)
         .lineBetween(target.x - rx, top, target.x - rx + arm, top).lineBetween(target.x - rx, top, target.x - rx, top + arm)
         .lineBetween(target.x + rx, top, target.x + rx - arm, top).lineBetween(target.x + rx, top, target.x + rx, top + arm)
@@ -745,7 +819,8 @@ export class GameScene extends Phaser.Scene {
       const isBoss = ZOMBIES[z.kind].boss;
       if (!isBoss && z.hp >= z.maxHp) continue;
       const w = isBoss ? 44 : 22;
-      const y = GROUND_Y - (this.zombies.get(z.id)?.displayHeight ?? 46) - 8;
+      const zy = GROUND_Y + (z.y ?? 0);
+      const y = zy - (this.zombies.get(z.id)?.displayHeight ?? (z.kind === 'bat' ? 28 : 46)) - 8;
       g.fillStyle(C.ink, 0.88).fillRect(z.x - w / 2, y, w, isBoss ? 5 : 4);
       g.fillStyle(isBoss ? C.gold : C.red, 1).fillRect(z.x - w / 2 + 1, y + 1, (w - 2) * Math.max(0, z.hp / z.maxHp), isBoss ? 3 : 2);
     }
@@ -826,7 +901,18 @@ export class GameScene extends Phaser.Scene {
           if (grip.shake > 0) this.cameras.main.shake(wId === 'rocket' || wId === 'rifle' ? 75 : 50, grip.shake);
         } else {
           this.burst('shot_hit', e.x + 6, e.y, 0.78);
-          if (e.from === 'turret') {
+          if (e.from === 'ally' && e.ally) {
+            const sp = this.allySprites.get(e.ally);
+            if (sp && !game.run.inside) {
+              sp.play(`${ALLIES[e.ally].sprite}_atk`);
+              if (e.ally === 'qiang') {
+                const pos = ALLY_POS.qiang;
+                this.waves.push({ x: pos.extX, y: GROUND_Y + pos.extY - 22, r: 8, maxR: 54, col: C.ember, life: 12, max: 12, width: 2.6 });
+                this.slashes.push({ x: e.x, y: e.y - 4, ang: e.ang ?? 0, len: 24, col: C.gold, until: now + 110 });
+                this.cameras.main.shake(55, 0.0022);
+              }
+            }
+          } else if (e.from === 'turret') {
             for (let i = 0; i < this.turretSprites.length; i++) {
               const sp = this.turretSprites[i];
               const ox = turretWorldPos(i).x;
@@ -898,26 +984,38 @@ export class GameScene extends Phaser.Scene {
       case 'kill': {
         if (game.run.inside) return;
         const dir = e.dir ?? 1;
-        this.burst('z_death', e.x, GROUND_Y - 26, e.boss ? 1.55 : 1.08);
-        this.waves.push({ x: e.x, y: BODY_Y, r: 5, maxR: e.boss ? 42 : 24, col: e.crit ? C.gold : C.paper, life: 13, max: 13, width: e.boss ? 3.5 : 2 });
+        const ky = e.y ?? BODY_Y;
+        const flying = ky < BODY_Y - 20;
+        this.burst('z_death', e.x, ky - 4, e.boss ? 1.55 : 1.08);
+        this.waves.push({ x: e.x, y: ky, r: 5, maxR: e.boss ? 42 : 24, col: e.crit ? C.gold : C.paper, life: 13, max: 13, width: e.boss ? 3.5 : 2 });
         for (let i = 0; i < (e.boss ? 16 : 9); i++) {
           this.spawnSpark(
-            e.x, BODY_Y + Phaser.Math.Between(-8, 6),
+            e.x, ky + Phaser.Math.Between(-8, 6),
             dir * Phaser.Math.FloatBetween(0.6, 3.2) + Phaser.Math.FloatBetween(-1.2, 1.2),
             Phaser.Math.FloatBetween(-3.8, -0.5),
-            0.13, 24, 2.6, i % 2 ? C.infected : C.rose, true,
+            0.13, 24, 2.6, i % 2 ? C.infected : C.rose, !flying,
           );
         }
         this.camZoom = Math.max(this.camZoom, e.boss ? 1.04 : 1.014);
         if (e.boss) this.cameras.main.shake(190, 0.0065);
         else if (e.crit) this.cameras.main.shake(45, 0.002);
-        floaters.add(e.x, GROUND_Y - 58, '+' + e.coins + (e.meat > 0 ? ' +肉' : ''), 'coin');
+        floaters.add(e.x, ky - 34, '+' + e.coins + (e.meat > 0 ? ' +肉' : ''), 'coin');
+        break;
+      }
+      case 'cookDone': {
+        if (game.run.inside) {
+          this.burst('fx_boom', IN_STATIONS.kitchen, GROUND_Y - 38, 0.55);
+          for (let i = 0; i < 6; i++) {
+            this.spawnSpark(IN_STATIONS.kitchen, GROUND_Y - 40, Phaser.Math.FloatBetween(-1.2, 1.2), Phaser.Math.FloatBetween(-2.2, -0.5), 0.08, 22, 2.2, e.quality === 'legendary' ? C.gold : C.ember);
+          }
+          floaters.add(IN_STATIONS.kitchen, GROUND_Y - 62, `${QUALITY_META[e.quality].label}！去上菜`, e.quality === 'legendary' || e.quality === 'perfect' ? 'crit' : 'coin');
+        }
         break;
       }
       case 'serve': {
-        this.burst('fx_boom', 118, GROUND_Y - 36, 0.65);
         const guest = game.run.guests.find((o) => o.id === e.guestId);
         const gx = guest ? guest.x : 340;
+        this.burst('fx_boom', gx, GROUND_Y - 36, 0.55);
         const burstN = e.quality === 'legendary' ? 10 : e.quality === 'perfect' ? 6 : 3;
         for (let i = 0; i < burstN; i++) {
           this.spawnSpark(gx, GROUND_Y - 40, Phaser.Math.FloatBetween(-1.4, 1.4), Phaser.Math.FloatBetween(-2.2, -0.6), 0.08, 26, 2.2, e.quality === 'legendary' ? C.gold : C.ember);
@@ -932,8 +1030,8 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'cook':
         if (game.run.inside) {
-          this.burst('fx_boom', 118, GROUND_Y - 36, 0.6);
-          floaters.add(118, GROUND_Y - 60, '+' + e.coins + ' 金币', 'coin');
+          this.burst('fx_boom', IN_STATIONS.kitchen, GROUND_Y - 36, 0.6);
+          floaters.add(IN_STATIONS.kitchen, GROUND_Y - 60, '+' + e.coins + ' 金币', 'coin');
         }
         break;
       case 'boom': {

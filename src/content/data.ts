@@ -79,12 +79,12 @@ export function sustainedDps(w: WeaponDef, star = 1): number {
   return (w.damage * starMul(star) * perPull * aoeScale * mag) / ((mag * effInterval + w.reload) / 60);
 }
 
-// ── 亡灵魔物与首领（100% 统一哥特暗黑像素风，15 天压迫递进曲线）──
-export type ZombieKind = 'roamer' | 'crawler' | 'sprinter' | 'bruiser' | 'ghoul' | 'boss_beast' | 'boss_demon';
+// ── 亡灵魔物与首领（100% 统一哥特暗黑像素风，15 天压迫递进曲线 + 空中翼魔威胁）──
+export type ZombieKind = 'roamer' | 'crawler' | 'sprinter' | 'bat' | 'bruiser' | 'ghoul' | 'boss_beast' | 'boss_demon';
 export interface ZombieDef {
   kind: ZombieKind; name: string; sprites: string[]; baseHp: number; speed: number; damage: number; attackEvery: number;
   coins: number; meat: number; firstDay: number; fps: number; weight: number; scale: number;
-  boss?: boolean; ranged?: boolean;
+  boss?: boolean; ranged?: boolean; flying?: boolean;
 }
 export const ZOMBIES: Record<ZombieKind, ZombieDef> = {
   roamer: {
@@ -99,13 +99,17 @@ export const ZOMBIES: Record<ZombieKind, ZombieDef> = {
     kind: 'sprinter', name: '地狱猎犬', sprites: ['z_hound'],
     baseHp: 62, speed: 1.92, damage: 11, attackEvery: 30, coins: 2, meat: 1, firstDay: 3, fps: 13, weight: 4, scale: 1.05,
   },
+  bat: {
+    kind: 'bat', name: '夜翼魔蝠', sprites: ['z_bat'],
+    baseHp: 46, speed: 1.54, damage: 8, attackEvery: 48, coins: 3, meat: 1, firstDay: 3, fps: 10, weight: 3.2, scale: 1.05, flying: true,
+  },
   bruiser: {
     kind: 'bruiser', name: '焦骨巨尸', sprites: ['z_ghoul'],
     baseHp: 245, speed: 0.72, damage: 20, attackEvery: 52, coins: 4, meat: 1, firstDay: 4, fps: 9, weight: 3, scale: 1.15,
   },
   ghoul: {
-    kind: 'ghoul', name: '提灯怨灵', sprites: ['z_wraith'],
-    baseHp: 135, speed: 0.94, damage: 16, attackEvery: 68, coins: 4, meat: 1, firstDay: 6, fps: 9, weight: 3, scale: 1.05, ranged: true,
+    kind: 'ghoul', name: '提灯怨灵', sprites: ['z_ghost'],
+    baseHp: 130, speed: 0.94, damage: 15, attackEvery: 68, coins: 4, meat: 1, firstDay: 6, fps: 8, weight: 3, scale: 1.02, ranged: true, flying: true,
   },
   boss_beast: {
     kind: 'boss_beast', name: '地狱巨兽·暴君', sprites: ['boss_beast'],
