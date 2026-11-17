@@ -195,71 +195,71 @@ export function CampKeys() {
   const ct = nearbyCampTarget(run);
   let icon = run.inside ? 'ic_kitchen' : 'ic_rooftop';
   let label = '交互';
-  let tip = run.inside ? '走近灶台 / 食客 / 行商 / 工坊 / 战友' : '走近木门或驻守战友交谈';
+  let tip = '';
 
   if (ct) {
     switch (ct.kind) {
       case 'cookFinish':
         icon = MEALS[ct.guest.dish].icon;
         label = '火候出锅';
-        tip = `铁板 ${ct.guest.dishName} · 点击出锅端菜`;
+        tip = `${ct.guest.dishName} → ${ct.guest.name}`;
         break;
       case 'cookStart':
         icon = MEALS[ct.guest.dish].icon;
         label = '开灶烹制';
-        tip = `${ct.guest.name} 要「${ct.guest.dishName}」(${ct.guest.meatCost}肉→${ct.guest.pay}金)`;
+        tip = `${ct.guest.name} · ${ct.guest.dishName} (${ct.guest.meatCost}肉)`;
         break;
       case 'serveCarried':
         icon = MEALS[ct.guest.dish].icon;
         label = `上菜·${ct.guest.name}`;
-        tip = `端给 ${ct.guest.name}（${QUALITY_META[run.carryingDish!.quality].label}火候）`;
+        tip = `${QUALITY_META[run.carryingDish!.quality].label}·${ct.guest.dishName}`;
         break;
       case 'guestTalk':
         icon = MEALS[ct.guest.dish].icon;
         label = '搭话';
-        tip = ct.guest.served ? `${ct.guest.name}（已用膳）` : `${ct.guest.name} 等「${ct.guest.dishName}」· 点左壁红砖炉做菜`;
+        tip = ct.guest.served ? `${ct.guest.name}` : `${ct.guest.name} · 等「${ct.guest.dishName}」`;
         break;
       case 'allyTalk':
         icon = 'ic_star';
         label = '交谈';
-        tip = `${ALLIES[ct.ally].name} · ${ALLIES[ct.ally].role}`;
+        tip = `${ALLIES[ct.ally].name}`;
         break;
       case 'kitchen':
         icon = 'ic_kitchen';
         label = '食堂总览';
-        tip = '查看特餐菜单 / 熟客图鉴 / 现炒鲜肉';
+        tip = '食堂';
         break;
       case 'shop':
         icon = 'ic_shop';
         label = '军械行商';
-        tip = '购置神兵 / 护甲 / 爆炎弹';
+        tip = '行商';
         break;
       case 'workshop':
         icon = 'ic_anvil';
         label = '防线工坊';
-        tip = '布防俯瞰图 / 炮塔 / 壁垒升星';
+        tip = '工坊';
         break;
       case 'doorOut':
         icon = 'ic_wall';
         label = '出门看墙';
-        tip = '走出暮夜酒馆大门巡查防线';
+        tip = '出门';
         break;
       case 'doorIn':
         icon = 'ic_kitchen';
         label = '回酒馆';
-        tip = '进入温暖酒馆大堂';
+        tip = '入堂';
         break;
     }
   } else if (run.carryingDish) {
     const dest = run.guests.find((o) => o.id === run.carryingDish!.guestId);
     icon = MEALS[run.carryingDish.dish].icon;
     label = '端菜中';
-    tip = `正端着「${run.carryingDish.dishName}」→ 送到 ${dest?.name ?? '客人'} 桌前`;
+    tip = `送往 ${dest?.name ?? '餐桌'}`;
   }
 
   return (
     <div class="keys-fan camp-fan">
-      <div class={`camp-act-tip ${ct || run.carryingDish ? 'on' : ''}`} id="camp-act-tip">{tip}</div>
+      <div class={`camp-act-tip ${tip ? 'on' : 'idle'}`} id="camp-act-tip">{tip}</div>
       <FanKey id="key-act" cls="fkey-fire fkey-act" lit={!!ct} empty={!ct} onDown={() => game.press('interact')}>
         <Icon k={icon} />
         <span>{label}</span>

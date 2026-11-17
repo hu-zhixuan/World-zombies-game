@@ -304,69 +304,55 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .portrait b { color: var(--paper); font: 900 var(--f2) var(--font); text-shadow: 0 1px 0 var(--ink); }
 .portrait.lg b { font-size: var(--f4); }
 
-/* ── 难度选择行 ── */
-.diff-picker { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 6px; }
-.diff-btn { display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 4px 8px; border-radius: var(--r1);
-  border: 2px solid var(--wood-dark); background: color-mix(in srgb, var(--ink) 74%, var(--leather)); color: var(--paper);
-  font: inherit; cursor: pointer; text-align: left; transition: border-color .12s, background .12s; }
-.diff-btn.on { border-color: var(--gold); background: color-mix(in srgb, var(--wood) 48%, var(--leather));
-  box-shadow: 0 0 10px color-mix(in srgb, var(--gold) 35%, transparent); }
-.diff-btn[data-diff='hard'].on { border-color: var(--ember); }
-.diff-btn[data-diff='nightmare'].on { border-color: var(--red); }
-.diff-top { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
-.diff-top strong { font-size: var(--f2); color: var(--gold); }
-.diff-btn[data-diff='nightmare'].on .diff-top strong { color: var(--red); }
-.diff-top em { font-style: normal; font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: var(--r1); background: var(--plum); color: var(--gold); }
-.diff-btn small { font-size: 10px; color: var(--haze); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ── 难度选择行（极简分段条） ── */
+.diff-picker { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px; margin: 0 auto 8px;
+  border-radius: var(--r1); border: 1.5px solid var(--wood-dark);
+  background: color-mix(in srgb, var(--ink) 74%, var(--leather)); }
+.diff-lbl { font-size: 11px; font-weight: 700; color: var(--haze); padding: 0 5px; }
+.diff-btn { padding: 3px 12px; border-radius: var(--r1); border: 1px solid transparent; background: transparent;
+  color: var(--haze); font: 800 11.5px var(--font); cursor: pointer; }
+.diff-btn.on { background: var(--wood); border-color: var(--copper); color: var(--gold); }
+.diff-btn[data-diff='nightmare'].on { color: var(--red); border-color: var(--rose); }
 
-/* ── 沉浸剧情对话弹窗 & 图文分镜演播 ── */
-.story-panel { max-width: min(92vw, 660px); }
-.story-step { font-size: 11px; font-weight: 800; color: var(--gold); padding: 2px 8px; border-radius: var(--r1); background: var(--leather); border: 1.5px solid var(--copper); }
-.story-visual { margin: 2px 0 6px; }
-.story-stage { display: flex; align-items: center; gap: 12px; padding: 8px 12px; margin: 0 0 6px; text-align: left;
+/* ── 剧情对话弹窗 & 分镜构图 ── */
+.story-panel { width: min(92vw, 520px); max-width: min(92vw, 520px); }
+.story-panel.wide { width: min(96vw, 720px); max-width: min(96vw, 720px); }
+.story-split { display: grid; grid-template-columns: 244px 1fr; gap: 10px; align-items: stretch; margin-bottom: 6px; text-align: left; }
+.story-solo { margin-bottom: 6px; }
+.story-visual { margin: 0; display: flex; }
+.story-stage { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin: 0; text-align: left;
   background: color-mix(in srgb, var(--ink) 78%, var(--leather)); border: 2px solid var(--copper); border-radius: var(--r2); min-height: 82px; }
 .story-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .story-speaker { display: flex; align-items: center; gap: 8px; }
 .story-speaker strong { font-size: var(--f3); color: var(--gold); }
-.story-speaker em { font-style: normal; font-size: 11px; font-weight: 800; padding: 1px 6px; border-radius: var(--r1); background: var(--plum); color: var(--paper); border: 1px solid var(--haze); }
 .story-text { margin: 0; font-size: var(--f2); line-height: 1.44; color: var(--paper); }
 .story-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
 
 .scene-art { position: relative; overflow: hidden; border: 2px solid var(--copper); border-radius: var(--r2);
-  background: var(--night); image-rendering: pixelated; height: 158px; box-shadow: inset 0 0 18px var(--ink); }
-.scene-art.compact { height: 98px; }
-.scene-art > span { position: absolute; pointer-events: none; background-repeat: no-repeat; }
+  background: var(--night); image-rendering: pixelated; width: 100%; height: 132px; box-shadow: inset 0 0 14px var(--ink); }
+.scene-art > span { position: absolute; pointer-events: none; }
 .sc-sky { inset: 0; background: url('../assets/bg_sky.png') repeat-x left bottom / auto 100%; }
 .sc-town { inset: 0; background: url('../assets/bg_town.png') repeat-x left bottom / auto 100%; opacity: .66; }
 .sc-tint { inset: 0; background: linear-gradient(180deg, color-mix(in srgb, var(--night) 42%, transparent), transparent 58%, color-mix(in srgb, var(--ink) 66%, transparent)); }
-[data-scene='siege'] .sc-tint { background: linear-gradient(90deg, color-mix(in srgb, var(--night) 35%, transparent), color-mix(in srgb, var(--rose) 38%, transparent)); }
-[data-scene='beacon'] .sc-tint { background: radial-gradient(circle at 82% 24%, color-mix(in srgb, var(--gold) 52%, transparent), color-mix(in srgb, var(--electric) 22%, transparent) 38%, transparent 72%); }
-[data-scene='hearth'] .sc-tint { background: radial-gradient(circle at 28% 64%, color-mix(in srgb, var(--ember) 38%, transparent), color-mix(in srgb, var(--ink) 52%, transparent) 78%); }
-[data-scene='dawn'] .sc-tint { background: linear-gradient(90deg, color-mix(in srgb, var(--ink) 32%, transparent), color-mix(in srgb, var(--gold) 34%, transparent) 70%, color-mix(in srgb, var(--lamp) 44%, transparent)); }
-.sc-ground { left: 0; right: 0; bottom: 0; height: 24px; background: url('../assets/ground.png') repeat-x left top / auto 100%; }
-[data-scene='hearth'] .sc-ground { display: none; }
-.sc-house { left: 10px; bottom: 14px; width: 148px; height: 118px; background: url('../assets/fort_house.png') no-repeat left bottom / contain; }
-.scene-art.compact .sc-house { width: 112px; height: 86px; bottom: 10px; }
-[data-scene='hearth'] .sc-house { left: 0; right: 0; bottom: 0; width: 100%; height: 100%; background: url('../assets/tavern_interior.png') no-repeat center bottom / cover; }
-.sc-actor-hero { width: 34px; height: 34px; background: url('../assets/hero_idle.png') no-repeat 0 0 / 600% 100%; }
-[data-scene='rooftop'] .sc-actor-hero, [data-scene='beacon'] .sc-actor-hero { left: 78px; bottom: 84px; }
-.scene-art.compact[data-scene='rooftop'] .sc-actor-hero, .scene-art.compact[data-scene='beacon'] .sc-actor-hero { left: 58px; bottom: 58px; }
-[data-scene='siege'] .sc-actor-hero { left: 112px; bottom: 22px; }
-.scene-art.compact[data-scene='siege'] .sc-actor-hero { left: 86px; bottom: 14px; }
-[data-scene='hearth'] .sc-actor-hero { left: 32%; bottom: 10px; }
-[data-scene='dawn'] .sc-actor-hero { left: 68px; bottom: 84px; }
-.scene-art.compact[data-scene='dawn'] .sc-actor-hero { left: 48px; bottom: 58px; }
-[data-scene='siege'] .sc-actor-side { right: 24px; bottom: 22px; width: 40px; height: 46px; background-image: url('../assets/z_clothed.png'); background-size: 800% 100%; transform: scaleX(-1); }
-.scene-art.compact[data-scene='siege'] .sc-actor-side { right: 28px; bottom: 14px; width: 32px; height: 38px; }
-[data-scene='rooftop'] .sc-actor-side { right: 24px; bottom: 22px; width: 22px; height: 64px; background-image: url('../assets/lamp.png'); background-size: contain; }
-.scene-art.compact[data-scene='rooftop'] .sc-actor-side { bottom: 14px; height: 52px; }
-[data-scene='beacon'] .sc-actor-side { right: 20px; bottom: 22px; width: 52px; height: 96px; background-image: url('../assets/fort_keep.png'); background-size: contain; }
-.scene-art.compact[data-scene='beacon'] .sc-actor-side { bottom: 14px; width: 42px; height: 74px; }
-[data-scene='hearth'] .sc-actor-side { right: 28%; bottom: 10px; width: 32px; height: 42px; background-image: url('../assets/npc_hat.png'); background-size: 400% 100%; transform: scaleX(-1); }
-[data-scene='dawn'] .sc-actor-side { left: 106px; bottom: 84px; width: 46px; height: 30px; background-image: url('../assets/ally_zhang.png'); background-size: auto 100%; background-position: 9% 0; }
-.scene-art.compact[data-scene='dawn'] .sc-actor-side { left: 82px; bottom: 58px; }
-.sc-tag { position: absolute; left: 8px; top: 6px; padding: 1px 7px; border-radius: var(--r1); border: 1px solid var(--copper);
-  background: color-mix(in srgb, var(--ink) 84%, transparent); color: var(--gold); font-style: normal; font-size: 10px; font-weight: 800; }
+.scene-art[data-scene='siege'] .sc-tint { background: linear-gradient(90deg, color-mix(in srgb, var(--night) 35%, transparent), color-mix(in srgb, var(--rose) 38%, transparent)); }
+.scene-art[data-scene='beacon'] .sc-tint { background: radial-gradient(circle at 82% 24%, color-mix(in srgb, var(--gold) 48%, transparent), color-mix(in srgb, var(--electric) 20%, transparent) 38%, transparent 72%); }
+.scene-art[data-scene='hearth'] .sc-tint { background: radial-gradient(circle at 30% 62%, color-mix(in srgb, var(--ember) 34%, transparent), color-mix(in srgb, var(--ink) 48%, transparent) 80%); }
+.scene-art[data-scene='dawn'] .sc-tint { background: linear-gradient(90deg, color-mix(in srgb, var(--ink) 30%, transparent), color-mix(in srgb, var(--gold) 32%, transparent) 70%, color-mix(in srgb, var(--lamp) 40%, transparent)); }
+.sc-ground { left: 0; right: 0; bottom: 0; height: 20px; background: url('../assets/ground.png') repeat-x left top / auto 100%; }
+.scene-art[data-scene='hearth'] .sc-ground { display: none; }
+.sc-house { left: 6px; bottom: 12px; width: 134px; height: 106px; background: url('../assets/fort_house.png') no-repeat left bottom / contain; }
+.scene-art[data-scene='hearth'] .sc-house { left: 0; top: 0; width: 100%; height: 100%; background: url('../assets/tavern_interior.png') no-repeat 22% bottom / cover; }
+.sc-actor-hero { width: 34px; height: 30px; background: url('../assets/hero_idle.png') no-repeat 0 0 / 600% 100%; }
+.scene-art[data-scene='rooftop'] .sc-actor-hero,
+.scene-art[data-scene='beacon'] .sc-actor-hero { left: 56px; bottom: 62px; }
+.scene-art[data-scene='siege'] .sc-actor-hero { left: 112px; bottom: 18px; }
+.scene-art[data-scene='hearth'] .sc-actor-hero { left: 28%; bottom: 10px; }
+.scene-art[data-scene='dawn'] .sc-actor-hero { left: 48px; bottom: 62px; }
+.scene-art[data-scene='siege'] .sc-actor-side { right: 20px; bottom: 18px; width: 32px; height: 38px; background-image: url('../assets/z_clothed.png'); background-repeat: no-repeat; background-size: 800% 100%; transform: scaleX(-1); }
+.scene-art[data-scene='rooftop'] .sc-actor-side { right: 28px; bottom: 18px; width: 20px; height: 62px; background-image: url('../assets/lamp.png'); background-repeat: no-repeat; background-size: contain; }
+.scene-art[data-scene='beacon'] .sc-actor-side { right: 16px; bottom: 18px; width: 42px; height: 90px; background-image: url('../assets/fort_keep.png'); background-repeat: no-repeat; background-size: contain; }
+.scene-art[data-scene='hearth'] .sc-actor-side { right: 22%; bottom: 10px; width: 28px; height: 38px; background-image: url('../assets/npc_hat.png'); background-repeat: no-repeat; background-size: 400% 100%; transform: scaleX(-1); }
+.scene-art[data-scene='dawn'] .sc-actor-side { left: 88px; bottom: 62px; width: 52px; height: 28px; background-image: url('../assets/ally_zhang.png'); background-repeat: no-repeat; background-size: 400% 100%; background-position: 0 0; }
 
 .diner-head-right { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
 .diner-tabs { display: flex; align-items: center; gap: 4px; margin: 0; flex-wrap: nowrap; }
@@ -376,12 +362,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night)
 .tab-right { margin-left: auto; }
 
 .lore-intro { display: flex; flex-direction: column; gap: 6px; text-align: left; }
-.scene-pills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.scene-pill { padding: 5px 8px; border-radius: var(--r1); border: 1.5px solid var(--wood-dark); background: var(--leather); color: var(--paper); font: 700 11px var(--font); cursor: pointer; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.scene-pill.on { border-color: var(--gold); background: var(--wood); color: var(--paper); }
-.lore-storyboard { display: grid; grid-template-columns: 270px 1fr; gap: 8px; align-items: stretch; }
+.lore-storyboard { display: grid; grid-template-columns: 260px 1fr; gap: 10px; align-items: stretch; }
+.lore-storyboard .scene-art { height: 136px; }
 .lore-scene-box { display: flex; flex-direction: column; padding: 8px 12px; border-radius: var(--r2); border: 2px solid var(--copper); background: color-mix(in srgb, var(--ink) 80%, var(--leather)); min-height: 0; }
-.lore-sub { font-size: 10.5px; color: var(--lamp); font-weight: 800; margin-bottom: 2px; }
 .lore-scene-box strong { display: block; font-size: var(--f2); color: var(--gold); margin-bottom: 4px; }
 .lore-scene-box p { margin: 0; font-size: 12px; line-height: 1.48; color: var(--paper); flex: 1; }
 .lore-nav { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 6px; }

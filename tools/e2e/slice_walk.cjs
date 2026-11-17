@@ -52,6 +52,7 @@ const L = require('./lib.cjs');
   const sceneAfter = await g.page.evaluate(() => document.querySelector('#panel-lore .lore-storyboard .scene-art')?.getAttribute('data-scene'));
   check(sceneBefore !== sceneAfter, `分镜可切换上一幕/下一幕 (${sceneBefore} -> ${sceneAfter})`);
   await fits('#panel-lore');
+  await g.shot('01c-lore-intro');
   await g.tap('#tab-lore-chapters');
   await fits('#panel-lore');
   await g.shot('01c-lore');

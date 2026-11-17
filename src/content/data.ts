@@ -294,9 +294,9 @@ export interface ClassDef {
   dur: number; cd: number; comingSoon?: string;
 }
 export const CLASSES: Record<ClassId, ClassDef> = {
-  gunner:   { id: 'gunner', name: '猎手', role: '屋顶神射', icon: 'wp_rifle', passive: '暴击率 +15%', skill: '鹰眼', skillDesc: '5 秒全穿透 + 必暴', dur: 300, cd: 1080 },
-  engineer: { id: 'engineer', name: '铸匠', role: '工坊铸造', icon: 'ic_turret', passive: '造塔/升塔 -25% 金币，塔伤害 +20%', skill: '过载', skillDesc: '所有炮塔 6 秒攻速 ×2', dur: 360, cd: 1080 },
-  chef:     { id: 'chef', name: '厨师', role: '食堂掌勺', icon: 'ic_chef', passive: '魔物多掉肉，卖菜/现炒 +35% 金币，特餐效果 +50%', skill: '守夜大餐', skillDesc: '回 40% 血 + 8 秒攻速 ×1.4', dur: 480, cd: 1080 },
+  gunner:   { id: 'gunner', name: '猎手', role: '屋顶神射', icon: 'wp_rifle', passive: '暴击率 +15%', skill: '鹰眼', skillDesc: '5 秒全穿透必暴', dur: 300, cd: 1080 },
+  engineer: { id: 'engineer', name: '铸匠', role: '工坊铸造', icon: 'ic_turret', passive: '造塔 -25%金 · 塔伤 +20%', skill: '过载', skillDesc: '炮塔 6 秒攻速 ×2', dur: 360, cd: 1080 },
+  chef:     { id: 'chef', name: '厨师', role: '食堂掌勺', icon: 'ic_chef', passive: '掉肉/卖菜 +35% · 特餐 +50%', skill: '守夜大餐', skillDesc: '回 40% 血 + 攻速 ×1.4', dur: 480, cd: 1080 },
 };
 export const CRIT_CHANCE = 0.15;
 export const CRIT_MUL = 2;

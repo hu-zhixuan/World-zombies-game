@@ -1537,7 +1537,8 @@ export function step(run: RunState, input: Input): GameEvent[] {
 
   if (run.phase === 'fight') {
     if (run.spawn.left > 0 && --run.spawn.timer <= 0) {
-      const groupCap = run.day === 1 ? 1.25 : 1.7 + run.day * 0.44;
+      const day1Normal = run.day === 1 && (run.difficulty ?? 'normal') === 'normal';
+      const groupCap = day1Normal ? 1 : run.day === 1 ? 1.35 : 1.7 + run.day * 0.44;
       const group = Math.min(run.spawn.left, 1 + Math.floor(rand(run) * groupCap));
       for (let i = 0; i < group; i++) { spawnZombie(run); run.spawn.left--; }
       if (run.spawn.bossKind && !run.spawn.bossSpawned && run.spawn.left <= Math.floor(run.spawn.total / 2)) {
@@ -1545,9 +1546,11 @@ export function step(run: RunState, input: Input): GameEvent[] {
         spawnZombie(run, run.spawn.bossKind);
         ev.push({ t: 'bossAppear', kind: run.spawn.bossKind });
       }
-      run.spawn.timer = run.day === 1
-        ? 40 + Math.floor(rand(run) * 14)
-        : Math.round(Math.max(10, 25 - run.day * 0.9) * (0.52 + group * 0.42)) + Math.floor(rand(run) * 8);
+      run.spawn.timer = day1Normal
+        ? 48 + Math.floor(rand(run) * 14)
+        : run.day === 1
+          ? 40 + Math.floor(rand(run) * 14)
+          : Math.round(Math.max(10, 25 - run.day * 0.9) * (0.52 + group * 0.42)) + Math.floor(rand(run) * 8);
     }
   }
 
