@@ -2,14 +2,14 @@ import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 import { audio } from '../app/audio';
 import { game } from '../app/game';
 import {
-  CLASSES, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
+  CLASSES, DIFFICULTIES, DIFFICULTY_ORDER, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
   MEALS, MEAL_ORDER, RARITY_NAME, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST, STAR_COST, STAR_PERKS,
   TURRETS, WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES, classUnlockStars, newZombieOn, nextUnlock, perkDef, sustainedDps, unlockName,
   type MealId, type TurretType,
 } from '../content/data';
 import {
   ALLIES, ALLY_ORDER, CHAPTER_CARDS, CINEMATIC_INTRO, COMPANION_JOIN_STORIES, QUALITY_META, REST_STORY, STORY_SCENES, VIP_CUSTOMERS, VIP_TIERS,
-  getFansRank, getRepTier, type DishQuality, type RestStoryKey,
+  getFansRank, getRepTier, type DishQuality, type RestStoryKey, type StorySceneKey,
 } from '../content/story';
 import {
   MAX_CARRY, dayRemaining, hasAlly, houseBuff, meatPrice, qteQuality, turretBuildCost, turretRefundCoins, turretUpgradeCost,
@@ -18,6 +18,30 @@ import { TURRET_SLOTS, type GameEvent, type TurretTargetMode } from '../sim/type
 import { CampBar, CampKeys, Keys, Pad, WeaponChip } from './controls';
 import { Bar, Btn, Chip, Icon, NpcPortrait, Panel, Stars } from './parts';
 
+const SCENE_TAG: Record<StorySceneKey, string> = {
+  siege: '黑雾压境 · 孤馆残灯',
+  rooftop: '屋顶高台 · 守夜迎敌',
+  beacon: '北岭烽火 · 十五夜约',
+  hearth: '深夜灶火 · 酒馆百态',
+  dawn: '破晓归途 · 暮夜终战',
+};
+
+function StorySceneView(p: { scene?: StorySceneKey; compact?: boolean }) {
+  const sc: StorySceneKey = p.scene ?? 'rooftop';
+  return (
+    <div class={`scene-art ${p.compact ? 'compact' : ''}`} data-scene={sc}>
+      <span class="sc-sky" />
+      <span class="sc-town" />
+      <span class="sc-tint" />
+      <span class="sc-ground" />
+      <span class="sc-house" />
+      <span class="sc-actor-hero" />
+      <span class="sc-actor-side" />
+      <em class="sc-tag">{SCENE_TAG[sc]}</em>
+    </div>
+  );
+}
+
 function Hud() {
   const run = game.run, p = run.player;
   const boss = run.zombies.find((z) => ZOMBIES[z.kind].boss);
@@ -25,6 +49,7 @@ function Hud() {
   const wallUp = run.wall.hp > 0;
   const defRatio = wallUp ? run.wall.hp / run.wall.maxHp : run.home.hp / run.home.maxHp;
   const defLabel = wallUp ? `防线 ${run.wall.hp}` : `大屋 ${run.home.hp}`;
+  const diffName = DIFFICULTIES[run.difficulty ?? 'normal'].name;
 
   return (
     <header class="hud">
@@ -39,7 +64,7 @@ function Hud() {
       </div>
 
       <div class="hud-mid">
-        <Chip id="hud-day">{run.phase === 'camp' ? `第${run.day}夜·${run.inside ? '酒馆' : '外院'}` : `第${run.day}/${LAST_DAY}天`}</Chip>
+        <Chip id="hud-day">{diffName}·{run.phase === 'camp' ? `第${run.day}夜·${run.inside ? '酒馆' : '外院'}` : `第${run.day}/${LAST_DAY}天`}</Chip>
         {boss ? (
           <Chip cls="boss" id="hud-left">
             {ZOMBIES[boss.kind].name.split('·')[0]} <Bar cls="boss" v={boss.hp / boss.maxHp} />
@@ -68,7 +93,7 @@ function HouseBadge() {
   const text = hb.zone === 'roof'
     ? `${hb.name} · 伤+${Math.round((hb.dmgMul - 1) * 100)}% 程+${Math.round(hb.rangeBonus * 100)}% 暴+${Math.round(hb.critBonus * 100)}% 掩体-${Math.round(hb.rangedCover * 100)}%`
     : hb.zone === 'porch'
-      ? `${hb.name} · 伤+12% 程+10% 掩体-20%`
+      ? `${hb.name} · 伤+12% 程+10% 掩体-${Math.round(hb.rangedCover * 100)}%`
       : `${hb.name} · 跃上酒馆屋顶获高地强效增益`;
   return (
     <div class="house-badge" id="hud-house" data-zone={hb.zone}>
@@ -97,13 +122,16 @@ const Purse = () => (
 );
 
 
-/** 全屏沉浸剧情对话弹窗（支持逐句推进或一键跳过） */
+/** 全屏沉浸剧情对话弹窗（顶部层叠像素分镜 + 逐句推进或一键跳过） */
 function StoryPanel() {
   const q = game.storyQueue;
   if (!q.length) return null;
   const cur = q[0], total = q.length;
   return (
     <Panel id="panel-story" cls="wide story-panel" title={cur.title} head={<span class="story-step">待读 {total} 段</span>}>
+      <div class="story-visual">
+        <StorySceneView scene={cur.line.scene ?? 'rooftop'} compact />
+      </div>
       <div class="story-stage">
         <NpcPortrait avatar={cur.line.avatar} initial={cur.line.initial} cls="lg" />
         <div class="story-body">
@@ -124,7 +152,7 @@ function StoryPanel() {
   );
 }
 
-/** 酒馆传闻录：序章前情 / 四章总览 / 四位战友档案 */
+/** 酒馆传闻录：序章图文分镜 / 四章总览 / 四位战友档案 */
 function LorePanel() {
   const [tab, setTab] = useState<'intro' | 'chapters' | 'allies'>('intro');
   const [sceneIdx, setSceneIdx] = useState(0);
@@ -153,11 +181,20 @@ function LorePanel() {
               </button>
             ))}
           </div>
-          <div class="lore-scene-box">
-            <strong>{scene.chapter} · {scene.title}</strong>
-            <p>{scene.text}</p>
+          <div class="lore-storyboard">
+            <StorySceneView scene={scene.sceneKey} />
+            <div class="lore-scene-box">
+              <small class="lore-sub">{scene.sub}</small>
+              <strong>{scene.chapter} · {scene.title}</strong>
+              <p>{scene.text}</p>
+              <div class="lore-nav">
+                <Btn id="btn-scene-prev" kind="small" disabled={sceneIdx <= 0} onClick={() => setSceneIdx((i) => Math.max(0, i - 1))}>上一幕</Btn>
+                <span class="lore-idx">{sceneIdx + 1} / {STORY_SCENES.length}</span>
+                <Btn id="btn-scene-next" kind="small" disabled={sceneIdx >= STORY_SCENES.length - 1} onClick={() => setSceneIdx((i) => Math.min(STORY_SCENES.length - 1, i + 1))}>下一幕</Btn>
+              </div>
+            </div>
           </div>
-          {!game.started && <small class="lore-tip">点击「开始守夜」选择职业出战后，将立即播放开场全剧情</small>}
+          {!game.started && <small class="lore-tip">点击「开始守夜」择定难度与职业后，立即进入暮夜酒馆开战</small>}
         </div>
       )}
 
@@ -228,17 +265,29 @@ function PerkPanel() {
   );
 }
 
-/** 开局选职业：3 个职业均可体验 */
+/** 开局选难度与职业：普通 / 困难 / 噩梦 + 3 个职业 */
 function ClassPanel() {
   const stars = game.meta.stars;
+  const selDiff = game.selectedDifficulty;
   return (
-    <Panel id="panel-class" title="选择出战职业" sub="一位守夜人守在暮夜酒馆屋顶，迎战十五夜黑雾尸潮">
+    <Panel id="panel-class" title="选择难度与出战职业">
+      <div class="diff-picker" id="diff-picker">
+        {DIFFICULTY_ORDER.map((id) => {
+          const d = DIFFICULTIES[id], on = selDiff === id;
+          return (
+            <button key={id} id={`btn-diff-${id}`} data-diff={id} class={`diff-btn ${on ? 'on' : ''}`} onClick={() => game.setDifficulty(id)}>
+              <span class="diff-top"><strong>{d.name}</strong><em>×{d.starMul}★</em></span>
+              <small>{d.desc}</small>
+            </button>
+          );
+        })}
+      </div>
       <div class="row">
         {Object.values(CLASSES).map((c) => {
           const need = classUnlockStars(c.id) ?? 0;
           const lock = c.comingSoon ?? (stars < need ? `再攒 ${need - stars} 颗星解锁` : '');
           return (
-            <button class="card" key={c.id} data-class={c.id} disabled={!!lock} onClick={() => game.restart(c.id)}>
+            <button class="card" key={c.id} data-class={c.id} disabled={!!lock} onClick={() => game.restart(c.id, selDiff)}>
               <Icon k={c.icon} cls="x3" /><strong>{c.name}</strong><em>{c.role}</em>
               <span>{c.passive}</span><small>{c.skill}：{c.skillDesc}</small>
               {lock && <u>{lock}</u>}
@@ -801,13 +850,13 @@ export function App() {
         </Panel>
       )}
       {panel === 'dead' && (
-        <Panel id="panel-dead" title="酒馆失守" sub={`坚持到了第 ${run.day} 天，消灭 ${run.kills} 只魔物 · 食堂 ${fansRank.grade}级 (${run.diner.servedTotal}客)`}>
+        <Panel id="panel-dead" title="酒馆失守" sub={`${DIFFICULTIES[run.difficulty ?? 'normal'].name}难度 · 坚持到了第 ${run.day} 天，消灭 ${run.kills} 只魔物 · 食堂 ${fansRank.grade}级 (${run.diner.servedTotal}客)`}>
           <Progress gain={game.lastGain} />
           <Btn id="btn-again" kind="primary" onClick={() => game.chooseClass()}>重返防线</Btn>
         </Panel>
       )}
       {panel === 'won' && (
-        <Panel id="panel-won" title="守住了暮夜酒馆！" sub={`守住全部 ${LAST_DAY} 个日夜，击杀 ${run.kills} 只深渊魔物 · 食堂达成 ${fansRank.grade}级·${fansRank.name}！`}>
+        <Panel id="panel-won" title="守住了暮夜酒馆！" sub={`${DIFFICULTIES[run.difficulty ?? 'normal'].name}难度 · 守住全部 ${LAST_DAY} 个日夜，击杀 ${run.kills} 只深渊魔物 · 食堂达成 ${fansRank.grade}级·${fansRank.name}！`}>
           <Progress gain={game.lastGain} />
           <Btn id="btn-again" kind="primary" onClick={() => game.chooseClass()}>再战一局</Btn>
         </Panel>

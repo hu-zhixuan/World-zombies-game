@@ -390,21 +390,62 @@ def main():
     strip('boss_demon', slice_grid(img('patreons', 'demon-Files', 'PNG', 'demon-idle.png'), 6, 160, 0, 150, flip=False))
     strip('z_death', [img('cemetery', 'Sprites', 'enemy-death', f'enemy-death-{i}.png') for i in range(1, 6)])
 
-    # ── 4 位并肩作战战友（全部重建为 Gothicvania 独立战斗角色：待机 + 攻击双动画，同款脊柱重心对齐绝不抖脚）──
-    def place_bottom(src, dx, top_y, out_w, out_h):
-        cv = Image.new('RGBA', (out_w, out_h), (0, 0, 0, 0))
+    # ── 4 位并肩作战战友（全部重建为 Gothicvania 独立战斗角色：待机 + 巡逻奔跑 + 完整攻击三态，脊柱中心 0.5 严格对齐绝不瞬移，全员朝右）──
+    def crop_anchor_frame(src, top_y, out_w, anchor_x):
         sub = src.crop((0, top_y, src.width, src.height))
-        cv.alpha_composite(sub, (dx, out_h - sub.height))
+        out_h = sub.height
+        cv = Image.new('RGBA', (out_w, out_h), (0, 0, 0, 0))
+        dx = out_w // 2 - round(anchor_x)
+        sx0 = max(0, -dx)
+        sx1 = min(sub.width, out_w - dx)
+        if sx1 > sx0:
+            cv.alpha_composite(sub.crop((sx0, 0, sx1, out_h)), (max(0, dx), 0))
         return cv
 
-    strip('ally_zhang', [img('cemetery', 'Sprites', 'hero', 'hero-idle', f'hero-idle-{i}.png').transpose(Image.FLIP_LEFT_RIGHT).crop((22, 12, 90, 59)) for i in range(1, 5)])
-    strip('ally_zhang_atk', [place_bottom(img('cemetery', 'Sprites', 'hero', 'hero-attack', f'hero-attack-{i}.png'), 13, 12, 112, 47) for i in range(1, 6)])
-    strip('ally_lin', [img('church', 'wizard', 'idle-sprites', f'wizard-idle-{i}.png').crop((11, 16, 67, 66)) for i in range(1, 6)])
-    strip('ally_lin_atk', [img('church', 'wizard', 'fire-sprites', f'fire{i}.png').crop((11, 16, 67, 66)) for i in range(1, 7)])
-    save('ally_qiang', img('patreons', 'Gothic-hero-Files', 'PNG', 'gothic-hero-idle.png'), frames=4)
-    save('ally_qiang_atk', img('patreons', 'Gothic-hero-Files', 'PNG', 'gothic-hero-attack.png'), frames=6)
-    strip('ally_zhao', [img('church', 'player', 'sprites', f'idle{i}.png').crop((19, 12, 63, 60)) for i in range(1, 5)])
+    def sheet_anchor_frames(im, fw, count, out_w, anchor_x, flip=False):
+        out_h = im.height
+        frames = []
+        for i in range(count):
+            cell = im.crop((i * fw, 0, (i + 1) * fw, out_h))
+            if flip:
+                cell = cell.transpose(Image.FLIP_LEFT_RIGHT)
+            frames.append(crop_anchor_frame(cell, 0, out_w, anchor_x))
+        return frames
+
+    # 老兵张（银枪穿刺）：idle 朝左故先水平翻转（中心 x=46）；run/atk 原生朝右（中心 x=51 / x=43.5）
+    strip('ally_zhang', [
+        crop_anchor_frame(img('cemetery', 'Sprites', 'hero', 'hero-idle', f'hero-idle-{i}.png').transpose(Image.FLIP_LEFT_RIGHT), 12, 88, 46)
+        for i in range(1, 5)
+    ])
+    strip('ally_zhang_run', [
+        crop_anchor_frame(img('cemetery', 'Sprites', 'hero', 'hero-run', f'hero-run-{i}.png'), 12, 88, 51)
+        for i in range(1, 7)
+    ])
+    strip('ally_zhang_atk', [
+        crop_anchor_frame(img('cemetery', 'Sprites', 'hero', 'hero-attack', f'hero-attack-{i}.png'), 12, 114, 44)
+        for i in range(1, 6)
+    ])
+
+    # 炼金师小林（圣火炼金）：原版 wizard 朝左，全部翻转朝右并导出完整 fire1..10 十帧施法动作
+    strip('ally_lin', [
+        img('church', 'wizard', 'idle-sprites', f'wizard-idle-{i}.png').transpose(Image.FLIP_LEFT_RIGHT).crop((11, 13, 71, 66))
+        for i in range(1, 6)
+    ])
+    strip('ally_lin_atk', [
+        img('church', 'wizard', 'fire-sprites', f'fire{i}.png').transpose(Image.FLIP_LEFT_RIGHT).crop((0, 13, 81, 66))
+        for i in range(1, 11)
+    ])
+
+    # 铁匠阿强（重铠剑卫）：idle(38px, 中心19)/run(66px, 中心36)/attack(96px, 中心48) 全员按脊柱对齐，彻底消除攻击瞬移
+    strip('ally_qiang', sheet_anchor_frames(img('patreons', 'Gothic-hero-Files', 'PNG', 'gothic-hero-idle.png'), 38, 4, 52, 19))
+    strip('ally_qiang_run', sheet_anchor_frames(img('patreons', 'Gothic-hero-Files', 'PNG', 'gothic-hero-run.png'), 66, 12, 68, 36))
+    strip('ally_qiang_atk', sheet_anchor_frames(img('patreons', 'Gothic-hero-Files', 'PNG', 'gothic-hero-attack.png'), 96, 6, 104, 48))
+
+    # 武僧小赵（苍蓝气劲）：原图共用 82x60 画布（身体中心 x=41），裁切保持中心 41 对齐并加入行走 6 帧
+    strip('ally_zhao', [img('church', 'player', 'sprites', f'idle{i}.png').crop((15, 12, 67, 60)) for i in range(1, 5)])
+    strip('ally_zhao_run', [img('church', 'player', 'sprites', f'walk{i}.png').crop((15, 12, 67, 60)) for i in range(1, 7)])
     strip('ally_zhao_atk', [img('church', 'player', 'sprites', f'punch{i}.png').crop((0, 12, 82, 60)) for i in range(1, 7)])
+
 
     # ── 深夜小食堂的幸存者食客 NPC（Gothicvania Town, ansimuz）──
     for key, d, n in [('npc_hat', 'hat-man-idle', 4), ('npc_woman', 'woman-idle', 7),

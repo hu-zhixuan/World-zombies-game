@@ -1,43 +1,58 @@
 {
  "ally_lin": {
-  "fh": 50,
+  "fh": 53,
   "frames": 5,
-  "fw": 56
+  "fw": 60
  },
  "ally_lin_atk": {
-  "fh": 50,
-  "frames": 6,
-  "fw": 56
+  "fh": 53,
+  "frames": 10,
+  "fw": 81
  },
  "ally_qiang": {
   "fh": 48,
   "frames": 4,
-  "fw": 38
+  "fw": 52
  },
  "ally_qiang_atk": {
   "fh": 48,
   "frames": 6,
-  "fw": 96
+  "fw": 104
+ },
+ "ally_qiang_run": {
+  "fh": 48,
+  "frames": 12,
+  "fw": 68
  },
  "ally_zhang": {
   "fh": 47,
   "frames": 4,
-  "fw": 68
+  "fw": 88
  },
  "ally_zhang_atk": {
   "fh": 47,
   "frames": 5,
-  "fw": 112
+  "fw": 114
+ },
+ "ally_zhang_run": {
+  "fh": 47,
+  "frames": 6,
+  "fw": 88
  },
  "ally_zhao": {
   "fh": 48,
   "frames": 4,
-  "fw": 44
+  "fw": 52
  },
  "ally_zhao_atk": {
   "fh": 48,
   "frames": 6,
   "fw": 82
+ },
+ "ally_zhao_run": {
+  "fh": 48,
+  "frames": 6,
+  "fw": 52
  },
  "barbed_wire": {
   "fh": 34,

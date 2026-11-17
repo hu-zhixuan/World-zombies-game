@@ -2,13 +2,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
-  CLASSES, CRIT_MUL, DINER_GUESTS, FORT_LEVELS, LAST_DAY, MEALS, PERKS, TURRETS, WALL_LEVELS, WEAPONS,
-  nextUnlock, sustainedDps, unlockedClasses, unlockedMeals, unlockedWeapons, zombieHp,
+  CLASSES, CRIT_MUL, DIFFICULTIES, DINER_GUESTS, FORT_LEVELS, LAST_DAY, MEALS, PERKS, TURRETS, WALL_LEVELS, WEAPONS,
+  dayZombieCount, nextUnlock, sustainedDps, unlockedClasses, unlockedMeals, unlockedWeapons, zombieHp,
 } from '../src/content/data';
 import {
   BOSS_INTROS, BOSS_VICTORY, CHAPTER_CARDS, CINEMATIC_INTRO, COMPANION_JOIN_STORIES, DAILY_TRENDS, FANS_RANKS,
   QUALITY_META, REP_TIERS, REST_STORY, STORY_SCENES, VIP_CUSTOMERS, VIP_TIERS, WAVE_STORY_LINES,
 } from '../src/content/story';
+import { starsEarned } from '../src/app/meta';
 import { runBot } from '../src/sim/bot';
 import {
   BODY_Y, MAX_CARRY, command, computeGrenadeThrow, damageMul, effectiveRange, houseBuff,
@@ -228,7 +229,7 @@ describe('2D 小屋实体碰撞、阶梯跳台与元气骑士式手动开火锁�
     expect(roofLv1.rangeBonus).toBeCloseTo(0.2);
     expect(roofLv1.critBonus).toBeCloseTo(0.1);
     expect(roofLv1.reloadHaste).toBeCloseTo(0.25);
-    expect(roofLv1.rangedCover).toBeCloseTo(0.35);
+    expect(roofLv1.rangedCover).toBeCloseTo(0.25);
     const roofRange = effectiveRange(r, 'pistol');
     const roofDmg = damageMul(r);
     r.player.weapons[0].ammo = 2;
@@ -239,7 +240,7 @@ describe('2D 小屋实体碰撞、阶梯跳台与元气骑士式手动开火锁�
     r.player.reloadT = 0; r.player.x = 266; r.player.y = PORCH_Y;
     expect(houseBuff(r).zone).toBe('porch');
     expect(damageMul(r)).toBeGreaterThan(1.05);
-    expect(houseBuff(r).rangedCover).toBeCloseTo(0.2);
+    expect(houseBuff(r).rangedCover).toBeCloseTo(0.15);
 
     // 下到地面庭院无屋舍高地增益
     r.player.x = 300; r.player.y = 0;
@@ -250,7 +251,7 @@ describe('2D 小屋实体碰撞、阶梯跳台与元气骑士式手动开火锁�
     expect(roofReloadT).toBeLessThan(r.player.reloadT);
     r.player.reloadT = 0; r.player.weapons[0].ammo = WEAPONS.pistol.mag;
 
-    // 升级 3 级哥特铁堡：屋顶掩体 -55% 远程火球伤 + 自动慢回血
+    // 升级 3 级哥特铁堡：屋顶掩体 -45% 远程火球伤 + 自动慢回血
     r.phase = 'camp'; r.coins = 600;
     command(r, { t: 'upgradeFort' });
     command(r, { t: 'upgradeFort' });
@@ -258,15 +259,15 @@ describe('2D 小屋实体碰撞、阶梯跳台与元气骑士式手动开火锁�
     r.spawn.left = 0; r.spawn.timer = 1e9;
     expect(r.fort.level).toBe(3);
     expect(houseBuff(r).dmgMul).toBeCloseTo(1.36);
-    expect(houseBuff(r).rangedCover).toBeCloseTo(0.55);
+    expect(houseBuff(r).rangedCover).toBeCloseTo(0.45);
 
-    // 远程火球打在 3 级屋顶主角身上应触发掩体大幅减伤并放出 cover 字段
+    // 远程火球打在 3 级屋顶主角身上应触发掩体减伤并放出 cover 字段
     r.player.hp = 80; r.player.hurtT = 0;
     r.enemyProjs.push({ x: r.player.x, y: GROUND_Y + r.player.y - 20, vx: 0, vy: 0, dmg: 20, life: 10 });
     const hurtEvs = step(r, NO_INPUT);
     const hurtEv = hurtEvs.find((e) => e.t === 'hurt');
-    expect(hurtEv && hurtEv.t === 'hurt' ? hurtEv.cover : 0).toBeGreaterThanOrEqual(10);
-    expect(hurtEv && hurtEv.t === 'hurt' ? hurtEv.dmg : 99).toBeLessThanOrEqual(9);
+    expect(hurtEv && hurtEv.t === 'hurt' ? hurtEv.cover : 0).toBeGreaterThanOrEqual(8);
+    expect(hurtEv && hurtEv.t === 'hurt' ? hurtEv.dmg : 99).toBeLessThanOrEqual(12);
   });
 
   test('点击指定优先目标会切过去集火，打死前不乱换', () => {
@@ -311,13 +312,14 @@ describe('兵器升星、可控抛物线爆炎弹、铁甲与军械行商', () =
     expect(r.coins).toBe(45);
   });
 
-  test('随身最多 3 把兵器：超出时替换手中兵器', () => {
+  test('随身最多 2 把兵器：超出时替换手中兵器', () => {
     const r = quiet(); r.player.x = 280; r.player.y = 0;
-    r.player.weapons.push({ id: 'smg', star: 1, ammo: 10 }, { id: 'revolver', star: 1, ammo: 6 });
+    r.player.weapons.push({ id: 'smg', star: 1, ammo: 10 });
     r.player.cur = 1;
     r.crates.push({ id: 900, x: 280, weapon: 'shotgun' }); step(r, NO_INPUT);
-    expect(r.player.weapons.map((w) => w.id)).toEqual(['pistol', 'shotgun', 'revolver']);
+    expect(r.player.weapons.map((w) => w.id)).toEqual(['pistol', 'shotgun']);
     expect(r.player.weapons.length).toBe(MAX_CARRY);
+    expect(MAX_CARRY).toBe(2);
   });
 
   test('军械行商可购买兵器、补给（爆炎弹/铁甲/秘药）、刷货与拆解', () => {
@@ -427,7 +429,7 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     expect(BOSS_INTROS.length).toBe(3);
     expect(BOSS_VICTORY.length).toBe(3);
     expect(Object.keys(COMPANION_JOIN_STORIES)).toEqual(['2', '4', '6', '8']);
-    expect(REST_STORY.firstOpen.lines.length).toBeGreaterThanOrEqual(5);
+    expect(REST_STORY.firstOpen.lines.length).toBeGreaterThanOrEqual(4);
 
     // 验证第 2/4/6/8 天选完天赋招募战友及增益
     const r = quiet();
@@ -453,8 +455,12 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
       WEAPONS, TURRETS, WALL_LEVELS, FORT_LEVELS, CLASSES, MEALS, DINER_GUESTS, PERKS,
     });
     expect(storyBlob).not.toMatch(forbidden);
+    expect(storyBlob).not.toMatch(/莫老板|莫掌柜/);
+    expect(storyBlob).toMatch(/小胡|胡掌柜/);
     for (const rel of ['src/ui/App.tsx', 'src/ui/controls.tsx', 'src/sim/sim.ts', 'src/app/game.ts']) {
-      expect(readFileSync(join(__dirname, '..', rel), 'utf8'), rel).not.toMatch(forbidden);
+      const txt = readFileSync(join(__dirname, '..', rel), 'utf8');
+      expect(txt, rel).not.toMatch(forbidden);
+      expect(txt, rel).not.toMatch(/莫老板|莫掌柜/);
     }
 
     // 验证声望里程碑触发 rep10 剧情事件
@@ -501,22 +507,24 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     expect(z2.hp).toBeLessThan(200);
   });
 
-  test('堡垒 3 级夜间自动修墙 30%', () => {
+  test('堡垒 3 级夜间自动修墙 20%', () => {
     const r = quiet(); r.phase = 'camp'; r.coins = 600;
     command(r, { t: 'upgradeFort' });
     command(r, { t: 'upgradeFort' });
     expect(r.fort.level).toBe(3);
     r.wall.hp = 10;
     command(r, { t: 'nextDay' });
-    expect(r.wall.hp).toBe(10 + Math.round(r.wall.maxHp * 0.3));
+    expect(r.wall.hp).toBe(10 + Math.round(r.wall.maxHp * 0.2));
   });
 
-  test('四位战友真实参战（银弩穿透/冰焰缓速回血/近战震退修墙/对空速射）与炮塔索敌模式切换（near → boss → air）', () => {
-    // 1. 战友真实参战
+  test('四位战友真实参战并巡逻走位（银枪穿透/绯火缓速回血/近战重劈修墙/苍蓝气劲对空）与炮塔索敌模式切换（near → boss → air）', () => {
+    // 1. 战友真实参战与动态移动
     const r = quiet();
     r.story.allies = ['zhang', 'lin', 'qiang', 'zhao'];
     r.player.hp = 70;
     r.wall.hp = 180;
+    const startX = { zhang: r.allies.zhang.x, qiang: r.allies.qiang.x };
+    const moved = { zhang: false, qiang: false };
     const zNear = zombie(r, WALL_X + 6, 400, 'roamer');
     const zBat = zombie(r, 460, 120, 'bat', -90);
     const allyShots = new Set<string>();
@@ -524,11 +532,15 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
       for (const e of step(r, NO_INPUT)) {
         if (e.t === 'shot' && e.from === 'ally' && e.ally) allyShots.add(e.ally);
       }
+      if (Math.abs(r.allies.zhang.x - startX.zhang) > 2) moved.zhang = true;
+      if (Math.abs(r.allies.qiang.x - startX.qiang) > 2) moved.qiang = true;
     }
     expect(allyShots.has('zhang')).toBe(true);
     expect(allyShots.has('lin')).toBe(true);
     expect(allyShots.has('qiang')).toBe(true);
     expect(allyShots.has('zhao')).toBe(true);
+    expect(moved.zhang).toBe(true);
+    expect(moved.qiang).toBe(true);
     expect(r.player.hp).toBeGreaterThan(70); // 小林战斗慢回血
     expect(r.wall.hp).toBeGreaterThan(180);  // 阿强前院修墙
     expect(zNear.hp).toBeLessThan(400);
@@ -658,8 +670,9 @@ describe('15 天完整流程与首领', () => {
     }
   });
 
-  test('零操作/不开火只靠 1 座 1 级初始火铳塔无法活过前几天；消极站屋顶或平地不建造购买也无法打通 15 天', () => {
+  test('第 1 天无免费白送炮塔，零操作/不开火活不过前几天；消极站屋顶或平地不建造购买也无法打通 15 天', () => {
     const r = newRun(3);
+    expect(r.turrets.every((t) => t.type === null)).toBe(true);
     r.autoFire = false;
     for (let i = 0; i < 60 * 60 * 6 && r.phase === 'fight'; i++) step(r, NO_INPUT);
     expect(r.phase).toBe('dead');
@@ -676,6 +689,29 @@ describe('15 天完整流程与首领', () => {
       expect(passive.phase, ground ? 'ground' : 'roof').toBe('dead');
       expect(passive.day, ground ? 'ground' : 'roof').toBeLessThan(LAST_DAY);
     }
+  });
+
+  test('三档难度（普通/困难/噩梦）正确拉升敌群强度、夜间续航惩罚与星星收益倍率', () => {
+    expect(zombieHp('roamer', 5, 'nightmare')).toBeGreaterThan(zombieHp('roamer', 5, 'hard'));
+    expect(zombieHp('roamer', 5, 'hard')).toBeGreaterThan(zombieHp('roamer', 5, 'normal'));
+    expect(dayZombieCount(5, 'nightmare')).toBeGreaterThan(dayZombieCount(5, 'normal'));
+
+    const nRun = newRun(7, ['revolver', 'smg'], 'gunner', 'normal');
+    const nmRun = newRun(7, ['revolver', 'smg'], 'gunner', 'nightmare');
+    nRun.phase = 'camp'; nRun.player.hp = 60;
+    nmRun.phase = 'camp'; nmRun.player.hp = 60;
+    command(nRun, { t: 'nextDay' });
+    command(nmRun, { t: 'nextDay' });
+    expect(nRun.player.hp).toBeGreaterThan(60);
+    expect(nmRun.player.hp).toBe(60); // 噩梦难度无夜间自动回血
+
+    const scoredNormal = newRun(1, ['revolver'], 'gunner', 'normal');
+    const scoredHard = newRun(1, ['revolver'], 'gunner', 'hard');
+    const scoredNm = newRun(1, ['revolver'], 'gunner', 'nightmare');
+    for (const st of [scoredNormal, scoredHard, scoredNm]) { st.day = 6; st.phase = 'won'; }
+    expect(starsEarned(scoredHard)).toBeGreaterThan(starsEarned(scoredNormal));
+    expect(starsEarned(scoredNm)).toBeGreaterThan(starsEarned(scoredHard));
+    expect(DIFFICULTIES.nightmare.starMul).toBe(2);
   });
 
   test('多个随机种子下基础解锁池（仅重锤左轮+连珠火铳）机器人也能稳定打通 15 天', () => {

@@ -1,5 +1,5 @@
 // 局外成长：星星和最好成绩。独立于单局，存在另一个键下，重开一局不动它。
-import { LAST_DAY } from '../content/data';
+import { DIFFICULTIES, LAST_DAY } from '../content/data';
 import type { RunState } from '../sim/types';
 
 export interface MetaState { stars: number; bestDay: number; runs: number }
@@ -11,5 +11,8 @@ export function loadMeta(): MetaState {
 }
 export function saveMeta(m: MetaState) { try { localStorage.setItem(KEY, JSON.stringify(m)); } catch { /* 存不了不影响玩 */ } }
 
-/** 一局结束时得几颗星：撑过几天就几颗 */
-export const starsEarned = (run: RunState) => (run.phase === 'won' ? LAST_DAY : Math.max(0, run.day - 1));
+/** 一局结束时得几颗星：撑过几天 × 难度倍率 */
+export const starsEarned = (run: RunState) => {
+  const base = run.phase === 'won' ? LAST_DAY : Math.max(0, run.day - 1);
+  return Math.round(base * DIFFICULTIES[run.difficulty ?? 'normal'].starMul);
+};

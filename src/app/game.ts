@@ -1,5 +1,5 @@
 // 把规则层、画面层、音效与界面层接起来的地方。全游戏只有这一份状态。
-import { ZOMBIES, unlockedWeapons, type ClassId } from '../content/data';
+import { ZOMBIES, unlockedWeapons, type ClassId, type DifficultyId } from '../content/data';
 import {
   ALLIES, BOSS_VICTORY, CINEMATIC_INTRO, COMPANION_JOIN_STORIES,
   REST_STORY, SPEAKERS, type AllyId, type StoryLine,
@@ -22,6 +22,7 @@ class Game {
   meta: MetaState = loadMeta();
   /** 上一局结束时得了几颗星（结算面板显示用） */
   lastGain = 0;
+  selectedDifficulty: DifficultyId = 'normal';
   run: RunState = newRun(Date.now() % 100000, unlockedWeapons(this.meta.stars));
   started = false;
   choosing = false;
@@ -117,11 +118,18 @@ class Game {
     this.notify();
   }
 
-  restart(cls: ClassId = this.run.cls) {
+  setDifficulty(d: DifficultyId) {
+    audio.unlock();
+    audio.uiClick();
+    this.selectedDifficulty = d;
+    this.notify();
+  }
+
+  restart(cls: ClassId = this.run.cls, difficulty: DifficultyId = this.selectedDifficulty) {
     audio.unlock();
     audio.uiClick();
     this.choosing = false;
-    this.run = newRun(Date.now() % 100000, unlockedWeapons(this.meta.stars), cls);
+    this.run = newRun(Date.now() % 100000, unlockedWeapons(this.meta.stars), cls, difficulty);
     this.stack = [];
     this.storyQueue = [];
     this.immediateStory = false;
@@ -182,10 +190,10 @@ class Game {
           const a = ALLIES[ct.ally];
           const join = COMPANION_JOIN_STORIES[a.joinDay];
           const campBanter: Record<AllyId, string> = {
-            zhang: r.inside ? '屋外寒雾越压越低，迎战时我就守在屋顶替你架稳银弩！' : '屋顶风向摸熟了，只要魔物进射程，我这把银弩绝不落空。',
-            lin:   r.inside ? '灶火旁正好温着药罐，战中我也会在门廊扔出炼金冰焰替大家续伤。' : '门廊的秘药瓶都码齐了，我会边控场边替你缓慢回血！',
-            qiang: r.inside ? '右侧铁砧刚淬过火，造塔加固跟我打声招呼就行，一律九折！' : '敢凑近壁垒的家伙吃我一记大锤！战斗间隙我还会抽空修墙。',
-            zhao:  r.inside ? '驿道上的商旅都在传咱们小酒馆的名头，今夜堂食涨粉又快三成！' : '空中那些夜翼魔蝠和提灯怨灵由我优先点射盯死，掌柜放心迎敌！',
+            zhang: r.inside ? '屋外寒雾越压越低，迎战时我就守在屋顶替你挺紧银枪！' : '屋顶高台视野通透，只要魔物敢露头，我这杆银枪当场贯穿！',
+            lin:   r.inside ? '灶火旁温着绯火药罐，迎战时我会在门廊炸出炼金火弹并替你调息！' : '门廊药囊都在手里，待我用绯火轰散前排，顺带替你慢慢续伤！',
+            qiang: r.inside ? '右侧铁砧刚淬过火，造塔加固跟我打声招呼就行，一律九折！' : '壁垒前由我顶着！靠过来的腐尸先吃一记重铠斩击，空隙我也会顺手修墙。',
+            zhao:  r.inside ? '驿道上的商旅都在传咱们暮夜酒馆的名头，今夜堂食涨粉又快三成！' : '半空扑来的夜翼魔蝠与提灯怨灵由我苍蓝气劲盯死，胡掌柜只管放手杀敌！',
           };
           const lines: StoryLine[] = [
             { npc: ct.ally, name: a.name, initial: a.initial, role: `${a.role} · ${a.buffDesc}`, avatar: a.sprite, text: campBanter[ct.ally] },

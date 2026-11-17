@@ -121,9 +121,32 @@ export const ZOMBIES: Record<ZombieKind, ZombieDef> = {
   },
 };
 
-export const zombieHp = (kind: ZombieKind, day: number) =>
-  Math.floor((ZOMBIES[kind].baseHp + day * 10) * (1 + 0.19 * day + 0.014 * day * day));
-export const dayZombieCount = (day: number) => Math.round(9 + day * 4.5 + (day >= 8 ? (day - 7) * 2 : 0));
+export type DifficultyId = 'normal' | 'hard' | 'nightmare';
+export interface DifficultyDef {
+  id: DifficultyId;
+  name: string;
+  tag: string;
+  desc: string;
+  hpMul: number;
+  dmgMul: number;
+  spawnMul: number;
+  nightHeal: number;
+  starMul: number;
+}
+export const DIFFICULTIES: Record<DifficultyId, DifficultyDef> = {
+  normal:    { id: 'normal',    name: '普通', tag: '暮夜守望', desc: '硬核基准 · 谨慎布防',   hpMul: 1.24, dmgMul: 1.18, spawnMul: 1.16, nightHeal: 0.16, starMul: 1 },
+  hard:      { id: 'hard',      name: '困难', tag: '血月围城', desc: '敌群厚甲 · 减半夜愈',   hpMul: 1.56, dmgMul: 1.38, spawnMul: 1.30, nightHeal: 0.08, starMul: 1.5 },
+  nightmare: { id: 'nightmare', name: '噩梦', tag: '深渊炼狱', desc: '绝境高压 · 零夜回血',   hpMul: 1.95, dmgMul: 1.62, spawnMul: 1.44, nightHeal: 0,    starMul: 2 },
+};
+export const DIFFICULTY_ORDER: DifficultyId[] = ['normal', 'hard', 'nightmare'];
+
+export const zombieHp = (kind: ZombieKind, day: number, diff: DifficultyId = 'normal') => {
+  const base = (ZOMBIES[kind].baseHp + day * 10) * (1 + 0.21 * day + 0.017 * day * day);
+  const diffMul = diff === 'normal' && day <= 1 ? 1 : DIFFICULTIES[diff].hpMul;
+  return Math.floor(base * diffMul);
+};
+export const dayZombieCount = (day: number, diff: DifficultyId = 'normal') =>
+  Math.round((10 + day * 4.8 + (day >= 6 ? (day - 5) * 2.2 : 0)) * DIFFICULTIES[diff].spawnMul);
 export const bossForDay = (day: number): ZombieKind | null => (day === 15 ? 'boss_demon' : day === 5 || day === 10 ? 'boss_beast' : null);
 export const newZombieOn = (day: number) => {
   const b = bossForDay(day);
@@ -166,16 +189,16 @@ export const TURRET = TURRETS.mg;
 // ── 路障与堡垒房子升级（Lv1..3：站在屋子/屋顶直接大幅增强火力与掩体减伤）──
 export const MAX_WALL_LEVEL = 3;
 export const WALL_LEVELS = [
-  { level: 1, name: '拒马木障', maxHp: 280, coins: 0, reflect: 0 },
-  { level: 2, name: '石砌壁垒', maxHp: 500, coins: 135, reflect: 4 },
-  { level: 3, name: '雷纹铁壁', maxHp: 800, coins: 270, reflect: 10 },
+  { level: 1, name: '拒马木障', maxHp: 300, coins: 0, reflect: 0 },
+  { level: 2, name: '石砌壁垒', maxHp: 460, coins: 135, reflect: 4 },
+  { level: 3, name: '雷纹铁壁', maxHp: 740, coins: 270, reflect: 10 },
 ];
 
 export const MAX_FORT_LEVEL = 3;
 export const FORT_LEVELS = [
-  { level: 1, name: '木石酒馆', maxHp: 170, coins: 0, desc: '屋顶+20%伤·+20%程·换弹+25%·掩体-35%火球伤' },
-  { level: 2, name: '石堡要塞', maxHp: 300, coins: 175, desc: '屋顶+28%伤·掩体-45% · 守卫火炮自动开火 · 大屋300血' },
-  { level: 3, name: '哥特铁堡', maxHp: 480, coins: 340, desc: '屋顶+36%伤·掩体-55% · 双联火炮 · 屋顶慢回血+夜修墙' },
+  { level: 1, name: '木石酒馆', maxHp: 160, coins: 0, desc: '屋顶+20%伤·+20%程·换弹+25%·掩体-25%火球伤' },
+  { level: 2, name: '石堡要塞', maxHp: 280, coins: 175, desc: '屋顶+28%伤·掩体-35% · 守卫火炮自动开火 · 大屋280血' },
+  { level: 3, name: '哥特铁堡', maxHp: 440, coins: 340, desc: '屋顶+36%伤·掩体-45% · 双联火炮 · 屋顶慢回血+夜修墙' },
 ];
 
 // ── 消耗品 & 商店售价 ──
@@ -279,7 +302,7 @@ export const CRIT_CHANCE = 0.15;
 export const CRIT_MUL = 2;
 
 export const LAST_DAY = 15;
-export const DAY_HEAL = 0.3;
+export const DAY_HEAL = 0.16;
 
 // ── 局外成长（更快解锁各把特色神兵，前期就能爽到不同机制）──
 export type Unlock = { stars: number; kind: 'weapon'; id: WeaponId } | { stars: number; kind: 'class'; id: ClassId };
