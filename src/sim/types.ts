@@ -1,4 +1,4 @@
-import type { ClassId, MealId, PerkId, TurretType, WeaponId, ZombieKind } from '../content/data';
+import type { ClassId, DifficultyId, MealId, PerkId, TurretType, WeaponId, ZombieKind } from '../content/data';
 import type { AllyId, DishQuality, VipTierId } from '../content/story';
 
 /** 世界尺寸（逻辑像素）。画面高 310，室外地面线在 222，下面留给石墙地基与手指按键。 */
@@ -78,7 +78,7 @@ export interface Zombie {
 export interface Bullet {
   x: number; y: number; vx: number; vy: number; dmg: number; life: number;
   from: 'player' | 'turret' | 'fort' | 'ally'; allyId?: AllyId; pierce: boolean; crit: boolean; bounces: number; hit: number[];
-  aoe?: number; slow?: number; kind?: 'normal' | 'rocket' | 'frost' | 'cannon' | 'firebolt';
+  aoe?: number; slow?: number; kind?: 'normal' | 'rocket' | 'frost' | 'cannon' | 'firebolt' | 'spear' | 'qi';
   weaponId?: WeaponId; startX?: number; startY?: number; pierceLeft?: number; ricochetLeft?: number;
   closeBoost?: boolean; shatter?: boolean; homing?: boolean; stun?: number; burn?: number;
 }
@@ -91,7 +91,16 @@ export interface EnemyProj {
 }
 export interface Crate { id: number; x: number; weapon: WeaponId }
 export interface TurretSlotState { type: TurretType | null; level: number; cd: number; aim: number; mode: TurretTargetMode }
-export interface AllyRuntime { cd: number; atkT: number; facing: 1 | -1 }
+export interface AllyRuntime {
+  cd: number;
+  atkT: number;
+  facing: 1 | -1;
+  x: number;
+  y: number;
+  vx: number;
+  state: 'idle' | 'move' | 'atk';
+  dir: 1 | -1;
+}
 
 export interface DinerGuest {
   id: string;
@@ -160,6 +169,7 @@ export interface RunState {
   day: number; phase: Phase; phaseT: number;
   inside: boolean;
   autoFire: boolean;
+  difficulty: DifficultyId;
   player: Player; zombies: Zombie[]; bullets: Bullet[]; fires: GroundFire[]; grenades: GrenadeProj[]; enemyProjs: EnemyProj[]; crates: Crate[];
   turrets: TurretSlotState[];
   allies: Record<AllyId, AllyRuntime>;

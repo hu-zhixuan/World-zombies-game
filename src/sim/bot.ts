@@ -1,6 +1,6 @@
 // 自动打的机器人：用来在测试里跑完整 15 天流程，检验难度曲线与各模块经济联动。
 import { WEAPONS, ZOMBIES, unlockedMeals, type TurretType } from '../content/data';
-import { command, isOnPorch, isOnRoof, step } from './sim';
+import { MAX_CARRY, command, isOnPorch, isOnRoof, step } from './sim';
 import { NO_INPUT, PORCH_MAX_X, ROOF_MAX_X, WALL_X, type GameEvent, type Input, type RunState } from './types';
 
 export function botInput(run: RunState): Input {
@@ -64,11 +64,12 @@ function manageCamp(run: RunState) {
     if (!run.turrets[slot].type) command(run, { t: 'buildTurret', slot, kind });
   }
 
-  for (const id of run.shop) {
+  const offers = [...run.shop].sort((a, b) => WEAPONS[b].price - WEAPONS[a].price);
+  for (const id of offers) {
     if (run.player.weapons.some((w) => w.id === id) || WEAPONS[id].price > run.coins) continue;
     const minScore = Math.min(...run.player.weapons.map((w) => WEAPONS[w.id].price * (1 + 0.35 * (w.star - 1))));
-    if (run.player.weapons.length < 3 || WEAPONS[id].price > minScore + 20) {
-      if (run.player.weapons.length >= 3) {
+    if (run.player.weapons.length < MAX_CARRY || WEAPONS[id].price > minScore + 20) {
+      if (run.player.weapons.length >= MAX_CARRY) {
         let worstIdx = 0, worstS = Infinity;
         run.player.weapons.forEach((w, idx) => {
           const sc = WEAPONS[w.id].price * (1 + 0.35 * (w.star - 1));

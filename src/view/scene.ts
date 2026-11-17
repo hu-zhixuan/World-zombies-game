@@ -96,8 +96,14 @@ export class GameScene extends Phaser.Scene {
     for (const [key, fps] of [['npc_hat', 6], ['npc_bearded', 6], ['npc_woman', 7], ['npc_oldman', 7]] as const) anim(key, fps);
     for (const [key, fps] of [['ally_zhang', 6], ['ally_lin', 6], ['ally_qiang', 6], ['ally_zhao', 6]] as const) {
       anim(key, fps);
-      anim(`${key}_atk`, 15, 0);
     }
+    anim('ally_zhang_run', 10);
+    anim('ally_qiang_run', 14);
+    anim('ally_zhao_run', 9);
+    anim('ally_zhang_atk', 15, 0);
+    anim('ally_lin_atk', 15, 0);
+    anim('ally_qiang_atk', 14, 0);
+    anim('ally_zhao_atk', 15, 0);
     anim('z_death', 14, 0);
     anim('fx_fireball', 14); anim('fx_boom', 16, 0);
     anim('shot', 18); anim('shot_hit', 22, 0);
@@ -291,7 +297,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private syncAllies() {
-    const run = game.run, inside = run.inside;
+    const run = game.run, inside = run.inside, now = this.time.now;
     const seen = new Set<string>();
     for (const allyId of run.story.allies) {
       seen.add(allyId);
@@ -305,12 +311,23 @@ export class GameScene extends Phaser.Scene {
         this.allySprites.set(allyId, sp);
       }
       const attacking = !inside && !!rt && rt.atkT > 0;
-      const wantAnim = attacking ? `${meta.sprite}_atk` : meta.sprite;
+      const moving = !!rt && Math.abs(rt.vx) > 0.05 && allyId !== 'lin';
+      const wantAnim = attacking ? `${meta.sprite}_atk` : moving ? `${meta.sprite}_run` : meta.sprite;
       if (sp.anims.currentAnim?.key !== wantAnim) sp.play(wantAnim);
-      const x = inside ? pos.intX : pos.extX;
-      const y = inside ? GROUND_Y : GROUND_Y + pos.extY;
-      const flip = inside ? pos.intFlip : (rt ? rt.facing < 0 : false);
+      const x = rt && typeof rt.x === 'number' ? rt.x : (inside ? pos.intX : pos.extX);
+      const baseY = GROUND_Y + (rt && typeof rt.y === 'number' ? rt.y : (inside ? 0 : pos.extY));
+      const y = allyId === 'lin' ? baseY + Math.sin(now / 110) * 1.8 : baseY;
+      const flip = rt ? rt.facing < 0 : (inside ? pos.intFlip : false);
       sp.setVisible(true).setPosition(x, y).setFlipX(flip);
+
+      if (allyId === 'lin' && !inside && rt && Math.abs(rt.vx) > 0.05 && run.tick % 18 === 0) {
+        this.spawnSpark(x, y - 22, Phaser.Math.FloatBetween(-0.25, 0.25), -0.65, 0.01, 16, 2, C.ember);
+      }
+      if (!inside && allyId === 'qiang' && rt && rt.state === 'idle' && run.wall.hp > 0 && run.wall.hp < run.wall.maxHp && run.tick % 45 === 0) {
+        for (let i = 0; i < 3; i++) {
+          this.spawnSpark(WALL_X - 4, GROUND_Y - 18, Phaser.Math.FloatBetween(-1.2, 0.8), Phaser.Math.FloatBetween(-2.2, -0.7), 0.12, 18, 2.1, i === 0 ? C.gold : C.ember, true);
+        }
+      }
     }
     for (const [id, sp] of this.allySprites) {
       if (!seen.has(id)) {
@@ -572,6 +589,8 @@ export class GameScene extends Phaser.Scene {
       if (vis && b) {
         s.setPosition(b.x, b.y).setRotation(Math.atan2(b.vy, b.vx));
         if (b.kind === 'firebolt') s.setScale(1.36).setTint(C.ember);
+        else if (b.kind === 'spear') s.setScale(1.45, 0.72).setTint(C.paper);
+        else if (b.kind === 'qi') s.setScale(1.22).setTint(C.electric);
         else if (b.kind === 'frost' || b.weaponId === 'assault') s.setScale(1.18).setTint(C.frost);
         else if (b.kind === 'rocket') {
           s.setScale(1.55).setTint(C.red);
@@ -718,10 +737,14 @@ export class GameScene extends Phaser.Scene {
       g.lineStyle(1.4, col, 0.78).strokeEllipse(p.x, py - 1, 28, 7);
     }
 
-    // 特色子弹拖尾（左轮金痕 / 连珠火铳炽焰弹 / 寒霜冰晶痕）
+    // 特色子弹拖尾（左轮金痕 / 连珠火铳炽焰弹 / 寒霜冰晶痕 / 战友银枪与苍蓝气劲）
     for (const b of run.bullets) {
       if (b.kind === 'firebolt') {
         g.lineStyle(2.4, C.ember, 0.82).lineBetween(b.x - b.vx * 1.3, b.y - b.vy * 1.3, b.x, b.y);
+      } else if (b.kind === 'spear') {
+        g.lineStyle(2.2, C.paper, 0.86).lineBetween(b.x - b.vx * 1.5, b.y - b.vy * 1.5, b.x, b.y);
+      } else if (b.kind === 'qi') {
+        g.lineStyle(2.2, C.electric, 0.84).lineBetween(b.x - b.vx * 1.3, b.y - b.vy * 1.3, b.x, b.y);
       } else if (b.weaponId === 'revolver') {
         g.lineStyle(2.0, C.gold, 0.75).lineBetween(b.x - b.vx * 1.4, b.y - b.vy * 1.4, b.x, b.y);
       } else if (b.weaponId === 'assault') {
@@ -903,13 +926,24 @@ export class GameScene extends Phaser.Scene {
           this.burst('shot_hit', e.x + 6, e.y, 0.78);
           if (e.from === 'ally' && e.ally) {
             const sp = this.allySprites.get(e.ally);
+            const rt = game.run.allies[e.ally];
             if (sp && !game.run.inside) {
-              sp.play(`${ALLIES[e.ally].sprite}_atk`);
+              sp.play(`${ALLIES[e.ally].sprite}_atk`, true);
               if (e.ally === 'qiang') {
-                const pos = ALLY_POS.qiang;
-                this.waves.push({ x: pos.extX, y: GROUND_Y + pos.extY - 22, r: 8, maxR: 54, col: C.ember, life: 12, max: 12, width: 2.6 });
+                const qx = rt?.x ?? ALLY_POS.qiang.extX;
+                const qy = GROUND_Y + (rt?.y ?? ALLY_POS.qiang.extY) - 22;
+                this.waves.push({ x: qx, y: qy, r: 8, maxR: 54, col: C.ember, life: 12, max: 12, width: 2.6 });
                 this.slashes.push({ x: e.x, y: e.y - 4, ang: e.ang ?? 0, len: 24, col: C.gold, until: now + 110 });
                 this.cameras.main.shake(55, 0.0022);
+              } else if (e.ally === 'lin') {
+                this.waves.push({ x: e.x, y: e.y, r: 5, maxR: 20, col: C.ember, life: 11, max: 11, width: 2 });
+                for (let i = 0; i < 4; i++) {
+                  this.spawnSpark(e.x, e.y, Phaser.Math.FloatBetween(-1.2, 1.2), Phaser.Math.FloatBetween(-1.6, 0.4), 0.04, 16, 2.1, C.ember);
+                }
+              } else if (e.ally === 'zhang') {
+                this.slashes.push({ x: e.x, y: e.y, ang: e.ang ?? 0, len: 16, col: C.paper, until: now + 90 });
+              } else if (e.ally === 'zhao') {
+                this.slashes.push({ x: e.x, y: e.y, ang: e.ang ?? 0, len: 14, col: C.electric, until: now + 90 });
               }
             }
           } else if (e.from === 'turret') {

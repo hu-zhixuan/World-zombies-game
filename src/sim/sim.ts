@@ -1,9 +1,9 @@
 // 规则层：纯计算，不碰浏览器。固定每秒 60 步；随机数带种子；同样的种子和输入一定得到同样的结果。
 import {
-  CLASSES, CRIT_CHANCE, CRIT_MUL, DAY_HEAL, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
+  CLASSES, CRIT_CHANCE, CRIT_MUL, DIFFICULTIES, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
   MEALS, MEAT_SELL_PRICE, PERKS, RARITY_WEIGHT, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST, STAR_COST, TURRETS,
   WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES, bossForDay, dayZombieCount, extraBullets, magSize, starMul, unlockedMeals, zombieHp,
-  type ClassId, type MealId, type PerkId, type TurretType, type WeaponId, type ZombieKind,
+  type ClassId, type DifficultyId, type MealId, type PerkId, type TurretType, type WeaponId, type ZombieKind,
 } from '../content/data';
 import {
   COMPANION_JOIN_STORIES, DAILY_TRENDS, DINER_REVIEW_POOL, QUALITY_META, VIP_CUSTOMERS, VIP_TIERS, getFansRank, getRepTier,
@@ -12,10 +12,10 @@ import {
 import {
   ALLY_POS, DINER_SEAT_X, DOOR_X, GROUND_Y, HOME_X, HOUSE_WALL_X, IN_MAX_X, IN_MIN_X, IN_STATIONS, LADDER_X, PLAYER_MAX_X, PLAYER_MIN_X,
   PORCH_MAX_X, PORCH_MIN_X, PORCH_Y, ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, SPAWN_X,
-  TURRET_SLOTS, WALL_X, type Bullet, type Command, type DinerGuest, type GameEvent, type Input, type RunState, type StationId, type TurretTargetMode, type Zombie,
+  TURRET_SLOTS, WALL_X, type AllyRuntime, type Bullet, type Command, type DinerGuest, type GameEvent, type Input, type RunState, type StationId, type TurretTargetMode, type Zombie,
 } from './types';
 
-export const MAX_CARRY = 3;
+export const MAX_CARRY = 2;
 export const GRENADE_G = 0.26;
 const GRAVITY = 0.32;
 const JUMP_V = -6.5;
@@ -82,12 +82,12 @@ export function houseBuff(run: RunState): HouseBuff {
     const rangeBonus = flv >= 3 ? 0.35 : flv === 2 ? 0.25 : 0.20;
     const critBonus = flv >= 3 ? 0.18 : flv === 2 ? 0.14 : 0.10;
     const reloadHaste = flv >= 3 ? 0.40 : flv === 2 ? 0.32 : 0.25;
-    const rangedCover = flv >= 3 ? 0.55 : flv === 2 ? 0.45 : 0.35;
+    const rangedCover = flv >= 3 ? 0.45 : flv === 2 ? 0.35 : 0.25;
     const name = flv >= 3 ? '铁堡屋顶' : flv === 2 ? '石堡屋顶' : '酒馆屋顶';
     return { zone: 'roof', name, dmgMul, rangeBonus, critBonus, reloadHaste, rangedCover, meleeImmune: true };
   }
   if (isOnPorch(run)) {
-    return { zone: 'porch', name: '门廊木台', dmgMul: 1.12, rangeBonus: 0.10, critBonus: 0.05, reloadHaste: 0.12, rangedCover: 0.20, meleeImmune: true };
+    return { zone: 'porch', name: '门廊木台', dmgMul: 1.12, rangeBonus: 0.10, critBonus: 0.05, reloadHaste: 0.12, rangedCover: 0.15, meleeImmune: true };
   }
   return { zone: 'ground', name: '前院平地', dmgMul: 1.0, rangeBonus: 0, critBonus: 0, reloadHaste: 0, rangedCover: 0, meleeImmune: false };
 }
@@ -173,10 +173,12 @@ export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
     let bestAlly: { score: number; target: CampInteractTarget } | null = null;
     for (const allyId of run.story.allies) {
       const pos = ALLY_POS[allyId];
-      const dx = Math.abs(p.x - pos.extX);
-      const dy = Math.abs(p.y - pos.extY);
+      const ax = run.allies[allyId]?.x ?? pos.extX;
+      const ay = run.allies[allyId]?.y ?? pos.extY;
+      const dx = Math.abs(p.x - ax);
+      const dy = Math.abs(p.y - ay);
       if (dx <= 28 && dy <= 16 && (!bestAlly || dx < bestAlly.score)) {
-        bestAlly = { score: dx, target: { kind: 'allyTalk', x: pos.extX, ally: allyId } };
+        bestAlly = { score: dx, target: { kind: 'allyTalk', x: ax, ally: allyId } };
       }
     }
     return bestAlly?.target ?? null;
@@ -224,9 +226,9 @@ export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
   }
 
   for (const allyId of run.story.allies) {
-    const ax = ALLY_POS[allyId].intX;
+    const ax = run.allies[allyId]?.x ?? ALLY_POS[allyId].intX;
     const da = Math.abs(p.x - ax);
-    if (da <= 24) push(da, { kind: 'allyTalk', x: ax, ally: allyId });
+    if (da <= 28) push(da, { kind: 'allyTalk', x: ax, ally: allyId });
   }
 
   cands.sort((a, b) => a.effD - b.effD);
@@ -268,7 +270,7 @@ const VIP_ORDER_LINES: Record<string, string> = {
   niqiu: '掌柜的，把招牌菜端上来，好吃明天再给你带稀罕门路！',
   gaolaotou: '确定没藏窃听符印吧？给我盛份热腾腾又干净的菜！',
   guying: '高热量。五分钟内上菜。不废话。',
-  huanyin: '整条长街都在传暮夜里的故事啦——上你们暮色酒馆最拿手的招牌硬菜！',
+  huanyin: '整条长街都在传暮夜里的故事啦——上你们暮夜酒馆最拿手的招牌硬菜！',
   tongshu: '发条铁胃涩滞，需要滚烫油脂与烈性热肉润滑机件。',
   dashan: '大山……大山饿了，想吃热乎乎的大块肉肉……',
   baishi: '妙极了！请务必上一份辛烈浓菜，助我印证今夜秘药方！',
@@ -276,7 +278,7 @@ const VIP_ORDER_LINES: Record<string, string> = {
   wumingke: '风雪太大……在角落安静吃一碗热汤便走。',
   yanlao: '百年前这里曾是老城区最体面的大旅店……能请我尝一口昔日宫廷风味吗？',
   kuangya: '哈哈哈！闻到香味了！拿最扎实的硬菜上来！',
-  guancezhe: '十五夜星象正往酒馆汇聚——莫掌柜，来道招牌让我尝尝今夜火候。',
+  guancezhe: '十五夜星象正往酒馆汇聚——胡掌柜，来道招牌让我尝尝今夜火候。',
 };
 
 function pickGuestMeal(run: RunState, vip: VipDef, forceTrend: boolean): MealId {
@@ -356,14 +358,38 @@ function rollDinerGuests(run: RunState) {
   run.guests = guests;
 }
 
+const makeAllyRuntime = (k: AllyId, inside: boolean): AllyRuntime => {
+  const pos = ALLY_POS[k];
+  const facing: 1 | -1 = inside && pos.intFlip ? -1 : 1;
+  return {
+    cd: 0,
+    atkT: 0,
+    facing,
+    x: inside ? pos.intX : pos.extX,
+    y: inside ? 0 : pos.extY,
+    vx: 0,
+    state: 'idle',
+    dir: k === 'qiang' && !inside ? -1 : facing,
+  };
+};
+
+function syncAlliesPos(run: RunState, inside: boolean) {
+  for (const k of ['zhang', 'lin', 'qiang', 'zhao'] as const) {
+    run.allies[k] = makeAllyRuntime(k, inside);
+  }
+}
+
 /** 开一局。pool 是这一局能掉落/进货的武器（局外解锁的那些）。 */
-export function newRun(seed = 1, pool: WeaponId[] = ['revolver', 'smg'], cls: ClassId = 'gunner'): RunState {
-  const turrets = TURRET_SLOTS.map((_, idx) => (idx === 1
-    ? { type: 'mg' as const, level: 1, cd: 0, aim: 0, mode: 'near' as const }
-    : { type: null, level: 0, cd: 0, aim: 0, mode: 'near' as const }));
+export function newRun(
+  seed = 1,
+  pool: WeaponId[] = ['revolver', 'smg'],
+  cls: ClassId = 'gunner',
+  difficulty: DifficultyId = 'normal',
+): RunState {
+  const turrets = TURRET_SLOTS.map(() => ({ type: null, level: 0, cd: 0, aim: 0, mode: 'near' as const }));
   const run: RunState = {
     seed, rng: seed >>> 0, tick: 0, nextId: 1, day: 0, phase: 'camp', phaseT: 0,
-    inside: false, autoFire: false,
+    inside: false, autoFire: false, difficulty,
     player: {
       x: 238, y: ROOF_Y, vx: 0, vy: 0, facing: 1, dropIgnoreT: 0, hp: 100, maxHp: 100, armor: 0, maxArmor: 80, hurtT: 0, healCarry: 0,
       dodgeT: 0, dodgeCd: 0, dodgeDir: 1, fireCd: 0, reloadT: 0, shootT: 0,
@@ -372,10 +398,10 @@ export function newRun(seed = 1, pool: WeaponId[] = ['revolver', 'smg'], cls: Cl
     },
     zombies: [], bullets: [], fires: [], grenades: [], enemyProjs: [], crates: [], turrets,
     allies: {
-      zhang: { cd: 0, atkT: 0, facing: 1 },
-      lin:   { cd: 0, atkT: 0, facing: 1 },
-      qiang: { cd: 0, atkT: 0, facing: 1 },
-      zhao:  { cd: 0, atkT: 0, facing: 1 },
+      zhang: makeAllyRuntime('zhang', false),
+      lin:   makeAllyRuntime('lin', false),
+      qiang: makeAllyRuntime('qiang', false),
+      zhao:  makeAllyRuntime('zhao', false),
     },
     wall: { level: 1, hp: WALL_LEVELS[0].maxHp, maxHp: WALL_LEVELS[0].maxHp },
     home: { hp: FORT_LEVELS[0].maxHp, maxHp: FORT_LEVELS[0].maxHp },
@@ -401,13 +427,12 @@ function startDay(run: RunState, ev: GameEvent[]) {
   run.player.x = 238; run.player.y = ROOF_Y; run.player.vy = 0; run.player.dropIgnoreT = 0; run.player.facing = 1;
   run.player.burstLeft = 0; run.player.burstCd = 0; run.player.smgHeat = 0;
   run.dinerCook = null; run.carryingDish = null;
-  for (const k of ['zhang', 'lin', 'qiang', 'zhao'] as const) {
-    run.allies[k] = { cd: 0, atkT: 0, facing: 1 };
-  }
-  const total = dayZombieCount(run.day);
+  syncAlliesPos(run, false);
+  const diff = run.difficulty ?? 'normal';
+  const total = dayZombieCount(run.day, diff);
   const crateAt = run.day === 1 || rand(run) < 0.45 ? Math.floor(total / 2) : -1;
   const bossKind = bossForDay(run.day);
-  run.spawn = { left: total, timer: 54, total, killed: 0, crateAt, bossKind, bossSpawned: false };
+  run.spawn = { left: total, timer: 46, total, killed: 0, crateAt, bossKind, bossSpawned: false };
   run.bullets = []; run.fires = []; run.grenades = []; run.enemyProjs = [];
   run.chain = { n: 0, t: 0 }; run.vanguardT = 0; run.skill = { t: 0, cd: 0 };
   rollDailyTrend(run);
@@ -424,7 +449,7 @@ function startDay(run: RunState, ev: GameEvent[]) {
   }
   if (has(run, 'secondwind')) run.player.hp = Math.min(run.player.maxHp, run.player.hp + run.player.maxHp * 0.25);
   if (has(run, 'fortify')) run.player.armor = Math.min(run.player.maxArmor, run.player.armor + 25);
-  if (run.fort.level >= 3) run.wall.hp = Math.min(run.wall.maxHp, run.wall.hp + Math.round(run.wall.maxHp * 0.3));
+  if (run.fort.level >= 3) run.wall.hp = Math.min(run.wall.maxHp, run.wall.hp + Math.round(run.wall.maxHp * 0.2));
   ev.push({ t: 'dayStart', day: run.day });
 }
 
@@ -438,7 +463,7 @@ function spawnZombie(run: RunState, forcedKind?: ZombieKind) {
     kind = kinds[0];
     for (const k of kinds) { roll -= ZOMBIES[k].weight; if (roll < 0) { kind = k; break; } }
   }
-  const hp = zombieHp(kind, run.day);
+  const hp = zombieHp(kind, run.day, run.difficulty ?? 'normal');
   const index = run.spawn.total - run.spawn.left;
   const y = kind === 'bat' ? -(78 + Math.round(rand(run) * 28)) : kind === 'ghoul' ? -(68 + Math.round(rand(run) * 26)) : 0;
   run.zombies.push({
@@ -481,7 +506,8 @@ function applyPlayerDamage(run: RunState, rawDmg: number, ev: GameEvent[], fromR
   ev.push({ t: 'hurt', dmg: finalDmg, blocked, cover: covered > 0 ? covered : undefined });
 }
 
-const enemyDmg = (raw: number, day: number) => Math.round(raw * (1 + (Math.max(1, day) - 1) * 0.065));
+const enemyDmg = (raw: number, day: number, diff: DifficultyId = 'normal') =>
+  Math.round(raw * (1 + (Math.max(1, day) - 1) * 0.08) * DIFFICULTIES[diff].dmgMul);
 
 function damageZombie(
   run: RunState,
@@ -911,7 +937,7 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
 
   // 堡垒 2 级+ 站在屋顶享要塞缓慢庇护回血
   if (run.phase === 'fight' && run.fort.level >= 2 && isOnRoof(run)) {
-    const interval = run.fort.level >= 3 ? 110 : 170;
+    const interval = run.fort.level >= 3 ? 210 : 320;
     if (run.tick % interval === 0 && p.hp < p.maxHp) p.hp = Math.min(p.maxHp, p.hp + 1);
   }
 
@@ -969,7 +995,7 @@ function stepZombies(run: RunState, ev: GameEvent[]) {
     if (z.stunT > 0) { z.stunT--; if (!def.boss) continue; }
     if (z.kb > 0) { z.x += z.kb; z.kb *= 0.7; if (z.kb < 0.2) z.kb = 0; if (!def.boss) continue; }
 
-    const scaledDmg = enemyDmg(def.damage, run.day);
+    const scaledDmg = enemyDmg(def.damage, run.day, run.difficulty ?? 'normal');
 
     // 空中近战魔物（夜翼魔蝠）：越过前院木障，低空盘旋俯冲撕咬屋顶守夜人或酒馆木门
     if (def.flying && !def.ranged) {
@@ -1003,9 +1029,9 @@ function stepZombies(run: RunState, ev: GameEvent[]) {
     const rangedStopX = def.boss ? WALL_X + 245 : WALL_X + 215;
     if (def.ranged && z.x <= rangedStopX && z.x >= WALL_X + 24) {
       if (z.atkCd === 0) {
-        z.atkCd = Math.round(def.attackEvery * (def.boss ? 1.02 : 1.18));
+        z.atkCd = Math.round(def.attackEvery * (def.boss ? 0.96 : 1.08));
         const onRoofOrPorch = isOnRoof(run) || isOnPorch(run);
-        const aimPlayer = !run.inside && Math.abs(p.x - z.x) <= 520 && (rand(run) < (onRoofOrPorch ? 0.58 : 0.74));
+        const aimPlayer = !run.inside && Math.abs(p.x - z.x) <= 520 && (rand(run) < (onRoofOrPorch ? 0.68 : 0.82));
         const tx = aimPlayer ? p.x : (run.wall.hp > 0 ? WALL_X : HOME_X);
         const ty = aimPlayer ? (GROUND_Y + p.y - 24) : (GROUND_Y - 14);
         const sx = z.x - 10, sy = zombieBodyY(z);
@@ -1153,83 +1179,178 @@ function stepTurrets(run: RunState, ev: GameEvent[]) {
   }
 }
 
-/** 四位驻守战友真实参战：老兵张屋顶银弩穿透、药师小林冰焰减速+战斗慢回血、铁匠阿强前院重击+修墙、哨兵小赵对空速射。 */
+function patrolBounds(rt: AllyRuntime, minX: number, maxX: number, speed: number) {
+  if (rt.x <= minX) rt.dir = 1;
+  else if (rt.x >= maxX) rt.dir = -1;
+  rt.vx = rt.dir * speed;
+  rt.x = Math.max(minX, Math.min(maxX, rt.x + rt.vx));
+  rt.facing = rt.dir;
+  rt.state = 'move';
+}
+
+/** 休整夜晚四位战友轻度来回巡视驻位（保持与锚点 ±10px 内，不阻挡交谈判定） */
+function stepAlliesCamp(run: RunState) {
+  const inside = run.inside;
+  for (const allyId of run.story.allies) {
+    const rt = run.allies[allyId];
+    if (!rt) continue;
+    const pos = ALLY_POS[allyId];
+    const anchorX = inside ? pos.intX : pos.extX;
+    rt.y = inside ? 0 : pos.extY;
+    rt.atkT = 0;
+    const span = inside ? 9 : 10;
+    const phase = (run.tick + allyId.length * 47) % 240;
+    if (phase < 110) {
+      if (rt.x <= anchorX - span) rt.dir = 1;
+      else if (rt.x >= anchorX + span) rt.dir = -1;
+      rt.vx = rt.dir * 0.24;
+      rt.x = Math.max(anchorX - span, Math.min(anchorX + span, rt.x + rt.vx));
+      rt.facing = rt.dir;
+      rt.state = 'move';
+    } else {
+      rt.vx = 0;
+      rt.state = 'idle';
+      rt.facing = inside && pos.intFlip ? -1 : 1;
+    }
+  }
+}
+
+/** 四位驻守战友真实参战：老兵张屋顶巡逻银枪穿透、药师小林门廊悬浮绯火群伤+慢回血、铁匠阿强前院冲锋重斩+修墙、武僧小赵屋顶巡逻苍蓝气劲优先对空。 */
 function stepAllies(run: RunState, ev: GameEvent[]) {
   if (run.inside || (run.phase !== 'fight' && run.phase !== 'clear')) return;
   const p = run.player;
   for (const allyId of run.story.allies) {
     const rt = run.allies[allyId];
     if (!rt) continue;
+    const pos = ALLY_POS[allyId];
+    if (typeof rt.x !== 'number') {
+      rt.x = pos.extX; rt.y = pos.extY; rt.vx = 0; rt.state = 'idle'; rt.dir = allyId === 'qiang' ? -1 : 1;
+    }
+    rt.y = pos.extY;
     if (rt.atkT > 0) rt.atkT--;
     if (rt.cd > 0) rt.cd--;
 
     if (run.phase === 'fight') {
-      if (allyId === 'lin' && run.tick % 300 === 0 && p.hp > 0 && p.hp < p.maxHp) {
+      if (allyId === 'lin' && run.tick % 240 === 0 && p.hp > 0 && p.hp < p.maxHp) {
         p.hp = Math.min(p.maxHp, p.hp + 1);
       }
-      if (allyId === 'qiang' && run.tick % 240 === 0 && run.wall.hp > 0 && run.wall.hp < run.wall.maxHp) {
-        run.wall.hp = Math.min(run.wall.maxHp, run.wall.hp + 2);
+      if (allyId === 'qiang' && run.tick % 180 === 0 && run.wall.hp > 0 && run.wall.hp < run.wall.maxHp) {
+        run.wall.hp = Math.min(run.wall.maxHp, run.wall.hp + 3);
       }
     }
-    if (rt.cd > 0) continue;
 
-    const pos = ALLY_POS[allyId];
-    const ax = pos.extX, ay = GROUND_Y + pos.extY - 26;
+    const ay = GROUND_Y + rt.y - 26;
+
+    if (rt.atkT > 0) {
+      rt.vx = 0;
+      rt.state = 'atk';
+      continue;
+    }
 
     if (allyId === 'zhang') {
       const best = run.zombies
-        .filter((z) => z.hp > 0 && Math.hypot(z.x - ax, zombieBodyY(z) - ay) <= 440)
-        .sort((a, b) => Math.hypot(a.x - ax, zombieBodyY(a) - ay) - Math.hypot(b.x - ax, zombieBodyY(b) - ay))[0];
-      if (!best) continue;
-      rt.cd = 76; rt.atkT = 22; rt.facing = best.x >= ax ? 1 : -1;
-      const dx = best.x - ax, dy = zombieBodyY(best) - ay, len = Math.hypot(dx, dy) || 1;
-      const ox = ax + (dx / len) * 12, oy = ay + (dy / len) * 12;
+        .filter((z) => z.hp > 0 && Math.hypot(z.x - rt.x, zombieBodyY(z) - ay) <= 450)
+        .sort((a, b) => Math.hypot(a.x - rt.x, zombieBodyY(a) - ay) - Math.hypot(b.x - rt.x, zombieBodyY(b) - ay))[0];
+      if (!best) {
+        patrolBounds(rt, 118, ROOF_MAX_X - 18, 0.68);
+        continue;
+      }
+      if (rt.cd > 0) {
+        patrolBounds(rt, 118, ROOF_MAX_X - 18, 0.55);
+        rt.facing = best.x >= rt.x ? 1 : -1;
+        continue;
+      }
+      rt.cd = 72; rt.atkT = 20; rt.vx = 0; rt.state = 'atk'; rt.facing = best.x >= rt.x ? 1 : -1;
+      const dx = best.x - rt.x, dy = zombieBodyY(best) - ay, len = Math.hypot(dx, dy) || 1;
+      const ox = rt.x + (dx / len) * 14, oy = ay + (dy / len) * 14;
       run.bullets.push({
-        x: ox, y: oy, vx: (dx / len) * 13, vy: (dy / len) * 13,
-        dmg: Math.round(12 + run.day * 1.4), life: 42,
-        from: 'ally', allyId: 'zhang', pierce: true, pierceLeft: 2, crit: false, bounces: 0, hit: [], kind: 'normal',
+        x: ox, y: oy, vx: (dx / len) * 13.5, vy: (dy / len) * 13.5,
+        dmg: Math.round(13 + run.day * 1.5), life: 42,
+        from: 'ally', allyId: 'zhang', pierce: true, pierceLeft: 2, crit: false, bounces: 0, hit: [], kind: 'spear',
       });
       ev.push({ t: 'shot', x: ox, y: oy, from: 'ally', ally: 'zhang', ang: Math.atan2(dy, dx) });
     } else if (allyId === 'lin') {
       const best = run.zombies
-        .filter((z) => z.hp > 0 && Math.hypot(z.x - ax, zombieBodyY(z) - ay) <= 360)
-        .sort((a, b) => Math.hypot(a.x - ax, zombieBodyY(a) - ay) - Math.hypot(b.x - ax, zombieBodyY(b) - ay))[0];
-      if (!best) continue;
-      rt.cd = 88; rt.atkT = 24; rt.facing = best.x >= ax ? 1 : -1;
-      const dx = best.x - ax, dy = zombieBodyY(best) - ay, len = Math.hypot(dx, dy) || 1;
-      const ox = ax + (dx / len) * 10, oy = ay + (dy / len) * 10;
+        .filter((z) => z.hp > 0 && Math.hypot(z.x - rt.x, zombieBodyY(z) - ay) <= 375)
+        .sort((a, b) => Math.hypot(a.x - rt.x, zombieBodyY(a) - ay) - Math.hypot(b.x - rt.x, zombieBodyY(b) - ay))[0];
+      if (!best) {
+        patrolBounds(rt, PORCH_MIN_X + 10, PORCH_MAX_X - 10, 0.45);
+        continue;
+      }
+      if (rt.cd > 0) {
+        patrolBounds(rt, PORCH_MIN_X + 10, PORCH_MAX_X - 10, 0.35);
+        rt.facing = best.x >= rt.x ? 1 : -1;
+        continue;
+      }
+      rt.cd = 84; rt.atkT = 40; rt.vx = 0; rt.state = 'atk'; rt.facing = best.x >= rt.x ? 1 : -1;
+      const dx = best.x - rt.x, dy = zombieBodyY(best) - ay, len = Math.hypot(dx, dy) || 1;
+      const ox = rt.x + (dx / len) * 12, oy = ay + (dy / len) * 12;
       run.bullets.push({
         x: ox, y: oy, vx: (dx / len) * 9.5, vy: (dy / len) * 9.5,
-        dmg: Math.round(10 + run.day * 1.1), life: 44,
-        from: 'ally', allyId: 'lin', pierce: false, crit: false, bounces: 0, hit: [], aoe: 42, slow: 110, kind: 'frost',
+        dmg: Math.round(12 + run.day * 1.25), life: 45,
+        from: 'ally', allyId: 'lin', pierce: false, crit: false, bounces: 0, hit: [], aoe: 44, burn: 105, kind: 'firebolt',
       });
       ev.push({ t: 'shot', x: ox, y: oy, from: 'ally', ally: 'lin', ang: Math.atan2(dy, dx) });
     } else if (allyId === 'qiang') {
-      const hits = run.zombies.filter((z) => z.hp > 0 && Math.hypot(z.x - ax, zombieBodyY(z) - ay) <= 95);
-      if (hits.length === 0) continue;
-      rt.cd = 78; rt.atkT = 24;
-      rt.facing = hits[0].x >= ax ? 1 : -1;
-      const dmg = Math.round(15 + run.day * 1.6);
-      for (const z of hits) {
-        damageZombie(run, z, dmg, ev, { byPlayer: false, kb: 4.0, dir: z.x >= ax ? 1 : -1, heavy: true });
+      const nearestEnemy = run.zombies
+        .filter((z) => z.hp > 0 && z.x <= WALL_X + 55)
+        .sort((a, b) => Math.abs(a.x - rt.x) - Math.abs(b.x - rt.x))[0];
+      const inStrikeRange = run.zombies.filter((z) => z.hp > 0 && Math.hypot(z.x - rt.x, zombieBodyY(z) - ay) <= 78);
+      if (inStrikeRange.length > 0 && rt.cd === 0) {
+        rt.cd = 72; rt.atkT = 26; rt.vx = 0; rt.state = 'atk';
+        rt.facing = inStrikeRange[0].x >= rt.x ? 1 : -1;
+        const dmg = Math.round(17 + run.day * 1.8);
+        for (const z of inStrikeRange) {
+          damageZombie(run, z, dmg, ev, { byPlayer: false, kb: 4.4, dir: z.x >= rt.x ? 1 : -1, heavy: true });
+        }
+        ev.push({ t: 'shot', x: rt.x + rt.facing * 24, y: ay, from: 'ally', ally: 'qiang', ang: rt.facing > 0 ? 0 : Math.PI });
+      } else if (nearestEnemy) {
+        const goalX = Math.max(278, Math.min(WALL_X - 8, nearestEnemy.x - 16));
+        const d = goalX - rt.x;
+        if (Math.abs(d) > 3) {
+          rt.vx = Math.sign(d) * 1.65;
+          rt.x = Math.max(278, Math.min(WALL_X - 8, rt.x + rt.vx));
+          rt.facing = rt.vx >= 0 ? 1 : -1;
+          rt.state = 'move';
+        } else {
+          rt.vx = 0; rt.state = 'idle'; rt.facing = nearestEnemy.x >= rt.x ? 1 : -1;
+        }
+      } else {
+        const guardX = WALL_X - 18;
+        const d = guardX - rt.x;
+        if (Math.abs(d) > 4) {
+          rt.vx = Math.sign(d) * 1.1;
+          rt.x = Math.max(278, Math.min(WALL_X - 8, rt.x + rt.vx));
+          rt.facing = rt.vx >= 0 ? 1 : -1;
+          rt.state = 'move';
+        } else {
+          rt.vx = 0; rt.state = 'idle'; rt.facing = 1;
+        }
       }
-      ev.push({ t: 'shot', x: ax + rt.facing * 24, y: ay, from: 'ally', ally: 'qiang', ang: rt.facing > 0 ? 0 : Math.PI });
     } else if (allyId === 'zhao') {
       const best = run.zombies
-        .filter((z) => z.hp > 0 && Math.hypot(z.x - ax, zombieBodyY(z) - ay) <= 470)
+        .filter((z) => z.hp > 0 && Math.hypot(z.x - rt.x, zombieBodyY(z) - ay) <= 480)
         .sort((a, b) => {
           const fa = ZOMBIES[a.kind].flying ? 1 : 0, fb = ZOMBIES[b.kind].flying ? 1 : 0;
           if (fa !== fb) return fb - fa;
-          return Math.hypot(a.x - ax, zombieBodyY(a) - ay) - Math.hypot(b.x - ax, zombieBodyY(b) - ay);
+          return Math.hypot(a.x - rt.x, zombieBodyY(a) - ay) - Math.hypot(b.x - rt.x, zombieBodyY(b) - ay);
         })[0];
-      if (!best) continue;
-      rt.cd = 58; rt.atkT = 22; rt.facing = best.x >= ax ? 1 : -1;
-      const dx = best.x - ax, dy = zombieBodyY(best) - ay, len = Math.hypot(dx, dy) || 1;
-      const ox = ax + (dx / len) * 12, oy = ay + (dy / len) * 12;
+      if (!best) {
+        patrolBounds(rt, ROOF_MIN_X + 10, 114, 0.85);
+        continue;
+      }
+      if (rt.cd > 0) {
+        patrolBounds(rt, ROOF_MIN_X + 10, 114, 0.72);
+        rt.facing = best.x >= rt.x ? 1 : -1;
+        continue;
+      }
+      rt.cd = 54; rt.atkT = 24; rt.vx = 0; rt.state = 'atk'; rt.facing = best.x >= rt.x ? 1 : -1;
+      const dx = best.x - rt.x, dy = zombieBodyY(best) - ay, len = Math.hypot(dx, dy) || 1;
+      const ox = rt.x + (dx / len) * 14, oy = ay + (dy / len) * 14;
       run.bullets.push({
-        x: ox, y: oy, vx: (dx / len) * 14.5, vy: (dy / len) * 14.5,
-        dmg: Math.round(10 + run.day * 1.2), life: 38,
-        from: 'ally', allyId: 'zhao', pierce: false, crit: false, bounces: 0, hit: [], kind: 'normal',
+        x: ox, y: oy, vx: (dx / len) * 15, vy: (dy / len) * 15,
+        dmg: Math.round(11 + run.day * 1.35), life: 40,
+        from: 'ally', allyId: 'zhao', pierce: false, crit: false, bounces: 0, hit: [], kind: 'qi',
       });
       ev.push({ t: 'shot', x: ox, y: oy, from: 'ally', ally: 'zhao', ang: Math.atan2(dy, dx) });
     }
@@ -1270,6 +1391,11 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
         if (b.kind === 'frost' && b.aoe) {
           ev.push({ t: 'frost', x: b.x, y: b.y, r: b.aoe });
           for (const o of run.zombies) if (o.hp > 0 && Math.hypot(o.x - b.x, zombieBodyY(o) - b.y) <= b.aoe) damageZombie(run, o, b.dmg, ev, { byPlayer: false, slow: b.slow ?? 150 });
+          alive = false;
+          break;
+        }
+        if (b.kind === 'firebolt' && b.aoe) {
+          explodeAt(run, b.x, Math.min(BODY_Y, b.y), b.aoe, b.dmg, ev, false, true, false);
           alive = false;
           break;
         }
@@ -1401,6 +1527,7 @@ export function step(run: RunState, input: Input): GameEvent[] {
   if (run.phase === 'camp') {
     run.tick++; run.phaseT++;
     stepPlayer(run, input, ev);
+    stepAlliesCamp(run);
     return ev;
   }
   if (run.phase !== 'fight' && run.phase !== 'clear') return ev;
@@ -1410,7 +1537,8 @@ export function step(run: RunState, input: Input): GameEvent[] {
 
   if (run.phase === 'fight') {
     if (run.spawn.left > 0 && --run.spawn.timer <= 0) {
-      const groupCap = run.day === 1 ? 1.15 : 1.7 + run.day * 0.42;
+      const day1Normal = run.day === 1 && (run.difficulty ?? 'normal') === 'normal';
+      const groupCap = day1Normal ? 1 : run.day === 1 ? 1.35 : 1.7 + run.day * 0.44;
       const group = Math.min(run.spawn.left, 1 + Math.floor(rand(run) * groupCap));
       for (let i = 0; i < group; i++) { spawnZombie(run); run.spawn.left--; }
       if (run.spawn.bossKind && !run.spawn.bossSpawned && run.spawn.left <= Math.floor(run.spawn.total / 2)) {
@@ -1418,7 +1546,11 @@ export function step(run: RunState, input: Input): GameEvent[] {
         spawnZombie(run, run.spawn.bossKind);
         ev.push({ t: 'bossAppear', kind: run.spawn.bossKind });
       }
-      run.spawn.timer = Math.round(Math.max(12, 28 - run.day * 0.9) * (0.55 + group * 0.45)) + Math.floor(rand(run) * 10);
+      run.spawn.timer = day1Normal
+        ? 48 + Math.floor(rand(run) * 14)
+        : run.day === 1
+          ? 40 + Math.floor(rand(run) * 14)
+          : Math.round(Math.max(10, 25 - run.day * 0.9) * (0.52 + group * 0.42)) + Math.floor(rand(run) * 8);
     }
   }
 
@@ -1499,27 +1631,33 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       }
 
       run.inside = true; run.player.x = IN_STATIONS.kitchen + 20; run.player.y = 0; run.player.vy = 0; run.player.facing = -1;
+      syncAlliesPos(run, true);
       run.dinerCook = null; run.carryingDish = null;
       rollShopOffers(run);
       rollDinerGuests(run);
       ev.push({ t: 'inside', inside: true });
       return ev;
     }
-    case 'nextDay':
+    case 'nextDay': {
       if (run.phase !== 'camp') return null;
-      run.player.hp = Math.min(run.player.maxHp, Math.round(run.player.hp + run.player.maxHp * DAY_HEAL + (hasAlly(run, 'lin') ? 18 : 0)));
+      const healFrac = DIFFICULTIES[run.difficulty ?? 'normal'].nightHeal;
+      const linFlat = hasAlly(run, 'lin') ? (run.difficulty === 'nightmare' ? 6 : 12) : 0;
+      run.player.hp = Math.min(run.player.maxHp, Math.round(run.player.hp + run.player.maxHp * healFrac + linFlat));
       run.crates = [];
       for (const w of run.player.weapons) w.ammo = magSize(w.id, w.star);
       startDay(run, ev);
       return ev;
+    }
     case 'enterHouse':
       if (run.phase !== 'camp' || run.inside) return null;
       run.inside = true; run.player.x = IN_STATIONS.door - 24; run.player.y = 0; run.player.vy = 0; run.player.facing = -1;
+      syncAlliesPos(run, true);
       ev.push({ t: 'inside', inside: true });
       return ev;
     case 'exitHouse':
       if (run.phase !== 'camp' || !run.inside) return null;
       run.inside = false; run.player.x = DOOR_X; run.player.y = 0; run.player.vy = 0; run.player.facing = 1;
+      syncAlliesPos(run, false);
       run.dinerCook = null; run.carryingDish = null;
       ev.push({ t: 'inside', inside: false });
       return ev;

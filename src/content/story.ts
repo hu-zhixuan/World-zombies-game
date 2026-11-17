@@ -72,6 +72,7 @@ const clean = (s: string) =>
 export type NpcId = 'ming' | 'zhang' | 'lin' | 'qiang' | 'zhao' | 'watch' | 'boss1' | 'boss2' | 'boss3' | 'dawn';
 export type AllyId = 'zhang' | 'lin' | 'qiang' | 'zhao';
 export type VipTierId = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond';
+export type StorySceneKey = 'siege' | 'rooftop' | 'beacon' | 'hearth' | 'dawn';
 
 export interface SpeakerMeta {
   id: string;
@@ -82,11 +83,11 @@ export interface SpeakerMeta {
 }
 
 export const SPEAKERS: Record<string, SpeakerMeta> = {
-  ming:  { id: 'ming',  name: '莫老板',   initial: '莫', desc: '暮夜酒馆守夜人兼掌勺', avatar: 'hero_idle' },
-  zhang: { id: 'zhang', name: '老兵张',   initial: '张', desc: '屋顶神射 · 银弩瞭望',   avatar: 'ally_zhang' },
-  lin:   { id: 'lin',   name: '药师小林', initial: '林', desc: '随行炼金 · 秘药照料',   avatar: 'ally_lin' },
-  qiang: { id: 'qiang', name: '铁匠阿强', initial: '强', desc: '重甲斩卫 · 锻造技师',   avatar: 'ally_qiang' },
-  zhao:  { id: 'zhao',  name: '哨兵小赵', initial: '赵', desc: '哨塔斥候 · 对空速射',   avatar: 'ally_zhao' },
+  ming:  { id: 'ming',  name: '小胡',     initial: '胡', desc: '暮夜酒馆守夜人', avatar: 'hero_idle' },
+  zhang: { id: 'zhang', name: '老兵张',   initial: '张', desc: '银枪破阵 · 屋顶守卫', avatar: 'ally_zhang' },
+  lin:   { id: 'lin',   name: '药师小林', initial: '林', desc: '绯火炼金 · 随行医者', avatar: 'ally_lin' },
+  qiang: { id: 'qiang', name: '铁匠阿强', initial: '强', desc: '重铠斩卫 · 锻造技师', avatar: 'ally_qiang' },
+  zhao:  { id: 'zhao',  name: '武僧小赵', initial: '赵', desc: '苍蓝气劲 · 对空斥候', avatar: 'ally_zhao' },
   boss1: { id: 'boss1', name: '地狱巨兽·暴君', initial: '暴', desc: '第5天首领 · 拆墙狂兽', avatar: 'boss_beast' },
   boss2: { id: 'boss2', name: '血月暴君·狂怒领主', initial: '怒', desc: '第10天首领 · 烈焰督军', avatar: 'boss_beast' },
   boss3: { id: 'boss3', name: '深渊魔王·尸皇', initial: '皇', desc: '第15天终极首领', avatar: 'boss_demon' },
@@ -101,11 +102,12 @@ export interface StoryLine {
   role: string;
   avatar: string;
   text: string;
+  scene?: StorySceneKey;
 }
 
-const line = (npc: string, text: string): StoryLine => {
+const line = (npc: string, text: string, scene?: StorySceneKey): StoryLine => {
   const sp = SPEAKERS[npc] ?? { id: npc, name: '旅人', initial: '客', desc: '镇民', avatar: 'npc_hat' };
-  return { npc: sp.id, name: sp.name, initial: sp.initial, role: sp.desc, avatar: sp.avatar, text: clean(text) };
+  return { npc: sp.id, name: sp.name, initial: sp.initial, role: sp.desc, avatar: sp.avatar, text: clean(text), scene };
 };
 
 function mapGuestLines(
@@ -130,31 +132,38 @@ function mapGuestLines(
   });
 }
 
-// ── 开场序幕：100% 贴合「暮夜酒馆：守夜人 × 屋顶守城 × 深夜食堂」 ──
+// ── 开场序幕：100% 暗黑悬疑叙事，主角「小胡」独守暮夜酒馆迎战十五夜黑潮 ──
 export const CINEMATIC_INTRO: StoryLine[] = [
-  line('ming', '暮色彻底沉下来了。镇口火把只剩这几盏还亮着，门前的拒马木障刚重新钉紧。'),
-  line('ming', '踏着大门旁的木挑台就能跃上二楼屋顶——居高临下既能借矮墙躲开地面的扑咬，还能多打出几成狠劲。'),
-  line('watch', '呜——北方灯塔哨站传来守夜号角！黎明猎团将在十五轮尸潮后沿驿道驰援暮色镇，请举灯守住这十五夜！'),
-  line('ming', '十五夜……屋顶上已经架好第一座火铳哨塔，屋里砖窑灶火也一直温着。'),
-  line('ming', '白天守在屋顶打退尸潮、捡回鲜肉与金币；入夜进堂开灶喂饱过路生还者、修墙铸炮买神兵——这间暮夜酒馆绝不熄灯！'),
+  line('ming', '黑雾沉沉压过石板街时，镇东最后一盏路灯也熄了。小胡钉死前院最后一块拒马木板，退回酒馆门檐下。', 'siege'),
+  line('ming', '整条老街只剩这栋两层木石酒馆还立着——门廊木台连着屋顶高台，脚下砖墙厚实，身后是未熄的砖窑炭火。', 'rooftop'),
+  line('watch', '呜——！北岭灯塔哨站吹响三长声号角！黎明猎团正顶风雪开拔，约定十五夜之后沿古驿道破雾驰援暮色镇！', 'beacon'),
+  line('ming', '屋顶炮塔座还空着，手边只有一对猎手双铳和两枚爆炎弹。没人能替小胡守第一夜的门。', 'rooftop'),
+  line('ming', '迎战时守住高台、清剿腐潮；夜幕歇息时推开堂门生火灶台——用热汤与烤肉留住过路旅人和战友，铸起整座要塞。', 'hearth'),
+  line('ming', '只要这盏灯在，暮色镇的最后一道门就还开着。第一波雾影已经进街了——迎战！', 'dawn'),
 ];
 
-export interface StorySceneCard { chapter: string; title: string; text: string }
+export interface StorySceneCard { chapter: string; title: string; sceneKey: 'siege' | 'hearth' | 'dawn'; sub: string; text: string }
 export const STORY_SCENES: StorySceneCard[] = [
   {
     chapter: '前情一',
-    title: '暮夜酒馆防线',
-    text: '黑雾席卷老街后，镇西两层木石酒馆凭厚实砖墙和屋顶高台成了唯一能守的堡垒。前院立起拒马木障与四座炮塔基座，踏上木挑台再跃屋顶，便能俯射整条长街。',
+    title: '黑雾淹城 · 孤馆残灯',
+    sceneKey: 'siege',
+    sub: '暮色镇西街 · 灾夜初临',
+    text: '赤紫黑雾漫过暮色镇老街，寻常木门与哨卡一夜倾覆。小胡经营的两层木石酒馆因地基厚重、挑台连顶，成了唯一能退守迎敌的孤灯要塞。',
   },
   {
     chapter: '前情二',
-    title: '不熄的砖窑灶火',
-    text: '只要退回屋里，红砖烤炉的余温总能把战场带回的兽肉煎得滋滋冒香。拾荒客、夜巡老兵与江湖怪客循香而来，一碗热肉汤既换来金币与口碑，也为明天的守城注满底气。',
+    title: '灶火生温 · 群客寻香',
+    sceneKey: 'hearth',
+    sub: '酒馆堂内 · 深夜灶台',
+    text: '白日斩杀魔物夺回的鲜肉与赏金，入夜便在红砖烤炉上滋滋作响。冻僵的拾荒客、夜巡老兵与炼金奇人循灯火登门，一顿热食换来金币、口碑与生死托付。',
   },
   {
     chapter: '前情三',
-    title: '十五夜之约',
-    text: '北塔哨站的守夜号角与烽火传来约期：十五夜腐潮之后，黎明猎团与马车编队会驰援镇东。第 5、10、15 夜更有深渊首领叩关——集结四位战友、升满堡垒火炮，活到天亮。',
+    title: '十五夜约 · 破晓号角',
+    sceneKey: 'dawn',
+    sub: '北岭烽火 · 终战誓约',
+    text: '北塔守夜号角传下死信：十五夜黑潮之后黎明猎团将抵达东门。第 5、10、15 夜将有深渊首领亲自叩关——聚拢四位战友、筑起炮塔铁壁，活到破晓！',
   },
 ];
 
@@ -164,7 +173,7 @@ export const CHAPTER_CARDS: ChapterCard[] = [
     chapter: '第一章',
     title: '暮色初围',
     sub: '第 1～4 天',
-    text: '游荡腐尸率先沿着暗紫长街涌来，第 2 天噬魂黑猫突袭、第 3 天地狱猎犬与低空掠袭的夜翼魔蝠齐至、第 4 天铁甲般的焦骨巨尸撞门——尽早升级兵器、修好壁垒并站稳屋顶！',
+    text: '游荡腐尸率先沿着暗紫长街涌来，第 2 夜噬魂黑猫突袭、第 3 夜地狱猎犬与掠空魔蝠齐至、第 4 夜重甲般的焦骨巨尸撞门——小胡必须迅速立起首座哨塔并守稳屋顶！',
     minDay: 1,
     maxDay: 4,
   },
@@ -172,7 +181,7 @@ export const CHAPTER_CARDS: ChapterCard[] = [
     chapter: '第二章',
     title: '暴君叩关',
     sub: '第 5～9 天',
-    text: '第 5 天首领「地狱巨兽·暴君」携火球与兽群碾压防线；第 6 天会飘在半空吐幽火的「提灯怨灵」登场。老兵张、药师小林、铁匠阿强与哨兵小赵也将在此期间陆续入伙并亲自参战！',
+    text: '第 5 夜首领「地狱巨兽·暴君」携烈焰与兽群撞向拒马壁垒；第 6 夜幽灵般的「提灯怨灵」浮空抛火。老兵张、药师小林、铁匠阿强与武僧小赵也会在夜色里陆续叩响馆门。',
     minDay: 5,
     maxDay: 9,
   },
@@ -180,7 +189,7 @@ export const CHAPTER_CARDS: ChapterCard[] = [
     chapter: '第三章',
     title: '血月死斗',
     sub: '第 10～14 天',
-    text: '第 10 天狂怒领主二度逼近酒馆。此时正是改建石堡、架设屋顶双联火炮与寒晶/雷鸣/黑铁重炮联动的高潮，别忘了在食堂给大伙留一顿长夜全宴。',
+    text: '第 10 夜血月压檐，狂怒领主二度碾境。此时已是改建石堡要塞、连携寒霜与雷鸣炮阵的高潮，别忘了替满堂守夜人煮一桌长夜全宴提振士气。',
     minDay: 10,
     maxDay: 14,
   },
@@ -188,108 +197,108 @@ export const CHAPTER_CARDS: ChapterCard[] = [
     chapter: '终章',
     title: '深渊黎明',
     sub: '第 15 天',
-    text: '终极首领「深渊魔王·尸皇」亲率黑潮压境。守住这最后一夜的屋顶与高墙，击溃魔王便能听见天边破晓号角与马蹄奔雷！',
+    text: '终极首领「深渊魔王·尸皇」亲率黑潮压境。守住酒馆屋顶与最后一道铁壁，斩落魔王之时，古驿道的破晓号角与马蹄奔雷必将响彻全镇！',
     minDay: 15,
     maxDay: 15,
   },
 ];
 
-// ── 第 1～15 波战前/战后节奏精准对齐（无任何冲突设定）──
+// ── 第 1～15 波战前/战后叙事 ──
 export const WAVE_STORY_LINES: Record<number, StoryLine[]> = {
   1: [
-    line('ming', '第 1 夜。先试试手中猎手双铳的点射节奏，别浪费屋顶矮墙的高低差优势。'),
-    line('ming', '路障撑不住时就花金币修一修，掉在院里的武器箱清完怪顺手下去捡回来。'),
+    line('ming', '第 1 夜。炮塔座空空如也，小胡把猎手双铳压实膛线，踩上屋檐石垛先压住街口这批腐尸。', 'rooftop'),
+    line('ming', '先攒够第一笔赏金筑起防线，绝不能让雾里的东西踏破木门。', 'siege'),
   ],
   2: [
-    line('ming', '雾里蹿出来不少黑影……第 2 夜会有速度飞快的噬魂黑猫贴地突进！'),
-    line('ming', '站高一点能躲开它们的扑咬，要是攒够金币，可以考虑换把重锤左轮或双管龙息铳了。'),
+    line('ming', '巷尾黑雾里蹿起成片幽绿猫眼……第 2 夜会有贴地疾扑的噬魂黑猫！', 'siege'),
+    line('ming', '站稳高台才能躲开撕咬，顺手攒钱添置新兵器和第一座炮塔。', 'rooftop'),
   ],
   3: [
-    line('ming', '第 3 夜！巷尾传出成群嚎叫——地狱猎犬顺街疾奔，半空还有夜翼魔蝠掠过屋檐！'),
-    line('ming', '屋顶同样能抬头打飞怪，下跳按↓就能穿回门廊与前院，记得给炮塔切好「对空」或「最近」优先度。'),
+    line('ming', '第 3 夜的嚎叫声不对劲——地面有地狱猎犬狂奔冲撞，屋檐上方还有夜翼魔蝠低空盘旋！', 'siege'),
+    line('ming', '屋顶矮墙挡得住地面扑咬，却挡不住空中俯冲的爪牙。', 'rooftop'),
   ],
   4: [
-    line('ming', '地面在震……第 4 夜会出现浑身焦黑的重甲大块头「焦骨巨尸」，硬啃路障很疼。'),
-    line('ming', '明天就是第 5 夜大关，今晚食堂多招待几位客人把钱和特餐备足！'),
+    line('ming', '街砖在震颤……第 4 夜「焦骨巨尸」压境，单靠木拒马硬扛可讨不到便宜。', 'siege'),
+    line('ming', '撑过今晚就是第 5 夜暴君关口，得进堂多备些热菜把金币与壁垒凑厚！', 'hearth'),
   ],
   5: [
-    line('ming', '红雾压过房檐了——第 5 天首领「地狱巨兽·暴君」就在这波尸潮里！'),
-    line('ming', '站稳二楼屋顶能借墙垛挡掉不少火球伤害，大群扑壁垒时毫不犹豫甩颗爆炎弹过去！'),
+    line('ming', '红雾滚过房檐——第 5 天首领「地狱巨兽·暴君」正在撞向防线！', 'siege'),
+    line('ming', '高台矮墙能替小胡卸掉几成火球震荡，但壁垒一旦溃口，屋墙便再无遮拦。', 'rooftop'),
   ],
   6: [
-    line('ming', '第 6 夜刚过第一道关口，半空又飘出青光——「提灯怨灵」会隔着墙抛幽火打屋顶！'),
-    line('ming', '注意看它抬手时的火球弧线，按一下闪避就能潇洒滑步躲开。'),
+    line('ming', '第 6 夜起雾色更深，「提灯怨灵」浮在半空隔墙抛掷幽火，直逼屋顶阵地！', 'siege'),
+    line('ming', '盯紧火球抛线腾挪避锋，尽快先把半空那盏鬼灯打灭。', 'rooftop'),
   ],
   7: [
-    line('ming', '第 7 夜，战程差不多过半。经过这几夜，酒馆已经不像孤堡了，炉火越烧越旺。'),
-    line('ming', '把多余金币投进防线工坊——两层木石酒馆升级成石堡要塞后，屋顶会自动架起守卫火炮！'),
+    line('ming', '第 7 夜，守夜历程过半。酒馆炉火与屋顶战旗已在长街立住名声。', 'hearth'),
+    line('ming', '若能将木石酒馆加固为石堡要塞，屋顶便会多出一门日夜轰鸣的守卫重炮。', 'rooftop'),
   ],
   8: [
-    line('ming', '第 8 夜尸群更密了，前排巨尸配后排怨灵是最麻烦的组合。'),
-    line('ming', '趁换弹间隙用猩红圣铳或秘蓝法杖清掉后排怨灵，别让它们把屋顶烤热了。'),
+    line('ming', '第 8 夜前排巨尸配后排怨灵双线施压，防线每一丝耐久都金贵无比。', 'siege'),
+    line('ming', '集中火力优先凿穿硬骨与后排，别叫尸潮把火线拖垮。', 'rooftop'),
   ],
   9: [
-    line('ming', '第 9 夜。远处的吼声比第 5 天那头还要狂暴，暴君的同伙明天多半要扑上来了。'),
-    line('ming', '食堂今晚应该能解锁更扎实的盛宴，留一份硬菜当明天开战底气！'),
+    line('ming', '第 9 夜远街传出比先前暴君更暴戾的咆哮……血月领主已经在半路上了。', 'siege'),
+    line('ming', '今晚堂内灶火烧旺些，留一顿扎实热菜给大伙压压惊。', 'hearth'),
   ],
   10: [
-    line('ming', '第 10 天血月当头！第二头首领「血月暴君·狂怒领主」带着漫街腐潮碾压过来了！'),
-    line('ming', '雷鸣臼炮配寒霜水晶塔能把狂奔护卫定死在壁垒外，剩下的交给屋顶火力和暴击瞄准！'),
+    line('ming', '第 10 夜血月当头！第二头首领「血月暴君·狂怒领主」踏碎街灯逼近前院！', 'siege'),
+    line('ming', '寒霜、雷弧与火炮全线齐鸣，这一仗退一步便是死局。', 'rooftop'),
   ],
   11: [
-    line('ming', '撑过第十夜只剩最后五关！第 11 夜起，每夜冲墙的频率都比之前凶一截。'),
-    line('ming', '手里的主力兵器尽量升到高星，星级带来的弹匣与爆发在残局里最救命。'),
+    line('ming', '跨过第十夜只余最后五关！黑潮自今晚起愈发急促凶狠，容错越来越低。', 'siege'),
+    line('ming', '高星神兵与四座联动炮台缺一不可。', 'rooftop'),
   ],
   12: [
-    line('ming', '第 12 夜，街尾火把半明半灭，几座炮塔要是还没升满，今晚过后一定要补齐！'),
-    line('ming', '真守到哥特铁堡三级，夜里还能自己修补三成路障，能省出大把修墙金币。'),
+    line('ming', '第 12 夜，街尾冷风刺骨，老街半数废屋都在黑雾中摇摇欲坠。', 'siege'),
+    line('ming', '只有这间还飘着肉香的哥特石堡亮着灯，绝不能在此夜熄火。', 'hearth'),
   ],
   13: [
-    line('ming', '第 13 夜——倒数第三场死守。小赵刚刚捕捉到北塔哨站传来的救援烽火信号。'),
-    line('ming', '爆炎弹和镶铁护甲都备足，只要壁垒和屋子都在，咱们就能耗死所有扑上来的怪物。'),
+    line('ming', '第 13 夜——小赵在屋顶捕捉到北岭哨塔连点三盏狼烟，黎明猎团离镇外只有两日脚程！', 'beacon'),
+    line('ming', '备足爆炎弹与镶铁护甲，把最后两夜前线咬牙钉死。', 'rooftop'),
   ],
   14: [
-    line('ming', '第 14 夜！明天就是最后一战，今天切忌省弹药、省爆炎弹，能保住满血防线过夜就是大胜！'),
-    line('ming', '今晚回堂把能喝的汤、能烤的排全都做了，明天见红！'),
+    line('ming', '第 14 夜！明日便是终战之夜，今夜倾尽所有补给保住屋墙完好！', 'siege'),
+    line('ming', '灶膛里的长夜全宴正冒着热气——明日决死一战！', 'hearth'),
   ],
   15: [
-    line('ming', '第 15 夜——最后一夜！天空彻底裂成赤紫，深渊魔王·尸皇正踏碎街砖走来！'),
-    line('watch', '破晓救援队距暮色镇仅剩一程快马！击溃深渊魔王、肃清最后一波尸潮，城门外即刻接应！'),
+    line('ming', '第 15 夜——深渊魔王·尸皇撕裂暮色天空，踏碎青石板一步步走来了！', 'siege'),
+    line('watch', '破晓救援队已抵镇东关卡！斩溃魔王、清扫黑潮，城门外即刻接应胡掌柜！', 'dawn'),
   ],
 };
 
-// ── 第 2 / 4 / 6 / 8 天清场加入的四位并肩战友（契合酒馆堡垒动线与纯金币体系）──
+// ── 第 2 / 4 / 6 / 8 天清场加入的四位并肩战友（银枪 / 绯火炼金 / 重铠剑卫 / 苍蓝武僧）──
 export const COMPANION_JOIN_STORIES: Record<number, { ally: AllyId; lines: StoryLine[] }> = {
   2: {
     ally: 'zhang',
     lines: [
-      line('zhang', '（门外响起干净利落的两记点射，一个披风满霜的退伍老兵翻进院门，顺手搭上屋顶瞭望口）'),
-      line('ming', '枪法很稳。哪来的？'),
-      line('zhang', '老兵张。顺着你的灯火摸过来的——这间酒馆二楼视野真他娘的好，留我替你校准风向、盯住盲区，以后全武器伤害再添一成！'),
+      line('zhang', '（寒风里一道银芒破空而至，穿风斗篷的退伍老兵挽着长枪翻进院墙，稳稳跃上屋檐巡视街口）', 'rooftop'),
+      line('ming', '银枪挑得干脆。阁下哪一营退下来的？'),
+      line('zhang', '老兵张。见胡掌柜一人撑着这间酒馆没熄灯，便赶来搭把手——这屋顶视野通透，我的银枪替你破阵盯梢，全武器伤害再添一成！'),
     ],
   },
   4: {
     ally: 'lin',
     lines: [
-      line('lin', '掌柜的！刚才替街口几个伤员煎药包扎时看见你的灯还亮着……我叫小林，以前在义诊药铺待过。'),
-      line('ming', '屋里正好缺药箱。肯留下，晚上烤炉边永远有你的热汤位置。'),
-      line('lin', '一言为定！每天迎战前我都会帮大家换好纱布与秘药汤剂，每夜开战前额外多稳回 18 点生命！'),
+      line('lin', '（绯红法袍边角还带着炼金火星，小林踩着木挑台迎面奔来，怀里护着药囊与赤铜火瓶）', 'hearth'),
+      line('ming', '这雾夜里还敢点炼金火？快进门廊歇脚。'),
+      line('lin', '胡掌柜收留过不少伤患，大伙都念着这口热汤呢。我就驻在门廊，战时掷绯火焚敌、顺手替你疗伤；入夜也能照看大伙伤势！'),
     ],
   },
   6: {
     ally: 'qiang',
     lines: [
-      line('qiang', '好家伙，这木石壁垒铆得真硬实！我是铁匠阿强——只要金币到位，我能把这屋前四座炮塔基座和铁壁全再锻厚一圈！'),
-      line('ming', '右角落那台旧铁砧正缺主事的师傅。欢迎进屋！'),
-      line('qiang', '妥妥的！路障与大屋上限立刻再加 50 点，往后造塔升塔全按九折收费，绝不坑自家掌柜！'),
+      line('qiang', '（沉重的金铠战靴踩响院砖，铁匠阿强单手拎着丈长战剑与锻锤大步上前，反手拍了拍木障）', 'siege'),
+      line('ming', '正愁前院缺个压阵的狠角色，右墙角落那台铁砧刚好给你开炉。'),
+      line('qiang', '痛快！胡掌柜放心守楼，前院迎面撞来的腐尸全交由我重剑劈退——顺手把壁垒和房子各再铆厚 50 点，往后造塔全按九折！'),
     ],
   },
   8: {
     ally: 'zhao',
     lines: [
-      line('zhao', '报告莫掌柜！我是哨兵小赵，刚顺着北塔烽火传令线翻进院墙！'),
-      line('ming', '黎明救援队那边还稳吗？'),
-      line('zhao', '号角一直没断！顺道我还替你的「深夜食堂」向驿道行商和守夜旅人吆喝了一圈——从今往后，食堂名气和涨粉速度再加三成！'),
+      line('zhao', '（院墙外飘来一串苍蓝气浪，披着念珠的青年武僧轻身落回屋顶，双掌一合向屋檐抱拳）', 'beacon'),
+      line('ming', '北岭的音讯带回来了？'),
+      line('zhao', '小赵幸不辱命！黎明猎团号角未断！今后我随老张同守屋顶，专运苍蓝气劲截杀半空翼魔，顺道也替小胡的酒馆再吆喝三成名气！'),
     ],
   },
 };
@@ -297,67 +306,66 @@ export const COMPANION_JOIN_STORIES: Record<number, { ally: AllyId; lines: Story
 // ── 第 5 / 10 / 15 天三大首领登场 & 击破剧情 ──
 export const BOSS_INTROS: StoryLine[][] = [
   [
-    line('boss1', '轰隆——！！！（整条青石街都在巨爪下震颤，暴君的独眼死死锁住酒馆大门）'),
-    line('ming', '这就是第 5 天的地狱巨兽·暴君？大家上屋顶、架稳枪线，绝不能让它掀翻路障！'),
+    line('boss1', '轰隆——！！！（青石长街在巨兽铁蹄下裂开细纹，暴君赤红独眼死死锁住酒馆大门）', 'siege'),
+    line('ming', '第 5 夜的地狱巨兽·暴君到了！站稳高台架好火线，绝不能叫它掀翻前院壁垒！', 'rooftop'),
   ],
   [
-    line('boss2', '吼——！！（第 10 夜的狂怒领主顶碎街灯，烈焰顺着它脊背滚烫翻涌）'),
-    line('ming', '暴君二号压境！寒霜水晶塔与雷鸣臼炮全力拖住它，屋顶重炮对准胸口轰！'),
+    line('boss2', '吼——！！（血月狂怒领主顶碎街头铁灯柱，炽热火星顺着它脊背滚滚翻涌）', 'siege'),
+    line('ming', '第 10 夜领主压境！寒霜减速、雷弧连锁、黑铁重炮全数齐发！', 'rooftop'),
   ],
   [
-    line('boss3', '……微弱的灶火，也敢在长夜尽头耀武扬威？（深渊魔王·尸皇拔高遮住半片暮色天空）'),
-    line('ming', '最后十五步了！为了这间酒馆、为了屋里还在喝汤的所有人——把火药和秘法全倾泻过去！'),
+    line('boss3', '……区区凡人灶火，竟也敢与长夜争辉？（深渊魔王·尸皇拔地遮蔽半片赤紫天穹）', 'siege'),
+    line('ming', '十五夜最后一关！为了这间救过无数人的酒馆——小胡与诸位今夜寸步不退！', 'dawn'),
   ],
 ];
 
 export const BOSS_VICTORY: StoryLine[][] = [
   [
-    line('ming', '呼……暴君倒下了！街口那层压迫感散了一半，今晚回堂多烤两盘庆功！'),
+    line('ming', '呼……暴君倒下了。街口黑雾稀薄了半截，今夜回堂生火给大家添菜！', 'hearth'),
   ],
   [
-    line('ming', '连血月领主都啃不动我们的屋顶和炮台！还剩最后五夜，大伙撑住！'),
+    line('ming', '血月领主也啃不动咱们的铁壁和屋顶！只剩最后五夜，咬牙撑到破晓！', 'rooftop'),
   ],
   [
-    line('boss3', '不可……思议……凡人的灯火，竟烧穿了深渊长夜……'),
-    line('dawn', '这里是北方破晓救援队！暮色镇上空的红雾散了——前方酒馆屋顶灯火清晰可见，马车与火炬队正在开进长街！'),
-    line('zhang', '哈哈哈哈！听见破晓号角和马蹄声没！十五个夜晚，咱们一砖一瓦都守下来了！'),
-    line('lin', '所有人的伤势都稳住了，连那只烤炉的余温都还烫着！'),
-    line('qiang', '伙计们，收兵器！这一锅全镇最传奇的「长夜全宴」，咱端出去分给远道而来的弟兄们！'),
-    line('ming', '暮色散去，天终于亮了。感谢各位老伙计——这间十五夜不灭的暮夜酒馆，我们守住了！'),
+    line('boss3', '不可……思议……凡人微弱的灶火，竟烧穿了无尽长夜……', 'siege'),
+    line('dawn', '这里是北方破晓救援队！镇东黑雾已经溃散——前方酒馆灯火长明，全队火炬马车正在入街接应！', 'dawn'),
+    line('zhang', '哈哈哈哈！听见那阵破晓号角与马蹄声没！十五个漫漫长夜，咱们一砖一瓦都扛下来了！', 'dawn'),
+    line('lin', '大伙的伤势全稳住了，炉膛里的铁锅还滚烫地冒着白气！', 'hearth'),
+    line('qiang', '伙计们收剑入鞘！把今夜那锅「长夜全宴」端出堂门，分给赶来驰援的弟兄们暖暖身！', 'hearth'),
+    line('ming', '黑雾散了，天光终于照进长街。小胡的这盏灯——和诸位一起，守到了天亮！', 'dawn'),
   ],
 ];
 
 export type RestStoryKey = 'firstOpen' | 'rep10' | 'rep25' | 'rep40';
 export const REST_STORY: Record<RestStoryKey, { title: string; lines: StoryLine[] }> = {
   firstOpen: {
-    title: '深夜食堂 · 炉火开张',
+    title: '深夜食堂 · 炉火初燃',
     lines: [
-      line('ming', '墙外的嘶吼声总算暂时退潮。回到屋里，先把红砖烤炉的碳火拨旺吧。'),
-      line('ming', '从魔物身上寻回来的鲜肉别囤着发酸：既可以上铁板现炒直接换金币买神兵、建炮塔，也能留着招待深夜来客。'),
-      line('ming', '门外那几位夜行旅人已经闻到香味了——照着今晚食客的点单和街头热门口味下锅，拿金币的同时还能攒口碑涨粉！'),
-      line('ming', '下锅时盯紧铁板上的游标指针：落在中央金焰区就能打出完美乃至传说火候，名气越响，后续来的稀客赏金越高。'),
-      line('ming', '最后别忘了给自己留一份「战前私房特餐」再上屋顶！明夜迎战时伤害、攻速和护甲都会明显涨一截。'),
+      line('ming', '墙外的嘶吼暂时退回黑雾深处。推开厚木门进堂，先把左壁砖窑烤炉里的炭火拨旺吧。', 'hearth'),
+      line('ming', '外面攒回来的鲜肉与金币都有大用：铁板现炒能直接变现添置炮塔神兵，也可端上餐桌喂饱赶夜路的生还者。', 'hearth'),
+      line('ming', '长桌上已有冻得发抖的旅人等着口热菜。顺着食客心思和今夜热门风味掌勺，名气攒起来，自会招来各方稀客。', 'hearth'),
+      line('ming', '临走前别忘了替自己留一份「战前私房特餐」——带着热汤与烤肉的底气登顶迎战，十五夜才能走得更远。', 'rooftop'),
     ],
   },
   rep10: {
     title: '街头口碑 · 老兵传香',
     lines: [
-      line('zhang', '掌柜的，听说隔壁街区逃难过来的幸存者都在打听你这间「暮夜酒馆」呢！'),
-      line('ming', '能让他们趁夜喝口热汤再接着活下去，这灶台就没白支起来。'),
+      line('zhang', '胡掌柜，隔壁街区逃难过来的幸存者都在打听你这间「暮夜酒馆」呢！', 'hearth'),
+      line('ming', '能让他们趁夜喝口热汤再接着活下去，这灶台就没白支起来。', 'hearth'),
     ],
   },
   rep25: {
     title: '名震暮夜 · 八方寻味',
     lines: [
-      line('zhao', '北塔哨站和驿道旅人全在打听这儿！都说穿过鬼雾往西看见两扇暖光拱窗，推门进去就能尝到昔日王都大旅店般的炉火手艺！'),
-      line('ming', '名声响了更好——往后常客赏金再涨两成，连各地奇人怪客都会陆续找上门。'),
+      line('zhao', '北岭哨站与驿道行商全在传颂这盏灯！穿过鬼雾往西看见暖光拱窗，便能尝到王都大旅店般的炉火手艺。', 'hearth'),
+      line('ming', '名声响了正好——往后熟客出手更阔绰，四方奇人异士也会循香前来投奔。', 'hearth'),
     ],
   },
   rep40: {
     title: '传奇名馆 · 长夜暖灯',
     lines: [
-      line('lin', '整座暮色镇都流传着这里的故事了——墙外是十五夜死斗，墙里却是比和平年代还温暖的深夜酒馆。'),
-      line('ming', '来吧，灶火越旺、枪声越稳。不管来的是什么客人，今夜管够！'),
+      line('lin', '整座暮色镇都流传着小胡与酒馆的故事了——墙外十五夜死斗，墙里却比和平岁月更暖人心。', 'hearth'),
+      line('ming', '灶火越旺，守城越稳。无论今夜来的是谁，管饱！', 'dawn'),
     ],
   },
 };
@@ -373,10 +381,10 @@ export interface AllyDef {
 }
 
 export const ALLIES: Record<AllyId, AllyDef> = {
-  zhang: { id: 'zhang', joinDay: 2, name: '老兵张', role: '屋顶神射', initial: '张', sprite: 'ally_zhang', buffDesc: '屋顶银弩助战 · 全武器伤害 +10%' },
-  lin:   { id: 'lin',   joinDay: 4, name: '药师小林', role: '随行炼金', initial: '林', sprite: 'ally_lin', buffDesc: '门廊炼金冰焰助战/慢回血 · 每夜 +18 血' },
-  qiang: { id: 'qiang', joinDay: 6, name: '铁匠阿强', role: '重甲斩卫', initial: '强', sprite: 'ally_qiang', buffDesc: '前院重斩退敌/修墙 · 墙大屋+50 · 造塔-10%' },
-  zhao:  { id: 'zhao',  joinDay: 8, name: '哨兵小赵', role: '斥候对空', initial: '赵', sprite: 'ally_zhao', buffDesc: '屋顶速射优先对空 · 食堂增粉 +30%' },
+  zhang: { id: 'zhang', joinDay: 2, name: '老兵张', role: '银枪破阵', initial: '张', sprite: 'ally_zhang', buffDesc: '屋顶银枪贯穿助战 · 全武器伤害 +10%' },
+  lin:   { id: 'lin',   joinDay: 4, name: '药师小林', role: '绯火炼金', initial: '林', sprite: 'ally_lin', buffDesc: '门廊绯火爆燃/战中慢愈 · 每夜额外回血' },
+  qiang: { id: 'qiang', joinDay: 6, name: '铁匠阿强', role: '重铠斩卫', initial: '强', sprite: 'ally_qiang', buffDesc: '前院冲锋重斩/修壁 · 墙屋+50 · 造塔-10%' },
+  zhao:  { id: 'zhao',  joinDay: 8, name: '武僧小赵', role: '苍蓝气劲', initial: '赵', sprite: 'ally_zhao', buffDesc: '屋顶苍蓝气劲优先对空 · 食堂增粉 +30%' },
 };
 export const ALLY_ORDER: AllyId[] = ['zhang', 'lin', 'qiang', 'zhao'];
 

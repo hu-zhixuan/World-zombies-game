@@ -1,6 +1,6 @@
 {
   "name": "world-zombies-game",
-  "version": "59.0.0",
+  "version": "60.0.0",
   "private": true,
   "type": "module",
   "description": "暮夜酒馆：守夜人 —— TypeScript + Phaser + Preact，打包成单个 HTML",

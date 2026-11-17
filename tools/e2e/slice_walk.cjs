@@ -46,7 +46,13 @@ const L = require('./lib.cjs');
 
   await g.tap('#btn-lore');
   check((await g.state()).panel === 'lore', '从标题可打开酒馆传闻录');
+  check(await g.page.evaluate(() => !!document.querySelector('#panel-lore .lore-storyboard .scene-art')), '序章前情展示图文分镜场景');
+  const sceneBefore = await g.page.evaluate(() => document.querySelector('#panel-lore .lore-storyboard .scene-art')?.getAttribute('data-scene'));
+  await g.tap('#btn-scene-next');
+  const sceneAfter = await g.page.evaluate(() => document.querySelector('#panel-lore .lore-storyboard .scene-art')?.getAttribute('data-scene'));
+  check(sceneBefore !== sceneAfter, `分镜可切换上一幕/下一幕 (${sceneBefore} -> ${sceneAfter})`);
   await fits('#panel-lore');
+  await g.shot('01c-lore-intro');
   await g.tap('#tab-lore-chapters');
   await fits('#panel-lore');
   await g.shot('01c-lore');
@@ -54,15 +60,24 @@ const L = require('./lib.cjs');
   await fits('#panel-lore');
   await g.tap('#btn-close');
 
-  // 2. 选职业 -> 播放序幕剧情 -> 跳过或推进入第 1 天房顶
+  // 2. 选难度与职业 -> 播放序幕剧情 -> 跳过或推进入第 1 天房顶
   await g.tap('#btn-start');
-  check((await g.state()).panel === 'class', '点「开始守夜」先选职业');
+  check((await g.state()).panel === 'class', '点「开始守夜」先选难度与职业');
+  check(await g.page.evaluate(() => document.querySelectorAll('#diff-picker .diff-btn').length === 3), '备战面板展示三档难度按钮');
+  await g.tap('#btn-diff-hard');
+  check(await g.page.evaluate(() => document.querySelector('#btn-diff-hard')?.classList.contains('on')), '可点选「困难」难度');
+  await g.tap('#btn-diff-normal');
   await g.shot('01b-class'); await fits('#panel-class');
   check(await g.page.evaluate(() => document.querySelector('#panel-class [data-class=engineer]').disabled && document.querySelector('#panel-class [data-class=chef]').disabled), '0星时铸匠/厨师正确锁定');
   await g.tap('#panel-class [data-class=gunner]');
 
   let s = await g.state();
   check(s.panel === 'story' && s.storyLen >= 3, `选职业后自动进入序幕剧情动画 (${s.storyLen}段)`);
+  check(await g.page.evaluate(() => !!document.querySelector('#panel-story .story-visual .scene-art')), '序幕对白上方展示像素分镜配图');
+  check(await g.page.evaluate(() => {
+    const txt = document.querySelector('#panel-story')?.innerText || '';
+    return /小胡|胡掌柜/.test(txt) && !/莫老板|莫掌柜/.test(txt);
+  }), '序幕剧情主角名称为「小胡」且无旧名');
   await fits('#panel-story');
   await g.shot('01d-story-intro');
   const n0 = s.storyLen;
@@ -288,7 +303,7 @@ const L = require('./lib.cjs');
   await g.tap('#btn-turret-mode-0');
   await g.shot('08-build'); await fits('#panel-build');
   s = await g.state();
-  check(s.turrets >= 3 && s.wallLv === 2 && s.fortLv === 2 && s.turretModes.startsWith('boss,'), `要塞沙盘可建造炮塔、升级壁垒堡垒并切换索敌重心 (${s.turretModes})`);
+  check(s.turrets >= 2 && s.wallLv === 2 && s.fortLv === 2 && s.turretModes.startsWith('boss,') && s.weapons.split(',').length <= 2, `要塞沙盘可建造炮塔、升级壁垒堡垒并切换索敌重心 (${s.turretModes}, weapons=${s.weapons})`);
   await g.tap('#btn-close');
 
   // 8. 走到大门用互动键出门查看升级后的哥特石堡与炮塔防线，随后迎战第 2 天
@@ -301,6 +316,17 @@ const L = require('./lib.cjs');
   s = await g.state();
   check(s.panel === null && s.day === 2 && s.phase === 'fight' && s.y <= -90, '迎战第 2 天正常出发站回房顶');
   check(await until((st) => st.kills > s.kills, 30000, '第 2 天自动击杀'), '第 2 天房顶塔防联合击杀正常');
+
+  // 验证中途战友（小张/阿强）在场上会实际移动走位与参战
+  await g.page.evaluate(() => {
+    const r = window.__game.run;
+    if (!r.story.allies.includes('zhang')) r.story.allies.push('zhang');
+    if (!r.story.allies.includes('qiang')) r.story.allies.push('qiang');
+  });
+  const allyX0 = await g.page.evaluate(() => ({ z: window.__game.run.allies.zhang.x, q: window.__game.run.allies.qiang.x }));
+  await wait(900);
+  const allyX1 = await g.page.evaluate(() => ({ z: window.__game.run.allies.zhang.x, q: window.__game.run.allies.qiang.x }));
+  check(Math.abs(allyX1.z - allyX0.z) > 1 || Math.abs(allyX1.q - allyX0.q) > 1, `中途战友战斗中真实走位巡逻 (${allyX0.z.toFixed(0)}->${allyX1.z.toFixed(0)}, ${allyX0.q.toFixed(0)}->${allyX1.q.toFixed(0)})`);
   await g.shot('09-day2');
 
   // 9. 验证静音键 & 飞行夜翼魔蝠(bat) + 第 5 天 Boss 视觉呈现
