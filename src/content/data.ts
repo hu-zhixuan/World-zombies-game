@@ -229,6 +229,56 @@ export const MEAL_ORDER: MealId[] = ['spicy_skewer', 'hearty_stew', 'iron_steak'
 export const unlockedMeals = (day: number): MealDef[] => MEAL_ORDER.map((id) => MEALS[id]).filter((m) => m.unlockDay <= day);
 export const MEAT_SELL_PRICE = 5; // 每块鲜肉现炒出锅可得 5 金币（厨师 7 金币）
 
+export type DrinkId = 'beer' | 'tea';
+export interface DrinkDef {
+  id: DrinkId;
+  name: string;
+  icon: string;
+  pay: number;
+  rep: number;
+  fans: number;
+  orderQuote: string;
+}
+export const DRINKS: Record<DrinkId, DrinkDef> = {
+  beer: {
+    id: 'beer',
+    name: '麦芽黑啤',
+    icon: 'ic_beer',
+    pay: 16,
+    rep: 2,
+    fans: 10,
+    orderQuote: '先打一大杯冰镇麦芽黑啤解乏，泡沫留足两指厚！',
+  },
+  tea: {
+    id: 'tea',
+    name: '守夜热茶',
+    icon: 'ic_tea',
+    pay: 14,
+    rep: 2,
+    fans: 9,
+    orderQuote: '夜风凉透骨头，快沏一盏滚烫暖胃的守夜热茶！',
+  },
+};
+
+export const MAX_DISH_LV = 5;
+export const dishUpgradeCost = (id: MealId, lv: number) => Math.round((MEALS[id].basePay * 1.45 + 16) * lv);
+export const dishLevelPayMul = (lv: number) => 1 + 0.18 * Math.max(0, lv - 1);
+
+export type TavernUpgradeId = 'fast_tap' | 'wide_pass' | 'warm_lantern';
+export interface TavernUpgradeDef {
+  id: TavernUpgradeId;
+  name: string;
+  desc: string;
+  cost: number;
+  icon: string;
+}
+export const TAVERN_UPGRADES: Record<TavernUpgradeId, TavernUpgradeDef> = {
+  fast_tap:     { id: 'fast_tap',     name: '精铜酒栓', desc: '完美金沫区加宽且酒水赏金 +25%', cost: 80,  icon: 'ic_beer' },
+  wide_pass:    { id: 'wide_pass',    name: '双层传菜架', desc: '传菜台扩至 5 格 · 食客落座更利索', cost: 95,  icon: 'ic_clean_plate' },
+  warm_lantern: { id: 'warm_lantern', name: '暖琥珀吊灯', desc: '食客耐心流失减缓 28% · 营业延长', cost: 110, icon: 'ic_ledger' },
+};
+export const TAVERN_UPGRADE_ORDER: TavernUpgradeId[] = ['fast_tap', 'wide_pass', 'warm_lantern'];
+
 export interface DinerGuestDef {
   id: string; name: string; role: string; sprite: string; fps: number;
   dish: MealId; dishName: string; meatCost: number; basePay: number;

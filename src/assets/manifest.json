@@ -2,12 +2,12 @@
  "ally_lin": {
   "fh": 53,
   "frames": 5,
-  "fw": 60
+  "fw": 64
  },
  "ally_lin_atk": {
   "fh": 53,
   "frames": 10,
-  "fw": 81
+  "fw": 84
  },
  "ally_qiang": {
   "fh": 48,
@@ -17,17 +17,17 @@
  "ally_qiang_atk": {
   "fh": 48,
   "frames": 6,
-  "fw": 104
+  "fw": 116
  },
  "ally_qiang_run": {
   "fh": 48,
   "frames": 12,
-  "fw": 68
+  "fw": 72
  },
  "ally_zhang": {
   "fh": 47,
   "frames": 4,
-  "fw": 88
+  "fw": 96
  },
  "ally_zhang_atk": {
   "fh": 47,
@@ -37,22 +37,22 @@
  "ally_zhang_run": {
   "fh": 47,
   "frames": 6,
-  "fw": 88
+  "fw": 96
  },
  "ally_zhao": {
   "fh": 48,
   "frames": 4,
-  "fw": 52
+  "fw": 54
  },
  "ally_zhao_atk": {
   "fh": 48,
   "frames": 6,
-  "fw": 82
+  "fw": 104
  },
  "ally_zhao_run": {
   "fh": 48,
   "frames": 6,
-  "fw": 52
+  "fw": 54
  },
  "barbed_wire": {
   "fh": 34,
@@ -209,6 +209,11 @@
   "frames": 1,
   "fw": 16
  },
+ "ic_beer": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
  "ic_bloodfrenzy": {
   "fh": 16,
   "frames": 1,
@@ -224,12 +229,22 @@
   "frames": 1,
   "fw": 16
  },
+ "ic_clean_plate": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
  "ic_coin": {
   "fh": 16,
   "frames": 1,
   "fw": 16
  },
  "ic_crate": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_dirty_plate": {
   "fh": 16,
   "frames": 1,
   "fw": 16
@@ -304,6 +319,11 @@
   "frames": 1,
   "fw": 16
  },
+ "ic_ledger": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
  "ic_lifesteal": {
   "fh": 16,
   "frames": 1,
@@ -364,6 +384,11 @@
   "frames": 1,
   "fw": 16
  },
+ "ic_tea": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
  "ic_turret": {
   "fh": 38,
   "frames": 1,
@@ -409,9 +434,19 @@
   "frames": 5,
   "fw": 40
  },
+ "npc_bearded_walk": {
+  "fh": 47,
+  "frames": 6,
+  "fw": 40
+ },
  "npc_hat": {
   "fh": 52,
   "frames": 4,
+  "fw": 39
+ },
+ "npc_hat_walk": {
+  "fh": 52,
+  "frames": 6,
   "fw": 39
  },
  "npc_oldman": {
@@ -419,9 +454,19 @@
   "frames": 8,
   "fw": 34
  },
+ "npc_oldman_walk": {
+  "fh": 42,
+  "frames": 12,
+  "fw": 34
+ },
  "npc_woman": {
   "fh": 46,
   "frames": 7,
+  "fw": 37
+ },
+ "npc_woman_walk": {
+  "fh": 46,
+  "frames": 6,
   "fw": 37
  },
  "porch_deck": {

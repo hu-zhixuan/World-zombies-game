@@ -301,11 +301,13 @@ def build_tavern_interior(house, house_b, wall_a, wall_b, left_roof, roof_t, rig
     room.paste(chair_l, (300, FLOOR_Y - chair_l.height), chair_l)
     room.paste(chair_r, (372, FLOOR_Y - chair_r.height), chair_r)
 
-    # ── 右区：防线铁砧工作台、酒馆招牌与出击木门 ──
+    # ── 右区：军械账簿（行商）、防线铁砧（工坊）、酒馆招牌与出击木门 ──
     room.paste(sign, (414, 96), sign)
     draw_oak_table(402, 0)
+    ledger = mi.crop((176, 240, 192, 256))
+    room.paste(ledger, (406, FLOOR_Y - 46), ledger)
     anvil = mi.crop((192, 240, 208, 256))
-    room.paste(anvil, (416, FLOOR_Y - 46), anvil)
+    room.paste(anvil, (438, FLOOR_Y - 46), anvil)
     door = house_b.crop((66, 178, 104, 244))
     room.paste(door, (476, FLOOR_Y - door.height), door)
 
@@ -412,44 +414,51 @@ def main():
             frames.append(crop_anchor_frame(cell, 0, out_w, anchor_x))
         return frames
 
-    # 老兵张（银枪穿刺）：idle 朝左故先水平翻转（中心 x=46）；run/atk 原生朝右（中心 x=51 / x=43.5）
+    # 老兵张（银枪穿刺）：idle 朝左故先水平翻转（中心 x=46）；run/atk 原生朝右（中心 x=50 / x=43）
     strip('ally_zhang', [
-        crop_anchor_frame(img('cemetery', 'Sprites', 'hero', 'hero-idle', f'hero-idle-{i}.png').transpose(Image.FLIP_LEFT_RIGHT), 12, 88, 46)
+        crop_anchor_frame(img('cemetery', 'Sprites', 'hero', 'hero-idle', f'hero-idle-{i}.png').transpose(Image.FLIP_LEFT_RIGHT), 12, 96, 46)
         for i in range(1, 5)
     ])
     strip('ally_zhang_run', [
-        crop_anchor_frame(img('cemetery', 'Sprites', 'hero', 'hero-run', f'hero-run-{i}.png'), 12, 88, 51)
+        crop_anchor_frame(img('cemetery', 'Sprites', 'hero', 'hero-run', f'hero-run-{i}.png'), 12, 96, 50)
         for i in range(1, 7)
     ])
     strip('ally_zhang_atk', [
-        crop_anchor_frame(img('cemetery', 'Sprites', 'hero', 'hero-attack', f'hero-attack-{i}.png'), 12, 114, 44)
+        crop_anchor_frame(img('cemetery', 'Sprites', 'hero', 'hero-attack', f'hero-attack-{i}.png'), 12, 114, 43)
         for i in range(1, 6)
     ])
 
-    # 炼金师小林（圣火炼金）：原版 wizard 朝左，全部翻转朝右并导出完整 fire1..10 十帧施法动作
+    # 炼金师小林（圣火炼金）：原版 wizard 朝左，全部翻转朝右并在中心 x=41 对齐施法 10 帧
     strip('ally_lin', [
-        img('church', 'wizard', 'idle-sprites', f'wizard-idle-{i}.png').transpose(Image.FLIP_LEFT_RIGHT).crop((11, 13, 71, 66))
+        crop_anchor_frame(img('church', 'wizard', 'idle-sprites', f'wizard-idle-{i}.png').transpose(Image.FLIP_LEFT_RIGHT), 13, 64, 41)
         for i in range(1, 6)
     ])
     strip('ally_lin_atk', [
-        img('church', 'wizard', 'fire-sprites', f'fire{i}.png').transpose(Image.FLIP_LEFT_RIGHT).crop((0, 13, 81, 66))
+        crop_anchor_frame(img('church', 'wizard', 'fire-sprites', f'fire{i}.png').transpose(Image.FLIP_LEFT_RIGHT), 13, 84, 41)
         for i in range(1, 11)
     ])
 
-    # 铁匠阿强（重铠剑卫）：idle(38px, 中心19)/run(66px, 中心36)/attack(96px, 中心48) 全员按脊柱对齐，彻底消除攻击瞬移
-    strip('ally_qiang', sheet_anchor_frames(img('patreons', 'Gothic-hero-Files', 'PNG', 'gothic-hero-idle.png'), 38, 4, 52, 19))
-    strip('ally_qiang_run', sheet_anchor_frames(img('patreons', 'Gothic-hero-Files', 'PNG', 'gothic-hero-run.png'), 66, 12, 68, 36))
-    strip('ally_qiang_atk', sheet_anchor_frames(img('patreons', 'Gothic-hero-Files', 'PNG', 'gothic-hero-attack.png'), 96, 6, 104, 48))
+    # 铁匠阿强（重铠剑卫）：idle(38px, 中心18)/run(66px, 中心38)/attack(96px, 中心43) 全员按脊柱对齐，彻底消除攻击瞬移
+    strip('ally_qiang', sheet_anchor_frames(img('patreons', 'Gothic-hero-Files', 'PNG', 'gothic-hero-idle.png'), 38, 4, 52, 18))
+    strip('ally_qiang_run', sheet_anchor_frames(img('patreons', 'Gothic-hero-Files', 'PNG', 'gothic-hero-run.png'), 66, 12, 72, 38))
+    strip('ally_qiang_atk', sheet_anchor_frames(img('patreons', 'Gothic-hero-Files', 'PNG', 'gothic-hero-attack.png'), 96, 6, 116, 43))
 
-    # 武僧小赵（苍蓝气劲）：原图共用 82x60 画布（身体中心 x=41），裁切保持中心 41 对齐并加入行走 6 帧
-    strip('ally_zhao', [img('church', 'player', 'sprites', f'idle{i}.png').crop((15, 12, 67, 60)) for i in range(1, 5)])
-    strip('ally_zhao_run', [img('church', 'player', 'sprites', f'walk{i}.png').crop((15, 12, 67, 60)) for i in range(1, 7)])
-    strip('ally_zhao_atk', [img('church', 'player', 'sprites', f'punch{i}.png').crop((0, 12, 82, 60)) for i in range(1, 7)])
+    # 武僧小赵（苍蓝气劲）：punch 第1帧姿态靠左、第2~6帧前探出拳，逐帧校准锚点 [32,35,35,35,35,35] 确保出拳不横移
+    strip('ally_zhao', [crop_anchor_frame(img('church', 'player', 'sprites', f'idle{i}.png'), 12, 54, 40) for i in range(1, 5)])
+    strip('ally_zhao_run', [crop_anchor_frame(img('church', 'player', 'sprites', f'walk{i}.png'), 12, 54, 38.5) for i in range(1, 7)])
+    strip('ally_zhao_atk', [
+        crop_anchor_frame(img('church', 'player', 'sprites', f'punch{i}.png'), 12, 104, ax)
+        for i, ax in enumerate([32, 35, 35, 35, 35, 35], 1)
+    ])
 
 
-    # ── 深夜小食堂的幸存者食客 NPC（Gothicvania Town, ansimuz）──
-    for key, d, n in [('npc_hat', 'hat-man-idle', 4), ('npc_woman', 'woman-idle', 7),
-                      ('npc_bearded', 'bearded-idle', 5), ('npc_oldman', 'oldman-idle', 8)]:
+    # ── 深夜小食堂的幸存者食客 NPC（含待机与进门步行帧，Gothicvania Town, ansimuz）──
+    for key, d, n in [
+        ('npc_hat', 'hat-man-idle', 4), ('npc_hat_walk', 'hat-man-walk', 6),
+        ('npc_woman', 'woman-idle', 7), ('npc_woman_walk', 'woman-walk', 6),
+        ('npc_bearded', 'bearded-idle', 5), ('npc_bearded_walk', 'bearded-walk', 6),
+        ('npc_oldman', 'oldman-idle', 8), ('npc_oldman_walk', 'oldman-walk', 12),
+    ]:
         strip(key, [img('gothicvania-town', 'sprites', d, f'{d}-{i}.png') for i in range(1, n + 1)])
 
     # ── 特效：火球、暗黑奇幻火焰爆炸（Magic Pack 9 FireBomb）、灶台炉火 ──
@@ -554,12 +563,17 @@ def main():
     save('ic_meat', mi.crop((224, 224, 240, 240)))
     save('ic_chef', mi.crop((224, 208, 240, 224)))
     save('ic_kitchen', mi.crop((176, 224, 192, 240)))
+    save('ic_beer', center16(mi.crop((176, 224, 192, 240))))
+    save('ic_tea', center16(img('foodicons', '1x', 'morning-tea-cup.png')))
+    save('ic_clean_plate', center16(mi.crop((176, 208, 192, 224))))
+    save('ic_dirty_plate', center16(mi.crop((208, 208, 224, 224))))
+    save('ic_ledger', center16(mi.crop((176, 240, 192, 256))))
     save('ic_dish_skewer', center16(img('foodicons', '1x', 'roasted-chicken-drumstick.png'))) # 炭烤香辣肉串
-    save('ic_dish_stew', center16(img('foodicons', '1x', 'morning-tea-cup.png')))             # 守夜暖胃肉汤
-    save('ic_dish_steak', center16(mi.crop((192, 208, 208, 224))))                          # 铁板滋滋厚排
-    save('ic_dish_grill', center16(img('foodicons', '1x', 'raw-chicken-breast.png')))        # 碳火三拼盛宴
-    save('ic_dish_hotpot', center16(img('foodicons', '1x', 'cold-mug-of-beer.png')))         # 深渊秘辣锅
-    save('ic_dish_feast', center16(mi.crop((192, 224, 208, 240))))                          # 长夜全宴
+    save('ic_dish_stew', center16(mi.crop((224, 208, 240, 224))))                            # 守夜暖胃肉汤
+    save('ic_dish_steak', center16(mi.crop((192, 208, 208, 224))))                           # 铁板滋滋厚排
+    save('ic_dish_grill', center16(img('foodicons', '1x', 'salmon-nigiri.png')))             # 碳火三拼盛宴
+    save('ic_dish_hotpot', center16(img('foodicons', '1x', 'sushi.png')))                    # 深渊秘辣锅
+    save('ic_dish_feast', center16(img('foodicons', '1x', 'cheeseburger.png')))              # 长夜全宴
     save('ic_shop', mi.crop((176, 288, 192, 304)))
     save('ic_anvil', mi.crop((192, 240, 208, 256)))
 

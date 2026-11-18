@@ -156,7 +156,7 @@ class Game {
     this.pressed[k] = true;
   }
 
-  /** 根据主角当前位置自动执行或打开附近交互（灶台铁板出锅/端盘上菜/NPC搭话/商店/工坊/进出木门）。 */
+  /** 根据主角当前位置自动执行或打开附近交互（灶台铁板出锅/酒桶斟酒/传菜台/收碗/端盘上菜/NPC搭话/商店/工坊/进出木门）。 */
   handleInteract(): boolean {
     const r = this.run;
     const ct = nearbyCampTarget(r);
@@ -164,22 +164,38 @@ class Game {
       switch (ct.kind) {
         case 'cookFinish':
           return this.send({ t: 'finishCook' });
+        case 'pourFinish':
+          return this.send({ t: 'stopPour' });
+        case 'pourStart':
+          audio.uiClick();
+          return this.send({ t: 'startPour', drink: ct.drink, guestId: ct.guest?.id ?? null });
         case 'cookStart':
           audio.cookSizzle();
           return this.send({ t: 'startCook', guestId: ct.guest.id });
+        case 'serveDrink':
+          return this.send({ t: 'serveDrink', guestId: ct.guest.id });
         case 'serveCarried':
           return this.send({ t: 'serveCarried' });
+        case 'cleanTable':
+          return this.send({ t: 'cleanTable', plateId: ct.plateId });
+        case 'pickCounter':
+          return this.send({ t: 'pickCounterDish', id: ct.counterDish.id });
         case 'guestTalk': {
           const g = ct.guest;
           const sp = SPEAKERS.ming;
+          const isDrink = g.orderKind === 'drink';
           const quote = g.served
             ? (g.reactionQuote ?? g.thanksQuote)
-            : `「${g.orderQuote}」——点单：${g.dishName}（${g.meatCost}肉→${g.pay}金${g.trendMatch ? ' · 今夜热门' : ''}）`;
+            : isDrink
+              ? `「${g.orderQuote}」——点单：${g.dishName}（饮品→${g.pay}金）`
+              : `「${g.orderQuote}」——点单：${g.dishName}（${g.meatCost}肉→${g.pay}金${g.trendMatch ? ' · 今夜热门' : ''}）`;
           const reply = g.served
             ? '慢用！屋里炉火常亮，明晚还来喝口热汤。'
-            : r.meat >= g.meatCost
-              ? '好嘞，这就到左墙红砖灶台起火开炒，出锅就给您端过来！'
-              : '记下了！明日出门多狩些鲜肉回来再给您现做。';
+            : isDrink
+              ? '好嘞，马上到旁边的原木酒桶替您现打一扎！'
+              : r.meat >= g.meatCost
+                ? '好嘞，这就到左墙红砖灶台起火开炒，出锅就给您端过来！'
+                : '记下了！明日出门多狩些鲜肉回来再给您现做。';
           this.enqueueStory(`${g.name} · ${g.role}`, [
             { npc: g.vipId, name: g.name, initial: g.name[0] ?? '客', role: g.role, avatar: g.sprite, text: quote },
             { npc: 'ming', name: sp.name, initial: sp.initial, role: sp.desc, avatar: sp.avatar, text: reply },
@@ -190,10 +206,10 @@ class Game {
           const a = ALLIES[ct.ally];
           const join = COMPANION_JOIN_STORIES[a.joinDay];
           const campBanter: Record<AllyId, string> = {
-            zhang: r.inside ? '屋外寒雾越压越低，迎战时我就守在屋顶替你挺紧银枪！' : '屋顶高台视野通透，只要魔物敢露头，我这杆银枪当场贯穿！',
-            lin:   r.inside ? '灶火旁温着绯火药罐，迎战时我会在门廊炸出炼金火弹并替你调息！' : '门廊药囊都在手里，待我用绯火轰散前排，顺带替你慢慢续伤！',
-            qiang: r.inside ? '右侧铁砧刚淬过火，造塔加固跟我打声招呼就行，一律九折！' : '壁垒前由我顶着！靠过来的腐尸先吃一记重铠斩击，空隙我也会顺手修墙。',
-            zhao:  r.inside ? '驿道上的商旅都在传咱们暮夜酒馆的名头，今夜堂食涨粉又快三成！' : '半空扑来的夜翼魔蝠与提灯怨灵由我苍蓝气劲盯死，胡掌柜只管放手杀敌！',
+            zhang: r.inside ? '屋外寒雾越压越低，迎战时我就守在屋顶替你挺紧银枪！堂食开张时传菜台上我来端！' : '屋顶高台视野通透，只要魔物敢露头，我这杆银枪当场贯穿！',
+            lin:   r.inside ? '灶火旁温着绯火药罐，营业时灶台热菜交给我帮衬，迎战再替你调息轰散前排！' : '门廊药囊都在手里，待我用绯火轰散前排，顺带替你慢慢续伤！',
+            qiang: r.inside ? '右侧铁砧刚淬过火，开张忙不过来我也能顺手收碗擦桌，造塔加固一律九折！' : '壁垒前由我顶着！靠过来的腐尸先吃一记重铠斩击，空隙我也会顺手修墙。',
+            zhao:  r.inside ? '驿道上的商旅都在传咱们暮夜酒馆的名头，今夜堂食涨粉快三成，我来照应中间茶座！' : '半空扑来的夜翼魔蝠与提灯怨灵由我苍蓝气劲盯死，胡掌柜只管放手杀敌！',
           };
           const lines: StoryLine[] = [
             { npc: ct.ally, name: a.name, initial: a.initial, role: `${a.role} · ${a.buffDesc}`, avatar: a.sprite, text: campBanter[ct.ally] },
@@ -202,6 +218,13 @@ class Game {
           this.enqueueStory(`${a.name} · ${a.role}`, lines, true);
           return true;
         }
+        case 'drink':
+          if (!r.dinerCook && !r.carryingDish && !r.carryingDrink && !r.pourMinigame) {
+            audio.uiClick();
+            return this.send({ t: 'startPour', drink: 'beer', guestId: null });
+          }
+          this.open('kitchen'); return true;
+        case 'pass':
         case 'kitchen': this.open('kitchen'); return true;
         case 'shop': this.open('shop'); return true;
         case 'workshop': this.open('build'); return true;
@@ -211,7 +234,14 @@ class Game {
     }
     if (r.inside) {
       const st = nearbyStation(r);
-      if (st === 'kitchen') { this.open('kitchen'); return true; }
+      if (st === 'kitchen' || st === 'pass') { this.open('kitchen'); return true; }
+      if (st === 'drink') {
+        if (!r.dinerCook && !r.carryingDish && !r.carryingDrink && !r.pourMinigame) {
+          audio.uiClick();
+          return this.send({ t: 'startPour', drink: 'beer', guestId: null });
+        }
+        return false;
+      }
       if (st === 'shop') { this.open('shop'); return true; }
       if (st === 'workshop') { this.open('build'); return true; }
       if (st === 'door') { return this.send({ t: 'exitHouse' }); }
@@ -253,7 +283,12 @@ class Game {
       this.pressed = { fire: false, jump: false, dodge: false, reload: false, swap: false, skill: false, grenade: false, interact: false };
       this.grenadeAimPayload = null;
       for (const e of step(this.run, input)) {
-        if (e.t === 'bossAppear' || e.t === 'pickup' || e.t === 'star' || e.t === 'kill' || e.t === 'hurt' || e.t === 'swap') urgent = true;
+        if (
+          e.t === 'bossAppear' || e.t === 'pickup' || e.t === 'star' || e.t === 'kill' || e.t === 'hurt' || e.t === 'swap'
+          || e.t === 'pourDone' || e.t === 'tableClean' || e.t === 'guestAngry' || e.t === 'shiftEnd' || e.t === 'shiftOpen' || e.t === 'serve'
+        ) {
+          urgent = true;
+        }
         this.emit(e);
       }
     }
@@ -261,7 +296,8 @@ class Game {
       if (this.run.phase !== beforePhase) this.releaseAll();
       this.syncBgm();
     }
-    if (urgent || this.run.tick % 6 === 0 || this.run.phase !== beforePhase || this.run.inside !== beforeInside || houseBuff(this.run).zone !== beforeZone) {
+    const liveTavern = this.run.phase === 'camp' && this.run.inside && this.run.dinerShift.mode === 'open' && this.run.tick % 4 === 0;
+    if (urgent || liveTavern || this.run.tick % 6 === 0 || this.run.phase !== beforePhase || this.run.inside !== beforeInside || houseBuff(this.run).zone !== beforeZone) {
       this.syncBgm();
       this.notify();
     }

@@ -2,11 +2,11 @@
 import Phaser from 'phaser';
 import { game } from '../app/game';
 import { ASSETS } from '../assets';
-import { MEALS, WEAPONS, ZOMBIES } from '../content/data';
+import { DRINKS, MEALS, WEAPONS, ZOMBIES } from '../content/data';
 import { ALLIES, QUALITY_META } from '../content/story';
 import { BODY_Y, FORT_GUN_X, computeGrenadeThrow, curWeapon, houseBuff, nearbyCampTarget, turretWorldPos, zombieBodyY } from '../sim/sim';
 import {
-  ALLY_POS, DOOR_X, GROUND_Y, IN_STATIONS, LADDER_X, PORCH_MAX_X, PORCH_MIN_X, PORCH_Y,
+  ALLY_POS, DINER_PLATE_X, DOOR_X, GROUND_Y, IN_STATIONS, LADDER_X, PORCH_MAX_X, PORCH_MIN_X, PORCH_Y,
   ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, TURRET_SLOTS, VIEW_H, WALL_X, WORLD_W, type GameEvent,
 } from '../sim/types';
 import { floaters } from '../ui/floaters';
@@ -52,9 +52,12 @@ export class GameScene extends Phaser.Scene {
 
   private zombies = new Map<number, Phaser.GameObjects.Sprite>();
   private allySprites = new Map<string, Phaser.GameObjects.Sprite>();
+  private allyLastAtkSeq = new Map<string, number>();
   private guestSprites = new Map<string, Phaser.GameObjects.Sprite>();
   private guestDishSprites = new Map<string, Phaser.GameObjects.Image>();
   private guestBubbleIcons = new Map<string, Phaser.GameObjects.Image>();
+  private dirtyPlateSprites = new Map<number, Phaser.GameObjects.Image>();
+  private counterDishSprites: Phaser.GameObjects.Image[] = [];
   private crates = new Map<number, Phaser.GameObjects.Image>();
   private bullets: Phaser.GameObjects.Sprite[] = [];
   private grenadeSprites: Phaser.GameObjects.Image[] = [];
@@ -93,7 +96,7 @@ export class GameScene extends Phaser.Scene {
     const anim = (key: string, fps: number, repeat = -1) => this.anims.create({ key, frames: this.anims.generateFrameNumbers(key), frameRate: fps, repeat });
     anim('hero_idle', 7); anim('hero_run', 18); anim('hero_shoot', 16); anim('hero_jump', 8); anim('hero_fall', 8); anim('hero_hurt', 10); anim('hero_crouch', 14, 0);
     for (const z of Object.values(ZOMBIES)) for (const key of z.sprites) anim(key, z.fps);
-    for (const [key, fps] of [['npc_hat', 6], ['npc_bearded', 6], ['npc_woman', 7], ['npc_oldman', 7]] as const) anim(key, fps);
+    for (const [key, fps] of [['npc_hat', 6], ['npc_bearded', 6], ['npc_woman', 7], ['npc_oldman', 7], ['npc_hat_walk', 8], ['npc_bearded_walk', 8], ['npc_woman_walk', 8], ['npc_oldman_walk', 10]] as const) anim(key, fps);
     for (const [key, fps] of [['ally_zhang', 6], ['ally_lin', 6], ['ally_qiang', 6], ['ally_zhao', 6]] as const) {
       anim(key, fps);
     }
@@ -313,7 +316,17 @@ export class GameScene extends Phaser.Scene {
       const attacking = !inside && !!rt && rt.atkT > 0;
       const moving = !!rt && Math.abs(rt.vx) > 0.05 && allyId !== 'lin';
       const wantAnim = attacking ? `${meta.sprite}_atk` : moving ? `${meta.sprite}_run` : meta.sprite;
-      if (sp.anims.currentAnim?.key !== wantAnim) sp.play(wantAnim);
+      const curSeq = rt?.atkSeq ?? 0;
+      const prevSeq = this.allyLastAtkSeq.get(allyId) ?? 0;
+      if (wantAnim === `${meta.sprite}_atk`) {
+        if (curSeq !== prevSeq || sp.anims.currentAnim?.key !== wantAnim) {
+          this.allyLastAtkSeq.set(allyId, curSeq);
+          sp.play(wantAnim, true);
+        }
+      } else {
+        if (sp.anims.currentAnim?.key !== wantAnim) sp.play(wantAnim, true);
+      }
+
       const x = rt && typeof rt.x === 'number' ? rt.x : (inside ? pos.intX : pos.extX);
       const baseY = GROUND_Y + (rt && typeof rt.y === 'number' ? rt.y : (inside ? 0 : pos.extY));
       const y = allyId === 'lin' ? baseY + Math.sin(now / 110) * 1.8 : baseY;
@@ -322,6 +335,9 @@ export class GameScene extends Phaser.Scene {
 
       if (allyId === 'lin' && !inside && rt && Math.abs(rt.vx) > 0.05 && run.tick % 18 === 0) {
         this.spawnSpark(x, y - 22, Phaser.Math.FloatBetween(-0.25, 0.25), -0.65, 0.01, 16, 2, C.ember);
+      }
+      if (inside && allyId === 'lin' && rt?.staffTask === 'cook' && run.tick % 24 === 0) {
+        this.spawnSpark(IN_STATIONS.kitchen, GROUND_Y - 26, Phaser.Math.FloatBetween(-0.3, 0.3), -0.9, -0.01, 20, 2, C.gold);
       }
       if (!inside && allyId === 'qiang' && rt && rt.state === 'idle' && run.wall.hp > 0 && run.wall.hp < run.wall.maxHp && run.tick % 45 === 0) {
         for (let i = 0; i < 3; i++) {
@@ -333,6 +349,7 @@ export class GameScene extends Phaser.Scene {
       if (!seen.has(id)) {
         sp.destroy();
         this.allySprites.delete(id);
+        this.allyLastAtkSeq.delete(id);
       }
     }
   }
@@ -341,8 +358,6 @@ export class GameScene extends Phaser.Scene {
     const run = game.run, inside = run.inside;
     const seen = new Set<string>();
     const bob = Math.sin(this.time.now / 210) * 1.6;
-    // 坐席 0/1 坐在 1 号桌左右两侧，坐席 2 坐在 2 号桌右侧；菜品稳稳摆在桌面正上方
-    const dishSpots: [number, number][] = [[298, GROUND_Y - 36], [342, GROUND_Y - 36], [444, GROUND_Y - 36]];
     if (inside) {
       for (let i = 0; i < run.guests.length; i++) {
         const g = run.guests[i];
@@ -353,26 +368,36 @@ export class GameScene extends Phaser.Scene {
           sp.play(g.sprite);
           this.guestSprites.set(g.id, sp);
         }
-        sp.setVisible(true).setPosition(g.x, GROUND_Y).setFlipX(i >= 1);
+        const wantAnim = g.walkState !== 'seated' ? `${g.sprite}_walk` : g.sprite;
+        if (sp.anims.currentAnim?.key !== wantAnim) sp.play(wantAnim);
+        sp.setVisible(true).setPosition(g.x, GROUND_Y).setFlipX(g.facing < 0);
 
-        const dishIcon = MEALS[g.dish].icon;
-        const [dx, dy] = dishSpots[i] ?? [g.x + 16, GROUND_Y - 36];
+        const orderIcon = g.orderKind === 'drink' && g.drink ? DRINKS[g.drink].icon : MEALS[g.dish].icon;
+        const px = DINER_PLATE_X[g.seatIdx] ?? (g.x + 16);
+        const py = GROUND_Y - 32;
         let dishIm = this.guestDishSprites.get(g.id);
         if (!dishIm) {
-          dishIm = this.add.image(dx, dy, dishIcon).setOrigin(0.5, 1).setDepth(D.prop + 0.4).setScale(0.88);
+          dishIm = this.add.image(px, py, orderIcon).setOrigin(0.5, 1).setDepth(D.prop + 0.4).setScale(0.86);
           this.guestDishSprites.set(g.id, dishIm);
         }
-        dishIm.setTexture(dishIcon).setVisible(g.served).setPosition(dx, dy);
+        dishIm.setTexture(orderIcon).setVisible(g.served && g.walkState === 'seated').setPosition(px, py);
 
         let bubbleIm = this.guestBubbleIcons.get(g.id);
         if (!bubbleIm) {
-          bubbleIm = this.add.image(g.x, GROUND_Y - 62, dishIcon).setOrigin(0.5, 0.5).setDepth(D.mark + 0.1).setScale(0.82);
+          bubbleIm = this.add.image(g.x, GROUND_Y - 62, orderIcon).setOrigin(0.5, 0.5).setDepth(D.mark + 0.1).setScale(0.82);
           this.guestBubbleIcons.set(g.id, bubbleIm);
         }
-        const isDeliveryTarget = run.carryingDish?.guestId === g.id;
+        const isDishTarget = g.orderKind === 'dish' && !!run.carryingDish && (
+          run.carryingDish.guestId === g.id
+          || (!run.guests.some((o) => o.id === run.carryingDish!.guestId && !o.served && o.walkState !== 'leaving') && g.dish === run.carryingDish.dish)
+        );
+        const isDrinkTarget = g.orderKind === 'drink' && !!run.carryingDrink && (
+          run.carryingDrink.guestId === g.id || run.carryingDrink.drink === g.drink
+        );
+        const isDeliveryTarget = isDishTarget || isDrinkTarget;
         bubbleIm
-          .setTexture(dishIcon)
-          .setVisible(!g.served)
+          .setTexture(orderIcon)
+          .setVisible(!g.served && g.walkState === 'seated')
           .setPosition(g.x, GROUND_Y - 62 + bob)
           .setScale(isDeliveryTarget ? 0.96 : 0.8);
       }
@@ -387,6 +412,36 @@ export class GameScene extends Phaser.Scene {
         this.guestBubbleIcons.delete(id);
       }
     }
+
+    // 同步餐桌脏盘子与橡木传菜台待送佳肴
+    const seenPlates = new Set<number>();
+    if (inside) {
+      for (const dp of run.dinerShift.dirtyTables) {
+        seenPlates.add(dp.id);
+        let im = this.dirtyPlateSprites.get(dp.id);
+        if (!im) {
+          im = this.add.image(dp.x, GROUND_Y - 32, 'ic_dirty_plate').setOrigin(0.5, 1).setDepth(D.prop + 0.42).setScale(0.88);
+          this.dirtyPlateSprites.set(dp.id, im);
+        }
+        im.setVisible(true).setPosition(dp.x, GROUND_Y - 32);
+      }
+    }
+    for (const [pid, im] of this.dirtyPlateSprites) {
+      if (!seenPlates.has(pid)) {
+        im.destroy();
+        this.dirtyPlateSprites.delete(pid);
+      }
+    }
+
+    const cDishes = inside ? run.dinerShift.counterDishes.slice(0, 5) : [];
+    while (this.counterDishSprites.length < cDishes.length) {
+      this.counterDishSprites.push(this.add.image(IN_STATIONS.pass, GROUND_Y - 32, 'ic_dish_skewer').setOrigin(0.5, 1).setDepth(D.prop + 0.42).setScale(0.76));
+    }
+    this.counterDishSprites.forEach((im, i) => {
+      const cd = cDishes[i];
+      im.setVisible(!!cd);
+      if (cd) im.setTexture(MEALS[cd.dish].icon).setPosition(IN_STATIONS.pass - 14 + i * 7, GROUND_Y - 32);
+    });
   }
 
   update(_t: number, dt: number) {
@@ -452,14 +507,19 @@ export class GameScene extends Phaser.Scene {
     const aliveVis = run.phase !== 'dead';
     this.heroArm.setVisible(aliveVis);
     this.heroGun.setVisible(!inside && aliveVis);
-    const carrying = inside && aliveVis && !!run.carryingDish;
+    const carryIcon = run.carryingDish
+      ? MEALS[run.carryingDish.dish].icon
+      : run.carryingDrink
+        ? DRINKS[run.carryingDrink.drink].icon
+        : null;
+    const carrying = inside && aliveVis && !!carryIcon;
 
     if (aliveVis) {
       const { shX, shY } = this.heroJoints(now);
       if (inside) {
-        // 室内脱枪，垂手轻松漫步或端盘上菜
+        // 室内脱枪，垂手轻松漫步或端盘/端酒上桌
         if (this.heroArm.texture.key !== 'hero_arm_rest') this.heroArm.setTexture('hero_arm_rest');
-        if (carrying && run.carryingDish) {
+        if (carrying && carryIcon) {
           const bob = Math.abs(p.vx) > 0.1 ? Math.sin(now / 85) * 1.2 : 0;
           this.heroArm
             .setOrigin(0.5, 0.16)
@@ -469,7 +529,7 @@ export class GameScene extends Phaser.Scene {
             .setFlipY(false)
             .setScale(1);
           this.carriedDishSprite
-            .setTexture(MEALS[run.carryingDish.dish].icon)
+            .setTexture(carryIcon)
             .setPosition(p.x + p.facing * 14, GROUND_Y + p.y - 22 + bob)
             .setVisible(true);
         } else {
@@ -626,8 +686,8 @@ export class GameScene extends Phaser.Scene {
       this.hearthTick = now;
       this.spawnSpark(118 + Phaser.Math.Between(-10, 10), GROUND_Y - 14, Phaser.Math.FloatBetween(-0.18, 0.18), Phaser.Math.FloatBetween(-0.85, -0.4), -0.008, 32, 2, C.ember);
       for (const guest of run.guests) {
-        if (guest.served && Math.random() < 0.4) {
-          this.spawnSpark(guest.x + Phaser.Math.Between(-8, 8), GROUND_Y - 36, 0, -0.4, -0.004, 24, 1.6, C.paper);
+        if (guest.served && guest.walkState === 'seated' && Math.random() < 0.4) {
+          this.spawnSpark((DINER_PLATE_X[guest.seatIdx] ?? guest.x) + Phaser.Math.Between(-6, 6), GROUND_Y - 34, 0, -0.4, -0.004, 24, 1.6, C.paper);
         }
       }
     }
@@ -635,30 +695,58 @@ export class GameScene extends Phaser.Scene {
     this.stepAndDrawImpacts(g, now);
 
     if (inside) {
-      // 酒馆沉浸互动：脚底当前站位高亮 + 食客菜品气泡 + 红砖炉世界火候条 + 端菜指引箭头
+      // 酒馆沉浸互动：站位高亮 + 食客气泡/耐心条 + 脏盘/传菜台指引 + 灶台火候/酒桶斟酒世界指示条
       const ct = nearbyCampTarget(run);
       if (ct) {
         const sx = ct.x;
-        const barW = ct.kind === 'cookStart' || ct.kind === 'cookFinish' || ct.kind === 'kitchen' ? 76
-          : ct.kind === 'workshop' ? 58 : ct.kind === 'shop' ? 48 : 34;
+        const barW = ct.kind === 'cookStart' || ct.kind === 'cookFinish' || ct.kind === 'kitchen' ? 72
+          : ct.kind === 'pourStart' || ct.kind === 'pourFinish' || ct.kind === 'drink' ? 42
+          : ct.kind === 'pass' || ct.kind === 'pickCounter' ? 34
+          : ct.kind === 'cleanTable' ? 24
+          : ct.kind === 'workshop' ? 56 : ct.kind === 'shop' ? 46 : 32;
         g.fillStyle(C.gold, 0.36).fillRoundedRect(sx - barW / 2, GROUND_Y - 4, barW, 5, 2);
         g.lineStyle(1.4, C.lamp, 0.9).strokeRoundedRect(sx - barW / 2, GROUND_Y - 4, barW, 5, 2);
       }
       const bob = Math.sin(now / 210) * 1.6;
+      const arrowBob = Math.sin(now / 120) * 2.5;
+      const rushOpen = run.dinerShift.mode === 'open';
       for (const guest of run.guests) {
-        if (guest.served) continue;
-        const isTarget = run.carryingDish?.guestId === guest.id;
+        if (guest.served || guest.walkState !== 'seated') continue;
+        const isDishTarget = guest.orderKind === 'dish' && !!run.carryingDish && (
+          run.carryingDish.guestId === guest.id
+          || (!run.guests.some((o) => o.id === run.carryingDish!.guestId && !o.served && o.walkState !== 'leaving') && guest.dish === run.carryingDish.dish)
+        );
+        const isDrinkTarget = guest.orderKind === 'drink' && !!run.carryingDrink && (
+          run.carryingDrink.guestId === guest.id || run.carryingDrink.drink === guest.drink
+        );
+        const isTarget = isDishTarget || isDrinkTarget;
+        const ratio = Math.max(0, Math.min(1, guest.patience / Math.max(1, guest.maxPatience)));
+        const isUrgent = rushOpen && ratio < 0.25;
         const gx = guest.x;
         const gy = GROUND_Y - 62 + bob;
         const bw = isTarget ? 24 : 21;
         const bh = isTarget ? 20 : 18;
-        const borderCol = isTarget ? C.gold : guest.trendMatch ? C.ember : C.copper;
+        const borderCol = isTarget ? C.gold : isUrgent ? C.red : guest.trendMatch ? C.ember : C.copper;
         g.fillStyle(C.leather, 0.94).fillRoundedRect(gx - bw / 2, gy - bh / 2, bw, bh, 5);
-        g.lineStyle(isTarget ? 2 : 1.4, borderCol, 0.98).strokeRoundedRect(gx - bw / 2, gy - bh / 2, bw, bh, 5);
+        g.lineStyle(isTarget || isUrgent ? 2 : 1.4, borderCol, 0.98).strokeRoundedRect(gx - bw / 2, gy - bh / 2, bw, bh, 5);
         g.fillStyle(C.leather, 0.94).fillTriangle(gx - 3, gy + bh / 2 - 1, gx + 3, gy + bh / 2 - 1, gx, gy + bh / 2 + 4);
+        if (rushOpen) {
+          const pw = 22, py = gy + bh / 2 + 5;
+          const pCol = ratio > 0.55 ? C.green : ratio > 0.25 ? C.gold : C.red;
+          g.fillStyle(C.ink, 0.9).fillRoundedRect(gx - pw / 2, py, pw, 3.5, 1.5);
+          g.fillStyle(pCol, 1).fillRect(gx - pw / 2 + 1, py + 0.8, Math.max(1, (pw - 2) * ratio), 2);
+        }
         if (isTarget) {
-          const arrowBob = Math.sin(now / 120) * 2.5;
           g.fillStyle(C.gold, 0.98).fillTriangle(gx - 5, gy - bh / 2 - 8 + arrowBob, gx + 5, gy - bh / 2 - 8 + arrowBob, gx, gy - bh / 2 - 2 + arrowBob);
+        }
+      }
+      if (rushOpen && !run.carryingDish && !run.carryingDrink) {
+        for (const dp of run.dinerShift.dirtyTables) {
+          g.fillStyle(C.ember, 0.95).fillTriangle(dp.x - 4, GROUND_Y - 52 + arrowBob, dp.x + 4, GROUND_Y - 52 + arrowBob, dp.x, GROUND_Y - 46 + arrowBob);
+        }
+        if (run.dinerShift.counterDishes.length > 0) {
+          const cx = IN_STATIONS.pass;
+          g.fillStyle(C.gold, 0.95).fillTriangle(cx - 4, GROUND_Y - 52 + arrowBob, cx + 4, GROUND_Y - 52 + arrowBob, cx, GROUND_Y - 46 + arrowBob);
         }
       }
       if (run.dinerCook) {
@@ -674,6 +762,21 @@ export class GameScene extends Phaser.Scene {
         const nx = left + Phaser.Math.Clamp(run.dinerCook.pos, 0, 1) * tw;
         g.fillStyle(C.paper, 1).fillRect(nx - 1.5, ky - 2, 3, th + 4);
         g.lineStyle(1.4, C.gold, 0.95).strokeRoundedRect(left - 1, ky - 1, tw + 2, th + 2, 2);
+      }
+      if (run.pourMinigame) {
+        const dx = IN_STATIONS.drink;
+        const dy = GROUND_Y - 72;
+        const tw = 58, th = 9;
+        const left = dx - tw / 2;
+        const fast = run.diner.upgrades.includes('fast_tap');
+        const lo = fast ? 0.70 : 0.74, hi = fast ? 0.92 : 0.90;
+        const f = Phaser.Math.Clamp(run.pourMinigame.fill, 0, 1);
+        g.fillStyle(C.ink, 0.92).fillRoundedRect(left - 2, dy - 2, tw + 4, th + 4, 3);
+        g.fillStyle(C.woodDark, 0.95).fillRoundedRect(left, dy, tw, th, 2);
+        g.fillStyle(C.lamp, 0.45).fillRect(left + lo * tw, dy + 1, (hi - lo) * tw, th - 2);
+        g.fillStyle(C.gold, 0.9).fillRect(left + 0.80 * tw, dy + 1, 0.04 * tw, th - 2);
+        g.fillStyle(f >= lo && f <= hi ? C.gold : C.ember, 0.95).fillRect(left, dy + 1.5, f * tw, th - 3);
+        g.lineStyle(1.4, C.gold, 0.95).strokeRoundedRect(left - 1, dy - 1, tw + 2, th + 2, 2);
       }
       return;
     }
@@ -928,7 +1031,6 @@ export class GameScene extends Phaser.Scene {
             const sp = this.allySprites.get(e.ally);
             const rt = game.run.allies[e.ally];
             if (sp && !game.run.inside) {
-              sp.play(`${ALLIES[e.ally].sprite}_atk`, true);
               if (e.ally === 'qiang') {
                 const qx = rt?.x ?? ALLY_POS.qiang.extX;
                 const qy = GROUND_Y + (rt?.y ?? ALLY_POS.qiang.extY) - 22;
@@ -1043,6 +1145,48 @@ export class GameScene extends Phaser.Scene {
             this.spawnSpark(IN_STATIONS.kitchen, GROUND_Y - 40, Phaser.Math.FloatBetween(-1.2, 1.2), Phaser.Math.FloatBetween(-2.2, -0.5), 0.08, 22, 2.2, e.quality === 'legendary' ? C.gold : C.ember);
           }
           floaters.add(IN_STATIONS.kitchen, GROUND_Y - 62, `${QUALITY_META[e.quality].label}！去上菜`, e.quality === 'legendary' || e.quality === 'perfect' ? 'crit' : 'coin');
+        }
+        break;
+      }
+      case 'pourDone': {
+        if (game.run.inside) {
+          for (let i = 0; i < 6; i++) {
+            this.spawnSpark(IN_STATIONS.drink, GROUND_Y - 38, Phaser.Math.FloatBetween(-1.1, 1.1), Phaser.Math.FloatBetween(-2.0, -0.5), 0.07, 20, 2.1, e.quality === 'legendary' ? C.gold : C.lamp);
+          }
+          floaters.add(IN_STATIONS.drink, GROUND_Y - 60, `${QUALITY_META[e.quality].label}·${DRINKS[e.drink].name}`, e.quality === 'legendary' || e.quality === 'perfect' ? 'crit' : 'coin');
+        }
+        break;
+      }
+      case 'tableClean': {
+        if (game.run.inside) {
+          for (let i = 0; i < 5; i++) {
+            this.spawnSpark(e.x, GROUND_Y - 34, Phaser.Math.FloatBetween(-1.0, 1.0), Phaser.Math.FloatBetween(-1.8, -0.4), 0.07, 18, 2.0, C.green);
+          }
+          floaters.add(e.x, GROUND_Y - 54, `收拾+${e.coins}金`, 'coin');
+        }
+        break;
+      }
+      case 'guestAngry': {
+        if (game.run.inside) {
+          floaters.add(IN_STATIONS.door - 48, GROUND_Y - 56, `${e.name} 离席`, 'hurt');
+        }
+        break;
+      }
+      case 'shiftOpen': {
+        if (game.run.inside) {
+          for (const lx of [302, 420]) {
+            for (let i = 0; i < 5; i++) {
+              this.spawnSpark(lx, GROUND_Y - 68, Phaser.Math.FloatBetween(-1.3, 1.3), Phaser.Math.FloatBetween(-1.5, 0.5), 0.03, 24, 2.2, C.gold);
+            }
+          }
+        }
+        break;
+      }
+      case 'shiftEnd': {
+        if (game.run.inside) {
+          for (let i = 0; i < 10; i++) {
+            this.spawnSpark(350, GROUND_Y - 52, Phaser.Math.FloatBetween(-2.0, 2.0), Phaser.Math.FloatBetween(-2.4, -0.4), 0.06, 26, 2.4, C.gold);
+          }
         }
         break;
       }
