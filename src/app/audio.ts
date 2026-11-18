@@ -386,8 +386,22 @@ class SoundEngine {
         this.play('sfx_reload', { gain: 0.95, jitter: 0.03 });
         break;
       case 'cookDone':
+      case 'pourDone':
       case 'serve':
         this.cookResult(e.quality);
+        break;
+      case 'tableClean':
+        this.play('sfx_coin', { gain: 0.72, rate: 1.16 });
+        break;
+      case 'guestAngry':
+        this.play('sfx_fail', { gain: 0.78, rate: 0.92 });
+        break;
+      case 'shiftOpen':
+        this.play('sfx_door', { gain: 0.85 });
+        this.play('sfx_day_start', { gain: 0.85, rate: 1.12, delay: 0.08 });
+        break;
+      case 'shiftEnd':
+        this.play('sfx_fanfare', { gain: 0.92 });
         break;
       case 'allyJoin':
         this.play('sfx_fanfare', { gain: 0.96, rate: 1.06 });

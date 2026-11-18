@@ -203,15 +203,18 @@ const L = require('./lib.cjs');
   check(s.panel === null && s.phase === 'camp' && s.inside === true, '剧场结束后进入酒馆小屋内自由走动');
   const campUiOk = await g.page.evaluate(() => {
     const barBtns = [...document.querySelectorAll('#camp-bar button')].map((b) => b.id);
+    const j = document.querySelector('#key-jump')?.getBoundingClientRect();
+    const d = document.querySelector('#key-dodge')?.getBoundingClientRect();
     return barBtns.length === 2 && barBtns.includes('btn-kitchen') && barBtns.includes('btn-next')
       && !document.querySelector('#btn-shop') && !document.querySelector('#btn-build') && !document.querySelector('#btn-inout')
-      && !!document.querySelector('#key-act') && !!document.querySelector('#camp-act-tip') && !!document.querySelector('#key-jump');
+      && !!document.querySelector('#key-act') && !!document.querySelector('#camp-act-tip') && !!j && !!d
+      && d.top >= j.bottom - 4 && Math.abs(d.left - j.left) < 25;
   });
-  check(campUiOk, '营地底栏极简化（仅食堂+迎战），右下统一配备 #key-act 智能互动键与 #key-jump');
+  check(campUiOk, '营地底栏极简化（仅食堂+迎战），右下配备 #key-act + 跳跃在上 + 冲刺在下');
   await g.shot('05-tavern-camp');
 
   // 7. 深夜食堂屋内核验玩法（走近红砖炉 -> 点 #key-act 开炒 #qte-hud -> 出锅端菜 -> 走到食客桌前 #key-act 上菜 -> #key-act 对话）
-  await g.page.evaluate(() => { window.__game.run.meat = 8; window.__game.run.coins = 700; window.__game.notify(); });
+  await g.page.evaluate(() => { window.__game.run.meat = 8; window.__game.run.coins = 900; window.__game.notify(); });
   await walkUntil(-38, 0, (st) => st.x <= 165, 3000, '走进左壁红砖炉旁');
   check(await g.page.evaluate(() => /开灶烹制/.test(document.querySelector('#key-act')?.textContent || '')), '走近灶台右下互动键切换为「开灶烹制」');
   await g.tap('#key-act');
@@ -234,15 +237,38 @@ const L = require('./lib.cjs');
   check((await g.state()).panel === 'story' && await g.page.evaluate(() => /好的|下一句/.test(document.querySelector('#btn-story-next').innerText)), '靠近食客按互动键进入对话，且结尾按钮为「好的」');
   await g.tap('#btn-story-skip');
 
-  // 测试食堂总览面板（特餐留餐 + 15VIP图鉴 + 食评墙 + 炒肉）
+  // 7b. 深夜酒馆正式堂食营业 + 原木酒桶斟酒小游戏 + 打烊账本结算
+  await g.tap('#btn-shift-start');
+  check(await g.page.evaluate(() => window.__game.run.dinerShift.mode === 'open' && !!document.querySelector('#shift-hud.open')), '点击开张营业进入倒计时堂食忙碌模式');
+  await wait(300);
+  await g.shot('05c-tavern-rush');
+  const barDir = (await g.state()).x > 240 ? -38 : 38;
+  await walkUntil(barDir, 0, (st) => Math.abs(st.x - 232) <= 18, 4000, '走到原木酒桶旁');
+  await g.tap('#key-act');
+  check(await g.page.evaluate(() => !!window.__game.run.pourMinigame && !!document.querySelector('#pour-hud')), '走到酒桶旁按互动键弹出斟酒浮条 #pour-hud');
+  await wait(240);
+  await g.tap('#btn-pour-hit');
+  check(await g.page.evaluate(() => !window.__game.run.pourMinigame && !!window.__game.run.carryingDrink), '点击止沫停杯成功装杯在手');
+  await g.tap('#btn-shift-stop');
+  check(await g.page.evaluate(() => window.__game.run.dinerShift.mode === 'summary' && !!document.querySelector('#panel-shift-summary')), '点击打烊弹出今夜结算账本');
+  await fits('#panel-shift-summary');
+  await g.shot('05d-shift-summary');
+  await g.tap('#btn-shift-summary-ok');
+  check(await g.page.evaluate(() => window.__game.run.dinerShift.mode === 'prep'), '点击收工归帐回到筹备态');
+
+  // 测试食堂总览面板（升级设备 + 菜品升级 + 特餐留餐 + 15VIP图鉴 + 食评墙 + 炒肉）
   const forbiddenReSrc = '十五波|短波|电台|直升机|运输机|螺旋桨|废土|加特林|磁轨|特斯拉|左轮炮|步枪|霰弹|手雷|防弹|电网|机枪塔|冰霜塔|电弧塔|重炮塔|避难所|米其林|异变|变异|主厨|工程师|枪手|护士|废品改造狂|卖的废铁|卖废铁|热搜|末世|感染者';
   await g.tap('#btn-kitchen');
   check((await g.state()).panel === 'kitchen', '点食堂按钮可打开深夜小食堂总览');
   check(await g.page.evaluate((src) => !new RegExp(src).test(document.querySelector('#panel-kitchen').innerText), forbiddenReSrc), '深夜食堂界面无出戏或过时设定文案');
+  await g.tap('#btn-tavern-fast_tap');
+  check(await g.page.evaluate(() => window.__game.run.diner.upgrades.includes('fast_tap')), '食堂首页可添置「精铜酒栓」设备升级');
   await g.shot('06-kitchen'); await fits('#panel-kitchen');
 
   await g.tap('#tab-kitchen-menu');
   await g.shot('06b-kitchen-menu'); await fits('#panel-kitchen');
+  await g.tap('#btn-dish-up-spicy_skewer');
+  check(await g.page.evaluate(() => window.__game.run.diner.dishLevels.spicy_skewer === 2), '菜单页可强化菜品等级至 Lv.2');
   await g.tap('#btn-meal-spicy_skewer');
   await g.tap('#btn-qte-quick');
   check(await g.page.evaluate(() => window.__game.run.meal === 'spicy_skewer'), '特餐菜单可通过铁板/快手留餐');
@@ -253,12 +279,12 @@ const L = require('./lib.cjs');
 
   await g.tap('#tab-kitchen-dine');
   await g.tap('#btn-cook-all');
-  check((await g.state()).meat === 0 && (await g.state()).coins > 700, '富余鲜肉现炒全部售出换金币');
+  check((await g.state()).meat === 0 && (await g.state()).coins > 750, '富余鲜肉现炒全部售出换金币');
   await g.tap('#btn-close');
 
-  // 走近行商货架 -> #key-act 打开商店
-  const shopDir = (await g.state()).x < 316 ? 38 : -38;
-  await walkUntil(shopDir, 0, (st) => Math.abs(st.x - 316) <= 18, 4000, '走到军械行商货架旁');
+  // 走近行商货架 -> #key-act 打开商店 (x=500)
+  const shopDir = (await g.state()).x < 500 ? 38 : -38;
+  await walkUntil(shopDir, 0, (st) => Math.abs(st.x - 500) <= 18, 4500, '走到军械行商货架旁');
   await g.tap('#key-act');
   check((await g.state()).panel === 'shop', '走近行商按互动键打开军械行商');
   check(await g.page.evaluate((src) => !new RegExp(src).test(document.querySelector('#panel-shop').innerText), forbiddenReSrc), '军械行商界面无科幻或现代出戏词汇');
@@ -269,8 +295,9 @@ const L = require('./lib.cjs');
   check(s.weapons.includes('revolver') && s.armor >= 40, '军械行商能购入重锤左轮并购买铁甲');
   await g.tap('#btn-close');
 
-  // 走近铁匠工坊 -> #key-act 打开空间要塞沙盘工坊（含炮塔索敌模式切换）
-  await walkUntil(38, 0, (st) => Math.abs(st.x - 518) <= 18, 4000, '走到防线工坊旁');
+  // 走近铁匠工坊 -> #key-act 打开空间要塞沙盘工坊（x=542）
+  const wsDir = (await g.state()).x < 542 ? 38 : -38;
+  await walkUntil(wsDir, 0, (st) => Math.abs(st.x - 542) <= 18, 4000, '走到防线工坊旁');
   await g.tap('#key-act');
   check((await g.state()).panel === 'build', '走近铁砧按互动键打开要塞沙盘工坊');
   check(await g.page.evaluate((src) => !/废铁/.test(document.querySelector('#panel-build').innerText) && !new RegExp(src).test(document.querySelector('#panel-build').innerText), forbiddenReSrc), '工坊文案不再提及废铁或现代兵器名');
@@ -307,7 +334,7 @@ const L = require('./lib.cjs');
   await g.tap('#btn-close');
 
   // 8. 走到大门用互动键出门查看升级后的哥特石堡与炮塔防线，随后迎战第 2 天
-  await walkUntil(38, 0, (st) => st.x >= 590, 3000, '走到酒馆大门');
+  await walkUntil(38, 0, (st) => st.x >= 585, 3000, '走到酒馆大门');
   await g.tap('#key-act');
   check((await g.state()).inside === false, '靠近酒馆大门按互动键走出门外巡查防线');
   await wait(250);
@@ -317,16 +344,34 @@ const L = require('./lib.cjs');
   check(s.panel === null && s.day === 2 && s.phase === 'fight' && s.y <= -90, '迎战第 2 天正常出发站回房顶');
   check(await until((st) => st.kills > s.kills, 30000, '第 2 天自动击杀'), '第 2 天房顶塔防联合击杀正常');
 
-  // 验证中途战友（小张/阿强）在场上会实际移动走位与参战
+  // 验证中途战友（小张/阿强）在场上会实际移动走位、攻击且零太空步倒走
   await g.page.evaluate(() => {
     const r = window.__game.run;
     if (!r.story.allies.includes('zhang')) r.story.allies.push('zhang');
     if (!r.story.allies.includes('qiang')) r.story.allies.push('qiang');
   });
-  const allyX0 = await g.page.evaluate(() => ({ z: window.__game.run.allies.zhang.x, q: window.__game.run.allies.qiang.x }));
-  await wait(900);
-  const allyX1 = await g.page.evaluate(() => ({ z: window.__game.run.allies.zhang.x, q: window.__game.run.allies.qiang.x }));
-  check(Math.abs(allyX1.z - allyX0.z) > 1 || Math.abs(allyX1.q - allyX0.q) > 1, `中途战友战斗中真实走位巡逻 (${allyX0.z.toFixed(0)}->${allyX1.z.toFixed(0)}, ${allyX0.q.toFixed(0)}->${allyX1.q.toFixed(0)})`);
+  const allySample = await g.page.evaluate(() => new Promise((res) => {
+    const x0 = { z: window.__game.run.allies.zhang.x, q: window.__game.run.allies.qiang.x };
+    let moonwalk = false;
+    let frames = 0;
+    const probe = () => {
+      for (const id of ['zhang', 'qiang']) {
+        const rt = window.__game.run.allies[id];
+        if (rt.state === 'move' && Math.abs(rt.vx) > 0.05 && rt.facing !== Math.sign(rt.vx)) moonwalk = true;
+      }
+      if (++frames >= 48) {
+        res({
+          moonwalk,
+          zMoved: Math.abs(window.__game.run.allies.zhang.x - x0.z),
+          qMoved: Math.abs(window.__game.run.allies.qiang.x - x0.q),
+        });
+      } else {
+        requestAnimationFrame(probe);
+      }
+    };
+    requestAnimationFrame(probe);
+  }));
+  check(!allySample.moonwalk && (allySample.zMoved > 1 || allySample.qMoved > 1), `战友战斗中真实走位且零太空步倒走 (z:${allySample.zMoved.toFixed(0)}, q:${allySample.qMoved.toFixed(0)})`);
   await g.shot('09-day2');
 
   // 9. 验证静音键 & 飞行夜翼魔蝠(bat) + 第 5 天 Boss 视觉呈现

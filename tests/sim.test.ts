@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
-  CLASSES, CRIT_MUL, DIFFICULTIES, DINER_GUESTS, FORT_LEVELS, LAST_DAY, MEALS, PERKS, TURRETS, WALL_LEVELS, WEAPONS,
-  dayZombieCount, nextUnlock, sustainedDps, unlockedClasses, unlockedMeals, unlockedWeapons, zombieHp,
+  CLASSES, CRIT_MUL, DIFFICULTIES, DINER_GUESTS, DRINKS, FORT_LEVELS, LAST_DAY, MEALS, PERKS, TAVERN_UPGRADES, TURRETS, WALL_LEVELS, WEAPONS,
+  dayZombieCount, dishUpgradeCost, nextUnlock, sustainedDps, unlockedClasses, unlockedMeals, unlockedWeapons, zombieHp,
 } from '../src/content/data';
 import {
   BOSS_INTROS, BOSS_VICTORY, CHAPTER_CARDS, CINEMATIC_INTRO, COMPANION_JOIN_STORIES, DAILY_TRENDS, FANS_RANKS,
@@ -12,11 +12,11 @@ import {
 import { starsEarned } from '../src/app/meta';
 import { runBot } from '../src/sim/bot';
 import {
-  BODY_Y, MAX_CARRY, command, computeGrenadeThrow, damageMul, effectiveRange, houseBuff,
-  isOnPorch, isOnRoof, meatPrice, nearbyCampTarget, newRun, step, turretBuildCost, turretRefundCoins, turretUpgradeCost,
+  BODY_Y, MAX_CARRY, command, computeGrenadeThrow, damageMul, dishLevel, effectiveRange, houseBuff,
+  isOnPorch, isOnRoof, meatPrice, nearbyCampTarget, newRun, pourQuality, step, turretBuildCost, turretRefundCoins, turretUpgradeCost,
 } from '../src/sim/sim';
 import {
-  ALLY_POS, DOOR_X, GROUND_Y, HOUSE_WALL_X, IN_STATIONS, NO_INPUT, PORCH_MAX_X, PORCH_Y, ROOF_Y, WALL_X, type RunState,
+  ALLY_POS, DINER_PLATE_X, DINER_SEAT_X, DOOR_X, GROUND_Y, HOUSE_WALL_X, IN_STATIONS, NO_INPUT, PORCH_MAX_X, PORCH_Y, ROOF_Y, WALL_X, type RunState,
 } from '../src/sim/types';
 
 const clone = (r: RunState): RunState => JSON.parse(JSON.stringify(r));
@@ -452,7 +452,7 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     const storyBlob = JSON.stringify({
       CINEMATIC_INTRO, CHAPTER_CARDS, STORY_SCENES, WAVE_STORY_LINES, COMPANION_JOIN_STORIES,
       BOSS_INTROS, BOSS_VICTORY, REST_STORY, VIP_CUSTOMERS, VIP_TIERS, FANS_RANKS, REP_TIERS, DAILY_TRENDS,
-      WEAPONS, TURRETS, WALL_LEVELS, FORT_LEVELS, CLASSES, MEALS, DINER_GUESTS, PERKS,
+      WEAPONS, TURRETS, WALL_LEVELS, FORT_LEVELS, CLASSES, MEALS, DRINKS, TAVERN_UPGRADES, DINER_GUESTS, PERKS,
     });
     expect(storyBlob).not.toMatch(forbidden);
     expect(storyBlob).not.toMatch(/莫老板|莫掌柜/);
@@ -613,6 +613,150 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
       expect(r.dinerCook).toBeNull();
       expect(nearbyCampTarget(r)?.kind).toBe('shop');
     }
+  });
+
+  test('战友 AI 零太空步倒走且出招与动画序列号严格同步（idle 停顿 + 单次出手）', () => {
+    // 1. 静止巡逻期间允许停顿 (idle)，且移动时 facing 永远等于 Math.sign(vx)
+    const idleRun = quiet();
+    idleRun.story.allies = ['zhang', 'lin', 'qiang', 'zhao'];
+    zombie(idleRun, 1200, 99999, 'roamer'); // 射程外保持昼夜交战状态不提前清场
+    let sawPause = false;
+    for (let i = 0; i < 240; i++) {
+      step(idleRun, NO_INPUT);
+      for (const id of ['zhang', 'lin', 'qiang', 'zhao'] as const) {
+        const rt = idleRun.allies[id];
+        if (rt.state === 'move' && Math.abs(rt.vx) > 0.01) {
+          expect(rt.facing, `${id} tick ${i}`).toBe(Math.sign(rt.vx));
+        }
+        if (rt.state === 'idle' && (rt.pauseT ?? 0) > 0) sawPause = true;
+      }
+    }
+    expect(sawPause).toBe(true);
+
+    // 2. 有敌交战：每次 atkSeq 递增恰好对应精确判定帧触发 1 次出手，绝不提前/连发
+    const r = quiet();
+    r.story.allies = ['zhang', 'lin', 'qiang', 'zhao'];
+    const z1 = zombie(r, 340, 2000, 'roamer');
+    const zBat = zombie(r, 420, 800, 'bat', -88);
+    z1.atkCd = 9999; zBat.atkCd = 9999;
+    const prevSeq: Record<string, number> = { zhang: 0, lin: 0, qiang: 0, zhao: 0 };
+    const shotsInSwing: Record<string, number> = { zhang: 0, lin: 0, qiang: 0, zhao: 0 };
+    const totalShots: Record<string, number> = { zhang: 0, lin: 0, qiang: 0, zhao: 0 };
+    for (let i = 0; i < 200; i++) {
+      const evs = step(r, NO_INPUT);
+      for (const id of ['zhang', 'lin', 'qiang', 'zhao'] as const) {
+        const rt = r.allies[id];
+        if (rt.state === 'move' && Math.abs(rt.vx) > 0.01) {
+          expect(rt.facing, `${id} combat tick ${i}`).toBe(Math.sign(rt.vx));
+        }
+        if ((rt.atkSeq ?? 0) > prevSeq[id]) {
+          prevSeq[id] = rt.atkSeq ?? 0;
+          shotsInSwing[id] = 0;
+        }
+      }
+      for (const e of evs) {
+        if (e.t === 'shot' && e.from === 'ally' && e.ally) {
+          expect(r.allies[e.ally].state).toBe('atk');
+          shotsInSwing[e.ally]++;
+          totalShots[e.ally]++;
+          expect(shotsInSwing[e.ally], `${e.ally} multi-shot in one swing`).toBe(1);
+        }
+      }
+    }
+    expect(totalShots.zhang).toBeGreaterThanOrEqual(2);
+    expect(totalShots.zhao).toBeGreaterThanOrEqual(2);
+  });
+
+  test('暮夜酒馆营业闭环：选单/菜品升级/设备升级 → 营业走动入座 → 饮品斟酒与0肉点单 → 收脏盘 → 战友伙计协同 → 结算归帐', () => {
+    const r = quiet(); r.phase = 'perk'; r.perkChoices = ['rooftop'];
+    command(r, { t: 'pickPerk', id: 'rooftop' });
+    r.day = 2; r.coins = 500; r.meat = 6;
+    expect(command(r, { t: 'toggleMenuDish', id: 'hearty_stew' })).not.toBeNull();
+    expect(r.diner.menu).toContain('hearty_stew');
+
+    const upCost = dishUpgradeCost('spicy_skewer', 1);
+    const coinsBefore = r.coins;
+    expect(command(r, { t: 'upgradeDish', id: 'spicy_skewer' })).not.toBeNull();
+    expect(dishLevel(r, 'spicy_skewer')).toBe(2);
+    expect(r.coins).toBe(coinsBefore - upCost);
+
+    expect(command(r, { t: 'buyTavernUpgrade', id: 'fast_tap' })).not.toBeNull();
+    expect(command(r, { t: 'buyTavernUpgrade', id: 'wide_pass' })).not.toBeNull();
+    expect(pourQuality(0.82, true)).toBe('legendary');
+
+    // 开张营业：延长营业 & 检验顾客步入、喝麦芽黑啤、0肉斟酒上桌、用完离席留脏盘与清理
+    expect(command(r, { t: 'startShift' })).not.toBeNull();
+    expect(r.dinerShift.mode).toBe('open');
+    expect(r.dinerShift.duration).toBe(45 * 60);
+
+    // 推几步让新客步入落座
+    r.dinerShift.spawnCd = 1;
+    for (let i = 0; i < 40; i++) step(r, NO_INPUT);
+    expect(r.guests.length).toBeGreaterThan(0);
+
+    // 测饮品零耗肉接酒小游戏 -> 上饮 -> 吃喝倒计时留脏盘 -> 收拾桌面
+    const drinkGuest = r.guests[0];
+    drinkGuest.orderKind = 'drink';
+    drinkGuest.drink = 'beer';
+    drinkGuest.dishName = DRINKS.beer.name;
+    drinkGuest.meatCost = 0;
+    drinkGuest.served = false;
+    drinkGuest.walkState = 'seated';
+    drinkGuest.x = DINER_SEAT_X[drinkGuest.seatIdx];
+    const meatBeforePour = r.meat;
+    r.player.x = IN_STATIONS.drink;
+    expect(command(r, { t: 'startPour', drink: 'beer', guestId: drinkGuest.id })).not.toBeNull();
+    expect(r.pourMinigame).not.toBeNull();
+    while (r.pourMinigame && r.pourMinigame.fill < 0.805) step(r, NO_INPUT);
+    expect(command(r, { t: 'stopPour' })?.some((e) => e.t === 'pourDone' && e.quality === 'legendary')).toBe(true);
+    expect(r.carryingDrink?.quality).toBe('legendary');
+    expect(r.meat).toBe(meatBeforePour);
+
+    r.player.x = drinkGuest.x;
+    expect(nearbyCampTarget(r)?.kind).toBe('serveDrink');
+    expect(command(r, { t: 'serveDrink', guestId: drinkGuest.id })?.some((e) => e.t === 'serve')).toBe(true);
+    expect(r.dinerShift.drinkCount).toBe(1);
+    expect(drinkGuest.eatT).toBe(180);
+
+    // 等吃完留脏盘（用空桌面触发 dirtyTables）
+    for (let i = 0; i < 185; i++) step(r, NO_INPUT);
+    expect(r.dinerShift.dirtyTables.some((d) => d.x === DINER_PLATE_X[drinkGuest.seatIdx])).toBe(true);
+    const dirty = r.dinerShift.dirtyTables[0];
+    r.player.x = dirty.x;
+    expect(nearbyCampTarget(r)?.kind).toBe('cleanTable');
+    const coinsPreClean = r.coins;
+    expect(command(r, { t: 'cleanTable', plateId: dirty.id })?.some((e) => e.t === 'tableClean')).toBe(true);
+    expect(r.coins).toBeGreaterThan(coinsPreClean);
+    expect(r.dinerShift.cleanedCount).toBe(1);
+
+    // 测耐心耗尽生气离席（口碑 -1、连击清零）
+    const patGuest = r.guests.find((g) => !g.served && g.walkState === 'seated');
+    if (patGuest) {
+      r.diner.rep = 5;
+      r.dinerShift.combo = 2;
+      patGuest.patience = 1;
+      const angryEvs = step(r, NO_INPUT);
+      expect(angryEvs.some((e) => e.t === 'guestAngry')).toBe(true);
+      expect(r.diner.rep).toBe(4);
+      expect(r.dinerShift.combo).toBe(0);
+    }
+
+    // 测战友伙计在营业中协同工作：小林备菜上台 -> 小张传菜 -> 阿强收脏盘
+    r.story.allies = ['zhang', 'lin', 'qiang', 'zhao'];
+    r.meat = 8;
+    const seatedDishGuest = r.guests.find((g) => !g.served && g.walkState === 'seated' && g.orderKind === 'dish');
+    if (seatedDishGuest) {
+      r.allies.lin.x = IN_STATIONS.kitchen + 24;
+      for (let i = 0; i < 145; i++) step(r, NO_INPUT);
+      expect(r.dinerShift.counterDishes.length + r.dinerShift.servedCount).toBeGreaterThan(1);
+    }
+
+    // 打烊结算与归帐重置
+    const closeEvs = command(r, { t: 'closeShift' })!;
+    expect(closeEvs.some((e) => e.t === 'shiftEnd')).toBe(true);
+    expect(r.dinerShift.mode).toBe('summary');
+    expect(command(r, { t: 'finishSummary' })).not.toBeNull();
+    expect(r.dinerShift.mode).toBe('prep');
   });
 });
 
