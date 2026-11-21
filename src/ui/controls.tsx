@@ -2,9 +2,9 @@
 import { useRef } from 'preact/hooks';
 import { audio } from '../app/audio';
 import { game } from '../app/game';
-import { CLASSES, DRINKS, MEALS, WEAPONS, magSize } from '../content/data';
+import { CLASSES, DRINKS, MEALS, RYE_FALLBACK, WEAPONS, magSize, type MealId } from '../content/data';
 import { ALLIES, QUALITY_META } from '../content/story';
-import { curWeapon, nearbyCampTarget, nearbyStation, pourQuality } from '../sim/sim';
+import { curWeapon, formatRecipeCost, nearbyCampTarget, nearbyStation, pourQuality } from '../sim/sim';
 import { Bar, Icon, Stars } from './parts';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -197,12 +197,14 @@ export function CampKeys() {
   let label = '交互';
   let tip = '';
 
+  const dishIcon = (id: MealId | 'rye', isRye?: boolean) => (isRye || id === 'rye' ? RYE_FALLBACK.icon : MEALS[id].icon);
+
   if (ct) {
     switch (ct.kind) {
-      case 'cookFinish':
-        icon = MEALS[ct.guest.dish].icon;
-        label = '火候出锅';
-        tip = `${ct.guest.dishName} → ${ct.guest.name}`;
+      case 'grindMortar':
+        icon = 'ic_mortar';
+        label = ct.sauce <= 0 ? '急磨辣酱' : '磨辣酱';
+        tip = `辛香辣酱 ${ct.sauce}/${ct.maxSauce}`;
         break;
       case 'pourFinish': {
         const q = pourQuality(run.pourMinigame!.fill, run.diner.upgrades.includes('fast_tap'));
@@ -216,18 +218,13 @@ export function CampKeys() {
         label = `打${ct.drink === 'beer' ? '黑啤' : '热茶'}`;
         tip = ct.guest ? `${ct.guest.name} · ${DRINKS[ct.drink].name}` : DRINKS[ct.drink].name;
         break;
-      case 'cookStart':
-        icon = MEALS[ct.guest.dish].icon;
-        label = '开灶烹制';
-        tip = `${ct.guest.name} · ${ct.guest.dishName} (${ct.guest.meatCost}肉)`;
-        break;
       case 'serveDrink':
         icon = DRINKS[run.carryingDrink!.drink].icon;
         label = `递酒·${ct.guest.name}`;
         tip = `${QUALITY_META[run.carryingDrink!.quality].label}·${ct.guest.dishName}`;
         break;
       case 'serveCarried':
-        icon = MEALS[ct.guest.dish].icon;
+        icon = dishIcon(run.carryingDish!.dish, run.carryingDish!.isRye);
         label = `上菜·${ct.guest.name}`;
         tip = `${QUALITY_META[run.carryingDish!.quality].label}·${ct.guest.dishName}`;
         break;
@@ -237,14 +234,14 @@ export function CampKeys() {
         tip = `清理空盘 (+${run.cls === 'chef' ? 4 : 3}金)`;
         break;
       case 'pickCounter':
-        icon = MEALS[ct.counterDish.dish].icon;
+        icon = dishIcon(ct.counterDish.dish, ct.counterDish.isRye);
         label = '端走热菜';
         tip = `传菜台 · ${ct.counterDish.dishName}`;
         break;
       case 'guestTalk':
-        icon = ct.guest.orderKind === 'drink' && ct.guest.drink ? DRINKS[ct.guest.drink].icon : MEALS[ct.guest.dish].icon;
+        icon = ct.guest.orderKind === 'drink' && ct.guest.drink ? DRINKS[ct.guest.drink].icon : dishIcon(ct.guest.dish, ct.guest.isRye);
         label = '搭话';
-        tip = ct.guest.served ? `${ct.guest.name}` : `${ct.guest.name} · 等「${ct.guest.dishName}」`;
+        tip = ct.guest.served ? `${ct.guest.name}` : `${ct.guest.name} · ${ct.guest.dishName} (${ct.guest.isRye ? '应急' : formatRecipeCost(MEALS[ct.guest.dish].cost)})`;
         break;
       case 'allyTalk':
         icon = 'ic_star';
@@ -254,7 +251,7 @@ export function CampKeys() {
       case 'kitchen':
         icon = 'ic_kitchen';
         label = '食堂总览';
-        tip = '食堂';
+        tip = '备菜 · 研发 · 菜单';
         break;
       case 'pass':
         icon = 'ic_clean_plate';
@@ -289,7 +286,7 @@ export function CampKeys() {
     }
   } else if (run.carryingDish) {
     const dest = run.guests.find((o) => o.id === run.carryingDish!.guestId);
-    icon = MEALS[run.carryingDish.dish].icon;
+    icon = dishIcon(run.carryingDish.dish, run.carryingDish.isRye);
     label = '端菜中';
     tip = `送往 ${dest?.name ?? '餐桌'}`;
   } else if (run.carryingDrink) {
@@ -401,9 +398,20 @@ export function CampBar() {
       <button id="btn-kitchen" class={`camp-btn ${near === 'kitchen' ? 'near' : ''}`} onClick={() => game.open('kitchen')}>
         <Icon k="ic_kitchen" />食堂 · {sub}
       </button>
-      <button id="btn-next" class="camp-btn primary" onClick={() => game.send({ t: 'nextDay' })}>
-        <Icon k="ic_rooftop" />迎战第 {run.day + 1} 天
-      </button>
+      {run.endless ? (
+        <>
+          <button id="btn-endless-night" class="camp-btn primary" onClick={() => game.send({ t: 'nextEndlessNight' })}>
+            <Icon k="ic_flame" />入夜 · 第 {run.day + 1} 档
+          </button>
+          <button id="btn-next" class="camp-btn" onClick={() => game.send({ t: 'nextDay' })}>
+            <Icon k="ic_rooftop" />外出猎材
+          </button>
+        </>
+      ) : (
+        <button id="btn-next" class="camp-btn primary" onClick={() => game.send({ t: 'nextDay' })}>
+          <Icon k="ic_rooftop" />迎战第 {run.day + 1} 天
+        </button>
+      )}
     </div>
   );
 }

@@ -249,12 +249,32 @@
   "frames": 1,
   "fw": 16
  },
- "ic_dish_feast": {
+ "ic_dish_carrot": {
   "fh": 16,
   "frames": 1,
   "fw": 16
  },
- "ic_dish_grill": {
+ "ic_dish_cheese": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_dish_coldcut": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_dish_corn": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_dish_egg": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_dish_feast": {
   "fh": 16,
   "frames": 1,
   "fw": 16
@@ -275,6 +295,21 @@
   "fw": 16
  },
  "ic_dish_stew": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_dish_tart": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_dish_turnip": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_flame": {
   "fh": 16,
   "frames": 1,
   "fw": 16
@@ -334,6 +369,21 @@
   "frames": 1,
   "fw": 16
  },
+ "ic_meat_essence": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_meat_thick": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_mortar": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
  "ic_overclock": {
   "fh": 16,
   "frames": 1,
@@ -359,6 +409,16 @@
   "frames": 1,
   "fw": 16
  },
+ "ic_rye": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_sauce": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
  "ic_secondwind": {
   "fh": 16,
   "frames": 1,
@@ -375,6 +435,11 @@
   "fw": 16
  },
  "ic_shrapnel": {
+  "fh": 16,
+  "frames": 1,
+  "fw": 16
+ },
+ "ic_spice": {
   "fh": 16,
   "frames": 1,
   "fw": 16
@@ -502,7 +567,27 @@
  "tavern_interior": {
   "fh": 220,
   "frames": 1,
-  "fw": 560
+  "fw": 720
+ },
+ "tavern_prop_chandelier": {
+  "fh": 32,
+  "frames": 1,
+  "fw": 35
+ },
+ "tavern_prop_pass": {
+  "fh": 48,
+  "frames": 1,
+  "fw": 34
+ },
+ "tavern_prop_table": {
+  "fh": 34,
+  "frames": 1,
+  "fw": 90
+ },
+ "tavern_prop_tap": {
+  "fh": 34,
+  "frames": 1,
+  "fw": 44
  },
  "turret": {
   "fh": 38,

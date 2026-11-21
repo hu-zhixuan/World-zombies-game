@@ -1,19 +1,34 @@
 // 规则层：纯计算，不碰浏览器。固定每秒 60 步；随机数带种子；同样的种子和输入一定得到同样的结果。
 import {
-  CLASSES, CRIT_CHANCE, CRIT_MUL, DIFFICULTIES, DRINKS, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_DISH_LV, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
-  MEALS, MEAT_SELL_PRICE, PERKS, RARITY_WEIGHT, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST, STAR_COST, TAVERN_UPGRADES, TURRETS,
-  WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES, bossForDay, dayZombieCount, dishLevelPayMul, dishUpgradeCost, extraBullets, magSize, starMul, unlockedMeals, zombieHp,
+  CLASSES, CRIT_CHANCE, CRIT_MUL, DIFFICULTIES, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
+  MEALS, PERKS, RARITY_WEIGHT, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST, STAR_COST, TURRETS,
+  WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES, bossForDay, dayZombieCount, defaultResearchedMeals, extraBullets, magSize, starMul, zombieHp,
   type ClassId, type DifficultyId, type DrinkId, type MealId, type PerkId, type TavernUpgradeId, type TurretType, type WeaponId, type ZombieKind,
 } from '../content/data';
 import {
-  COMPANION_JOIN_STORIES, DAILY_TRENDS, DINER_REVIEW_POOL, QUALITY_META, VIP_CUSTOMERS, VIP_TIERS, getFansRank, getRepTier,
-  type AllyId, type DishQuality, type VipDef,
+  COMPANION_JOIN_STORIES, DAILY_TRENDS, QUALITY_META,
+  type AllyId, type DishQuality,
 } from '../content/story';
 import {
-  ALLY_POS, DINER_PLATE_X, DINER_SEAT_X, DOOR_X, GROUND_Y, HOME_X, HOUSE_WALL_X, IN_MAX_X, IN_MIN_X, IN_STATIONS, LADDER_X, PLAYER_MAX_X, PLAYER_MIN_X,
+  ALLY_POS, DOOR_X, GROUND_Y, HOME_X, HOUSE_WALL_X, IN_MAX_X, IN_MIN_X, IN_STATIONS, LADDER_X, PLAYER_MAX_X, PLAYER_MIN_X,
   PORCH_MAX_X, PORCH_MIN_X, PORCH_Y, ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, SPAWN_X,
-  TURRET_SLOTS, WALL_X, type AllyRuntime, type Bullet, type Command, type CounterDish, type DinerGuest, type DinerShiftState, type GameEvent, type Input, type RunState, type StationId, type TurretTargetMode, type Zombie,
+  TURRET_SLOTS, WALL_X, type AllyRuntime, type Bullet, type Command, type CounterDish, type DinerGuest, type GameEvent, type Input, type RunState, type StationId, type TurretTargetMode, type Zombie,
 } from './types';
+import {
+  allyRole, buySpiceCmd, buyTavernUpgradeCmd, completeServeGuest, dinerRank, dishLevel, dishPrice, dishResearchCost, dishServings, dishTaste,
+  finishShiftToSummary, formatRecipeCost, grindMortarCmd, hasIngredients, hasTavernUpgrade, hireStaffCmd,
+  makeIdleShift, maxMenuSlots, maxSeats, maxStaffSlots, meatPrice, passCounterCapacity, postRecruitmentCmd, pourQuality,
+  prepDishCmd, researchDishCmd, resolveNightPrepAndDispatch, rollDailyTrend, rollDinerGuests, sellMeatKindCmd,
+  setAllyRoleCmd, setStaffRoleCmd, spendIngredients, staffDef, staffHasSkill, startShiftCmd, stepStaffCamp,
+  stepTavernShift, stoveCapacity, tavernUpgradeCost, toggleAutoSupplyCmd, toggleMenuDishCmd, totalMeat, trainStaffCmd,
+  upgradeDishCmd, upgradeRackCmd,
+} from './diner';
+
+export {
+  allyRole, dinerRank, dishLevel, dishPrice, dishResearchCost, dishServings, dishTaste, formatRecipeCost, hasIngredients,
+  hasTavernUpgrade, maxMenuSlots, maxSeats, maxStaffSlots, meatPrice, passCounterCapacity, pourQuality, staffDef,
+  staffHasSkill, stoveCapacity, tavernUpgradeCost, totalMeat,
+};
 
 export const MAX_CARRY = 2;
 export const GRENADE_G = 0.26;
@@ -32,47 +47,6 @@ export const FORT_GUN_Y = GROUND_Y + ROOF_Y - 18;
 /** 僵尸当前 2D 受击与瞄准中心纵坐标（兼容地面怪、低空夜翼魔蝠与高大首领） */
 export const zombieBodyY = (z: Zombie): number =>
   GROUND_Y + (z.y ?? 0) - (z.kind === 'bat' ? 14 : ZOMBIES[z.kind].boss ? 34 : 22);
-
-/** 铁板火候 QTE 判定 */
-export function qteQuality(pos: number): DishQuality {
-  const d = Math.abs(pos - 0.5);
-  if (d <= 0.045) return 'legendary';
-  if (d <= 0.12) return 'perfect';
-  if (d <= 0.28) return 'good';
-  return 'poor';
-}
-
-/** 酒桶接酒/泡茶金沫判定 */
-export function pourQuality(fill: number, fastTap = false): DishQuality {
-  const legSpan = fastTap ? 0.045 : 0.03;
-  const lo = fastTap ? 0.70 : 0.74;
-  const hi = fastTap ? 0.92 : 0.90;
-  if (Math.abs(fill - 0.82) <= legSpan) return 'legendary';
-  if (fill >= lo && fill <= hi) return 'perfect';
-  if (fill >= 0.48 && fill <= 0.98) return 'good';
-  return 'poor';
-}
-
-export const hasTavernUpgrade = (run: RunState, id: TavernUpgradeId) => run.diner.upgrades.includes(id);
-export const dishLevel = (run: RunState, id: MealId) => Math.max(1, run.diner.dishLevels[id] ?? 1);
-
-const makeIdleShift = (): DinerShiftState => ({
-  mode: 'prep',
-  timer: 0,
-  duration: 45 * 60,
-  spawnCd: 0,
-  servedCount: 0,
-  drinkCount: 0,
-  cleanedCount: 0,
-  lostCount: 0,
-  coinsEarned: 0,
-  tipsEarned: 0,
-  fansEarned: 0,
-  combo: 0,
-  bestCombo: 0,
-  dirtyTables: [],
-  counterDishes: [],
-});
 
 function rand(run: RunState): number { // mulberry32
   let t = (run.rng += 0x6d2b79f5);
@@ -133,7 +107,6 @@ export const turretRefundCoins = (kind: TurretType, level: number, cls: ClassId,
   for (let l = 1; l < level; l++) spent += turretUpgradeCost(kind, l, cls, hasQiang);
   return Math.max(20, Math.floor(spent * 0.5));
 };
-export const meatPrice = (cls: ClassId) => Math.round(MEAT_SELL_PRICE * (cls === 'chef' ? 1.35 : 1));
 export const weaponDamage = (id: WeaponId, star: number) => WEAPONS[id].damage * starMul(star);
 
 /** 主角射程（在门廊/屋顶享受高低差加成，居高临下天赋额外叠加） */
@@ -185,14 +158,13 @@ export function nearbyExterior(run: RunState): 'door' | 'ladder' | null {
 }
 
 export type CampInteractTarget =
-  | { kind: 'cookFinish'; x: number; guest: DinerGuest }
   | { kind: 'pourFinish'; x: number; drink: DrinkId; guestId: string | null }
   | { kind: 'serveDrink'; x: number; guest: DinerGuest }
   | { kind: 'serveCarried'; x: number; guest: DinerGuest }
   | { kind: 'cleanTable'; x: number; plateId: number; seatIdx: number }
-  | { kind: 'pourStart'; x: number; drink: DrinkId; guest: DinerGuest | null }
   | { kind: 'pickCounter'; x: number; counterDish: CounterDish }
-  | { kind: 'cookStart'; x: number; guest: DinerGuest }
+  | { kind: 'grindMortar'; x: number; sauce: number; maxSauce: number }
+  | { kind: 'pourStart'; x: number; drink: DrinkId; guest: DinerGuest | null }
   | { kind: 'guestTalk'; x: number; guest: DinerGuest }
   | { kind: 'allyTalk'; x: number; ally: AllyId }
   | { kind: 'kitchen'; x: number }
@@ -203,7 +175,7 @@ export type CampInteractTarget =
   | { kind: 'doorOut'; x: number }
   | { kind: 'doorIn'; x: number };
 
-/** 营地（室内与室外）走近可交互的对象：灶台 QTE、酒桶打酒、传菜台、端盘上菜、收碗、搭话、商店、工坊、进出木门 */
+/** 营地（室内与室外）走近可交互的对象：石臼磨辣酱、酒桶打酒、传菜台取菜、端盘上菜、收碗、搭话、商店、工坊、进出木门 */
 export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
   if (run.phase !== 'camp') return null;
   const p = run.player;
@@ -227,13 +199,6 @@ export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
     return { kind: 'pourFinish', x: IN_STATIONS.drink, drink: run.pourMinigame.drink, guestId: run.pourMinigame.guestId };
   }
 
-  if (run.dinerCook) {
-    const g = run.guests.find((o) => o.id === run.dinerCook!.guestId && !o.served && o.walkState !== 'leaving');
-    if (g && Math.abs(p.x - IN_STATIONS.kitchen) <= 58) {
-      return { kind: 'cookFinish', x: IN_STATIONS.kitchen, guest: g };
-    }
-  }
-
   const cands: { effD: number; target: CampInteractTarget }[] = [];
   const push = (effD: number, target: CampInteractTarget) => cands.push({ effD, target });
 
@@ -249,7 +214,8 @@ export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
   }
   if (run.carryingDish) {
     const targetG = run.guests.find((o) => o.id === run.carryingDish!.guestId && !o.served && o.walkState !== 'leaving')
-      ?? run.guests.find((o) => o.orderKind === 'dish' && !o.served && o.walkState === 'seated' && o.dish === run.carryingDish!.dish);
+      ?? run.guests.find((o) => o.orderKind === 'dish' && !o.served && o.walkState === 'seated' && !o.isRye && o.dish === run.carryingDish!.dish)
+      ?? run.guests.find((o) => o.orderKind === 'dish' && !o.served && o.walkState === 'seated');
     if (targetG) {
       const dg = Math.abs(p.x - targetG.x);
       if (dg <= 36) push(dg - 14, { kind: 'serveCarried', x: targetG.x, guest: targetG });
@@ -264,38 +230,36 @@ export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
     }
   }
 
-  // 3. 左墙红砖灶台
+  // 3. 左墙红砖灶台（备菜 / 菜单 / 炉火灵感研发）
   const dk = Math.abs(p.x - IN_STATIONS.kitchen);
-  if (dk <= 34) {
-    if (!run.carryingDish && !run.carryingDrink) {
-      const nextOrder = run.guests
-        .filter((g) =>
-          g.orderKind === 'dish'
-          && !g.served
-          && g.walkState === 'seated'
-          && run.meat >= g.meatCost
-          && !run.dinerShift.counterDishes.some((c) => c.guestId === g.id),
-        )
-        .sort((a, b) => a.patience - b.patience || Number(b.trendMatch) - Number(a.trendMatch))[0];
-      if (nextOrder) push(dk, { kind: 'cookStart', x: IN_STATIONS.kitchen, guest: nextOrder });
-      else push(dk, { kind: 'kitchen', x: IN_STATIONS.kitchen });
-    } else {
-      push(dk + 5, { kind: 'kitchen', x: IN_STATIONS.kitchen });
-    }
+  if (dk <= 24) {
+    push(dk + (run.dinerShift.mode === 'open' ? 6 : 0), { kind: 'kitchen', x: IN_STATIONS.kitchen });
   }
 
-  // 4. 橡木传菜台 (pass)
+  // 4. 石臼磨酱台（营业中磨辛香辣酱，缺酱时高优提示）
+  const dm = Math.abs(p.x - IN_STATIONS.mortar);
+  if (dm <= 22 && run.dinerShift.mode === 'open' && run.dinerShift.sauce < run.dinerShift.maxSauce) {
+    const urg = run.dinerShift.sauce <= 35 ? -8 : 0;
+    push(dm + urg, {
+      kind: 'grindMortar',
+      x: IN_STATIONS.mortar,
+      sauce: Math.round(run.dinerShift.sauce),
+      maxSauce: run.dinerShift.maxSauce,
+    });
+  }
+
+  // 5. 橡木传菜台 (pass)
   const dpd = Math.abs(p.x - IN_STATIONS.pass);
   if (dpd <= 22) {
     if (!run.carryingDish && !run.carryingDrink && run.dinerShift.counterDishes.length > 0) {
       const cd = run.dinerShift.counterDishes[0];
       push(dpd - 4, { kind: 'pickCounter', x: IN_STATIONS.pass, counterDish: cd });
     } else if (run.dinerShift.mode === 'open') {
-      push(dpd + 3, { kind: 'pass', x: IN_STATIONS.pass });
+      push(dpd + 4, { kind: 'pass', x: IN_STATIONS.pass });
     }
   }
 
-  // 5. 原木啤酒/热茶桶 (drink)
+  // 6. 原木啤酒/热茶桶 (drink)
   const ddr = Math.abs(p.x - IN_STATIONS.drink);
   if (ddr <= 22) {
     if (!run.carryingDish && !run.carryingDrink) {
@@ -305,10 +269,10 @@ export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
       if (drinkGuest) {
         push(ddr - 3, { kind: 'pourStart', x: IN_STATIONS.drink, drink: drinkGuest.drink ?? 'beer', guest: drinkGuest });
       } else {
-        push(ddr + 3, { kind: 'drink', x: IN_STATIONS.drink });
+        push(ddr + 4, { kind: 'drink', x: IN_STATIONS.drink });
       }
     } else {
-      push(ddr + 5, { kind: 'drink', x: IN_STATIONS.drink });
+      push(ddr + 6, { kind: 'drink', x: IN_STATIONS.drink });
     }
   }
 
@@ -321,7 +285,7 @@ export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
   const dd = Math.abs(p.x - IN_STATIONS.door);
   if (dd <= 26) push(dd, { kind: 'doorOut', x: IN_STATIONS.door });
 
-  // 6. 与在座食客搭话
+  // 7. 与在座食客搭话
   for (const g of run.guests) {
     if (g.walkState === 'leaving') continue;
     const isCarryMatch = (run.carryingDish && run.carryingDish.guestId === g.id)
@@ -331,7 +295,7 @@ export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
     if (dg <= 22) push(dg + 1, { kind: 'guestTalk', x: g.x, guest: g });
   }
 
-  // 7. 与室内战友交谈
+  // 8. 与室内战友交谈
   for (const allyId of run.story.allies) {
     const ax = run.allies[allyId]?.x ?? ALLY_POS[allyId].intX;
     const da = Math.abs(p.x - ax);
@@ -357,216 +321,6 @@ function rollShopOffers(run: RunState) {
     picks.push(rest.splice(idx, 1)[0]);
   }
   run.shop = picks;
-}
-
-function rollDailyTrend(run: RunState) {
-  const availableMeals = unlockedMeals(Math.max(1, run.day));
-  const allTags = new Set(availableMeals.flatMap((m) => m.tags));
-  const pool = DAILY_TRENDS.filter((t) => t.unlockDay <= Math.max(1, run.day) && allTags.has(t.tag) && t.id !== run.diner.trendId);
-  const src = pool.length ? pool : DAILY_TRENDS.filter((t) => t.unlockDay <= 1);
-  const picked = src[Math.floor(rand(run) * src.length)] ?? DAILY_TRENDS[0];
-  run.diner.trendId = picked.id;
-  run.diner.trendTag = picked.tag;
-  run.diner.trendTitle = picked.title;
-}
-
-const VIP_ORDER_LINES: Record<string, string> = {
-  agou: '掌柜，求给我留一口热乎肉串就行，我扫地洗碗都行！',
-  laobao: '连守三夜防线了，来份最够劲的热菜提提神！',
-  qijie: '刚锻完一批铜齿轮与炮架，上最扎实管饱的菜，少敷衍我！',
-  niqiu: '掌柜的，把招牌菜端上来，好吃明天再给你带稀罕门路！',
-  gaolaotou: '确定没藏窃听符印吧？给我盛份热腾腾又干净的菜！',
-  guying: '高热量。五分钟内上菜。不废话。',
-  huanyin: '整条长街都在传暮夜里的故事啦——上你们暮夜酒馆最拿手的招牌硬菜！',
-  tongshu: '发条铁胃涩滞，需要滚烫油脂与烈性热肉润滑机件。',
-  dashan: '大山……大山饿了，想吃热乎乎的大块肉肉……',
-  baishi: '妙极了！请务必上一份辛烈浓菜，助我印证今夜秘药方！',
-  jinlaoban: '净水生意刚谈完，端上你们酒馆最拿手的菜色试试成色。',
-  wumingke: '风雪太大……在角落安静吃一碗热汤便走。',
-  yanlao: '百年前这里曾是老城区最体面的大旅店……能请我尝一口昔日宫廷风味吗？',
-  kuangya: '哈哈哈！闻到香味了！拿最扎实的硬菜上来！',
-  guancezhe: '十五夜星象正往酒馆汇聚——胡掌柜，来道招牌让我尝尝今夜火候。',
-};
-
-function pickGuestMeal(run: RunState, vip: VipDef, forceTrend: boolean, allowed?: MealId[]): MealId {
-  const unlocked = unlockedMeals(Math.max(1, run.day));
-  const list = allowed && allowed.length > 0 ? unlocked.filter((m) => allowed.includes(m.id)) : unlocked;
-  const pool = list.length > 0 ? list : unlocked;
-  if (forceTrend) {
-    const tHit = pool.find((m) => m.tags.includes(run.diner.trendTag));
-    if (tHit) return tHit.id;
-  }
-  const prefMap: Record<string, MealId[]> = {
-    cheap: ['spicy_skewer'],
-    stimulating: ['spicy_skewer', 'mixed_grill', 'elite_hotpot'],
-    mechanical: ['iron_steak', 'mixed_grill'],
-    tactical: ['iron_steak', 'apocalypse_feast'],
-    dark: ['elite_hotpot', 'apocalypse_feast'],
-    mutant: ['elite_hotpot', 'apocalypse_feast'],
-    soup: ['hearty_stew'],
-    french: ['apocalypse_feast', 'hearty_stew'],
-    premium: ['apocalypse_feast', 'iron_steak'],
-  };
-  const prefs = prefMap[vip.preferredDishPref] ?? [];
-  const prefHit = prefs.find((id) => pool.some((m) => m.id === id));
-  if (prefHit && rand(run) < 0.72) return prefHit;
-  return pool[Math.floor(rand(run) * pool.length)].id;
-}
-
-function buildVipPool(run: RunState, count: number, excludeIds: Set<string>): VipDef[] {
-  const unlocked = VIP_CUSTOMERS.filter((v) => v.unlockFans <= run.diner.fans);
-  const chosen: VipDef[] = [];
-  const usedIds = new Set(excludeIds);
-
-  const unmet = unlocked.filter((v) => !usedIds.has(v.id) && !run.diner.metVips.includes(v.id));
-  for (const v of unmet) {
-    if (chosen.length >= Math.min(2, count)) break;
-    chosen.push(v);
-    usedIds.add(v.id);
-  }
-  while (chosen.length < count) {
-    const pool = unlocked.filter((v) => !usedIds.has(v.id));
-    const src = pool.length > 0 ? pool : VIP_CUSTOMERS.filter((v) => !usedIds.has(v.id));
-    const fallback = src.length > 0 ? src : unlocked;
-    if (fallback.length === 0) break;
-    let roll = rand(run) * fallback.reduce((s, v) => s + v.weight, 0);
-    let pick = fallback[0];
-    for (const v of fallback) {
-      roll -= v.weight;
-      if (roll < 0) { pick = v; break; }
-    }
-    chosen.push(pick);
-    usedIds.add(pick.id);
-  }
-  return chosen;
-}
-
-function rollDinerGuests(run: RunState) {
-  const chosen = buildVipPool(run, 3, new Set<string>());
-  const repTier = getRepTier(run.diner.rep);
-  const chefMul = run.cls === 'chef' ? 1.35 : 1;
-  const seatOrder = [0, 1, 3];
-  const guests: DinerGuest[] = chosen.map((vip, idx) => {
-    const seatIdx = seatOrder[idx] ?? idx;
-    const dishId = pickGuestMeal(run, vip, idx === 0, run.diner.menu);
-    const meal = MEALS[dishId];
-    const trendMatch = meal.tags.includes(run.diner.trendTag);
-    const shortName = vip.name.includes('·') ? vip.name.split('·').pop()! : vip.name;
-    const lvMul = dishLevelPayMul(dishLevel(run, dishId));
-    const pay = Math.round((meal.basePay * 0.62 + run.day * 0.55) * lvMul * chefMul * (0.8 + vip.tipBonus * 0.22) * (1 + repTier.bonusMul) * (trendMatch ? 1.35 : 1));
-    return {
-      id: `${vip.id}_${run.day}_${idx}`,
-      vipId: vip.id,
-      tier: vip.tier,
-      name: shortName,
-      role: vip.name.includes('·') ? vip.name.split('·')[0] : VIP_TIERS[vip.tier].name,
-      sprite: vip.sprite,
-      x: DINER_SEAT_X[seatIdx] ?? 266,
-      seatIdx,
-      targetX: DINER_SEAT_X[seatIdx] ?? 266,
-      walkState: 'seated',
-      facing: seatIdx % 2 === 0 ? 1 : -1,
-      orderKind: 'dish',
-      dish: dishId,
-      dishName: meal.name,
-      meatCost: meal.meatCost,
-      pay,
-      trendMatch,
-      orderQuote: VIP_ORDER_LINES[vip.id] ?? vip.bg,
-      thanksQuote: vip.reactions.good,
-      served: false,
-      patience: 9999,
-      maxPatience: 9999,
-      eatT: 0,
-    };
-  });
-  run.guests = guests;
-}
-
-function spawnShiftGuest(run: RunState): DinerGuest | null {
-  const occupied = new Set(run.guests.filter((g) => g.walkState !== 'leaving').map((g) => g.seatIdx));
-  const dirty = new Set(run.dinerShift.dirtyTables.map((d) => d.seatIdx));
-  const seatIdx = [0, 1, 3, 2].find((i) => !occupied.has(i) && !dirty.has(i));
-  if (seatIdx === undefined) return null;
-
-  const activeVips = new Set(run.guests.map((g) => g.vipId));
-  const vip = buildVipPool(run, 1, activeVips)[0] ?? VIP_CUSTOMERS[0];
-  const repTier = getRepTier(run.diner.rep);
-  const chefMul = run.cls === 'chef' ? 1.35 : 1;
-  const unlocked = unlockedMeals(Math.max(1, run.day));
-  const menuPool = unlocked.filter((m) => run.diner.menu.includes(m.id) && m.meatCost <= run.meat);
-  const affordable = menuPool.length > 0 ? menuPool : unlocked.filter((m) => m.meatCost <= run.meat);
-  const wantDrink = affordable.length === 0 || rand(run) < 0.36;
-  const shortName = vip.name.includes('·') ? vip.name.split('·').pop()! : vip.name;
-  const maxPatience = Math.round((1560 + rand(run) * 280) * (hasTavernUpgrade(run, 'warm_lantern') ? 1.28 : 1));
-
-  if (wantDrink) {
-    const drinkId: DrinkId = rand(run) < 0.56 ? 'beer' : 'tea';
-    const dDef = DRINKS[drinkId];
-    const tapMul = hasTavernUpgrade(run, 'fast_tap') ? 1.25 : 1;
-    const pay = Math.round(dDef.pay * (run.cls === 'chef' ? 1.25 : 1) * tapMul * (0.85 + vip.tipBonus * 0.2) * (1 + repTier.bonusMul));
-    const g: DinerGuest = {
-      id: `${vip.id}_rush_${run.nextId++}`,
-      vipId: vip.id,
-      tier: vip.tier,
-      name: shortName,
-      role: vip.name.includes('·') ? vip.name.split('·')[0] : VIP_TIERS[vip.tier].name,
-      sprite: vip.sprite,
-      x: IN_STATIONS.door,
-      seatIdx,
-      targetX: DINER_SEAT_X[seatIdx] ?? 266,
-      walkState: 'entering',
-      facing: -1,
-      orderKind: 'drink',
-      dish: 'spicy_skewer',
-      drink: drinkId,
-      dishName: dDef.name,
-      meatCost: 0,
-      pay,
-      trendMatch: false,
-      orderQuote: dDef.orderQuote,
-      thanksQuote: vip.reactions.good,
-      served: false,
-      patience: maxPatience,
-      maxPatience,
-      eatT: 0,
-    };
-    run.guests.push(g);
-    return g;
-  }
-
-  const dishId = pickGuestMeal(run, vip, rand(run) < 0.4, affordable.map((m) => m.id));
-  const meal = MEALS[dishId];
-  const trendMatch = meal.tags.includes(run.diner.trendTag);
-  const lvMul = dishLevelPayMul(dishLevel(run, dishId));
-  const pay = Math.round((meal.basePay * 0.65 + run.day * 0.55) * lvMul * chefMul * (0.8 + vip.tipBonus * 0.22) * (1 + repTier.bonusMul) * (trendMatch ? 1.35 : 1));
-  const g: DinerGuest = {
-    id: `${vip.id}_rush_${run.nextId++}`,
-    vipId: vip.id,
-    tier: vip.tier,
-    name: shortName,
-    role: vip.name.includes('·') ? vip.name.split('·')[0] : VIP_TIERS[vip.tier].name,
-    sprite: vip.sprite,
-    x: IN_STATIONS.door,
-    seatIdx,
-    targetX: DINER_SEAT_X[seatIdx] ?? 266,
-    walkState: 'entering',
-    facing: -1,
-    orderKind: 'dish',
-    dish: dishId,
-    dishName: meal.name,
-    meatCost: meal.meatCost,
-    pay,
-    trendMatch,
-    orderQuote: VIP_ORDER_LINES[vip.id] ?? vip.bg,
-    thanksQuote: vip.reactions.good,
-    served: false,
-    patience: maxPatience,
-    maxPatience,
-    eatT: 0,
-  };
-  run.guests.push(g);
-  return g;
 }
 
 const makeAllyRuntime = (k: AllyId, inside: boolean): AllyRuntime => {
@@ -597,14 +351,18 @@ function syncAlliesPos(run: RunState, inside: boolean) {
   }
 }
 
-/** 开一局。pool 是这一局能掉落/进货的武器（局外解锁的那些）。 */
+/** 开一局。pool 是这一局能掉落/进货的武器（局外解锁的那些），heirloom 为跨局轻度酒馆传承。 */
 export function newRun(
   seed = 1,
   pool: WeaponId[] = ['revolver', 'smg'],
   cls: ClassId = 'gunner',
   difficulty: DifficultyId = 'normal',
+  heirloom?: { metVips?: string[]; mastery?: Partial<Record<MealId, number>>; decor?: TavernUpgradeId[] },
 ): RunState {
   const turrets = TURRET_SLOTS.map(() => ({ type: null, level: 0, cd: 0, aim: 0, mode: 'near' as const }));
+  const hMet = heirloom?.metVips ?? [];
+  const hDecor = heirloom?.decor ?? [];
+  const hFlame = Math.min(3, Math.floor(hMet.length / 3));
   const run: RunState = {
     seed, rng: seed >>> 0, tick: 0, nextId: 1, day: 0, phase: 'camp', phaseT: 0,
     inside: false, autoFire: false, difficulty,
@@ -625,19 +383,37 @@ export function newRun(
     home: { hp: FORT_LEVELS[0].maxHp, maxHp: FORT_LEVELS[0].maxHp },
     fort: { level: 1, cd: 0, aim: 0 },
     spawn: { left: 0, timer: 0, total: 0, killed: 0, crateAt: 0, bossKind: null, bossSpawned: false },
-    coins: 0, meat: 0, kills: 0,
+    coins: 0,
+    meats: { tender: 0, thick: 0, essence: 0 },
+    spice: 1 + (hDecor.length > 0 ? 1 : 0),
+    kills: 0,
     meal: null, mealQuality: 'good', guests: [],
-    dinerCook: null, carryingDish: null,
+    carryingDish: null,
     pourMinigame: null, carryingDrink: null,
-    dinerShift: makeIdleShift(),
+    dinerShift: makeIdleShift(0),
     diner: {
-      rep: 0, fans: 0, trendId: DAILY_TRENDS[0].id, trendTag: DAILY_TRENDS[0].tag, trendTitle: DAILY_TRENDS[0].title,
-      servedTotal: 0, metVips: [], reviews: [], dishLevels: { spicy_skewer: 1 }, menu: ['spicy_skewer'], upgrades: [],
+      rep: 0, fans: 0, flame: hFlame, bestTaste: 100,
+      trendId: DAILY_TRENDS[0].id, trendTag: DAILY_TRENDS[0].tag, trendTitle: DAILY_TRENDS[0].title,
+      servedTotal: 0, metVips: [], reviews: [],
+      researched: defaultResearchedMeals(),
+      dishLevels: { spicy_skewer: 1, hearty_stew: 1 },
+      menu: ['spicy_skewer', 'hearty_stew'],
+      menuStock: {},
+      autoSupply: {},
+      upgrades: [],
+      hiredStaff: [],
+      applicants: [],
+      adTier: null,
+      rackLevel: 0,
+      lastDispatchLog: '',
+      allyRoles: {},
     },
     story: { allies: [], seenEvents: [] },
     buff: { dmgMul: 0, haste: 0 }, shop: [],
     perks: [], perkChoices: [], targetId: null, priorityId: null,
     pool: [...pool], chain: { n: 0, t: 0 }, vanguardT: 0, cls, skill: { t: 0, cd: 0 },
+    endless: false,
+    heirloom: heirloom ? { metVips: [...hMet], mastery: { ...(heirloom.mastery ?? {}) }, decor: [...hDecor] } : undefined,
   };
   rollShopOffers(run);
   startDay(run, []);
@@ -649,12 +425,8 @@ function startDay(run: RunState, ev: GameEvent[]) {
   run.phase = 'fight'; run.phaseT = 0; run.inside = false;
   run.player.x = 238; run.player.y = ROOF_Y; run.player.vy = 0; run.player.dropIgnoreT = 0; run.player.facing = 1;
   run.player.burstLeft = 0; run.player.burstCd = 0; run.player.smgHeat = 0;
-  run.dinerCook = null; run.carryingDish = null; run.pourMinigame = null; run.carryingDrink = null;
-  run.dinerShift = makeIdleShift();
-  for (const m of unlockedMeals(run.day)) {
-    if (!run.diner.dishLevels[m.id]) run.diner.dishLevels[m.id] = 1;
-    if (m.unlockDay === run.day && !run.diner.menu.includes(m.id)) run.diner.menu.push(m.id);
-  }
+  run.carryingDish = null; run.pourMinigame = null; run.carryingDrink = null;
+  run.dinerShift = makeIdleShift(0);
   syncAlliesPos(run, false);
   const diff = run.difficulty ?? 'normal';
   const total = dayZombieCount(run.day, diff);
@@ -784,11 +556,19 @@ function damageZombie(
   const def = ZOMBIES[z.kind];
   run.coins += def.coins; run.kills++; run.spawn.killed++;
   const chef = run.cls === 'chef';
-  const meatDrop = def.meat > 1 ? def.meat + (chef ? 1 : 0) : (rand(run) < (chef ? 0.42 : 0.28) ? 1 : 0);
-  run.meat += meatDrop;
+  const meatKind = def.meatKind;
+  const baseMeat = def.meat > 1 || meatKind === 'essence'
+    ? def.meat + (chef ? 1 : 0)
+    : (rand(run) < (chef ? 0.48 : 0.34) ? 1 : 0);
+  const preserved = isOnRoof(run) || z.freezeT > 0 || z.stunT > 0 || !!opts.crit;
+  const meatDrop = baseMeat > 0 && preserved ? baseMeat * 2 : baseMeat;
+  run.meats[meatKind] += meatDrop;
 
   if (has(run, 'chainkill')) run.chain = { n: Math.min(8, run.chain.n + 1), t: 180 };
-  ev.push({ t: 'kill', id: z.id, x: z.x, y: zy, kind: z.kind, coins: def.coins, meat: meatDrop, dir, crit: opts.crit, boss: def.boss });
+  ev.push({
+    t: 'kill', id: z.id, x: z.x, y: zy, kind: z.kind, coins: def.coins,
+    meat: meatDrop, meatKind, preserved: preserved && meatDrop > 0, dir, crit: opts.crit, boss: def.boss,
+  });
   if (def.boss) {
     ev.push({ t: 'bossDead', kind: z.kind, bossIdx: run.day <= 5 ? 0 : run.day <= 10 ? 1 : 2 });
   }
@@ -1107,14 +887,6 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
     if (p.y >= 0) { p.y = 0; p.vy = 0; }
     p.x = Math.max(IN_MIN_X, Math.min(IN_MAX_X, p.x + p.vx));
     if (move !== 0 && p.dodgeT === 0) p.facing = move > 0 ? 1 : -1;
-    if (run.dinerCook) {
-      if (Math.abs(p.x - IN_STATIONS.kitchen) > 58) {
-        run.dinerCook = null;
-      } else {
-        const sec = (run.tick - run.dinerCook.startedTick) / 60;
-        run.dinerCook.pos = 0.5 - 0.5 * Math.cos(sec * 3.15);
-      }
-    }
     if (run.pourMinigame && Math.abs(p.x - IN_STATIONS.drink) > 46) {
       run.pourMinigame = null;
     }
@@ -1457,22 +1229,32 @@ function stepAllyTo(rt: AllyRuntime, targetX: number, minX: number, maxX: number
   return true;
 }
 
-/** 休整夜晚战友平稳驻守，或在堂食营业冲刺期间担任酒馆伙计协同收碗/备菜/传菜/迎宾 */
+/** 休整夜晚战友平稳驻守，或在营业冲刺期辅助看灶与兜底溢出的传菜台/陈旧脏盘 */
 function stepAlliesCamp(run: RunState, ev: GameEvent[]) {
   const inside = run.inside;
   const rush = inside && run.dinerShift.mode === 'open';
-  const passCap = hasTavernUpgrade(run, 'wide_pass') ? 5 : 3;
+  const passCap = passCounterCapacity(run);
 
   for (const allyId of run.story.allies) {
     const rt = run.allies[allyId];
     if (!rt) continue;
     const pos = ALLY_POS[allyId];
+    const role = allyRole(run, allyId);
     const anchorX = inside ? pos.intX : pos.extX;
     rt.y = inside ? 0 : pos.extY;
     rt.atkT = 0;
     rt.fireDone = true;
 
-    if (!rush) {
+    if (role === 'dispatch' && inside) {
+      rt.vx = 0;
+      rt.state = 'idle';
+      rt.staffTask = 'idle';
+      rt.staffT = 0;
+      rt.staffGuestId = undefined;
+      continue;
+    }
+
+    if (!rush || role === 'rest') {
       rt.staffTask = 'idle';
       rt.staffT = 0;
       rt.staffGuestId = undefined;
@@ -1482,21 +1264,36 @@ function stepAlliesCamp(run: RunState, ev: GameEvent[]) {
       continue;
     }
 
+    if (role === 'kitchen') {
+      if (run.dinerShift.kitchenOrders.length > 0) {
+        rt.staffTask = 'cook';
+        stepAllyTo(rt, IN_STATIONS.kitchen + 18, IN_MIN_X, IN_MAX_X, 1.05, -1);
+      } else {
+        rt.staffTask = 'idle';
+        rt.staffT = 0;
+        stepAllyTo(rt, anchorX, IN_MIN_X, IN_MAX_X, 0.9, pos.intFlip ? -1 : 1);
+      }
+      continue;
+    }
+
     if (allyId === 'qiang') {
-      const dp = run.dinerShift.dirtyTables[0];
+      const dp = run.dinerShift.dirtyTables.find((d) => run.tick - d.createdTick >= 280);
       if (dp) {
         rt.staffTask = 'clean';
-        const arrived = stepAllyTo(rt, dp.x, IN_MIN_X, IN_MAX_X, 1.25, dp.x >= rt.x ? 1 : -1);
+        const arrived = stepAllyTo(rt, dp.x, IN_MIN_X, IN_MAX_X, 1.2, dp.x >= rt.x ? 1 : -1);
         if (arrived) {
           rt.staffT = (rt.staffT ?? 0) + 1;
-          if (rt.staffT >= 42) {
-            run.dinerShift.dirtyTables.shift();
-            const tip = 3;
-            run.coins += tip;
-            run.dinerShift.coinsEarned += tip;
-            run.dinerShift.cleanedCount++;
+          if (rt.staffT >= 45) {
+            const idx = run.dinerShift.dirtyTables.findIndex((d) => d.id === dp.id);
+            if (idx >= 0) {
+              run.dinerShift.dirtyTables.splice(idx, 1);
+              const tip = 2;
+              run.coins += tip;
+              run.dinerShift.coinsEarned += tip;
+              run.dinerShift.cleanedCount++;
+              ev.push({ t: 'tableClean', x: dp.x, coins: tip, byAlly: 'qiang' });
+            }
             rt.staffT = 0;
-            ev.push({ t: 'tableClean', x: dp.x, coins: tip, byAlly: 'qiang' });
           }
         }
       } else {
@@ -1505,7 +1302,9 @@ function stepAlliesCamp(run: RunState, ev: GameEvent[]) {
         stepAllyTo(rt, anchorX, IN_MIN_X, IN_MAX_X, 1.0, pos.intFlip ? -1 : 1);
       }
     } else if (allyId === 'zhang') {
-      const cd = run.dinerShift.counterDishes.find((c) => c.id === Number(rt.staffGuestId)) ?? run.dinerShift.counterDishes[0];
+      const overflowing = run.dinerShift.counterDishes.length >= Math.max(2, passCap - 1);
+      const cd = run.dinerShift.counterDishes.find((c) => c.id === Number(rt.staffGuestId))
+        ?? (overflowing ? run.dinerShift.counterDishes[0] : undefined);
       const destGuest = cd
         ? (run.guests.find((o) => o.id === cd.guestId && !o.served && o.walkState === 'seated')
           ?? run.guests.find((o) => o.orderKind === 'dish' && !o.served && o.walkState === 'seated'))
@@ -1513,20 +1312,20 @@ function stepAlliesCamp(run: RunState, ev: GameEvent[]) {
       if (cd && destGuest) {
         rt.staffTask = 'serve';
         if (rt.staffGuestId !== String(cd.id)) {
-          const atPass = stepAllyTo(rt, IN_STATIONS.pass, IN_MIN_X, IN_MAX_X, 1.25, -1);
+          const atPass = stepAllyTo(rt, IN_STATIONS.pass, IN_MIN_X, IN_MAX_X, 1.2, -1);
           if (atPass) {
             rt.staffGuestId = String(cd.id);
             rt.staffT = 0;
           }
         } else {
-          const atTable = stepAllyTo(rt, destGuest.x, IN_MIN_X, IN_MAX_X, 1.25, destGuest.seatIdx % 2 === 0 ? 1 : -1);
+          const atTable = stepAllyTo(rt, destGuest.x, IN_MIN_X, IN_MAX_X, 1.2, destGuest.seatIdx % 2 === 0 ? 1 : -1);
           if (atTable) {
             rt.staffT = (rt.staffT ?? 0) + 1;
-            if (rt.staffT >= 14) {
+            if (rt.staffT >= 16) {
               const idx = run.dinerShift.counterDishes.findIndex((c) => c.id === cd.id);
               if (idx >= 0) {
                 run.dinerShift.counterDishes.splice(idx, 1);
-                completeServeGuest(run, destGuest, cd.quality, ev, false, false);
+                completeServeGuest(run, destGuest, cd.quality, ev, false, false, cd.isRye);
               }
               rt.staffGuestId = undefined;
               rt.staffT = 0;
@@ -1534,44 +1333,10 @@ function stepAlliesCamp(run: RunState, ev: GameEvent[]) {
           }
         }
       } else {
-        rt.staffTask = 'idle';
+        rt.staffTask = 'host';
         rt.staffT = 0;
         rt.staffGuestId = undefined;
         stepAllyTo(rt, anchorX, IN_MIN_X, IN_MAX_X, 0.95, pos.intFlip ? -1 : 1);
-      }
-    } else if (allyId === 'lin') {
-      const orderGuest = run.dinerShift.counterDishes.length < passCap
-        ? run.guests.find((o) =>
-            o.orderKind === 'dish'
-            && !o.served
-            && o.walkState === 'seated'
-            && run.meat >= o.meatCost
-            && run.dinerCook?.guestId !== o.id
-            && run.carryingDish?.guestId !== o.id
-            && !run.dinerShift.counterDishes.some((c) => c.guestId === o.id))
-        : undefined;
-      if (orderGuest) {
-        rt.staffTask = 'cook';
-        const atStove = stepAllyTo(rt, IN_STATIONS.kitchen + 24, IN_MIN_X, IN_MAX_X, 1.05, -1);
-        if (atStove) {
-          rt.staffT = (rt.staffT ?? 0) + 1;
-          if (rt.staffT >= 135) {
-            run.meat -= orderGuest.meatCost;
-            const cDish: CounterDish = {
-              id: run.nextId++,
-              guestId: orderGuest.id,
-              dish: orderGuest.dish,
-              dishName: orderGuest.dishName,
-              quality: 'good',
-            };
-            run.dinerShift.counterDishes.push(cDish);
-            rt.staffT = 0;
-          }
-        }
-      } else {
-        rt.staffTask = 'idle';
-        rt.staffT = 0;
-        stepAllyTo(rt, anchorX, IN_MIN_X, IN_MAX_X, 0.9, pos.intFlip ? -1 : 1);
       }
     } else {
       rt.staffTask = 'host';
@@ -1923,123 +1688,6 @@ function stepEnemyProjs(run: RunState, ev: GameEvent[]) {
   run.enemyProjs = out;
 }
 
-function finishShiftToSummary(run: RunState, ev: GameEvent[]) {
-  const s = run.dinerShift;
-  if (s.mode !== 'open') return;
-  s.mode = 'summary';
-  s.timer = 0;
-  run.dinerCook = null;
-  run.pourMinigame = null;
-  run.carryingDish = null;
-  run.carryingDrink = null;
-  run.guests = run.guests.filter((g) => g.walkState === 'seated' && !g.angry);
-  ev.push({
-    t: 'shiftEnd',
-    served: s.servedCount,
-    coins: s.coinsEarned,
-    tips: s.tipsEarned,
-    fans: s.fansEarned,
-    bestCombo: s.bestCombo,
-  });
-}
-
-function stepTavernShift(run: RunState, ev: GameEvent[]) {
-  if (!run.inside) return;
-
-  if (run.pourMinigame) {
-    run.pourMinigame.fill += run.pourMinigame.speed;
-    if (run.pourMinigame.fill >= 1.04) {
-      const pour = run.pourMinigame;
-      run.pourMinigame = null;
-      run.carryingDrink = { drink: pour.drink, guestId: pour.guestId, quality: 'poor' };
-      ev.push({ t: 'pourDone', drink: pour.drink, quality: 'poor' });
-    }
-  }
-
-  if (run.dinerShift.mode !== 'open') return;
-
-  const walkSpeed = hasTavernUpgrade(run, 'wide_pass') ? 1.15 : 0.92;
-  const drainMul = (hasTavernUpgrade(run, 'warm_lantern') ? 0.72 : 1) * (hasAlly(run, 'zhao') ? 0.85 : 1);
-  const nextGuests: DinerGuest[] = [];
-
-  for (const g of run.guests) {
-    if (g.walkState === 'entering') {
-      const d = g.targetX - g.x;
-      if (Math.abs(d) <= 1.5) {
-        g.x = g.targetX;
-        g.walkState = 'seated';
-        g.facing = g.seatIdx % 2 === 0 ? 1 : -1;
-      } else {
-        const vx = Math.sign(d) * Math.min(walkSpeed, Math.abs(d));
-        g.x += vx;
-        g.facing = vx >= 0 ? 1 : -1;
-      }
-      nextGuests.push(g);
-      continue;
-    }
-
-    if (g.walkState === 'leaving') {
-      const d = g.targetX - g.x;
-      if (Math.abs(d) <= 4) continue;
-      const vx = Math.sign(d) * Math.min(1.2, Math.abs(d));
-      g.x += vx;
-      g.facing = vx >= 0 ? 1 : -1;
-      nextGuests.push(g);
-      continue;
-    }
-
-    if (!g.served) {
-      g.patience -= drainMul;
-      if (g.patience <= 0) {
-        g.patience = 0;
-        g.angry = true;
-        g.walkState = 'leaving';
-        g.targetX = IN_STATIONS.door;
-        g.facing = 1;
-        if (run.dinerCook?.guestId === g.id) run.dinerCook = null;
-        if (run.carryingDish?.guestId === g.id) run.carryingDish = null;
-        if (run.carryingDrink?.guestId === g.id) run.carryingDrink.guestId = null;
-        run.dinerShift.lostCount++;
-        run.dinerShift.combo = 0;
-        run.diner.rep = Math.max(0, run.diner.rep - 1);
-        ev.push({ t: 'guestAngry', guestId: g.id, name: g.name });
-      }
-      nextGuests.push(g);
-      continue;
-    }
-
-    if (g.eatT > 0) {
-      g.eatT--;
-      if (g.eatT <= 0) {
-        run.dinerShift.dirtyTables.push({
-          id: run.nextId++,
-          seatIdx: g.seatIdx,
-          x: DINER_PLATE_X[g.seatIdx] ?? g.x,
-          createdTick: run.tick,
-        });
-        g.walkState = 'leaving';
-        g.targetX = IN_STATIONS.door;
-        g.facing = 1;
-      }
-    }
-    nextGuests.push(g);
-  }
-  run.guests = nextGuests;
-
-  const activeCount = run.guests.filter((g) => g.walkState !== 'leaving').length;
-  if (run.dinerShift.timer > 180 && activeCount + run.dinerShift.dirtyTables.length < 4) {
-    if (run.dinerShift.spawnCd > 0) run.dinerShift.spawnCd--;
-    if (run.dinerShift.spawnCd <= 0) {
-      spawnShiftGuest(run);
-      run.dinerShift.spawnCd = 165 + Math.floor(rand(run) * 75);
-    }
-  }
-
-  if (--run.dinerShift.timer <= 0) {
-    finishShiftToSummary(run, ev);
-  }
-}
-
 /** 推进一步。返回这一步发生的事件。 */
 export function step(run: RunState, input: Input): GameEvent[] {
   const ev: GameEvent[] = [];
@@ -2048,6 +1696,7 @@ export function step(run: RunState, input: Input): GameEvent[] {
     stepPlayer(run, input, ev);
     stepTavernShift(run, ev);
     stepAlliesCamp(run, ev);
+    stepStaffCamp(run, ev);
     return ev;
   }
   if (run.phase !== 'fight' && run.phase !== 'clear') return ev;
@@ -2098,7 +1747,7 @@ export function step(run: RunState, input: Input): GameEvent[] {
       const c = run.crates.shift()!;
       collectCrate(run, c.weapon, ev);
     }
-    if (run.day >= LAST_DAY) {
+    if (run.day >= LAST_DAY && !run.endless) {
       run.phase = 'won';
       ev.push({ t: 'won' });
     } else {
@@ -2109,7 +1758,12 @@ export function step(run: RunState, input: Input): GameEvent[] {
         while (i < pool.length - 1 && (roll -= RARITY_WEIGHT[pool[i].rarity]) >= 0) i++;
         picks.push(pool.splice(i, 1)[0].id);
       }
-      run.perkChoices = picks; run.phase = 'perk';
+      if (picks.length > 0) {
+        run.perkChoices = picks;
+        run.phase = 'perk';
+      } else {
+        enterCampSession(run, ev);
+      }
     }
   }
   return ev;
@@ -2117,13 +1771,31 @@ export function step(run: RunState, input: Input): GameEvent[] {
 
 const qiangWallBonus = (run: RunState) => (hasAlly(run, 'qiang') ? 50 : 0);
 
+function enterCampSession(run: RunState, ev: GameEvent[]) {
+  run.phase = 'camp';
+  run.inside = true;
+  run.player.x = IN_STATIONS.kitchen + 20;
+  run.player.y = 0;
+  run.player.vy = 0;
+  run.player.facing = -1;
+  syncAlliesPos(run, true);
+  run.carryingDish = null;
+  run.pourMinigame = null;
+  run.carryingDrink = null;
+  run.dinerShift = makeIdleShift(0);
+  rollShopOffers(run);
+  rollDinerGuests(run);
+  resolveNightPrepAndDispatch(run, ev);
+  ev.push({ t: 'inside', inside: true });
+}
+
 /** 面板和按钮的指令。成功返回事件，不满足条件（钱不够、时机不对）返回 null。 */
 export function command(run: RunState, cmd: Command): GameEvent[] | null {
   const ev: GameEvent[] = [];
   switch (cmd.t) {
     case 'pickPerk': {
       if (run.phase !== 'perk' || !run.perkChoices.includes(cmd.id)) return null;
-      run.perks.push(cmd.id); run.perkChoices = []; run.phase = 'camp';
+      run.perks.push(cmd.id); run.perkChoices = [];
       if (cmd.id === 'glasscannon') { const p = run.player; p.maxHp = Math.round(p.maxHp / 2); p.hp = Math.min(p.hp, p.maxHp); }
       if (cmd.id === 'fortify') {
         const nextWallMax = Math.round(WALL_LEVELS[run.wall.level - 1].maxHp * 1.4) + qiangWallBonus(run);
@@ -2150,13 +1822,7 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
         ev.push({ t: 'dinerStory', eventKey: 'firstOpen' });
       }
 
-      run.inside = true; run.player.x = IN_STATIONS.kitchen + 20; run.player.y = 0; run.player.vy = 0; run.player.facing = -1;
-      syncAlliesPos(run, true);
-      run.dinerCook = null; run.carryingDish = null; run.pourMinigame = null; run.carryingDrink = null;
-      run.dinerShift = makeIdleShift();
-      rollShopOffers(run);
-      rollDinerGuests(run);
-      ev.push({ t: 'inside', inside: true });
+      enterCampSession(run, ev);
       return ev;
     }
     case 'nextDay': {
@@ -2169,6 +1835,38 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       startDay(run, ev);
       return ev;
     }
+    case 'enterEndless': {
+      if (run.phase !== 'won') return null;
+      run.endless = true;
+      run.player.hp = run.player.maxHp;
+      run.crates = [];
+      for (const w of run.player.weapons) w.ammo = magSize(w.id, w.star);
+      enterCampSession(run, ev);
+      ev.push({ t: 'endlessEnter' });
+      return ev;
+    }
+    case 'nextEndlessNight': {
+      if (run.phase !== 'camp' || !run.endless) return null;
+      run.day++;
+      const healFrac = Math.max(0.25, DIFFICULTIES[run.difficulty ?? 'normal'].nightHeal);
+      run.player.hp = Math.min(run.player.maxHp, Math.round(run.player.hp + run.player.maxHp * healFrac));
+      run.crates = [];
+      for (const w of run.player.weapons) w.ammo = magSize(w.id, w.star);
+      const mealBoost = (run.cls === 'chef' ? 1.5 : 1) * QUALITY_META[run.mealQuality ?? 'good'].buffMul;
+      if (run.meal) {
+        const m = MEALS[run.meal];
+        run.buff = { dmgMul: m.dmgMul * mealBoost, haste: m.haste * mealBoost };
+        run.player.armor = Math.min(run.player.maxArmor, run.player.armor + Math.round(m.armor * mealBoost));
+        run.meal = null;
+        run.mealQuality = 'good';
+      } else {
+        run.buff = { dmgMul: 0, haste: 0 };
+      }
+      rollDailyTrend(run);
+      enterCampSession(run, ev);
+      ev.push({ t: 'dayStart', day: run.day });
+      return ev;
+    }
     case 'enterHouse':
       if (run.phase !== 'camp' || run.inside) return null;
       run.inside = true; run.player.x = IN_STATIONS.door - 24; run.player.y = 0; run.player.vy = 0; run.player.facing = -1;
@@ -2179,42 +1877,12 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       if (run.phase !== 'camp' || !run.inside) return null;
       run.inside = false; run.player.x = DOOR_X; run.player.y = 0; run.player.vy = 0; run.player.facing = 1;
       syncAlliesPos(run, false);
-      run.dinerCook = null; run.carryingDish = null; run.pourMinigame = null; run.carryingDrink = null;
-      if (run.dinerShift.mode !== 'prep') run.dinerShift = makeIdleShift();
+      run.carryingDish = null; run.pourMinigame = null; run.carryingDrink = null;
+      if (run.dinerShift.mode !== 'prep') run.dinerShift = makeIdleShift(run.dinerShift.spiceSpentCoins);
       ev.push({ t: 'inside', inside: false });
       return ev;
     case 'startShift': {
-      if (run.phase !== 'camp' || !run.inside || run.dinerShift.mode === 'open') return null;
-      if (run.diner.menu.length === 0) run.diner.menu = ['spicy_skewer'];
-      const duration = (hasTavernUpgrade(run, 'warm_lantern') ? 55 : 45) * 60;
-      const maxP = Math.round(1620 * (hasTavernUpgrade(run, 'warm_lantern') ? 1.28 : 1));
-      run.dinerCook = null;
-      run.carryingDish = null;
-      run.pourMinigame = null;
-      run.carryingDrink = null;
-      run.guests = run.guests
-        .filter((g) => !g.served && g.walkState !== 'leaving' && (g.orderKind === 'drink' || run.meat >= g.meatCost))
-        .map((g) => ({ ...g, maxPatience: maxP, patience: maxP, eatT: 0 }));
-      run.dinerShift = {
-        mode: 'open',
-        timer: duration,
-        duration,
-        spawnCd: 95,
-        servedCount: 0,
-        drinkCount: 0,
-        cleanedCount: 0,
-        lostCount: 0,
-        coinsEarned: 0,
-        tipsEarned: 0,
-        fansEarned: 0,
-        combo: 0,
-        bestCombo: 0,
-        dirtyTables: [],
-        counterDishes: [],
-      };
-      if (run.guests.length < 3) spawnShiftGuest(run);
-      ev.push({ t: 'shiftOpen', duration });
-      return ev;
+      return startShiftCmd(run, ev);
     }
     case 'closeShift': {
       if (run.phase !== 'camp' || run.dinerShift.mode !== 'open') return null;
@@ -2223,51 +1891,41 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
     }
     case 'finishSummary': {
       if (run.dinerShift.mode !== 'summary') return null;
-      run.dinerShift = makeIdleShift();
+      run.dinerShift = makeIdleShift(0);
       run.guests = run.guests
         .filter((g) => !g.served && g.walkState !== 'leaving' && !g.angry)
         .map((g) => ({ ...g, patience: 9999, maxPatience: 9999, eatT: 0 }));
       return ev;
     }
     case 'toggleMenuDish': {
-      const m = MEALS[cmd.id];
-      if (!m || m.unlockDay > Math.max(1, run.day)) return null;
-      const idx = run.diner.menu.indexOf(cmd.id);
-      if (idx >= 0) {
-        if (run.diner.menu.length <= 1) return null;
-        run.diner.menu.splice(idx, 1);
-      } else {
-        run.diner.menu.push(cmd.id);
-      }
-      return ev;
+      return toggleMenuDishCmd(run, cmd.id, ev);
     }
     case 'upgradeDish': {
-      const m = MEALS[cmd.id];
-      if (!m || m.unlockDay > Math.max(1, run.day)) return null;
-      const lv = dishLevel(run, cmd.id);
-      if (lv >= MAX_DISH_LV) return null;
-      const cost = dishUpgradeCost(cmd.id, lv);
-      if (run.coins < cost) return null;
-      run.coins -= cost;
-      run.diner.dishLevels[cmd.id] = lv + 1;
-      for (const g of run.guests) {
-        if (!g.served && g.orderKind === 'dish' && g.dish === cmd.id) {
-          g.pay = Math.round((g.pay * dishLevelPayMul(lv + 1)) / dishLevelPayMul(lv));
-        }
-      }
-      ev.push({ t: 'shop', item: `${m.name} Lv.${lv + 1}` });
-      return ev;
+      return upgradeDishCmd(run, cmd.id, ev);
     }
     case 'buyTavernUpgrade': {
-      const u = TAVERN_UPGRADES[cmd.id];
-      if (!u || run.diner.upgrades.includes(cmd.id) || run.coins < u.cost) return null;
-      run.coins -= u.cost;
-      run.diner.upgrades.push(cmd.id);
-      ev.push({ t: 'shop', item: u.name });
-      return ev;
+      return buyTavernUpgradeCmd(run, cmd.id, ev);
+    }
+    case 'postRecruitment': {
+      return postRecruitmentCmd(run, cmd.tier, ev);
+    }
+    case 'hireStaff': {
+      return hireStaffCmd(run, cmd.id, ev);
+    }
+    case 'setStaffRole': {
+      return setStaffRoleCmd(run, cmd.id, cmd.role, ev);
+    }
+    case 'trainStaff': {
+      return trainStaffCmd(run, cmd.id, ev);
+    }
+    case 'setAllyRole': {
+      return setAllyRoleCmd(run, cmd.ally, cmd.role, ev);
+    }
+    case 'upgradeRack': {
+      return upgradeRackCmd(run, ev);
     }
     case 'startPour': {
-      if (run.phase !== 'camp' || !run.inside || run.dinerCook || run.carryingDish || run.carryingDrink || run.pourMinigame) return null;
+      if (run.phase !== 'camp' || !run.inside || run.carryingDish || run.carryingDrink || run.pourMinigame) return null;
       const guest = (cmd.guestId ? run.guests.find((o) => o.id === cmd.guestId && !o.served && o.walkState !== 'leaving') : undefined)
         ?? run.guests.filter((o) => o.orderKind === 'drink' && !o.served && o.walkState === 'seated' && o.drink === cmd.drink).sort((a, b) => a.patience - b.patience)[0]
         ?? run.guests.filter((o) => o.orderKind === 'drink' && !o.served && o.walkState === 'seated').sort((a, b) => a.patience - b.patience)[0];
@@ -2300,7 +1958,7 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       const carried = run.carryingDrink;
       const g = (cmd.guestId ? run.guests.find((o) => o.id === cmd.guestId && !o.served && o.walkState !== 'leaving') : undefined)
         ?? (carried.guestId ? run.guests.find((o) => o.id === carried.guestId && !o.served && o.walkState !== 'leaving') : undefined)
-        ?? run.guests.find((o) => o.orderKind === 'drink' && !o.served && o.walkState === 'seated' && o.drink === carried.drink)
+        ?? run.guests.filter((o) => o.orderKind === 'drink' && !o.served && o.walkState === 'seated' && o.drink === carried.drink)[0]
         ?? run.guests.find((o) => o.orderKind === 'drink' && !o.served && o.walkState === 'seated');
       run.carryingDrink = null;
       if (!g) return ev;
@@ -2320,12 +1978,12 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       return ev;
     }
     case 'pickCounterDish': {
-      if (run.phase !== 'camp' || !run.inside || run.carryingDish || run.carryingDrink || run.dinerCook || run.pourMinigame) return null;
+      if (run.phase !== 'camp' || !run.inside || run.carryingDish || run.carryingDrink || run.pourMinigame) return null;
       const list = run.dinerShift.counterDishes;
       if (list.length === 0) return null;
       const idx = cmd.id !== undefined ? Math.max(0, list.findIndex((c) => c.id === cmd.id)) : 0;
       const [cd] = list.splice(idx, 1);
-      run.carryingDish = { guestId: cd.guestId, dish: cd.dish, dishName: cd.dishName, quality: cd.quality };
+      run.carryingDish = { guestId: cd.guestId, dish: cd.dish, dishName: cd.dishName, quality: cd.quality, isRye: cd.isRye };
       return ev;
     }
     case 'focusTarget': {
@@ -2466,64 +2124,67 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       run.coins += 45 + removed.star * 20;
       return ev;
     }
-    case 'startCook': {
-      if (run.phase !== 'camp' || !run.inside || run.dinerCook || run.carryingDish || run.carryingDrink || run.pourMinigame) return null;
-      const g = run.guests.find((o) => o.id === cmd.guestId && o.orderKind === 'dish' && !o.served && o.walkState !== 'leaving');
-      if (!g || run.meat < g.meatCost) return null;
-      run.dinerCook = { guestId: g.id, dish: g.dish, dishName: g.dishName, startedTick: run.tick, pos: 0 };
-      return ev;
-    }
-    case 'finishCook': {
-      if (run.phase !== 'camp' || !run.inside || !run.dinerCook) return null;
-      const cook = run.dinerCook;
-      const g = run.guests.find((o) => o.id === cook.guestId && !o.served && o.walkState !== 'leaving');
-      run.dinerCook = null;
-      if (!g || run.meat < g.meatCost) return null;
-      run.meat -= g.meatCost;
-      const quality: DishQuality = cmd.quick ? 'good' : qteQuality(cook.pos);
-      run.carryingDish = { guestId: g.id, dish: cook.dish, dishName: cook.dishName, quality };
-      ev.push({ t: 'cookDone', guestId: g.id, dish: cook.dish, dishName: cook.dishName, quality });
-      return ev;
-    }
-    case 'cancelCook': {
-      if (!run.dinerCook) return null;
-      run.dinerCook = null;
-      return ev;
-    }
     case 'serveCarried': {
       if (run.phase !== 'camp' || !run.inside || !run.carryingDish) return null;
       const carried = run.carryingDish;
       const g = run.guests.find((o) => o.id === carried.guestId && !o.served && o.walkState !== 'leaving')
-        ?? run.guests.find((o) => o.orderKind === 'dish' && !o.served && o.walkState === 'seated' && o.dish === carried.dish);
+        ?? run.guests.find((o) => o.orderKind === 'dish' && !o.served && o.walkState === 'seated' && !o.isRye && o.dish === carried.dish)
+        ?? run.guests.find((o) => o.orderKind === 'dish' && !o.served && o.walkState === 'seated');
       run.carryingDish = null;
       if (!g) return ev;
-      completeServeGuest(run, g, carried.quality, ev, false, false);
+      completeServeGuest(run, g, carried.quality, ev, false, false, carried.isRye);
       return ev;
     }
     case 'serveGuest': {
       if (run.phase !== 'camp') return null;
       const g = run.guests.find((o) => o.id === cmd.guestId && !o.served && o.walkState !== 'leaving');
       if (!g) return null;
-      if (g.orderKind === 'dish' && run.meat < g.meatCost) return null;
-      if (run.dinerCook?.guestId === g.id) run.dinerCook = null;
+      if (g.orderKind === 'dish' && !g.isRye) {
+        if ((run.diner.menuStock[g.dish] ?? 0) > 0) {
+          run.diner.menuStock[g.dish]! -= 1;
+        } else if (!hasIngredients(run, MEALS[g.dish].cost)) {
+          return null;
+        } else {
+          spendIngredients(run, MEALS[g.dish].cost);
+        }
+      }
       if (run.carryingDish?.guestId === g.id) run.carryingDish = null;
-      completeServeGuest(run, g, cmd.quality ?? 'good', ev, g.orderKind === 'dish', g.orderKind === 'drink');
+      completeServeGuest(run, g, cmd.quality ?? 'good', ev, false, g.orderKind === 'drink', g.isRye);
       return ev;
     }
     case 'cookSell': {
-      const n = Math.min(run.meat, Math.max(0, Math.floor(cmd.count)));
-      if (n <= 0) return null;
-      const earned = n * meatPrice(run.cls);
-      run.meat -= n; run.coins += earned;
-      ev.push({ t: 'cook', meat: n, coins: earned });
-      return ev;
+      return sellMeatKindCmd(run, 'tender', cmd.count, ev);
+    }
+    case 'sellMeatKind': {
+      return sellMeatKindCmd(run, cmd.kind, cmd.count, ev);
+    }
+    case 'buySpice': {
+      return buySpiceCmd(run, cmd.count, ev);
+    }
+    case 'grindMortar': {
+      return grindMortarCmd(run, ev);
+    }
+    case 'researchDish': {
+      return researchDishCmd(run, cmd.id, ev);
+    }
+    case 'prepDish': {
+      return prepDishCmd(run, cmd.id, cmd.batches, ev);
+    }
+    case 'toggleAutoSupply': {
+      return toggleAutoSupplyCmd(run, cmd.id, ev);
     }
     case 'pickMeal': {
       if (run.phase !== 'camp' || run.meal !== null) return null;
       const m = MEALS[cmd.id];
-      if (!m || m.unlockDay > Math.max(1, run.day) || run.meat < m.meatCost) return null;
+      if (!m || !run.diner.researched.includes(cmd.id)) return null;
+      if ((run.diner.menuStock[cmd.id] ?? 0) > 0) {
+        run.diner.menuStock[cmd.id]! -= 1;
+      } else if (hasIngredients(run, m.cost)) {
+        spendIngredients(run, m.cost);
+      } else {
+        return null;
+      }
       const quality: DishQuality = cmd.quality ?? 'good';
-      run.meat -= m.meatCost;
       run.meal = cmd.id;
       run.mealQuality = quality;
       if (m.heal > 0) {
@@ -2534,97 +2195,5 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       ev.push({ t: 'meal', id: cmd.id, quality });
       return ev;
     }
-  }
-}
-
-function completeServeGuest(run: RunState, g: DinerGuest, quality: DishQuality, ev: GameEvent[], spendMeat: boolean, isDrink = false) {
-  const qMeta = QUALITY_META[quality];
-  const vip = VIP_CUSTOMERS.find((v) => v.id === g.vipId);
-  if (spendMeat) run.meat -= g.meatCost;
-  g.served = true;
-  g.qualityServed = quality;
-  g.reactionQuote = vip?.reactions[quality] ?? g.thanksQuote;
-
-  const isRush = run.dinerShift.mode === 'open';
-  g.eatT = isRush ? 180 : 0;
-
-  let comboTip = 0;
-  if (isRush) {
-    run.dinerShift.combo++;
-    run.dinerShift.bestCombo = Math.max(run.dinerShift.bestCombo, run.dinerShift.combo);
-    comboTip = Math.min(20, (run.dinerShift.combo - 1) * 3);
-  }
-
-  const beforeRank = getFansRank(run.diner.fans).cur.grade;
-  const baseCoins = Math.round(g.pay * qMeta.payMul);
-  const finalCoins = baseCoins + comboTip;
-  const zhaoMul = hasAlly(run, 'zhao') ? 1.3 : 1;
-  const chefFans = run.cls === 'chef' ? 1.25 : 1;
-  const trendFans = g.trendMatch ? 2 : 1;
-  const tierFans = g.tier === 'bronze' ? 1 : g.tier === 'silver' ? 1.2 : g.tier === 'gold' ? 1.4 : g.tier === 'platinum' ? 1.7 : 2.1;
-  const drinkDef = isDrink && g.drink ? DRINKS[g.drink] : null;
-  const fansGain = drinkDef
-    ? Math.round(drinkDef.fans * qMeta.payMul * zhaoMul * chefFans * tierFans)
-    : Math.round(qMeta.fans * trendFans * zhaoMul * chefFans * tierFans);
-  const repGain = drinkDef
-    ? drinkDef.rep + (quality === 'legendary' ? 1 : 0)
-    : qMeta.rep + (g.trendMatch ? 1 : 0);
-
-  run.coins += finalCoins;
-  run.diner.fans += fansGain;
-  run.diner.rep += repGain;
-  run.diner.servedTotal++;
-  if (isRush) {
-    run.dinerShift.servedCount++;
-    if (isDrink) run.dinerShift.drinkCount++;
-    run.dinerShift.coinsEarned += baseCoins;
-    run.dinerShift.tipsEarned += comboTip;
-    run.dinerShift.fansEarned += fansGain;
-  }
-
-  const firstMeet = !run.diner.metVips.includes(g.vipId);
-  if (firstMeet) run.diner.metVips.push(g.vipId);
-
-  const pool = DINER_REVIEW_POOL[quality];
-  const revText = pool[Math.floor(rand(run) * pool.length)] ?? g.reactionQuote;
-  run.diner.reviews.unshift({
-    id: run.nextId++,
-    author: g.name,
-    tierName: VIP_TIERS[g.tier].name,
-    dishName: g.dishName,
-    quality,
-    text: revText,
-    fansDelta: fansGain,
-  });
-  if (run.diner.reviews.length > 12) run.diner.reviews.length = 12;
-
-  const allServed = !isRush && run.guests.length > 0 && run.guests.every((o) => o.served);
-  let totalCoins = finalCoins;
-  if (allServed) {
-    const tip = run.cls === 'chef' ? 28 : 18;
-    run.coins += tip;
-    totalCoins += tip;
-    run.diner.fans += 8;
-    run.diner.rep += 1;
-    run.player.hp = Math.min(run.player.maxHp, run.player.hp + 15);
-  }
-
-  const afterRank = getFansRank(run.diner.fans).cur;
-  const rankUp = afterRank.grade !== beforeRank ? `${afterRank.grade}级·${afterRank.name}` : undefined;
-  ev.push({
-    t: 'serve', guestId: g.id, vipId: g.vipId, name: g.name, dishName: g.dishName,
-    quality, coins: totalCoins, fans: fansGain + (allServed ? 8 : 0), rep: repGain + (allServed ? 1 : 0),
-    quote: g.reactionQuote, allServed, firstMeet, trendMatch: g.trendMatch, rankUp,
-  });
-
-  if (run.diner.rep >= 10 && !run.story.seenEvents.includes('rep10')) {
-    run.story.seenEvents.push('rep10');
-    ev.push({ t: 'dinerStory', eventKey: 'rep10' });
-  } else if (run.diner.rep >= 25 && !run.story.seenEvents.includes('rep25')) {
-    run.story.seenEvents.push('rep25');
-    ev.push({ t: 'dinerStory', eventKey: 'rep25' });
-  } else if (run.diner.rep >= 40 && !run.story.seenEvents.includes('rep40')) {
-    run.story.seenEvents.push('rep40');
-    ev.push({ t: 'dinerStory', eventKey: 'rep40' });
   }
 }

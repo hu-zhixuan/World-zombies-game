@@ -2,9 +2,9 @@
 import Phaser from 'phaser';
 import { game } from '../app/game';
 import { ASSETS } from '../assets';
-import { DRINKS, MEALS, WEAPONS, ZOMBIES } from '../content/data';
+import { DRINKS, MEALS, MEATS, RYE_FALLBACK, WEAPONS, ZOMBIES, type MealId } from '../content/data';
 import { ALLIES, QUALITY_META } from '../content/story';
-import { BODY_Y, FORT_GUN_X, computeGrenadeThrow, curWeapon, houseBuff, nearbyCampTarget, turretWorldPos, zombieBodyY } from '../sim/sim';
+import { BODY_Y, FORT_GUN_X, allyRole, computeGrenadeThrow, curWeapon, hasTavernUpgrade, houseBuff, nearbyCampTarget, staffDef, stoveCapacity, turretWorldPos, zombieBodyY } from '../sim/sim';
 import {
   ALLY_POS, DINER_PLATE_X, DOOR_X, GROUND_Y, IN_STATIONS, LADDER_X, PORCH_MAX_X, PORCH_MIN_X, PORCH_Y,
   ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, TURRET_SLOTS, VIEW_H, WALL_X, WORLD_W, type GameEvent,
@@ -15,6 +15,7 @@ import { PALETTE as C } from '../ui/palette';
 export { VIEW_H };
 
 const D = { sky: 0, town: 1, back: 2, ground: 3, prop: 4, actor: 5, fx: 6, mark: 7 };
+const dishIconKey = (id: MealId | 'rye', isRye?: boolean) => (isRye || id === 'rye' ? RYE_FALLBACK.icon : MEALS[id].icon);
 
 /** 每把枪精确的握把锚点、前臂伸展距离与枪口前伸量（对齐 15x8 hero_arm 拳头中心与紧裁武器轮廓） */
 const WEAPON_GRIP: Record<string, { ox: number; oy: number; reach: number; gyOff: number; muzzle: number; scale: number; kick: number; recoil: number; shake: number }> = {
@@ -44,6 +45,11 @@ export class GameScene extends Phaser.Scene {
   // 室外与室内两组静态舞台物件（随 run.inside 快速切换可见性）
   private extObjs: { setVisible(v: boolean): void }[] = [];
   private intObjs: { setVisible(v: boolean): void }[] = [];
+  private tavernPropTable6!: Phaser.GameObjects.Image;
+  private tavernPropTable8!: Phaser.GameObjects.Image;
+  private tavernPropPass!: Phaser.GameObjects.Image;
+  private tavernPropTap!: Phaser.GameObjects.Image;
+  private tavernChandObjs: { setVisible(v: boolean): void }[] = [];
   private fortKeepObjs: Phaser.GameObjects.GameObject[] = [];
   private fortCannon!: Phaser.GameObjects.Image;
   private turretSprites: (Phaser.GameObjects.Sprite | Phaser.GameObjects.Image | null)[] = [null, null, null, null];
@@ -56,6 +62,8 @@ export class GameScene extends Phaser.Scene {
   private guestSprites = new Map<string, Phaser.GameObjects.Sprite>();
   private guestDishSprites = new Map<string, Phaser.GameObjects.Image>();
   private guestBubbleIcons = new Map<string, Phaser.GameObjects.Image>();
+  private staffSprites = new Map<string, Phaser.GameObjects.Sprite>();
+  private staffDishSprites = new Map<string, Phaser.GameObjects.Image>();
   private dirtyPlateSprites = new Map<number, Phaser.GameObjects.Image>();
   private counterDishSprites: Phaser.GameObjects.Image[] = [];
   private crates = new Map<number, Phaser.GameObjects.Image>();
@@ -177,16 +185,28 @@ export class GameScene extends Phaser.Scene {
     wPush(3, 'crate_stack', WALL_X + 4, GROUND_Y, 0.72, D.back);
     wPush(3, 'barbed_wire', WALL_X + 16, GROUND_Y - 26, 1, D.prop);
 
-    // ── 室内：哥特木石酒馆温馨剖面（左砖窑烤炉料理区 / 中明窗双木桌堂食区 / 右铁砧整备与出击木门） ──
+    // ── 室内：哥特木石酒馆温馨剖面（扩建宽 720*1.12 ≈ 806px，支持 4 桌 8 座与 4 大件硬体实景显隐） ──
     const intAdd = <T extends { setVisible(v: boolean): void }>(o: T) => { this.intObjs.push(o); return o; };
     intAdd(this.add.image(40, GROUND_Y + 26, 'tavern_interior').setOrigin(0, 1).setScale(1.12).setDepth(D.ground));
     for (const [lx, ly, r, col] of [
       [118, GROUND_Y - 14, 58, C.ember],   // 砖窑炉口炉火暖光
       [302, GROUND_Y - 68, 72, C.lamp],    // 左拱窗与餐桌暖光
-      [420, GROUND_Y - 68, 72, C.lamp],    // 右拱窗与餐桌暖光
-      [520, GROUND_Y - 46, 54, C.lamp],    // 铁砧工作台暖光
+      [454, GROUND_Y - 68, 72, C.lamp],    // 中拱窗与扩建区暖光
+      [606, GROUND_Y - 68, 72, C.lamp],    // 右拱窗与扩建区暖光
+      [718, GROUND_Y - 46, 56, C.lamp],    // 铁砧与军械柜台暖光
     ] as [number, number, number, number][]) {
       intAdd(this.add.pointlight(lx, ly, col, r, 0.22, 0.07).setDepth(D.fx));
+    }
+
+    // 4 件实体酒馆装修升级（买入立刻现身：3/4 号扩建橡木桌、双层传菜木架、精铜酒栓吧台、暖琥珀吊灯）
+    this.tavernPropTable6 = this.add.image(468, GROUND_Y, 'tavern_prop_table').setOrigin(0, 1).setScale(1.12).setDepth(D.prop - 0.1).setVisible(false);
+    this.tavernPropTable8 = this.add.image(578, GROUND_Y, 'tavern_prop_table').setOrigin(0, 1).setScale(1.12).setDepth(D.prop - 0.1).setVisible(false);
+    this.tavernPropPass = this.add.image(IN_STATIONS.pass + 4, GROUND_Y, 'tavern_prop_pass').setOrigin(0.5, 1).setScale(1.12).setDepth(D.prop - 0.18).setVisible(false);
+    this.tavernPropTap = this.add.image(IN_STATIONS.drink - 10, GROUND_Y, 'tavern_prop_tap').setOrigin(0.5, 1).setScale(1.12).setDepth(D.prop - 0.12).setVisible(false);
+    for (const cx of [290, 412, 530, 646]) {
+      const ch = this.add.image(cx, GROUND_Y - 82, 'tavern_prop_chandelier').setOrigin(0.5, 0).setScale(1.12).setDepth(D.prop + 0.1).setVisible(false);
+      const glow = this.add.pointlight(cx, GROUND_Y - 64, C.gold, 70, 0.28, 0.06).setDepth(D.fx).setVisible(false);
+      this.tavernChandObjs.push(ch, glow);
     }
 
     // ── 角色、独立瞄准手臂/闲置手臂、手持武器、端菜托盘、特效与矢量层 ──
@@ -224,8 +244,8 @@ export class GameScene extends Phaser.Scene {
   private targetCamX() {
     const w = this.scale.gameSize.width, run = game.run, p = run.player;
     if (run.inside) {
-      // 室内宽 700：宽屏直接居中，窄屏平稳跟随主角
-      const roomSpan = 700;
+      // 室内扩建宽 880（涵盖 40..846）：宽屏居中，横屏手机平滑跟随主角
+      const roomSpan = 880;
       if (w >= roomSpan) return (roomSpan - w) / 2;
       return Phaser.Math.Clamp(p.x - w * 0.5, 0, roomSpan - w);
     }
@@ -303,11 +323,15 @@ export class GameScene extends Phaser.Scene {
     const run = game.run, inside = run.inside, now = this.time.now;
     const seen = new Set<string>();
     for (const allyId of run.story.allies) {
-      seen.add(allyId);
       const meta = ALLIES[allyId];
       const pos = ALLY_POS[allyId];
       const rt = run.allies[allyId];
       let sp = this.allySprites.get(allyId);
+      if (inside && allyRole(run, allyId) === 'dispatch') {
+        sp?.setVisible(false);
+        continue;
+      }
+      seen.add(allyId);
       if (!sp) {
         sp = this.add.sprite(0, GROUND_Y, meta.sprite).setOrigin(0.5, 1).setDepth(D.actor - 0.1).setScale(0.92);
         sp.play(meta.sprite);
@@ -354,6 +378,49 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private syncStaff() {
+    const run = game.run, inside = run.inside;
+    const seen = new Set<string>();
+    if (inside) {
+      for (const st of run.diner.hiredStaff) {
+        if (st.role === 'dispatch') continue;
+        const def = staffDef(st.id);
+        if (!def) continue;
+        seen.add(st.id);
+        let sp = this.staffSprites.get(st.id);
+        if (!sp) {
+          sp = this.add.sprite(st.x, GROUND_Y, def.sprite).setOrigin(0.5, 1).setDepth(D.actor - 0.12).setScale(0.90);
+          sp.play(def.sprite);
+          this.staffSprites.set(st.id, sp);
+        }
+        const moving = Math.abs(st.vx) > 0.05;
+        const wantAnim = moving ? `${def.sprite}_walk` : def.sprite;
+        if (sp.anims.currentAnim?.key !== wantAnim) sp.play(wantAnim, true);
+        sp.setVisible(true).setPosition(st.x, GROUND_Y).setFlipX(st.facing < 0);
+
+        const carryDish = st.carrying;
+        let carryIm = this.staffDishSprites.get(st.id);
+        if (!carryIm) {
+          carryIm = this.add.image(st.x, GROUND_Y - 34, 'ic_dish_skewer').setOrigin(0.5, 0.5).setDepth(D.mark).setScale(0.75);
+          this.staffDishSprites.set(st.id, carryIm);
+        }
+        if (carryDish) {
+          carryIm.setTexture(dishIconKey(carryDish.dish, carryDish.isRye)).setVisible(true).setPosition(st.x + st.facing * 8, GROUND_Y - 26);
+        } else {
+          carryIm.setVisible(false);
+        }
+      }
+    }
+    for (const [id, sp] of this.staffSprites) {
+      if (!seen.has(id)) {
+        sp.destroy();
+        this.staffSprites.delete(id);
+        this.staffDishSprites.get(id)?.destroy();
+        this.staffDishSprites.delete(id);
+      }
+    }
+  }
+
   private syncDinerGuests() {
     const run = game.run, inside = run.inside;
     const seen = new Set<string>();
@@ -372,7 +439,7 @@ export class GameScene extends Phaser.Scene {
         if (sp.anims.currentAnim?.key !== wantAnim) sp.play(wantAnim);
         sp.setVisible(true).setPosition(g.x, GROUND_Y).setFlipX(g.facing < 0);
 
-        const orderIcon = g.orderKind === 'drink' && g.drink ? DRINKS[g.drink].icon : MEALS[g.dish].icon;
+        const orderIcon = g.orderKind === 'drink' && g.drink ? DRINKS[g.drink].icon : dishIconKey(g.dish, g.isRye);
         const px = DINER_PLATE_X[g.seatIdx] ?? (g.x + 16);
         const py = GROUND_Y - 32;
         let dishIm = this.guestDishSprites.get(g.id);
@@ -389,7 +456,7 @@ export class GameScene extends Phaser.Scene {
         }
         const isDishTarget = g.orderKind === 'dish' && !!run.carryingDish && (
           run.carryingDish.guestId === g.id
-          || (!run.guests.some((o) => o.id === run.carryingDish!.guestId && !o.served && o.walkState !== 'leaving') && g.dish === run.carryingDish.dish)
+          || (!run.guests.some((o) => o.id === run.carryingDish!.guestId && !o.served && o.walkState !== 'leaving') && !g.isRye && g.dish === run.carryingDish.dish)
         );
         const isDrinkTarget = g.orderKind === 'drink' && !!run.carryingDrink && (
           run.carryingDrink.guestId === g.id || run.carryingDrink.drink === g.drink
@@ -440,7 +507,7 @@ export class GameScene extends Phaser.Scene {
     this.counterDishSprites.forEach((im, i) => {
       const cd = cDishes[i];
       im.setVisible(!!cd);
-      if (cd) im.setTexture(MEALS[cd.dish].icon).setPosition(IN_STATIONS.pass - 14 + i * 7, GROUND_Y - 32);
+      if (cd) im.setTexture(dishIconKey(cd.dish, cd.isRye)).setPosition(IN_STATIONS.pass - 14 + i * 7, GROUND_Y - 32);
     });
   }
 
@@ -448,9 +515,15 @@ export class GameScene extends Phaser.Scene {
     game.advance(dt);
     const run = game.run, p = run.player, now = this.time.now, inside = run.inside;
 
-    // 快速切换室内 / 室外图层
+    // 快速切换室内 / 室外图层与 4 大件硬体装修实景显隐
     for (const o of this.extObjs) o.setVisible(!inside);
     for (const o of this.intObjs) o.setVisible(inside);
+    this.tavernPropTable6.setVisible(inside && hasTavernUpgrade(run, 'tables_6'));
+    this.tavernPropTable8.setVisible(inside && hasTavernUpgrade(run, 'tables_8'));
+    this.tavernPropPass.setVisible(inside && hasTavernUpgrade(run, 'wide_pass'));
+    this.tavernPropTap.setVisible(inside && hasTavernUpgrade(run, 'fast_tap'));
+    const warmLit = inside && hasTavernUpgrade(run, 'warm_lantern');
+    for (const co of this.tavernChandObjs) co.setVisible(warmLit);
     this.sky.setVisible(!inside);
     this.town.setVisible(!inside);
 
@@ -464,6 +537,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.syncTurretSprites();
     this.syncAllies();
+    this.syncStaff();
     this.syncDinerGuests();
 
     // 摄像机跟随 + 开火/暴击/爆炸微震推拉与镜头张力缩放
@@ -508,7 +582,7 @@ export class GameScene extends Phaser.Scene {
     this.heroArm.setVisible(aliveVis);
     this.heroGun.setVisible(!inside && aliveVis);
     const carryIcon = run.carryingDish
-      ? MEALS[run.carryingDish.dish].icon
+      ? dishIconKey(run.carryingDish.dish, run.carryingDish.isRye)
       : run.carryingDrink
         ? DRINKS[run.carryingDrink.drink].icon
         : null;
@@ -695,11 +769,12 @@ export class GameScene extends Phaser.Scene {
     this.stepAndDrawImpacts(g, now);
 
     if (inside) {
-      // 酒馆沉浸互动：站位高亮 + 食客气泡/耐心条 + 脏盘/传菜台指引 + 灶台火候/酒桶斟酒世界指示条
+      // 酒馆沉浸互动：站位高亮 + 食客性格气泡/耐心条 + 脏盘/传菜台/石臼/砖灶进度指示
       const ct = nearbyCampTarget(run);
       if (ct) {
         const sx = ct.x;
-        const barW = ct.kind === 'cookStart' || ct.kind === 'cookFinish' || ct.kind === 'kitchen' ? 72
+        const barW = ct.kind === 'kitchen' ? 56
+          : ct.kind === 'grindMortar' ? 34
           : ct.kind === 'pourStart' || ct.kind === 'pourFinish' || ct.kind === 'drink' ? 42
           : ct.kind === 'pass' || ct.kind === 'pickCounter' ? 34
           : ct.kind === 'cleanTable' ? 24
@@ -714,7 +789,7 @@ export class GameScene extends Phaser.Scene {
         if (guest.served || guest.walkState !== 'seated') continue;
         const isDishTarget = guest.orderKind === 'dish' && !!run.carryingDish && (
           run.carryingDish.guestId === guest.id
-          || (!run.guests.some((o) => o.id === run.carryingDish!.guestId && !o.served && o.walkState !== 'leaving') && guest.dish === run.carryingDish.dish)
+          || (!run.guests.some((o) => o.id === run.carryingDish!.guestId && !o.served && o.walkState !== 'leaving') && !guest.isRye && guest.dish === run.carryingDish.dish)
         );
         const isDrinkTarget = guest.orderKind === 'drink' && !!run.carryingDrink && (
           run.carryingDrink.guestId === guest.id || run.carryingDrink.drink === guest.drink
@@ -726,10 +801,18 @@ export class GameScene extends Phaser.Scene {
         const gy = GROUND_Y - 62 + bob;
         const bw = isTarget ? 24 : 21;
         const bh = isTarget ? 20 : 18;
-        const borderCol = isTarget ? C.gold : isUrgent ? C.red : guest.trendMatch ? C.ember : C.copper;
+        const borderCol = isTarget ? C.gold : isUrgent ? C.red : guest.isVipRequest ? C.gold : guest.isRye ? C.grey : guest.trendMatch ? C.ember : C.copper;
         g.fillStyle(C.leather, 0.94).fillRoundedRect(gx - bw / 2, gy - bh / 2, bw, bh, 5);
-        g.lineStyle(isTarget || isUrgent ? 2 : 1.4, borderCol, 0.98).strokeRoundedRect(gx - bw / 2, gy - bh / 2, bw, bh, 5);
+        g.lineStyle(isTarget || isUrgent || guest.isVipRequest ? 2 : 1.4, borderCol, 0.98).strokeRoundedRect(gx - bw / 2, gy - bh / 2, bw, bh, 5);
         g.fillStyle(C.leather, 0.94).fillTriangle(gx - 3, gy + bh / 2 - 1, gx + 3, gy + bh / 2 - 1, gx, gy + bh / 2 + 4);
+        // 特邀点名金钻标 + 性格角标色点（急客红、老饕金、酒客琥珀）
+        if (guest.isVipRequest) {
+          g.fillStyle(C.gold, 1).fillCircle(gx - bw / 2 + 2, gy - bh / 2 + 2, 2.5);
+        }
+        if (guest.personality !== 'regular') {
+          const pAccent = guest.personality === 'hurried' ? C.red : guest.personality === 'gourmet' ? C.gold : C.lamp;
+          g.fillStyle(pAccent, 1).fillCircle(gx + bw / 2 - 2, gy - bh / 2 + 2, 2.3);
+        }
         if (rushOpen) {
           const pw = 22, py = gy + bh / 2 + 5;
           const pCol = ratio > 0.55 ? C.green : ratio > 0.25 ? C.gold : C.red;
@@ -738,6 +821,17 @@ export class GameScene extends Phaser.Scene {
         }
         if (isTarget) {
           g.fillStyle(C.gold, 0.98).fillTriangle(gx - 5, gy - bh / 2 - 8 + arrowBob, gx + 5, gy - bh / 2 - 8 + arrowBob, gx, gy - bh / 2 - 2 + arrowBob);
+        }
+      }
+      // 雇佣伙计标识环与忙碌动作条（与坐席顾客/战友一目区分）
+      for (const st of run.diner.hiredStaff) {
+        if (st.role === 'dispatch') continue;
+        const ringCol = st.role === 'kitchen' ? C.ember : st.role === 'rest' ? C.grey : C.lamp;
+        g.lineStyle(1.4, ringCol, 0.78).strokeEllipse(st.x, GROUND_Y - 1, 18, 5);
+        if (rushOpen && st.taskT > 0) {
+          const pct = Math.min(1, st.taskT / 38);
+          g.fillStyle(C.ink, 0.9).fillRoundedRect(st.x - 10, GROUND_Y - 48, 20, 3.5, 1);
+          g.fillStyle(C.green, 0.98).fillRect(st.x - 9, GROUND_Y - 47, Math.max(2, 18 * pct), 1.8);
         }
       }
       if (rushOpen && !run.carryingDish && !run.carryingDrink) {
@@ -749,19 +843,33 @@ export class GameScene extends Phaser.Scene {
           g.fillStyle(C.gold, 0.95).fillTriangle(cx - 4, GROUND_Y - 52 + arrowBob, cx + 4, GROUND_Y - 52 + arrowBob, cx, GROUND_Y - 46 + arrowBob);
         }
       }
-      if (run.dinerCook) {
-        const kx = IN_STATIONS.kitchen;
-        const ky = GROUND_Y - 72;
-        const tw = 66, th = 9;
-        const left = kx - tw / 2;
-        g.fillStyle(C.ink, 0.92).fillRoundedRect(left - 2, ky - 2, tw + 4, th + 4, 3);
-        g.fillStyle(C.woodDark, 0.95).fillRoundedRect(left, ky, tw, th, 2);
-        g.fillStyle(C.ember, 0.52).fillRect(kx - tw * 0.28, ky + 1, tw * 0.56, th - 2);
-        g.fillStyle(C.lamp, 0.72).fillRect(kx - tw * 0.12, ky + 1, tw * 0.24, th - 2);
-        g.fillStyle(C.gold, 1).fillRect(kx - tw * 0.045, ky + 1, tw * 0.09, th - 2);
-        const nx = left + Phaser.Math.Clamp(run.dinerCook.pos, 0, 1) * tw;
-        g.fillStyle(C.paper, 1).fillRect(nx - 1.5, ky - 2, 3, th + 4);
-        g.lineStyle(1.4, C.gold, 0.95).strokeRoundedRect(left - 1, ky - 1, tw + 2, th + 2, 2);
+      // 砖灶自动烹制进度条与石臼辛香辣酱存量计
+      if (rushOpen) {
+        const s = run.dinerShift;
+        const activeOrders = s.kitchenOrders.slice(0, stoveCapacity(run));
+        activeOrders.forEach((o, idx) => {
+          const ky = GROUND_Y - 66 - idx * 10;
+          const tw = 38, th = 6;
+          const left = IN_STATIONS.kitchen - tw / 2;
+          const prog = Phaser.Math.Clamp(1 - o.ticksLeft / Math.max(1, o.totalTicks), 0, 1);
+          const stalled = !o.isRye && s.sauce <= 0;
+          g.fillStyle(C.ink, 0.92).fillRoundedRect(left - 1, ky - 1, tw + 2, th + 2, 2);
+          g.fillStyle(stalled ? C.red : o.isRye ? C.grey : C.ember, 0.95).fillRect(left, ky, Math.max(2, tw * prog), th);
+          g.lineStyle(1, stalled ? C.red : C.gold, 0.9).strokeRoundedRect(left - 1, ky - 1, tw + 2, th + 2, 2);
+        });
+
+        const mx = IN_STATIONS.mortar;
+        const my = GROUND_Y - 52;
+        const sw = 28, sh = 5;
+        const sRatio = Phaser.Math.Clamp(s.sauce / Math.max(1, s.maxSauce), 0, 1);
+        const lowSauce = s.sauce <= 25 || s.sauceStalled;
+        const sCol = s.sauceStalled ? C.red : sRatio <= 0.3 ? C.ember : C.green;
+        g.fillStyle(C.ink, 0.9).fillRoundedRect(mx - sw / 2 - 1, my - 1, sw + 2, sh + 2, 2);
+        g.fillStyle(sCol, 1).fillRect(mx - sw / 2, my, Math.max(sRatio > 0 ? 2 : 0, sw * sRatio), sh);
+        g.lineStyle(1, lowSauce ? C.red : C.copper, 0.95).strokeRoundedRect(mx - sw / 2 - 1, my - 1, sw + 2, sh + 2, 2);
+        if (lowSauce) {
+          g.fillStyle(C.red, 0.98).fillTriangle(mx - 4, my - 9 + arrowBob, mx + 4, my - 9 + arrowBob, mx, my - 3 + arrowBob);
+        }
       }
       if (run.pourMinigame) {
         const dx = IN_STATIONS.drink;
@@ -1135,16 +1243,36 @@ export class GameScene extends Phaser.Scene {
         this.camZoom = Math.max(this.camZoom, e.boss ? 1.04 : 1.014);
         if (e.boss) this.cameras.main.shake(190, 0.0065);
         else if (e.crit) this.cameras.main.shake(45, 0.002);
-        floaters.add(e.x, ky - 34, '+' + e.coins + (e.meat > 0 ? ' +肉' : ''), 'coin');
+        const mTxt = e.meat > 0 ? ` +${e.meat}${e.meatKind ? MEATS[e.meatKind].short : '肉'}` : '';
+        floaters.add(e.x, ky - 34, `+${e.coins}${mTxt}`, 'coin');
+        if (e.preserved && e.meat > 0) {
+          floaters.add(e.x, ky - 48, '保鲜 ×2!', 'crit');
+        }
         break;
       }
-      case 'cookDone': {
+      case 'kitchenDone': {
         if (game.run.inside) {
-          this.burst('fx_boom', IN_STATIONS.kitchen, GROUND_Y - 38, 0.55);
+          this.burst('fx_boom', IN_STATIONS.pass, GROUND_Y - 36, 0.48);
           for (let i = 0; i < 6; i++) {
-            this.spawnSpark(IN_STATIONS.kitchen, GROUND_Y - 40, Phaser.Math.FloatBetween(-1.2, 1.2), Phaser.Math.FloatBetween(-2.2, -0.5), 0.08, 22, 2.2, e.quality === 'legendary' ? C.gold : C.ember);
+            this.spawnSpark(IN_STATIONS.pass, GROUND_Y - 38, Phaser.Math.FloatBetween(-1.2, 1.2), Phaser.Math.FloatBetween(-2.2, -0.5), 0.08, 22, 2.2, e.isRye ? C.copper : C.gold);
           }
-          floaters.add(IN_STATIONS.kitchen, GROUND_Y - 62, `${QUALITY_META[e.quality].label}！去上菜`, e.quality === 'legendary' || e.quality === 'perfect' ? 'crit' : 'coin');
+          const txt = e.extraPlate ? `余锅+1盘 ${e.dishName}` : `${e.dishName} 出锅!`;
+          floaters.add(IN_STATIONS.pass, GROUND_Y - (e.extraPlate ? 72 : 58), txt, e.isRye ? 'hurt' : 'coin');
+        }
+        break;
+      }
+      case 'grindSauce': {
+        if (game.run.inside) {
+          for (let i = 0; i < 6; i++) {
+            this.spawnSpark(IN_STATIONS.mortar, GROUND_Y - 34, Phaser.Math.FloatBetween(-1.0, 1.0), Phaser.Math.FloatBetween(-1.9, -0.5), 0.08, 20, 2.1, C.ember);
+          }
+          floaters.add(IN_STATIONS.mortar, GROUND_Y - 56, e.byStaff ? `${e.byStaff}磨酱 ${e.sauce}%` : `辣酱 ${e.sauce}%`, 'coin');
+        }
+        break;
+      }
+      case 'sauceEmpty': {
+        if (game.run.inside) {
+          floaters.add(IN_STATIONS.mortar, GROUND_Y - 62, '辣酱耗尽！去磨酱', 'hurt');
         }
         break;
       }
@@ -1162,7 +1290,30 @@ export class GameScene extends Phaser.Scene {
           for (let i = 0; i < 5; i++) {
             this.spawnSpark(e.x, GROUND_Y - 34, Phaser.Math.FloatBetween(-1.0, 1.0), Phaser.Math.FloatBetween(-1.8, -0.4), 0.07, 18, 2.0, C.green);
           }
-          floaters.add(e.x, GROUND_Y - 54, `收拾+${e.coins}金`, 'coin');
+          floaters.add(e.x, GROUND_Y - 54, `${e.byStaff ?? ''}收碗+${e.coins}金`, 'coin');
+        }
+        break;
+      }
+      case 'dispatchReturn': {
+        if (game.run.inside) {
+          floaters.add(IN_STATIONS.door - 40, GROUND_Y - 68, `派遣归来 +${e.spice}香料`, 'crit');
+        }
+        break;
+      }
+      case 'rackHarvest': {
+        if (game.run.inside) {
+          floaters.add(IN_STATIONS.kitchen, GROUND_Y - 72, `贮肉架 +${e.tender}嫩/+${e.thick}厚`, 'coin');
+        }
+        break;
+      }
+      case 'partyStart': {
+        if (game.run.inside) {
+          for (const lx of [280, 390]) {
+            for (let i = 0; i < 6; i++) {
+              this.spawnSpark(lx, GROUND_Y - 74, Phaser.Math.FloatBetween(-1.5, 1.5), Phaser.Math.FloatBetween(-2.0, 0.2), 0.03, 28, 2.4, C.gold);
+            }
+          }
+          floaters.add(340, GROUND_Y - 82, `${e.name} 今夜开宴!`, 'crit');
         }
         break;
       }
@@ -1199,6 +1350,11 @@ export class GameScene extends Phaser.Scene {
           this.spawnSpark(gx, GROUND_Y - 40, Phaser.Math.FloatBetween(-1.4, 1.4), Phaser.Math.FloatBetween(-2.2, -0.6), 0.08, 26, 2.2, e.quality === 'legendary' ? C.gold : C.ember);
         }
         floaters.add(gx, GROUND_Y - 62, '+' + e.coins + '金', 'coin');
+        if (e.vipRequestClear) {
+          floaters.add(gx, GROUND_Y - 80, '点名委托达成 +2灵感!', 'crit');
+        } else if (e.partyMatch) {
+          floaters.add(gx, GROUND_Y - 80, '派对大卖!', 'crit');
+        }
         break;
       }
       case 'allyJoin':
@@ -1247,6 +1403,15 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'bossAppear':
         this.cameras.main.shake(260, 0.008);
+        break;
+      case 'endlessEnter':
+        this.camX = this.targetCamX();
+        if (game.run.inside) {
+          for (let i = 0; i < 12; i++) {
+            this.spawnSpark(380, GROUND_Y - 62, Phaser.Math.FloatBetween(-2.2, 2.2), Phaser.Math.FloatBetween(-2.4, -0.3), 0.04, 28, 2.6, C.gold);
+          }
+          floaters.add(380, GROUND_Y - 76, '破晓无尽酒馆 开业!', 'crit');
+        }
         break;
       case 'skill':
         this.cameras.main.flash(180, (C.lamp >> 16) & 255, (C.lamp >> 8) & 255, C.lamp & 255);

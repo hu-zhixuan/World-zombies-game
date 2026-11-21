@@ -590,23 +590,34 @@ export const VIP_CUSTOMERS: VipDef[] = legacyRest.VIP_CUSTOMERS.map((v) => {
   };
 });
 
-export interface FansRankDef { grade: string; name: string; minFans: number; unlock: string }
+export interface FansRankDef {
+  grade: string;
+  name: string;
+  minFans: number;
+  minTaste: number;
+  minResearched: number;
+  maxStaff: number;
+  unlock: string;
+}
 export const FANS_RANKS: FansRankDef[] = [
-  { grade: 'E', name: '据点小灶', minFans: 0, unlock: '开启深夜食堂堂食与青铜熟客' },
-  { grade: 'D', name: '暮夜风味摊', minFans: 60, unlock: '吸引白银级江湖客来访' },
-  { grade: 'C', name: '酒馆名厨坊', minFans: 180, unlock: '解锁黄金级特邀常客' },
-  { grade: 'B', name: '要塞星级厨', minFans: 400, unlock: '全镇守夜人闻香而来' },
-  { grade: 'A', name: '暮夜名厨阁', minFans: 700, unlock: '解锁铂金势力人物' },
-  { grade: 'S', name: '长夜传奇食堂', minFans: 1000, unlock: '吸引传说人物与全图鉴朝圣' },
+  { grade: 'E', name: '据点小灶',     minFans: 0,    minTaste: 0,   minResearched: 2,  maxStaff: 1, unlock: '开启深夜酒馆堂食与青铜熟客（2 菜位 / 1 伙计）' },
+  { grade: 'D', name: '暮夜风味摊',   minFans: 60,   minTaste: 115, minResearched: 3,  maxStaff: 2, unlock: '解锁 3 菜位 · 2 伙计编 · 吸引白银级江湖客' },
+  { grade: 'C', name: '酒馆名厨坊',   minFans: 180,  minTaste: 175, minResearched: 5,  maxStaff: 3, unlock: '解锁黄金特邀常客 · 3 伙计编 · 赠送香料守备包' },
+  { grade: 'B', name: '要塞星级厨',   minFans: 400,  minTaste: 245, minResearched: 7,  maxStaff: 4, unlock: '解锁 4 菜位 · 4 伙计编 · 全镇守夜人闻香而来' },
+  { grade: 'A', name: '暮夜名厨阁',   minFans: 700,  minTaste: 330, minResearched: 9,  maxStaff: 5, unlock: '解锁 5 菜位 · 5 伙计编 · 解锁铂金势力人物' },
+  { grade: 'S', name: '长夜传奇食堂', minFans: 1000, minTaste: 420, minResearched: 11, maxStaff: 6, unlock: '6 伙计全编制 · 吸引传说人物与全图鉴朝圣' },
 ];
 
-export function getFansRank(fans: number) {
+export function getFansRank(fans: number, bestTaste = 999, researched = 99) {
   let cur = FANS_RANKS[0];
   let next: FansRankDef | null = FANS_RANKS[1];
   for (let i = 0; i < FANS_RANKS.length; i++) {
-    if (fans >= FANS_RANKS[i].minFans) {
-      cur = FANS_RANKS[i];
+    const r = FANS_RANKS[i];
+    if (fans >= r.minFans && bestTaste >= r.minTaste && researched >= r.minResearched) {
+      cur = r;
       next = FANS_RANKS[i + 1] ?? null;
+    } else {
+      break;
     }
   }
   return { cur, next };

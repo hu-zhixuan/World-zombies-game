@@ -1,4 +1,4 @@
-import type { ClassId, DifficultyId, DrinkId, MealId, PerkId, TavernUpgradeId, TurretType, WeaponId, ZombieKind } from '../content/data';
+import type { AdTierId, ClassId, DifficultyId, DrinkId, MealId, MeatInventory, MeatKind, PerkId, StaffRole, TavernUpgradeId, TurretType, WeaponId, ZombieKind } from '../content/data';
 import type { AllyId, DishQuality, VipTierId } from '../content/story';
 
 /** 世界尺寸（逻辑像素）。画面高 310，室外地面线在 222，下面留给石墙地基与手指按键。 */
@@ -35,29 +35,30 @@ export const TURRET_SLOTS = [
   { id: 3, x: 364, y: 0,      roof: false, name: '前线堡垒' },
 ] as const;
 
-/** 酒馆室内动线（对应 560x220 哥特木石酒馆剖面图 * 1.12 缩放后的世界坐标，工位与餐桌精确对齐） */
+/** 酒馆室内动线（对应 720x220 哥特木石酒馆剖面图 * 1.12 ≈ 806px 缩放后的世界坐标，支持 4 桌 8 座扩建） */
 export const IN_MIN_X = 76;
-export const IN_MAX_X = 626;
+export const IN_MAX_X = 804;
 export const IN_STATIONS = {
-  kitchen: 128,
-  pass: 184,
-  drink: 232,
-  shop: 500,
-  workshop: 542,
-  door: 600,
+  kitchen: 112,
+  mortar: 152,
+  pass: 192,
+  drink: 236,
+  shop: 700,
+  workshop: 736,
+  door: 782,
 } as const;
 export type StationId = keyof typeof IN_STATIONS;
 
-/** 酒馆餐桌 4 个食客座位与对应桌面摆盘/收碗世界 X 坐标 */
-export const DINER_SEAT_X = [266, 364, 385, 466] as const;
-export const DINER_PLATE_X = [296, 338, 408, 444] as const;
+/** 酒馆餐桌最多 8 个食客座位（4桌：基础4座 + 扩建6/8座）与对应桌面摆盘/收碗世界 X 坐标 */
+export const DINER_SEAT_X = [258, 342, 368, 452, 477, 559, 587, 669] as const;
+export const DINER_PLATE_X = [282, 316, 390, 424, 498, 536, 608, 646] as const;
 
-/** 四位战友室外守城位置与室内营地站位（全部彼此保持充足间距） */
+/** 四位战友室外守城位置与室内营地站位（随扩建大堂拉大站位间距） */
 export const ALLY_POS: Record<AllyId, { extX: number; extY: number; intX: number; intFlip: boolean }> = {
-  zhang: { extX: 132, extY: ROOF_Y,  intX: 316, intFlip: false },
-  lin:   { extX: 266, extY: PORCH_Y, intX: 156, intFlip: false },
-  qiang: { extX: 342, extY: 0,       intX: 572, intFlip: true },
-  zhao:  { extX: 58,  extY: ROOF_Y,  intX: 424, intFlip: true },
+  zhang: { extX: 132, extY: ROOF_Y,  intX: 355, intFlip: false },
+  lin:   { extX: 266, extY: PORCH_Y, intX: 130, intFlip: false },
+  qiang: { extX: 342, extY: 0,       intX: 760, intFlip: true },
+  zhao:  { extX: 58,  extY: ROOF_Y,  intX: 545, intFlip: true },
 };
 
 export type Phase = 'fight' | 'clear' | 'perk' | 'camp' | 'dead' | 'won';
@@ -112,10 +113,13 @@ export interface AllyRuntime {
   staffGuestId?: string;
 }
 
+export type GuestPersonality = 'regular' | 'hurried' | 'gourmet' | 'drinker';
+
 export interface DinerGuest {
   id: string;
   vipId: string;
   tier: VipTierId;
+  personality: GuestPersonality;
   name: string;
   role: string;
   sprite: string;
@@ -128,9 +132,11 @@ export interface DinerGuest {
   dish: MealId;
   drink?: DrinkId;
   dishName: string;
-  meatCost: number;
   pay: number;
   trendMatch: boolean;
+  isRye?: boolean;
+  isVipRequest?: boolean;
+  requestBonusCoins?: number;
   orderQuote: string;
   thanksQuote: string;
   served: boolean;
@@ -155,9 +161,21 @@ export interface DinerReview {
 export interface CounterDish {
   id: number;
   guestId: string;
-  dish: MealId;
+  dish: MealId | 'rye';
   dishName: string;
   quality: DishQuality;
+  isRye?: boolean;
+}
+
+export interface KitchenOrder {
+  id: number;
+  guestId: string;
+  dish: MealId | 'rye';
+  dishName: string;
+  ticksLeft: number;
+  totalTicks: number;
+  sauceCost: number;
+  isRye?: boolean;
 }
 
 export interface DirtyPlate {
@@ -181,6 +199,22 @@ export interface CarriedDrinkState {
   quality: DishQuality;
 }
 
+export interface ShiftReport {
+  dishCoins: number;
+  drinkCoins: number;
+  tipsCoins: number;
+  partyBonusCoins: number;
+  spiceExpense: number;
+  staffWages: number;
+  upkeepCost: number;
+  ryePenaltyCount: number;
+  angryCount: number;
+  dirtyLeftCount: number;
+  rating: number;
+  flameEarned: number;
+  netProfit: number;
+}
+
 export interface DinerShiftState {
   mode: 'prep' | 'open' | 'summary';
   timer: number;
@@ -190,27 +224,67 @@ export interface DinerShiftState {
   drinkCount: number;
   cleanedCount: number;
   lostCount: number;
+  ryeCount: number;
   coinsEarned: number;
   tipsEarned: number;
+  partyBonusCoins?: number;
   fansEarned: number;
+  spiceSpentCoins: number;
   combo: number;
   bestCombo: number;
+  sauce: number;
+  maxSauce: number;
+  sauceStalled: boolean;
+  kitchenOrders: KitchenOrder[];
   dirtyTables: DirtyPlate[];
   counterDishes: CounterDish[];
+  report: ShiftReport | null;
+}
+
+export interface StaffCarriedDish {
+  guestId: string;
+  dish: MealId | 'rye';
+  dishName: string;
+  quality: DishQuality;
+  isRye?: boolean;
+}
+
+export interface HiredStaffState {
+  id: string;
+  level: number;
+  role: StaffRole;
+  x: number;
+  vx: number;
+  facing: 1 | -1;
+  task: 'idle' | 'clean' | 'serve' | 'drink' | 'mortar' | 'cook';
+  taskT: number;
+  targetId?: number | string | null;
+  carrying?: StaffCarriedDish | null;
 }
 
 export interface DinerState {
   rep: number;
   fans: number;
+  flame: number;
+  bestTaste: number;
   trendId: string;
   trendTag: string;
   trendTitle: string;
   servedTotal: number;
   metVips: string[];
   reviews: DinerReview[];
+  researched: MealId[];
   dishLevels: Partial<Record<MealId, number>>;
   menu: MealId[];
+  menuStock: Partial<Record<MealId, number>>;
+  autoSupply: Partial<Record<MealId, boolean>>;
   upgrades: TavernUpgradeId[];
+  hiredStaff: HiredStaffState[];
+  applicants: { id: string; startLevel: number }[];
+  adTier: AdTierId | null;
+  rackLevel: number;
+  lastDispatchLog: string;
+  allyRoles: Partial<Record<AllyId, StaffRole>>;
 }
 
 export interface StoryProgress {
@@ -218,19 +292,12 @@ export interface StoryProgress {
   seenEvents: string[];
 }
 
-export interface DinerCookState {
-  guestId: string;
-  dish: MealId;
-  dishName: string;
-  startedTick: number;
-  pos: number;
-}
-
 export interface CarriedDishState {
   guestId: string;
-  dish: MealId;
+  dish: MealId | 'rye';
   dishName: string;
   quality: DishQuality;
+  isRye?: boolean;
 }
 
 /** 一局的全部状态。能直接 JSON 序列化：存档就是存它。 */
@@ -247,11 +314,13 @@ export interface RunState {
   home: { hp: number; maxHp: number };
   fort: { level: number; cd: number; aim: number };
   spawn: { left: number; timer: number; total: number; killed: number; crateAt: number; bossKind: ZombieKind | null; bossSpawned: boolean };
-  coins: number; meat: number; kills: number;
+  coins: number;
+  meats: MeatInventory;
+  spice: number;
+  kills: number;
   meal: MealId | null;
   mealQuality: DishQuality;
   guests: DinerGuest[];
-  dinerCook: DinerCookState | null;
   carryingDish: CarriedDishState | null;
   pourMinigame: PourMinigameState | null;
   carryingDrink: CarriedDrinkState | null;
@@ -269,6 +338,9 @@ export interface RunState {
   priorityId: number | null;
   /** 职业，和主动技能的剩余时间 / 冷却 */
   cls: ClassId; skill: { t: number; cd: number };
+  /** 破晓无尽酒馆模式与跨局轻度传承 */
+  endless?: boolean;
+  heirloom?: { metVips: string[]; mastery: Partial<Record<MealId, number>>; decor: TavernUpgradeId[] };
 }
 
 /** 这一步玩家按了什么。jump/dodge/reload/swap/skill/grenade/interact 是「这一步刚按下」。 */
@@ -297,16 +369,25 @@ export type Command =
   | { t: 'rerollShop' }
   | { t: 'salvageWeapon'; index: number }
   | { t: 'serveGuest'; guestId: string; quality?: DishQuality }
-  | { t: 'startCook'; guestId: string }
-  | { t: 'finishCook'; quick?: boolean }
-  | { t: 'cancelCook' }
   | { t: 'serveCarried' }
+  | { t: 'grindMortar' }
   | { t: 'startShift' }
   | { t: 'closeShift' }
   | { t: 'finishSummary' }
+  | { t: 'researchDish'; id: MealId }
   | { t: 'toggleMenuDish'; id: MealId }
+  | { t: 'toggleAutoSupply'; id: MealId }
+  | { t: 'prepDish'; id: MealId; batches?: number }
   | { t: 'upgradeDish'; id: MealId }
   | { t: 'buyTavernUpgrade'; id: TavernUpgradeId }
+  | { t: 'postRecruitment'; tier: AdTierId }
+  | { t: 'hireStaff'; id: string }
+  | { t: 'setStaffRole'; id: string; role: StaffRole }
+  | { t: 'trainStaff'; id: string }
+  | { t: 'setAllyRole'; ally: AllyId; role: StaffRole }
+  | { t: 'upgradeRack' }
+  | { t: 'buySpice'; count?: number }
+  | { t: 'sellMeatKind'; kind: MeatKind; count: number }
   | { t: 'startPour'; drink: DrinkId; guestId?: string | null }
   | { t: 'stopPour' }
   | { t: 'cancelPour' }
@@ -318,7 +399,9 @@ export type Command =
   | { t: 'focusTarget'; x: number }
   | { t: 'enterHouse' }
   | { t: 'exitHouse' }
-  | { t: 'nextDay' };
+  | { t: 'nextDay' }
+  | { t: 'enterEndless' }
+  | { t: 'nextEndlessNight' };
 
 /** 这一步发生了什么，给画面层播特效和音效用。 */
 export type GameEvent =
@@ -329,7 +412,7 @@ export type GameEvent =
   | { t: 'frost'; x: number; y: number; r: number }
   | { t: 'grenadeThrow' }
   | { t: 'skill'; cls: ClassId }
-  | { t: 'kill'; id: number; x: number; y?: number; kind: ZombieKind; coins: number; meat: number; dir?: 1 | -1; crit?: boolean; boss?: boolean }
+  | { t: 'kill'; id: number; x: number; y?: number; kind: ZombieKind; coins: number; meat: number; meatKind?: MeatKind; preserved?: boolean; dir?: 1 | -1; crit?: boolean; boss?: boolean }
   | { t: 'boom'; x: number; y: number; r: number }
   | { t: 'hurt'; dmg: number; blocked?: number; cover?: number }
   | { t: 'wallHit'; reflect?: boolean }
@@ -340,13 +423,20 @@ export type GameEvent =
   | { t: 'star'; weapon: WeaponId; star: number }
   | { t: 'build'; kind: 'turret' | 'wall' | 'fort' }
   | { t: 'shop'; item: string }
-  | { t: 'cookDone'; guestId: string; dish: MealId; dishName: string; quality: DishQuality }
+  | { t: 'kitchenDone'; dish: MealId | 'rye'; dishName: string; isRye?: boolean; extraPlate?: boolean }
+  | { t: 'grindSauce'; sauce: number; byStaff?: string }
+  | { t: 'sauceEmpty' }
+  | { t: 'research'; id: MealId; flameLeft: number }
+  | { t: 'prepDish'; id: MealId; servingsAdded: number }
   | { t: 'pourDone'; drink: DrinkId; quality: DishQuality }
-  | { t: 'tableClean'; x: number; coins: number; byAlly?: AllyId }
+  | { t: 'tableClean'; x: number; coins: number; byAlly?: AllyId; byStaff?: string }
+  | { t: 'dispatchReturn'; log: string; spice: number; meats: MeatInventory }
+  | { t: 'rackHarvest'; tender: number; thick: number; essence: number }
+  | { t: 'partyStart'; partyId: string; name: string }
   | { t: 'guestAngry'; guestId: string; name: string }
   | { t: 'shiftOpen'; duration: number }
-  | { t: 'shiftEnd'; served: number; coins: number; tips: number; fans: number; bestCombo: number }
-  | { t: 'serve'; guestId: string; vipId: string; name: string; dishName: string; quality: DishQuality; coins: number; fans: number; rep: number; quote: string; allServed?: boolean; firstMeet?: boolean; trendMatch?: boolean; rankUp?: string }
+  | { t: 'shiftEnd'; served: number; coins: number; tips: number; fans: number; bestCombo: number; rating: number; flameEarned: number }
+  | { t: 'serve'; guestId: string; vipId: string; name: string; dishName: string; quality: DishQuality; coins: number; fans: number; rep: number; quote: string; allServed?: boolean; firstMeet?: boolean; trendMatch?: boolean; partyMatch?: boolean; vipRequestClear?: boolean; rankUp?: string; isRye?: boolean }
   | { t: 'cook'; meat: number; coins: number }
   | { t: 'meal'; id: MealId; quality: DishQuality }
   | { t: 'dinerStory'; eventKey: 'firstOpen' | 'rep10' | 'rep25' | 'rep40' }
@@ -355,5 +445,6 @@ export type GameEvent =
   | { t: 'roof'; onRoof: boolean }
   | { t: 'bossAppear'; kind: ZombieKind }
   | { t: 'bossDead'; kind: ZombieKind; bossIdx: 0 | 1 | 2 }
+  | { t: 'endlessEnter' }
   | { t: 'dayStart'; day: number } | { t: 'dayClear'; day: number } | { t: 'dead' } | { t: 'won' };
 

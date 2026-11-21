@@ -385,7 +385,21 @@ class SoundEngine {
       case 'reload':
         this.play('sfx_reload', { gain: 0.95, jitter: 0.03 });
         break;
-      case 'cookDone':
+      case 'kitchenDone':
+        this.play('sfx_serve', { gain: 0.72, rate: e.isRye ? 0.86 : 1.08 });
+        break;
+      case 'grindSauce':
+        this.play('sfx_cook_sizzle', { gain: 0.72, rate: 1.24 });
+        break;
+      case 'sauceEmpty':
+        this.play('sfx_empty', { gain: 0.88, rate: 0.9 });
+        break;
+      case 'research':
+        this.play('sfx_good', { gain: 0.9, rate: 1.08 });
+        break;
+      case 'prepDish':
+        this.play('sfx_cook_sizzle', { gain: 0.76, rate: 1.0 });
+        break;
       case 'pourDone':
       case 'serve':
         this.cookResult(e.quality);
@@ -404,7 +418,13 @@ class SoundEngine {
         this.play('sfx_fanfare', { gain: 0.92 });
         break;
       case 'allyJoin':
+      case 'partyStart':
+      case 'endlessEnter':
         this.play('sfx_fanfare', { gain: 0.96, rate: 1.06 });
+        break;
+      case 'dispatchReturn':
+      case 'rackHarvest':
+        this.play('sfx_good', { gain: 0.85, rate: 1.06 });
         break;
       case 'pickup':
       case 'star':
