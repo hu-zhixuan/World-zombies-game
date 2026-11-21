@@ -1,13 +1,13 @@
 // 把规则层、画面层、音效与界面层接起来的地方。全游戏只有这一份状态。
-import { ZOMBIES, unlockedWeapons, type ClassId, type DifficultyId } from '../content/data';
+import { MEALS, ZOMBIES, unlockedWeapons, type ClassId, type DifficultyId } from '../content/data';
 import {
   ALLIES, BOSS_VICTORY, CINEMATIC_INTRO, COMPANION_JOIN_STORIES,
   REST_STORY, SPEAKERS, type AllyId, type StoryLine,
 } from '../content/story';
-import { command, houseBuff, nearbyCampTarget, nearbyExterior, nearbyStation, newRun, step } from '../sim/sim';
+import { command, formatRecipeCost, hasIngredients, houseBuff, nearbyCampTarget, nearbyExterior, nearbyStation, newRun, step } from '../sim/sim';
 import { NO_INPUT, type Command, type GameEvent, type Input, type RunState } from '../sim/types';
 import { audio } from './audio';
-import { loadMeta, saveMeta, starsEarned, type MetaState } from './meta';
+import { loadMeta, recordRunToMeta, saveMeta, starsEarned, type MetaState } from './meta';
 
 /** 玩家主动打开的弹窗。三选一与结算直接由 run.phase 驱动；营地夜晚可自由走动并按需开店/下厨/修防线。 */
 export type UserPanel = 'shop' | 'build' | 'kitchen' | 'pause' | 'lore';
@@ -23,7 +23,9 @@ class Game {
   /** 上一局结束时得了几颗星（结算面板显示用） */
   lastGain = 0;
   selectedDifficulty: DifficultyId = 'normal';
-  run: RunState = newRun(Date.now() % 100000, unlockedWeapons(this.meta.stars));
+  run: RunState = newRun(Date.now() % 100000, unlockedWeapons(this.meta.stars), 'gunner', 'normal', {
+    metVips: this.meta.metVips, mastery: this.meta.recipeMastery, decor: this.meta.unlockedDecor,
+  });
   started = false;
   choosing = false;
   private stack: UserPanel[] = [];
@@ -129,7 +131,9 @@ class Game {
     audio.unlock();
     audio.uiClick();
     this.choosing = false;
-    this.run = newRun(Date.now() % 100000, unlockedWeapons(this.meta.stars), cls, difficulty);
+    this.run = newRun(Date.now() % 100000, unlockedWeapons(this.meta.stars), cls, difficulty, {
+      metVips: this.meta.metVips, mastery: this.meta.recipeMastery, decor: this.meta.unlockedDecor,
+    });
     this.stack = [];
     this.storyQueue = [];
     this.immediateStory = false;
@@ -162,16 +166,13 @@ class Game {
     const ct = nearbyCampTarget(r);
     if (ct) {
       switch (ct.kind) {
-        case 'cookFinish':
-          return this.send({ t: 'finishCook' });
         case 'pourFinish':
           return this.send({ t: 'stopPour' });
         case 'pourStart':
           audio.uiClick();
           return this.send({ t: 'startPour', drink: ct.drink, guestId: ct.guest?.id ?? null });
-        case 'cookStart':
-          audio.cookSizzle();
-          return this.send({ t: 'startCook', guestId: ct.guest.id });
+        case 'grindMortar':
+          return this.send({ t: 'grindMortar' });
         case 'serveDrink':
           return this.send({ t: 'serveDrink', guestId: ct.guest.id });
         case 'serveCarried':
@@ -184,18 +185,20 @@ class Game {
           const g = ct.guest;
           const sp = SPEAKERS.ming;
           const isDrink = g.orderKind === 'drink';
+          const costStr = g.isRye ? '断货救急' : formatRecipeCost(MEALS[g.dish].cost);
           const quote = g.served
             ? (g.reactionQuote ?? g.thanksQuote)
             : isDrink
               ? `「${g.orderQuote}」——点单：${g.dishName}（饮品→${g.pay}金）`
-              : `「${g.orderQuote}」——点单：${g.dishName}（${g.meatCost}肉→${g.pay}金${g.trendMatch ? ' · 今夜热门' : ''}）`;
+              : `「${g.orderQuote}」——点单：${g.dishName}（${costStr}→${g.pay}金${g.trendMatch ? ' · 今夜热门' : ''}）`;
+          const hasStockOrIng = (r.diner.menuStock[g.dish] ?? 0) > 0 || hasIngredients(r, MEALS[g.dish].cost);
           const reply = g.served
             ? '慢用！屋里炉火常亮，明晚还来喝口热汤。'
             : isDrink
               ? '好嘞，马上到旁边的原木酒桶替您现打一扎！'
-              : r.meat >= g.meatCost
-                ? '好嘞，这就到左墙红砖灶台起火开炒，出锅就给您端过来！'
-                : '记下了！明日出门多狩些鲜肉回来再给您现做。';
+              : hasStockOrIng
+                ? '好嘞，后厨砖灶已记下这一单，出锅就从传菜台替您端来！'
+                : '记下了！今夜备菜稍紧，先替您现烤干硬黑麦饼垫垫腹。';
           this.enqueueStory(`${g.name} · ${g.role}`, [
             { npc: g.vipId, name: g.name, initial: g.name[0] ?? '客', role: g.role, avatar: g.sprite, text: quote },
             { npc: 'ming', name: sp.name, initial: sp.initial, role: sp.desc, avatar: sp.avatar, text: reply },
@@ -206,9 +209,9 @@ class Game {
           const a = ALLIES[ct.ally];
           const join = COMPANION_JOIN_STORIES[a.joinDay];
           const campBanter: Record<AllyId, string> = {
-            zhang: r.inside ? '屋外寒雾越压越低，迎战时我就守在屋顶替你挺紧银枪！堂食开张时传菜台上我来端！' : '屋顶高台视野通透，只要魔物敢露头，我这杆银枪当场贯穿！',
-            lin:   r.inside ? '灶火旁温着绯火药罐，营业时灶台热菜交给我帮衬，迎战再替你调息轰散前排！' : '门廊药囊都在手里，待我用绯火轰散前排，顺带替你慢慢续伤！',
-            qiang: r.inside ? '右侧铁砧刚淬过火，开张忙不过来我也能顺手收碗擦桌，造塔加固一律九折！' : '壁垒前由我顶着！靠过来的腐尸先吃一记重铠斩击，空隙我也会顺手修墙。',
+            zhang: r.inside ? '屋外寒雾越压越低，迎战时我就守在屋顶替你挺紧银枪！传菜台快堆满时我来搭手端！' : '屋顶高台视野通透，只要魔物敢露头，我这杆银枪当场贯穿！',
+            lin:   r.inside ? '灶火旁温着绯火药罐，开张后我看紧左灶加快出菜，迎战再替你调息轰散前排！' : '门廊药囊都在手里，待我用绯火轰散前排，顺带替你慢慢续伤！',
+            qiang: r.inside ? '右侧铁砧刚淬过火，久未收拾的脏碗盘我也会顺手擦净，造塔加固一律九折！' : '壁垒前由我顶着！靠过来的腐尸先吃一记重铠斩击，空隙我也会顺手修墙。',
             zhao:  r.inside ? '驿道上的商旅都在传咱们暮夜酒馆的名头，今夜堂食涨粉快三成，我来照应中间茶座！' : '半空扑来的夜翼魔蝠与提灯怨灵由我苍蓝气劲盯死，胡掌柜只管放手杀敌！',
           };
           const lines: StoryLine[] = [
@@ -219,7 +222,7 @@ class Game {
           return true;
         }
         case 'drink':
-          if (!r.dinerCook && !r.carryingDish && !r.carryingDrink && !r.pourMinigame) {
+          if (!r.carryingDish && !r.carryingDrink && !r.pourMinigame) {
             audio.uiClick();
             return this.send({ t: 'startPour', drink: 'beer', guestId: null });
           }
@@ -234,9 +237,10 @@ class Game {
     }
     if (r.inside) {
       const st = nearbyStation(r);
+      if (st === 'mortar') return this.send({ t: 'grindMortar' });
       if (st === 'kitchen' || st === 'pass') { this.open('kitchen'); return true; }
       if (st === 'drink') {
-        if (!r.dinerCook && !r.carryingDish && !r.carryingDrink && !r.pourMinigame) {
+        if (!r.carryingDish && !r.carryingDrink && !r.pourMinigame) {
           audio.uiClick();
           return this.send({ t: 'startPour', drink: 'beer', guestId: null });
         }
@@ -286,6 +290,8 @@ class Game {
         if (
           e.t === 'bossAppear' || e.t === 'pickup' || e.t === 'star' || e.t === 'kill' || e.t === 'hurt' || e.t === 'swap'
           || e.t === 'pourDone' || e.t === 'tableClean' || e.t === 'guestAngry' || e.t === 'shiftEnd' || e.t === 'shiftOpen' || e.t === 'serve'
+          || e.t === 'grindSauce' || e.t === 'sauceEmpty' || e.t === 'kitchenDone' || e.t === 'research' || e.t === 'prepDish'
+          || e.t === 'dispatchReturn' || e.t === 'rackHarvest' || e.t === 'partyStart' || e.t === 'endlessEnter'
         ) {
           urgent = true;
         }
@@ -331,12 +337,12 @@ class Game {
       const ev = REST_STORY[e.eventKey];
       if (ev) this.enqueueStory(ev.title, ev.lines);
     } else if (e.t === 'dead' || e.t === 'won') {
-      this.lastGain = starsEarned(this.run);
-      this.meta = {
-        stars: this.meta.stars + this.lastGain,
-        bestDay: Math.max(this.meta.bestDay, this.run.phase === 'won' ? this.run.day : this.run.day - 1),
-        runs: this.meta.runs + 1,
-      };
+      const firstFinish = !(e.t === 'dead' && this.run.endless);
+      this.lastGain = firstFinish ? starsEarned(this.run) : 0;
+      this.meta = recordRunToMeta(this.meta, this.run, firstFinish);
+      saveMeta(this.meta);
+    } else if (e.t === 'shiftEnd' || e.t === 'endlessEnter' || e.t === 'research') {
+      this.meta = recordRunToMeta(this.meta, this.run, false);
       saveMeta(this.meta);
     }
     this.eventListeners.forEach((fn) => fn(e));
