@@ -2,19 +2,19 @@ import { useEffect, useReducer, useRef, useState } from 'preact/hooks';
 import { audio } from '../app/audio';
 import { game } from '../app/game';
 import {
-  AD_TIERS, AD_TIER_ORDER, CLASSES, DIFFICULTIES, DIFFICULTY_ORDER, DRINKS, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_DISH_LV, MAX_FORT_LEVEL, MAX_GRENADES, MAX_RACK_LEVEL, MAX_STAFF_LV, MAX_STAR, MAX_WALL_LEVEL,
-  MEALS, MEAL_ORDER, MEAT_ORDER, MEATS, RACK_LEVELS, RARITY_NAME, RYE_FALLBACK, SEAT_UPGRADE_ORDER, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST,
-  SPICE_BUY_COST, STAFF_TRAIN_COST, STAR_COST, STAR_PERKS, TAVERN_UPGRADES, TAVERN_UPGRADE_ORDER, TURRETS, WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES,
-  classUnlockStars, dishEnhanceMeatCost, dishUpgradeCost, newZombieOn, nextUnlock, partyForDay, perkDef, sustainedDps, unlockName,
-  type MeatKind, type StaffRole, type TurretType,
+  CLASSES, DIFFICULTIES, DIFFICULTY_ORDER, DRINKS, FORT_LEVELS, FORT_REPAIR_COST, GUEST_SUPPORTS, LAST_DAY, MAX_DISH_LV, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
+  MEALS, MEAL_ORDER, MEAT_ORDER, MEATS, RARITY_NAME, RYE_FALLBACK, SEAT_UPGRADE_ORDER, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST,
+  STAR_COST, STAR_PERKS, TAVERN_UPGRADES, TAVERN_UPGRADE_ORDER, TURRETS, WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES,
+  classUnlockStars, newZombieOn, nextUnlock, partyForDay, perkDef, sustainedDps, unlockName,
+  type MeatKind, type TurretType,
 } from '../content/data';
 import {
-  ALLIES, ALLY_ORDER, CHAPTER_CARDS, CINEMATIC_INTRO, COMPANION_JOIN_STORIES, QUALITY_META, REST_STORY, STORY_SCENES, VIP_CUSTOMERS, VIP_TIERS,
+  ALLIES, ALLY_ORDER, CHAPTER_CARDS, CINEMATIC_INTRO, COMPANION_JOIN_STORIES, QUALITY_META, REST_STORY, STORY_SCENES, VIP_CUSTOMERS,
   type RestStoryKey, type StorySceneKey,
 } from '../content/story';
 import {
-  MAX_CARRY, allyRole, dayRemaining, dinerRank, dishLevel, dishPrice, dishResearchCost, dishServings, dishTaste, formatRecipeCost, hasAlly, hasIngredients, hasTavernUpgrade, houseBuff,
-  maxMenuSlots, maxSeats, maxStaffSlots, meatPrice, pourQuality, staffDef, tavernUpgradeCost, turretBuildCost, turretRefundCoins, turretUpgradeCost,
+  MAX_CARRY, computeTomorrowBattleBuff, dayRemaining, dinerRank, dishLevel, dishPrice, dishXp, dishXpTarget, formatRecipeCost, hasAlly, hasIngredients, hasTavernUpgrade, houseBuff,
+  maxSeats, meatPrice, nearbyCampTarget, pourQuality, tavernUpgradeCost, turretBuildCost, turretRefundCoins, turretUpgradeCost, vipSupportKind,
 } from '../sim/sim';
 import { TURRET_SLOTS, type GameEvent, type TurretTargetMode } from '../sim/types';
 import { CampBar, CampKeys, Keys, Pad, WeaponChip } from './controls';
@@ -77,7 +77,6 @@ function Hud() {
         <Chip icon="ic_coin" id="hud-coins">{run.coins}</Chip>
         <Chip icon="ic_meat" id="hud-meat">
           <b>{run.meats.tender}</b>/<b>{run.meats.thick}</b>/<b>{run.meats.essence}</b>
-          <Icon k="ic_spice" /><b>{run.spice}</b>
         </Chip>
         <button class={`btn-icon ${audio.muted ? 'muted' : ''}`} id="btn-mute" onClick={() => game.toggleMute()}>{audio.muted ? '静音' : '音效'}</button>
         <button class="btn-icon" id="btn-pause" onClick={() => game.open('pause')}>暂停</button>
@@ -90,15 +89,20 @@ function HouseBadge() {
   const run = game.run;
   if (run.inside) return null;
   const hb = houseBuff(run);
-  const text = hb.zone === 'roof'
-    ? `${hb.name} · 伤+${Math.round((hb.dmgMul - 1) * 100)}% 掩体-${Math.round(hb.rangedCover * 100)}%`
+  const zoneText = hb.zone === 'roof'
+    ? `${hb.name} · 伤+${Math.round((hb.dmgMul - 1) * 100)}%`
     : hb.zone === 'porch'
-      ? `${hb.name} · 伤+12% 掩体-${Math.round(hb.rangedCover * 100)}%`
+      ? `${hb.name} · 伤+12%`
       : '前院地面';
+  const c = run.diner.contract;
+  const contractText = c && run.phase === 'fight'
+    ? (c.done ? ` · ${c.title}达成` : ` · ${c.title} ${c.progress}/${c.target}`)
+    : '';
+  const buffText = run.buff.dmgMul > 0 ? ` · 战备+${Math.round(run.buff.dmgMul * 100)}%` : '';
   return (
     <div class="house-badge" id="hud-house" data-zone={hb.zone}>
       <Icon k="ic_rooftop" />
-      <span>{text}</span>
+      <span>{zoneText}{buffText}{contractText}</span>
     </div>
   );
 }
@@ -121,7 +125,6 @@ const Purse = () => (
   <div class="purse">
     <Chip icon="ic_coin">{game.run.coins}</Chip>
     <Chip icon="ic_meat">{game.run.meats.tender}/{game.run.meats.thick}/{game.run.meats.essence}</Chip>
-    <Chip icon="ic_spice">{game.run.spice}</Chip>
   </div>
 );
 
@@ -297,22 +300,12 @@ function ClassPanel() {
   );
 }
 
-const ROLE_BTNS: { id: StaffRole; short: string; label: string }[] = [
-  { id: 'kitchen',  short: '厨', label: '后厨' },
-  { id: 'floor',    short: '堂', label: '大堂' },
-  { id: 'dispatch', short: '派', label: '派遣' },
-  { id: 'rest',     short: '休', label: '休息' },
-];
-
-/** 深夜小食堂：今夜备战 + 人手与贮肉架 + 12 道食谱研发 + 15 位熟客口碑图鉴 */
+/** 暮夜战备酒馆：一屏贯通「主战场悬赏 → 魔物战备料理 → 食客战场支援 → 永固工事设施」 */
 function KitchenPanel() {
   const run = game.run;
-  const [tab, setTab] = useState<'dine' | 'staff' | 'menu' | 'vip'>('dine');
+  const [tab, setTab] = useState<'dine' | 'vip'>('dine');
 
   const fansRank = dinerRank(run);
-  const slotCap = maxMenuSlots(run);
-  const staffCap = maxStaffSlots(run);
-  const pInfo = partyForDay(run.day);
   const tenderPrice = meatPrice(run.cls, 'tender');
   const thickPrice = meatPrice(run.cls, 'thick');
   const essencePrice = meatPrice(run.cls, 'essence');
@@ -327,151 +320,180 @@ function KitchenPanel() {
     }
   };
 
-  const nextRack = run.diner.rackLevel < MAX_RACK_LEVEL ? RACK_LEVELS[run.diner.rackLevel] : null;
-  const curRack = run.diner.rackLevel > 0 ? RACK_LEVELS[run.diner.rackLevel - 1] : null;
+  const tBuff = computeTomorrowBattleBuff(run);
+  const feastDishes = run.diner.feastDishes ?? [];
+  const extraCrates = run.diner.extraCrates ?? 0;
+  const buffPills: string[] = [];
+  if (tBuff.dmgMul > 0) buffPills.push(`枪伤+${Math.round(tBuff.dmgMul * 100)}%`);
+  if (tBuff.haste > 0) buffPills.push(`攻速+${Math.round(tBuff.haste * 100)}%`);
+  if (tBuff.turretMul > 0) buffPills.push(`炮塔+${Math.round(tBuff.turretMul * 100)}%`);
+  if (tBuff.critBonus > 0) buffPills.push(`暴击+${Math.round(tBuff.critBonus * 100)}%`);
+  if (tBuff.frostRounds) buffPills.push('寒霜弹');
+  if (run.diner.smithDiscount) buffPills.push('造塔85折');
+  if (extraCrates > 0) buffPills.push(`空投箱+${extraCrates}`);
+  if (run.diner.allyFuryNext) buffPills.push('战友狂飙');
+
+  const canFeastAny = run.guests.some((g) => !g.served && (g.orderKind === 'drink' || hasIngredients(run, MEALS[g.dish].cost)))
+    || (!feastDishes.length && MEAL_ORDER.some((id) => hasIngredients(run, MEALS[id].cost)));
+  const contract = run.diner.contract;
 
   return (
-    <Panel id="panel-kitchen" cls="wide" title="深夜小食堂" head={
+    <Panel id="panel-kitchen" cls="wide" title="暮夜战备酒馆" head={
       <div class="diner-head-right">
         <div class="diner-tabs">
-          <button id="tab-kitchen-dine" class={`tab-btn ${tab === 'dine' ? 'on' : ''}`} onClick={() => setTab('dine')}>今夜备战</button>
-          <button id="tab-kitchen-staff" class={`tab-btn ${tab === 'staff' ? 'on' : ''}`} onClick={() => setTab('staff')}>人手 ({run.diner.hiredStaff.length}/{staffCap})</button>
-          <button id="tab-kitchen-menu" class={`tab-btn ${tab === 'menu' ? 'on' : ''}`} onClick={() => setTab('menu')}>食谱 ({run.diner.researched.length}/12)</button>
-          <button id="tab-kitchen-vip" class={`tab-btn ${tab === 'vip' ? 'on' : ''}`} onClick={() => setTab('vip')}>图鉴 ({run.diner.metVips.length}/15)</button>
+          <button id="tab-kitchen-dine" class={`tab-btn ${tab === 'dine' ? 'on' : ''}`} onClick={() => setTab('dine')}>战备堂食</button>
+          <button id="tab-kitchen-vip" class={`tab-btn ${tab === 'vip' ? 'on' : ''}`} onClick={() => setTab('vip')}>熟客录 ({run.diner.metVips.length}/15)</button>
         </div>
+        <Purse />
         <Btn id="btn-close" kind="primary" onClick={() => game.close()}>回堂内</Btn>
       </div>
     }>
-      <div class="diner-ribbon">
-        <span><b>{fansRank.cur.grade}级·{fansRank.cur.name}</b> ({run.diner.fans}粉·{maxSeats(run)}座)</span>
-        <span class="ribbon-flame"><Icon k="ic_flame" /><b>{run.diner.flame}</b> 灵感</span>
-        <em class="ribbon-trend">热门「{run.diner.trendTag}」</em>
-        {pInfo.active ? (
-          <em class="ribbon-party on">今夜·{pInfo.active.name}</em>
-        ) : pInfo.upcoming ? (
-          <em class="ribbon-party">{pInfo.daysAway === 1 ? '明晚' : '后天'}·{pInfo.upcoming.name}</em>
-        ) : (
-          <small class={run.meal ? 'meal-set' : ''}>{run.meal ? `特餐：${MEALS[run.meal].name}` : '未留特餐'}</small>
-        )}
+      <div class="diner-ribbon war-ribbon">
+        <span id="tavern-contract" class="war-contract-pill">
+          {contract ? (
+            <><b>猎令·{contract.title}</b> {contract.done ? `已达成 (+${contract.coins}金)` : `${contract.desc} (${contract.progress}/${contract.target})`}</>
+          ) : (
+            <><b>{fansRank.cur.grade}级·{fansRank.cur.name}</b> ({maxSeats(run)}座 · 口碑{run.diner.fans})</>
+          )}
+        </span>
+        <span id="tavern-battle-buffs" class="war-buff-summary">
+          <b>明日战备：</b>{buffPills.length > 0 ? buffPills.join(' · ') : '上菜招待或自享料理即可叠加明日主战场火力'}
+        </span>
+        <div class="war-ribbon-acts">
+          <Btn kind="small" id="btn-feast-all" disabled={!canFeastAny} onClick={() => game.send({ t: 'feastAll' })}>一键犒赏</Btn>
+          <Btn kind="primary" cls="small" id="btn-kitchen-shift"
+            onClick={() => {
+              if (run.dinerShift.mode === 'open') { game.send({ t: 'closeShift' }); game.close(); }
+              else { game.send({ t: 'startShift' }); game.close(); }
+            }}>
+            {run.dinerShift.mode === 'open' ? '提前打烊' : '堂内开张'}
+          </Btn>
+        </div>
       </div>
 
       {tab === 'dine' && (
         <>
-          <div class="tavern-strip">
-            <Btn kind="primary" cls="small" id="btn-kitchen-shift"
-              onClick={() => {
-                if (run.dinerShift.mode === 'open') { game.send({ t: 'closeShift' }); game.close(); }
-                else { game.send({ t: 'startShift' }); game.close(); }
-              }}>
-              {run.dinerShift.mode === 'open' ? '提前打烊' : '开张营业'}
-            </Btn>
-            <div class="tavern-upgs">
-              {(() => {
-                const seatUid = !hasTavernUpgrade(run, SEAT_UPGRADE_ORDER[0]) ? SEAT_UPGRADE_ORDER[0] : SEAT_UPGRADE_ORDER[1];
-                const su = TAVERN_UPGRADES[seatUid], sOwn = hasTavernUpgrade(run, seatUid);
-                const sCost = tavernUpgradeCost(run, seatUid);
-                return (
-                  <button key={seatUid} id="btn-tavern-seats" class={`tavern-btn ${sOwn ? 'own' : ''}`}
-                    title={su.desc} disabled={sOwn || run.coins < sCost}
-                    onClick={() => game.send({ t: 'buyTavernUpgrade', id: seatUid })}>
-                    <Icon k={su.icon} />
-                    <span>{su.name}</span>
-                    <em>{sOwn ? '满8座' : `${sCost}金`}</em>
-                  </button>
-                );
-              })()}
-              {TAVERN_UPGRADE_ORDER.map((uid) => {
-                const u = TAVERN_UPGRADES[uid], own = hasTavernUpgrade(run, uid);
-                const cost = tavernUpgradeCost(run, uid);
-                return (
-                  <button key={uid} id={`btn-tavern-${uid}`} class={`tavern-btn ${own ? 'own' : ''}`}
-                    title={u.desc} disabled={own || run.coins < cost}
-                    onClick={() => game.send({ t: 'buyTavernUpgrade', id: uid })}>
-                    <Icon k={u.icon} />
-                    <span>{u.name}</span>
-                    <em>{own ? '已装' : `${cost}金`}</em>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div class="prep-grid">
-            {run.diner.menu.map((id) => {
-              const m = MEALS[id];
-              const stock = run.diner.menuStock[id] ?? 0;
-              const autoOn = !!run.diner.autoSupply[id];
-              const servings = dishServings(run, id);
-              const price = dishPrice(run, id);
-              const canCook = hasIngredients(run, m.cost);
-              const pickedMeal = run.meal === id;
+          <div class="tavern-upgs war-upgs">
+            {(() => {
+              const seatUid = !hasTavernUpgrade(run, SEAT_UPGRADE_ORDER[0]) ? SEAT_UPGRADE_ORDER[0] : SEAT_UPGRADE_ORDER[1];
+              const su = TAVERN_UPGRADES[seatUid], sOwn = hasTavernUpgrade(run, seatUid);
+              const sCost = tavernUpgradeCost(run, seatUid);
               return (
-                <div class="item prep-card" key={id}>
-                  <div class="prep-top">
-                    <Icon k={m.icon} />
-                    <b>{m.name}</b>
-                    {m.tags.includes(run.diner.trendTag) && <u class="trend-hit">热</u>}
-                    <em class={`stock-pill ${stock === 0 && !autoOn ? 'empty' : ''}`}>存{stock}份</em>
-                  </div>
-                  <small>{formatRecipeCost(m.cost)}→{servings}份 · {price}金 · 味{dishTaste(run, id)}</small>
-                  <div class="prep-acts">
-                    <Btn kind="small" id={`btn-prep-${id}`} disabled={!canCook || stock >= 99}
-                      onClick={() => game.send({ t: 'prepDish', id, batches: 1 })}>
-                      备+{servings}份
-                    </Btn>
-                    <Btn kind="small" id={`btn-auto-${id}`} cls={autoOn ? 'menu-on' : ''}
-                      onClick={() => game.send({ t: 'toggleAutoSupply', id })}>
-                      {autoOn ? '自动:开' : '自动:关'}
-                    </Btn>
-                    <Btn kind="small" id={`btn-meal-prep-${id}`} disabled={run.meal !== null || (!canCook && stock <= 0)}
-                      onClick={() => game.send({ t: 'pickMeal', id, quality: 'good' })}>
-                      {pickedMeal ? '已留餐' : '留特餐'}
-                    </Btn>
-                  </div>
-                </div>
+                <button key={seatUid} id="btn-tavern-seats" class={`tavern-btn ${sOwn ? 'own' : ''}`}
+                  title={su.desc} disabled={sOwn || run.coins < sCost}
+                  onClick={() => game.send({ t: 'buyTavernUpgrade', id: seatUid })}>
+                  <Icon k={su.icon} />
+                  <span>{su.name} · {su.battleTag}</span>
+                  <em>{sOwn ? '已永固' : `${sCost}金`}</em>
+                </button>
+              );
+            })()}
+            {TAVERN_UPGRADE_ORDER.map((uid) => {
+              const u = TAVERN_UPGRADES[uid], own = hasTavernUpgrade(run, uid);
+              const cost = tavernUpgradeCost(run, uid);
+              return (
+                <button key={uid} id={`btn-tavern-${uid}`} class={`tavern-btn ${own ? 'own' : ''}`}
+                  title={u.desc} disabled={own || run.coins < cost}
+                  onClick={() => game.send({ t: 'buyTavernUpgrade', id: uid })}>
+                  <Icon k={u.icon} />
+                  <span>{u.name} · {u.battleTag}</span>
+                  <em>{own ? '已永固' : `${cost}金`}</em>
+                </button>
               );
             })}
           </div>
 
-          {run.guests.length > 0 && (
-            <div class="cols3 guest-mini-row">
-              {run.guests.slice(0, 3).map((g, i) => {
-                const vip = VIP_CUSTOMERS.find((v) => v.id === g.vipId);
-                const isDrink = g.orderKind === 'drink';
-                const dishIcon = isDrink && g.drink ? DRINKS[g.drink].icon : (g.isRye ? RYE_FALLBACK.icon : MEALS[g.dish].icon);
-                const canServe = isDrink || (run.diner.menuStock[g.dish] ?? 0) > 0 || hasIngredients(run, MEALS[g.dish].cost);
-                return (
-                  <div class={`item guest-mini ${g.served ? 'served' : ''}`} key={g.id}>
-                    <NpcPortrait avatar={g.sprite} initial={g.name[0]} cls="xs" />
-                    <div class="grow">
-                      <div class="card-top">
-                        <b>{g.name}</b>
-                        {g.isVipRequest && <u class="vip-req-tag">点名</u>}
-                        <small>{g.pay}金</small>
+          <div class="cols2 war-tavern-split">
+            <div class="box war-guest-box">
+              <div class="section-title">
+                <span>今夜到访食客 ({run.guests.filter((g) => g.served).length}/{run.guests.length})</span>
+                <small>招待即获赏金 + 战场支援 + 明日料理增益</small>
+              </div>
+              <div class="war-guest-list">
+                {run.guests.slice(0, 3).map((g, i) => {
+                  const vip = VIP_CUSTOMERS.find((v) => v.id === g.vipId);
+                  const sk = g.supportKind ?? vipSupportKind(g.vipId);
+                  const sup = GUEST_SUPPORTS[sk];
+                  const isDrink = g.orderKind === 'drink';
+                  const dishIcon = isDrink && g.drink ? DRINKS[g.drink].icon : (g.isRye ? RYE_FALLBACK.icon : MEALS[g.dish].icon);
+                  const mealDef = MEALS[g.dish];
+                  const canServe = isDrink || (run.diner.menuStock[g.dish] ?? 0) > 0 || hasIngredients(run, mealDef.cost);
+                  return (
+                    <div class={`item war-guest-card ${g.served ? 'served' : ''}`} key={g.id}>
+                      <NpcPortrait avatar={g.sprite} initial={g.name[0]} cls="xs" />
+                      <div class="grow">
+                        <div class="card-top">
+                          <b>{g.name}</b>
+                          <em class={`support-badge sup-${sk}`}>{sup.roleName}·{sup.shortTag}</em>
+                          <small class="pay-tag">+{g.pay}金</small>
+                        </div>
+                        <small class="guest-order-line">
+                          <Icon k={dishIcon} />
+                          <span>{g.dishName}{!isDrink ? ` (${formatRecipeCost(mealDef.cost)})` : ''}</span>
+                          {!isDrink && <u class="battle-tag">{mealDef.battleTag}</u>}
+                        </small>
                       </div>
-                      <small><Icon k={dishIcon} /> {g.dishName}</small>
-                    </div>
-                    <div class="guest-mini-acts">
-                      {vip && vip.firstMeet.length > 0 && (
-                        <button id={`btn-guest-story-${i}`} class="mini-story-btn" onClick={() => game.enqueueStory(`${g.name} · 初遇`, vip.firstMeet, true)}>初遇</button>
-                      )}
-                      {run.dinerShift.mode === 'prep' && (
+                      <div class="guest-mini-acts">
+                        {vip && vip.firstMeet.length > 0 && (
+                          <button id={`btn-guest-story-${i}`} class="mini-story-btn" onClick={() => game.enqueueStory(`${g.name} · 初遇`, vip.firstMeet, true)}>对话</button>
+                        )}
                         <Btn kind="small" id={`btn-serve-${i}`} disabled={g.served || !canServe}
                           onClick={() => game.send({ t: 'serveGuest', guestId: g.id, quality: 'good' })}>
-                          {g.served ? '已上' : '先上菜'}
+                          {g.served ? '已援' : '上菜犒赏'}
                         </Btn>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          )}
+
+            <div class="box war-meal-box">
+              <div class="section-title">
+                <span>6 道魔物战备料理 (已入席 {feastDishes.length}/3 道)</span>
+                <small>越做越精自动升招牌 · 上菜与自享均可叠加明日火力</small>
+              </div>
+              <div class="war-meal-grid">
+                {MEAL_ORDER.map((id) => {
+                  const m = MEALS[id];
+                  const lv = dishLevel(run, id);
+                  const xp = dishXp(run, id);
+                  const need = dishXpTarget(lv);
+                  const isMaxLv = lv >= MAX_DISH_LV;
+                  const activeInFeast = feastDishes.includes(id);
+                  const canEat = !activeInFeast && hasIngredients(run, m.cost);
+                  return (
+                    <div class={`item war-meal-card ${activeInFeast ? 'active' : ''}`} key={id} title={`${m.desc}（上菜售 ${dishPrice(run, id)} 金）`}>
+                      <div class="recipe-top">
+                        <Icon k={m.icon} />
+                        <b>{m.name}</b>
+                        <em class="dish-lv">{isMaxLv ? '绝活' : `Lv.${lv}`}</em>
+                      </div>
+                      <div class="war-meal-meta">
+                        <span>{formatRecipeCost(m.cost)}</span>
+                        <u class="battle-tag">{m.battleTag}</u>
+                      </div>
+                      <div class="war-meal-foot">
+                        <span class="meal-xp">{isMaxLv ? '满级招牌' : `熟${xp}/${need}`}</span>
+                        <Btn kind="small" id={`btn-meal-${id}`} cls={activeInFeast ? 'menu-on' : ''} disabled={!canEat}
+                          onClick={() => game.send({ t: 'pickMeal', id, quality: 'good' })}>
+                          {activeInFeast ? '已备战' : '烹制战备'}
+                        </Btn>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
 
           <div class="item kitchen-footer">
-            <Btn kind="small" id="btn-buy-spice" disabled={run.coins < SPICE_BUY_COST} onClick={() => game.send({ t: 'buySpice', count: 1 })}>
-              <Icon k="ic_spice" /> 购秘酿香料 ({SPICE_BUY_COST}金) · 现有{run.spice}
-            </Btn>
+            <span class="footer-def-status">
+              防线 <b>{run.wall.hp}/{run.wall.maxHp}</b> · 大屋 <b>{run.home.hp}/{run.home.maxHp}</b>
+              {run.diner.smithDiscount ? ' · 匠师造塔85折' : ''}
+              {extraCrates > 0 ? ` · 明晚空投箱+${extraCrates}` : ''}
+              {run.diner.allyFuryNext ? ' · 战友狂飙已就绪' : ''}
+            </span>
             <div class="sell-row">
               {MEAT_ORDER.map((k: MeatKind) => {
                 const count = run.meats[k];
@@ -484,197 +506,9 @@ function KitchenPanel() {
                 );
               })}
               <Btn kind="small" id="btn-cook-all" disabled={totalSellVal <= 0} onClick={sellAllMeats}>
-                全清肉 (+{totalSellVal}金)
+                余肉换金 (+{totalSellVal}金)
               </Btn>
             </div>
-          </div>
-        </>
-      )}
-
-      {tab === 'staff' && (
-        <div class="cols2 staff-split">
-          <div class="box">
-            <div class="section-title">
-              <span>在编排班 ({run.diner.hiredStaff.length}/{staffCap}伙计)</span>
-              <small>Lv.3/5 解锁自动绝技</small>
-            </div>
-            <div class="staff-list">
-              {run.diner.hiredStaff.length === 0 && run.story.allies.length === 0 && (
-                <small class="lore-tip">右栏可发榜招揽帮手，守夜战友入伙后亦在此调班。</small>
-              )}
-              {run.diner.hiredStaff.map((st) => {
-                const def = staffDef(st.id);
-                if (!def) return null;
-                const isMax = st.level >= MAX_STAFF_LV;
-                const trainCost = STAFF_TRAIN_COST[st.level] ?? 999;
-                return (
-                  <div class="item staff-card" key={st.id}>
-                    <NpcPortrait avatar={def.sprite} initial={def.name[0]} cls="xs" />
-                    <div class="grow">
-                      <div class="card-top">
-                        <b>{def.name} Lv.{st.level}</b>
-                        <small>{st.role === 'rest' ? '休息·0金' : `${def.dailyWage}金/夜`}</small>
-                      </div>
-                      <div class="staff-skills">
-                        <em class={st.level >= 3 ? 'sk on' : 'sk'}>3:{def.lv3Label}</em>
-                        <em class={st.level >= 5 ? 'sk on' : 'sk'}>5:{def.lv5Label}</em>
-                      </div>
-                      <div class="staff-acts">
-                        <div class="role-pills">
-                          {ROLE_BTNS.map((rb) => (
-                            <button key={rb.id} id={`btn-staff-role-${st.id}-${rb.id}`}
-                              class={`role-btn ${st.role === rb.id ? 'on' : ''}`}
-                              onClick={() => game.send({ t: 'setStaffRole', id: st.id, role: rb.id })}>
-                              {rb.short}
-                            </button>
-                          ))}
-                        </div>
-                        <Btn kind="small" id={`btn-staff-train-${st.id}`} disabled={isMax || run.coins < trainCost}
-                          onClick={() => game.send({ t: 'trainStaff', id: st.id })}>
-                          {isMax ? '满级' : `培${trainCost}金`}
-                        </Btn>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {run.story.allies.map((allyId) => {
-                const a = ALLIES[allyId];
-                const curR = allyRole(run, allyId);
-                return (
-                  <div class="item staff-card ally-row" key={allyId}>
-                    <NpcPortrait avatar={a.sprite} initial={a.initial} cls="xs" />
-                    <div class="grow">
-                      <div class="card-top">
-                        <b>{a.name} · 战友</b>
-                        <small>零日薪</small>
-                      </div>
-                      <small>{allyId === 'lin' ? '主后厨加速' : allyId === 'qiang' ? '主清陈盘' : allyId === 'zhang' ? '主救传菜' : '主稳客心'}</small>
-                    </div>
-                    <div class="role-pills">
-                      {ROLE_BTNS.map((rb) => (
-                        <button key={rb.id} id={`btn-ally-role-${allyId}-${rb.id}`}
-                          class={`role-btn ${curR === rb.id ? 'on' : ''}`}
-                          onClick={() => game.send({ t: 'setAllyRole', ally: allyId, role: rb.id })}>
-                          {rb.short}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div class="box">
-            <div class="section-title">
-              <span>招工告示榜</span>
-              <div class="ad-row">
-                {AD_TIER_ORDER.map((tid) => {
-                  const ad = AD_TIERS[tid];
-                  return (
-                    <Btn key={tid} kind="small" id={`btn-ad-${tid}`} disabled={run.coins < ad.cost}
-                      onClick={() => game.send({ t: 'postRecruitment', tier: tid })}>
-                      {ad.name}{ad.cost}金
-                    </Btn>
-                  );
-                })}
-              </div>
-            </div>
-            <div class="app-list">
-              {run.diner.applicants.length === 0 ? (
-                <small class="lore-tip">第 2 日开放自动招工，亦可随时张贴告示立即招揽。</small>
-              ) : run.diner.applicants.slice(0, 3).map((app) => {
-                const def = staffDef(app.id);
-                if (!def) return null;
-                const full = run.diner.hiredStaff.length >= staffCap;
-                return (
-                  <div class="item app-card" key={app.id}>
-                    <NpcPortrait avatar={def.sprite} initial={def.name[0]} cls="xs" />
-                    <div class="grow">
-                      <div class="card-top">
-                        <b>{def.name} · {def.title}</b>
-                        <small>日薪{def.dailyWage}金</small>
-                      </div>
-                      <small>Lv.{app.startLevel} · {def.lv3Label}/{def.lv5Label}</small>
-                    </div>
-                    <Btn kind="small" id={`btn-hire-${def.id}`} disabled={full || run.coins < def.hireCost}
-                      onClick={() => game.send({ t: 'hireStaff', id: def.id })}>
-                      {full ? '满编' : `聘${def.hireCost}金`}
-                    </Btn>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div class="rack-box">
-              <div class="card-top">
-                <b>后院贮肉架 {curRack ? `· Lv.${curRack.level} ${curRack.name}` : '· 未建'}</b>
-                <Btn kind="small" id="btn-upgrade-rack" disabled={run.day < 4 || !nextRack || run.coins < nextRack.cost}
-                  onClick={() => game.send({ t: 'upgradeRack' })}>
-                  {run.day < 4 ? '第4日解锁' : !nextRack ? '已满级' : `${curRack ? '升级' : '搭建'} ${nextRack.cost}金`}
-                </Btn>
-              </div>
-              <small>{curRack ? `每战自动产：+${curRack.tender}嫩 +${curRack.thick}厚${curRack.essence ? ` +${curRack.essence}髓` : ''}` : '第 4 日起可建架风干熟肉，稳住高阶硬菜原料。'}</small>
-              {run.diner.lastDispatchLog && <small class="dispatch-note">{run.diner.lastDispatchLog}</small>}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {tab === 'menu' && (
-        <>
-          <div class="research-bar">
-            <span>今日菜单位 <b>{run.diner.menu.length}/{slotCap}</b></span>
-            <span>最高美味度 <b>{run.diner.bestTaste}</b></span>
-            <span>研发消耗：夜战打烊获「炉火灵感」</span>
-          </div>
-          <div class="recipe-grid">
-            {MEAL_ORDER.map((id) => {
-              const m = MEALS[id], picked = run.meal === id;
-              const researched = run.diner.researched.includes(id);
-              const inMenu = run.diner.menu.includes(id);
-              const lv = dishLevel(run, id);
-              const isMaxLv = lv >= MAX_DISH_LV;
-              const upCoin = dishUpgradeCost(id, lv);
-              const upMeat = dishEnhanceMeatCost(id, lv);
-              const canUp = researched && !isMaxLv && run.coins >= upCoin && hasIngredients(run, upMeat);
-              const canMeal = researched && !picked && run.meal === null && ((run.diner.menuStock[id] ?? 0) > 0 || hasIngredients(run, m.cost));
-              const hit = m.tags.includes(run.diner.trendTag);
-              return (
-                <div class={`item recipe-card ${!researched ? 'locked' : inMenu ? 'active' : ''}`} key={id}>
-                  <div class="recipe-top">
-                    <Icon k={m.icon} />
-                    <b>{m.name}</b>
-                    {hit && <u class="trend-hit">热</u>}
-                    <em class="dish-lv">{researched ? `Lv.${lv}` : `${dishResearchCost(run, id)}灵感`}</em>
-                  </div>
-                  <small>{formatRecipeCost(m.cost)} · {dishServings(run, id)}份/{dishPrice(run, id)}金/味{dishTaste(run, id)}</small>
-                  {!researched ? (
-                    <Btn kind="small" cls="full-btn" id={`btn-dish-research-${id}`} disabled={run.diner.flame < dishResearchCost(run, id)}
-                      onClick={() => game.send({ t: 'researchDish', id })}>
-                      炉火研发 ({dishResearchCost(run, id)}灵感)
-                    </Btn>
-                  ) : (
-                    <div class="meal-actions">
-                      <Btn kind="small" id={`btn-menu-toggle-${id}`} cls={inMenu ? 'menu-on' : ''}
-                        disabled={inMenu ? run.diner.menu.length <= 1 : run.diner.menu.length >= slotCap}
-                        onClick={() => game.send({ t: 'toggleMenuDish', id })}>
-                        {inMenu ? '在售' : '上架'}
-                      </Btn>
-                      <Btn kind="small" id={`btn-dish-up-${id}`} disabled={!canUp}
-                        onClick={() => game.send({ t: 'upgradeDish', id })}>
-                        {isMaxLv ? '满级' : `强${upCoin}金`}
-                      </Btn>
-                      <Btn kind="small" id={`btn-meal-${id}`} disabled={!canMeal}
-                        onClick={() => game.send({ t: 'pickMeal', id, quality: 'good' })}>
-                        {picked ? '已留' : '留特餐'}
-                      </Btn>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
           </div>
         </>
       )}
@@ -682,19 +516,20 @@ function KitchenPanel() {
       {tab === 'vip' && (
         <div class="cols2 vip-split">
           <div class="box">
-            <div class="section-title"><span>熟客图鉴</span></div>
+            <div class="section-title"><span>15 位暮夜熟客 · 战场支援名录</span></div>
             <div class="vip-grid">
               {VIP_CUSTOMERS.map((v) => {
                 const met = run.diner.metVips.includes(v.id);
                 const unlocked = run.diner.fans >= v.unlockFans;
                 const shortName = v.name.split('·').pop() ?? v.name;
+                const sk = vipSupportKind(v.id);
                 return (
                   <button key={v.id} id={`btn-vip-${v.id}`} class={`vip-cell ${met ? 'met' : unlocked ? 'open' : 'lock'}`}
                     disabled={!met && !unlocked}
                     onClick={() => game.enqueueStory(`${v.name} · 食客档案`, v.firstMeet, true)}>
                     <NpcPortrait avatar={v.sprite} initial={shortName[0]} cls="xs" />
                     <b>{shortName}</b>
-                    <small>{met ? VIP_TIERS[v.tier].name : unlocked ? '待初遇' : `${v.unlockFans}粉`}</small>
+                    <small>{met ? GUEST_SUPPORTS[sk].roleName : unlocked ? '待到访' : `${v.unlockFans}粉`}</small>
                   </button>
                 );
               })}
@@ -704,23 +539,23 @@ function KitchenPanel() {
             <div class="fans-box">
               <div class="card-top">
                 <b>{fansRank.cur.grade}级 · {fansRank.cur.name}</b>
-                <small>{fansRank.next ? `晋升 ${fansRank.next.grade}级 需达三项` : '已达最高段位'}</small>
+                <small>{fansRank.next ? `晋升 ${fansRank.next.grade}级 解锁高阶熟客` : '已达最高段位'}</small>
               </div>
               <Bar cls="fort" v={fansProgress} />
               {fansRank.next ? (
                 <div class="rank-gates">
                   <span class={run.diner.fans >= fansRank.next.minFans ? 'gate ok' : 'gate'}>
-                    粉 {run.diner.fans}/{fansRank.next.minFans}
+                    口碑 {run.diner.fans}/{fansRank.next.minFans}
                   </span>
                   <span class={run.diner.bestTaste >= fansRank.next.minTaste ? 'gate ok' : 'gate'}>
-                    味 {run.diner.bestTaste}/{fansRank.next.minTaste}
+                    美味 {run.diner.bestTaste}/{fansRank.next.minTaste}
                   </span>
-                  <span class={run.diner.researched.length >= fansRank.next.minResearched ? 'gate ok' : 'gate'}>
-                    菜 {run.diner.researched.length}/{fansRank.next.minResearched}
+                  <span class="gate ok">
+                    战备菜 {MEAL_ORDER.length}/{MEAL_ORDER.length}
                   </span>
                 </div>
               ) : (
-                <small>菜单位 {run.diner.menu.length}/{slotCap} · 最高美味 {run.diner.bestTaste} · 菜谱 {run.diner.researched.length}/12</small>
+                <small>全战备菜谱已贯通 · 最高美味 {run.diner.bestTaste}</small>
               )}
               {run.story.seenEvents.length > 0 && (
                 <div class="milestone-pills">
@@ -732,10 +567,10 @@ function KitchenPanel() {
                 </div>
               )}
             </div>
-            <div class="section-title"><span>食评</span></div>
+            <div class="section-title"><span>熟客战地留言</span></div>
             <div class="review-list">
               {run.diner.reviews.length === 0 ? (
-                <small class="lore-tip">暂无食评</small>
+                <small class="lore-tip">招待食客后将在此记录战地口信与支援回馈</small>
               ) : run.diner.reviews.slice(0, 3).map((rv) => (
                 <div class="review-item" key={rv.id}>
                   <div class="card-top">
@@ -862,81 +697,163 @@ function PourHud() {
   );
 }
 
-/** 堂食营业悬浮条（#shift-hud）：筹备态显示备菜与派对预告；营业态实时显示倒计时、辛香辣酱、菜数进账 */
+/** 堂食营业悬浮条（#shift-hud）：筹备态显示战备料理与待援食客；营业态实时显示倒计时、战备增益与堂食进账 */
 function ShiftHud() {
   const run = game.run, s = run.dinerShift;
-  const stockSum = run.diner.menu.reduce((sum, id) => sum + (run.diner.menuStock[id] ?? 0), 0);
   const pInfo = partyForDay(run.day);
+  const unserved = run.guests.filter((g) => !g.served).length;
+  const feastCnt = (run.diner.feastDishes ?? []).length;
   if (s.mode === 'prep') {
     return (
       <div class="shift-hud prep" id="shift-hud">
         <Icon k="ic_ledger" />
-        <span>精选 <b>{run.diner.menu.length}/{maxMenuSlots(run)}</b> 菜 · 已备 <b>{stockSum}</b> 份</span>
+        <span>明日战备 <b>{feastCnt}/6</b> 道 · 待援食客 <b>{unserved}</b> 位</span>
         {pInfo.active && <em class="shift-party">{pInfo.active.name}</em>}
-        {!pInfo.active && pInfo.upcoming && <em class="shift-party soon">{pInfo.daysAway === 1 ? '明晚' : '后天'}·{pInfo.upcoming.name}</em>}
+        <Btn id="btn-shift-menu-prep" kind="ghost" cls="small" onClick={() => game.open('kitchen')}>战备台</Btn>
         <Btn id="btn-shift-start" kind="primary" cls="small" onClick={() => game.send({ t: 'startShift' })}>开张营业</Btn>
       </div>
     );
   }
   const secLeft = Math.max(0, Math.ceil(s.timer / 60));
   const totalCoins = s.coinsEarned + s.tipsEarned;
-  const saucePct = Math.round((s.sauce / Math.max(1, s.maxSauce)) * 100);
-  const lowSauce = s.sauce <= 25 || s.sauceStalled;
   return (
     <div class="shift-hud open" id="shift-hud">
       <div class="shift-timer">
         <b>营业 {secLeft}s</b>
         <Bar cls="wall" v={s.timer / Math.max(1, s.duration)} />
       </div>
-      <div class={`shift-sauce ${lowSauce ? 'stalled' : ''}`} id="hud-sauce">
-        <Icon k="ic_sauce" />
-        <Bar cls={lowSauce ? 'sauce-low' : 'sauce'} v={s.sauce / Math.max(1, s.maxSauce)} />
-        <span>{s.sauceStalled ? '停摆!' : `${saucePct}%`}</span>
-      </div>
-      <span class="shift-stat">客 <b>{s.servedCount}</b> · <b>+{totalCoins}金</b></span>
+      <span class="shift-stat">招待 <b>{s.servedCount}</b> 客 · <b>+{totalCoins}金</b> · 战备 <b>{feastCnt}道</b></span>
       {pInfo.active && <em class="shift-party">{pInfo.active.name}</em>}
       {s.combo > 1 && <em class="shift-combo">{s.combo}连</em>}
-      <Btn id="btn-shift-menu" kind="ghost" cls="small" onClick={() => game.open('kitchen')}>菜单</Btn>
+      <Btn id="btn-shift-menu" kind="ghost" cls="small" onClick={() => game.open('kitchen')}>战备台</Btn>
       <Btn id="btn-shift-stop" kind="ghost" cls="small" onClick={() => game.send({ t: 'closeShift' })}>打烊</Btn>
     </div>
   );
 }
 
-/** 今夜经营日报（#panel-shift-summary）：★评分、炉火灵感产出、分项收入与日薪损耗净利 */
+/** 室外实地建塔/修墙/加固浮条（#field-build-hud）：走近屋顶或前院工事基座即现，不挡屏幕、当场落成 */
+function FieldBuildHud() {
+  const run = game.run;
+  if (run.phase !== 'camp' || run.inside) return null;
+  const ct = nearbyCampTarget(run);
+  if (!ct) return null;
+  const qiang = hasAlly(run, 'qiang');
+  const smith = !!run.diner.smithDiscount;
+
+  if (ct.kind === 'turretSlot') {
+    const i = ct.slot;
+    const sl = run.turrets[i];
+    const meta = TURRET_SLOTS[i];
+    if (!sl.type) {
+      return (
+        <div class="shift-hud field-build-hud" id="field-build-hud">
+          <Icon k="ic_anvil" />
+          <span><b>{meta.name}</b>{smith ? ' (85折)' : ''}</span>
+          {(['mg', 'frost', 'tesla', 'cannon'] as TurretType[]).map((kind) => {
+            const c = turretBuildCost(kind, run.cls, qiang, smith);
+            return (
+              <Btn key={kind} kind="small" id={`btn-field-build-${i}-${kind}`} disabled={run.coins < c}
+                onClick={() => game.send({ t: 'buildTurret', slot: i, kind })}>
+                {TURRET_SHORT[kind]} {c}金
+              </Btn>
+            );
+          })}
+        </div>
+      );
+    }
+    const def = TURRETS[sl.type];
+    const isMax = sl.level >= def.levels.length;
+    const upCost = turretUpgradeCost(sl.type, sl.level, run.cls, qiang, smith);
+    const refund = turretRefundCoins(sl.type, sl.level, run.cls, qiang);
+    const mode: TurretTargetMode = sl.mode ?? 'near';
+    return (
+      <div class="shift-hud field-build-hud" id="field-build-hud">
+        <Icon k={def.icon} />
+        <span><b>{meta.name} · {def.name} Lv.{sl.level}</b></span>
+        <Btn kind="small" id={`btn-field-mode-${i}`} onClick={() => game.send({ t: 'cycleTurretMode', slot: i })}>
+          {TURRET_MODE_LABEL[mode]}
+        </Btn>
+        <Btn kind="primary" cls="small" id={`btn-field-up-${i}`} disabled={isMax || run.coins < upCost}
+          onClick={() => game.send({ t: 'upgradeTurret', slot: i })}>
+          {isMax ? '满级' : `升 ${upCost}金`}
+        </Btn>
+        <Btn kind="ghost" cls="small" id={`btn-field-del-${i}`} onClick={() => game.send({ t: 'sellTurret', slot: i })}>
+          拆+{refund}
+        </Btn>
+      </div>
+    );
+  }
+
+  if (ct.kind === 'wallSpot') {
+    const wallMax = run.wall.level >= MAX_WALL_LEVEL;
+    const nextWall = wallMax ? null : WALL_LEVELS[run.wall.level];
+    return (
+      <div class="shift-hud field-build-hud" id="field-build-hud">
+        <Icon k="ic_wall" />
+        <span><b>{WALL_LEVELS[run.wall.level - 1].name} Lv.{run.wall.level}</b> ({run.wall.hp}/{run.wall.maxHp})</span>
+        <Btn kind="small" id="btn-field-wall-repair" disabled={run.wall.hp >= run.wall.maxHp || run.coins < WALL_REPAIR_COST}
+          onClick={() => game.send({ t: 'repairWall' })}>修 {WALL_REPAIR_COST}金</Btn>
+        <Btn kind="primary" cls="small" id="btn-field-wall-up" disabled={!nextWall || run.coins < nextWall.coins}
+          onClick={() => game.send({ t: 'upgradeWall' })}>{nextWall ? `升${nextWall.name} ${nextWall.coins}金` : '已满级'}</Btn>
+      </div>
+    );
+  }
+
+  if (ct.kind === 'fortSpot') {
+    const fortMax = run.fort.level >= MAX_FORT_LEVEL;
+    const nextFort = fortMax ? null : FORT_LEVELS[run.fort.level];
+    return (
+      <div class="shift-hud field-build-hud" id="field-build-hud">
+        <Icon k="ic_fort" />
+        <span><b>{FORT_LEVELS[run.fort.level - 1].name} Lv.{run.fort.level}</b> ({run.home.hp}/{run.home.maxHp})</span>
+        <Btn kind="small" id="btn-field-fort-repair" disabled={run.home.hp >= run.home.maxHp || run.coins < FORT_REPAIR_COST}
+          onClick={() => game.send({ t: 'repairFort' })}>修 {FORT_REPAIR_COST}金</Btn>
+        <Btn kind="primary" cls="small" id="btn-field-fort-up" disabled={!nextFort || run.coins < nextFort.coins}
+          onClick={() => game.send({ t: 'upgradeFort' })}>{nextFort ? `加固 ${nextFort.coins}金` : '已满级'}</Btn>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+/** 今夜战备日报（#panel-shift-summary）：堂食赏金结算 + 明日主战场火力与食客支援总览 */
 function ShiftSummaryPanel() {
   const run = game.run, s = run.dinerShift;
   if (run.phase !== 'camp' || !run.inside || s.mode !== 'summary') return null;
   const rep = s.report ?? {
     dishCoins: s.coinsEarned, drinkCoins: 0, tipsCoins: s.tipsEarned, partyBonusCoins: 0,
-    spiceExpense: s.spiceSpentCoins, staffWages: 0, upkeepCost: 0,
+    spiceExpense: 0, staffWages: 0, upkeepCost: 0,
     ryePenaltyCount: s.ryeCount, angryCount: s.lostCount, dirtyLeftCount: s.dirtyTables.length,
-    rating: 3.0, flameEarned: 4, netProfit: s.coinsEarned + s.tipsEarned - s.spiceSpentCoins,
+    rating: 4.5, flameEarned: 4, netProfit: s.coinsEarned + s.tipsEarned,
   };
+  const tBuff = computeTomorrowBattleBuff(run);
+  const feastCnt = (run.diner.feastDishes ?? []).length;
   return (
-    <Panel id="panel-shift-summary" cls="summary-panel" title="今夜经营日报">
+    <Panel id="panel-shift-summary" cls="summary-panel" title="今夜战备与堂食日报">
       <div class="summary-head">
         <Icon k="ic_ledger" cls="x2" />
-        <div class="summary-gold">净利 {rep.netProfit >= 0 ? `+${rep.netProfit}` : rep.netProfit} 金</div>
+        <div class="summary-gold">堂食净入 {rep.netProfit >= 0 ? `+${rep.netProfit}` : rep.netProfit} 金</div>
         <div class="summary-badges">
           <em class="sum-rate">{rep.rating.toFixed(1)}★</em>
-          <em class="sum-flame"><Icon k="ic_flame" />+{rep.flameEarned} 灵感</em>
+          <em class="sum-flame">战备 {feastCnt} 道</em>
         </div>
       </div>
       <div class="cols2 summary-grid">
         <div class="box">
-          <div class="item"><span>堂食菜金 / 派对</span><b>+{rep.dishCoins} / +{rep.partyBonusCoins} 金</b></div>
-          <div class="item"><span>酒水饮品 ({s.drinkCount})</span><b>+{rep.drinkCoins} 金</b></div>
-          <div class="item"><span>加急 / 委托 / 连击</span><b>+{rep.tipsCoins} 金</b></div>
-          <div class="item"><span>满座与涨粉 ({s.servedCount}客)</span><b>+{s.fansEarned} 粉</b></div>
+          <div class="item"><span>料理赏金 / 狂欢</span><b>+{rep.dishCoins} / +{rep.partyBonusCoins} 金</b></div>
+          <div class="item"><span>佳酿饮品 ({s.drinkCount})</span><b>+{rep.drinkCoins} 金</b></div>
+          <div class="item"><span>快手与熟客重赏</span><b>+{rep.tipsCoins} 金</b></div>
+          <div class="item"><span>招待食客 ({s.servedCount}位)</span><b>+{s.fansEarned} 口碑</b></div>
         </div>
         <div class="box">
-          <div class="item"><span>香料进货</span><b>-{rep.spiceExpense} 金</b></div>
-          <div class="item"><span>伙计日薪 / 店耗</span><b>-{rep.staffWages} / -{rep.upkeepCost} 金</b></div>
-          <div class="item"><span>断货黑麦饼惩罚</span><b>{rep.ryePenaltyCount} 份</b></div>
-          <div class="item"><span>生气离席 / 留脏碗</span><b>{rep.angryCount} 客 / {rep.dirtyLeftCount} 盘</b></div>
+          <div class="item"><span>明日枪械伤害 / 攻速</span><b>+{Math.round(tBuff.dmgMul * 100)}% / +{Math.round(tBuff.haste * 100)}%</b></div>
+          <div class="item"><span>明日炮塔 / 暴击</span><b>+{Math.round(tBuff.turretMul * 100)}% / +{Math.round(tBuff.critBonus * 100)}%</b></div>
+          <div class="item"><span>匠师折扣 / 明日空投</span><b>{run.diner.smithDiscount ? '85折' : '无'} / +{run.diner.extraCrates ?? 0}箱</b></div>
+          <div class="item"><span>同行战友狂飙</span><b>{run.diner.allyFuryNext ? '已激活 (+35%伤)' : '未触发'}</b></div>
         </div>
       </div>
-      <Btn id="btn-shift-summary-ok" kind="primary" onClick={() => game.send({ t: 'finishSummary' })}>收工归帐</Btn>
+      <Btn id="btn-shift-summary-ok" kind="primary" onClick={() => game.send({ t: 'finishSummary' })}>收工迎战</Btn>
     </Panel>
   );
 }
@@ -945,6 +862,7 @@ function ShiftSummaryPanel() {
 function BuildPanel() {
   const run = game.run;
   const qiang = hasAlly(run, 'qiang');
+  const smith = !!run.diner.smithDiscount;
   const wallMax = run.wall.level >= MAX_WALL_LEVEL, nextWall = wallMax ? null : WALL_LEVELS[run.wall.level];
   const fortMax = run.fort.level >= MAX_FORT_LEVEL, nextFort = fortMax ? null : FORT_LEVELS[run.fort.level];
 
@@ -960,7 +878,7 @@ function BuildPanel() {
           </div>
           <div class="mini-btns">
             {(['mg', 'frost', 'tesla', 'cannon'] as TurretType[]).map((kind) => {
-              const c = turretBuildCost(kind, run.cls, qiang);
+              const c = turretBuildCost(kind, run.cls, qiang, smith);
               return (
                 <Btn kind="small" key={kind} id={`btn-build-${i}-${kind}`} disabled={run.coins < c} onClick={() => game.send({ t: 'buildTurret', slot: i, kind })}>
                   {TURRET_SHORT[kind]} {c}金
@@ -973,7 +891,7 @@ function BuildPanel() {
     }
     const tDef = TURRETS[sl.type];
     const isMax = sl.level >= tDef.levels.length;
-    const upCost = turretUpgradeCost(sl.type, sl.level, run.cls, qiang);
+    const upCost = turretUpgradeCost(sl.type, sl.level, run.cls, qiang, smith);
     const refund = turretRefundCoins(sl.type, sl.level, run.cls, qiang);
     const mode: TurretTargetMode = sl.mode ?? 'near';
     return (
@@ -1004,7 +922,7 @@ function BuildPanel() {
     <Panel id="panel-build" cls="wide" title="防线工坊" head={<><Purse /><Btn id="btn-close" kind="primary" onClick={() => game.close()}>好了</Btn></>}>
       <div class="fort-blueprint">
         <div class="blueprint-legend">
-          <span>屋顶{qiang ? ' · 造塔-10%' : ''}</span>
+          <span>屋顶{qiang ? ' · 老强-10%' : ''}{smith ? ' · 匠师造塔85折' : ''}</span>
         </div>
         <div class="fort-tier tier-roof">
           {renderSlot(0)}
@@ -1082,30 +1000,13 @@ function Toasts(p: { layer?: 'shift' | 'bar' }) {
     else if (e.t === 'bossAppear') pushToast(`首领 ${ZOMBIES[e.kind].name} 现身`, true);
     else if (e.t === 'bossDead') pushToast(`击溃 ${ZOMBIES[e.kind].name}`, true);
     else if (e.t === 'dayClear') pushToast('本夜清场');
+    else if (e.t === 'contractDone') pushToast(`猎令达成「${e.title}」${e.rewardText}`, true);
     else if (e.t === 'pickup' && e.isNew) pushToast(`获得 ${WEAPONS[e.weapon].name}`, true);
     else if (e.t === 'star') pushToast(`${WEAPONS[e.weapon].name} ${'★'.repeat(e.star)}${STAR_PERKS[e.star] ? ' · ' + STAR_PERKS[e.star] : ''}`, true);
     else if (e.t === 'skill') pushToast(`${CLASSES[e.cls].skill}`, true);
     else if (e.t === 'allyJoin') pushToast(`${ALLIES[e.ally].name} 入伙`, true);
     else if (e.t === 'kitchenDone') {
       pushToast(e.extraPlate ? `余锅顺手加出 1 盘「${e.dishName}」！` : `后厨出锅：${e.dishName}`, !e.isRye);
-    }
-    else if (e.t === 'sauceEmpty') {
-      pushToast('辣酱耗尽！去石臼研磨补酱', true);
-    }
-    else if (e.t === 'grindSauce') {
-      pushToast(`${e.byStaff ? `${e.byStaff}磨出` : ''}辛香辣酱恢复至 ${e.sauce}%`);
-    }
-    else if (e.t === 'research') {
-      pushToast(`研发成功「${MEALS[e.id].name}」`, true);
-    }
-    else if (e.t === 'prepDish') {
-      pushToast(`已备好「${MEALS[e.id].name}」×${e.servingsAdded} 份`);
-    }
-    else if (e.t === 'dispatchReturn') {
-      pushToast(e.log, true);
-    }
-    else if (e.t === 'rackHarvest') {
-      pushToast(`贮肉架熟成：+${e.tender}嫩肉 +${e.thick}厚肉${e.essence ? ` +${e.essence}魔髓` : ''}`);
     }
     else if (e.t === 'partyStart') {
       pushToast(`今夜主题狂欢「${e.name}」开宴！`, true);
@@ -1120,17 +1021,21 @@ function Toasts(p: { layer?: 'shift' | 'bar' }) {
       const who = e.byAlly ? `${ALLIES[e.byAlly].name}收拾桌面` : e.byStaff ? `${e.byStaff}收拾桌面` : '收拾桌面';
       pushToast(`${who} +${e.coins}金`);
     }
-    else if (e.t === 'guestAngry') pushToast(`${e.name} 等久离席 (口碑-1)`, true);
+    else if (e.t === 'guestAngry') pushToast(`${e.name} 等久离席`, true);
     else if (e.t === 'shiftOpen') pushToast('暮夜堂食开张营业！', true);
-    else if (e.t === 'shiftEnd') pushToast(`打烊 ${e.rating.toFixed(1)}★ · 净入 ${e.coins + e.tips}金 · +${e.flameEarned}灵感`, true);
+    else if (e.t === 'shiftEnd') pushToast(`打烊 ${e.rating.toFixed(1)}★ · 净入 ${e.coins + e.tips}金`, true);
     else if (e.t === 'serve') {
-      if (e.isRye) pushToast(`${e.name} 被迫啃「${RYE_FALLBACK.name}」+1金 口碑下滑`, false);
-      else if (e.vipRequestClear) pushToast(`点名委托完成！${e.name} +${e.coins}金 +2灵感`, true);
-      else pushToast(`${e.name}「${QUALITY_META[e.quality].label}」+${e.coins}金 +${e.fans}粉`, !!e.allServed || e.quality === 'legendary' || !!e.partyMatch);
-      if (e.rankUp) pushToast(`食堂晋升 ${e.rankUp} (+25金/+2香料)`, true);
+      if (e.isRye) pushToast(`${e.name} 尝了「${RYE_FALLBACK.name}」+1金`, false);
+      else {
+        const supTxt = e.supportTag ? ` · ${e.supportTag}` : '';
+        const buffTxt = e.dishBuffTag ? ` · ${e.dishBuffTag}` : '';
+        pushToast(`${e.name} +${e.coins}金${supTxt}${buffTxt}`, true);
+      }
+      if (e.rankUp) pushToast(`酒馆晋升 ${e.rankUp} (+25金)`, true);
     }
     else if (e.t === 'cook') pushToast(`食材变现 ×${e.meat} +${e.coins}金`);
-    else if (e.t === 'meal') pushToast(`特餐「${MEALS[e.id].name}」已备`, false);
+    else if (e.t === 'dishLevelUp') pushToast(`招牌晋升！「${MEALS[e.id].name}」练成 Lv.${e.level}（收益与战备大增）`, true);
+    else if (e.t === 'meal') pushToast(`战备「${MEALS[e.id].name}」已激活 (${MEALS[e.id].battleTag})`, true);
     else if (e.t === 'hurt') setHurt((n) => n + 1);
   }), []);
   return (
@@ -1159,6 +1064,7 @@ export function App() {
           <Pad />
           {isCamp && run.inside && run.pourMinigame && <PourHud />}
           {isCamp && run.inside && !run.pourMinigame && <ShiftHud />}
+          {isCamp && !run.inside && <FieldBuildHud />}
           {!isCamp && !run.inside && <><WeaponChip /><Keys /></>}
           {isCamp && <><CampBar /><CampKeys /></>}
         </>

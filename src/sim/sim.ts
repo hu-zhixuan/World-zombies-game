@@ -1,12 +1,12 @@
 // 规则层：纯计算，不碰浏览器。固定每秒 60 步；随机数带种子；同样的种子和输入一定得到同样的结果。
 import {
   CLASSES, CRIT_CHANCE, CRIT_MUL, DIFFICULTIES, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
-  MEALS, PERKS, RARITY_WEIGHT, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST, STAR_COST, TURRETS,
+  MEALS, MEAL_ORDER, PERKS, RARITY_WEIGHT, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST, STAR_COST, TURRETS,
   WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES, bossForDay, dayZombieCount, defaultResearchedMeals, extraBullets, magSize, starMul, zombieHp,
   type ClassId, type DifficultyId, type DrinkId, type MealId, type PerkId, type TavernUpgradeId, type TurretType, type WeaponId, type ZombieKind,
 } from '../content/data';
 import {
-  COMPANION_JOIN_STORIES, DAILY_TRENDS, QUALITY_META,
+  COMPANION_JOIN_STORIES, DAILY_TRENDS,
   type AllyId, type DishQuality,
 } from '../content/story';
 import {
@@ -15,19 +15,20 @@ import {
   TURRET_SLOTS, WALL_X, type AllyRuntime, type Bullet, type Command, type CounterDish, type DinerGuest, type GameEvent, type Input, type RunState, type StationId, type TurretTargetMode, type Zombie,
 } from './types';
 import {
-  allyRole, buySpiceCmd, buyTavernUpgradeCmd, completeServeGuest, dinerRank, dishLevel, dishPrice, dishResearchCost, dishServings, dishTaste,
-  finishShiftToSummary, formatRecipeCost, grindMortarCmd, hasIngredients, hasTavernUpgrade, hireStaffCmd,
+  activateDishBattleBuff, allyRole, applyGuestBattleSupport, buySpiceCmd, buyTavernUpgradeCmd, completeServeGuest, computeTomorrowBattleBuff,
+  dinerRank, dishLevel, dishPrice, dishResearchCost, dishServings, dishTaste, dishXp, dishXpTarget, feastAllCmd,
+  finishShiftToSummary, formatRecipeCost, gainDishXp, grindMortarCmd, hasIngredients, hasTavernUpgrade, hireStaffCmd,
   makeIdleShift, maxMenuSlots, maxSeats, maxStaffSlots, meatPrice, passCounterCapacity, postRecruitmentCmd, pourQuality,
-  prepDishCmd, researchDishCmd, resolveNightPrepAndDispatch, rollDailyTrend, rollDinerGuests, sellMeatKindCmd,
+  prepDishCmd, progressBattleContract, researchDishCmd, resolveNightPrepAndDispatch, rollBattleContract, rollDailyTrend, rollDinerGuests, sellMeatKindCmd,
   setAllyRoleCmd, setStaffRoleCmd, spendIngredients, staffDef, staffHasSkill, startShiftCmd, stepStaffCamp,
-  stepTavernShift, stoveCapacity, tavernUpgradeCost, toggleAutoSupplyCmd, toggleMenuDishCmd, totalMeat, trainStaffCmd,
-  upgradeDishCmd, upgradeRackCmd,
+  stepTavernShift, stoveCapacity, tavernUpgradeCost, tavernWallMaxBonus, toggleAutoSupplyCmd, toggleMenuDishCmd, totalMeat, trainStaffCmd,
+  upgradeDishCmd, upgradeRackCmd, vipSupportKind,
 } from './diner';
 
 export {
-  allyRole, dinerRank, dishLevel, dishPrice, dishResearchCost, dishServings, dishTaste, formatRecipeCost, hasIngredients,
-  hasTavernUpgrade, maxMenuSlots, maxSeats, maxStaffSlots, meatPrice, passCounterCapacity, pourQuality, staffDef,
-  staffHasSkill, stoveCapacity, tavernUpgradeCost, totalMeat,
+  activateDishBattleBuff, allyRole, applyGuestBattleSupport, computeTomorrowBattleBuff, dinerRank, dishLevel, dishPrice, dishResearchCost, dishServings, dishTaste,
+  dishXp, dishXpTarget, formatRecipeCost, hasIngredients, hasTavernUpgrade, maxMenuSlots, maxSeats, maxStaffSlots, meatPrice, passCounterCapacity, pourQuality,
+  rollBattleContract, staffDef, staffHasSkill, stoveCapacity, tavernUpgradeCost, tavernWallMaxBonus, totalMeat, vipSupportKind,
 };
 
 export const MAX_CARRY = 2;
@@ -80,28 +81,30 @@ export interface HouseBuff {
   meleeImmune: boolean;
 }
 
-/** 房屋/屋顶高地防守增益：站上酒馆门廊或二楼屋顶可获得显著火力、暴击、射程、换弹与矮墙掩体减伤。 */
+/** 房屋/屋顶高地防守增益：站上酒馆门廊或二楼屋顶可获得显著火力、暴击、射程、换弹与矮墙掩体减伤（酒馆暖琥珀吊灯额外加成高地暴击与射程）。 */
 export function houseBuff(run: RunState): HouseBuff {
   const flv = Math.max(1, run.fort.level);
+  const lanternCrit = hasTavernUpgrade(run, 'warm_lantern') ? 0.12 : 0;
+  const lanternRange = hasTavernUpgrade(run, 'warm_lantern') ? 0.10 : 0;
   if (isOnRoof(run)) {
     const dmgMul = flv >= 3 ? 1.36 : flv === 2 ? 1.28 : 1.20;
-    const rangeBonus = flv >= 3 ? 0.35 : flv === 2 ? 0.25 : 0.20;
-    const critBonus = flv >= 3 ? 0.18 : flv === 2 ? 0.14 : 0.10;
+    const rangeBonus = (flv >= 3 ? 0.35 : flv === 2 ? 0.25 : 0.20) + lanternRange;
+    const critBonus = (flv >= 3 ? 0.18 : flv === 2 ? 0.14 : 0.10) + lanternCrit;
     const reloadHaste = flv >= 3 ? 0.40 : flv === 2 ? 0.32 : 0.25;
     const rangedCover = flv >= 3 ? 0.45 : flv === 2 ? 0.35 : 0.25;
     const name = flv >= 3 ? '铁堡屋顶' : flv === 2 ? '石堡屋顶' : '酒馆屋顶';
     return { zone: 'roof', name, dmgMul, rangeBonus, critBonus, reloadHaste, rangedCover, meleeImmune: true };
   }
   if (isOnPorch(run)) {
-    return { zone: 'porch', name: '门廊木台', dmgMul: 1.12, rangeBonus: 0.10, critBonus: 0.05, reloadHaste: 0.12, rangedCover: 0.15, meleeImmune: true };
+    return { zone: 'porch', name: '门廊木台', dmgMul: 1.12, rangeBonus: 0.10 + lanternRange, critBonus: 0.05 + lanternCrit, reloadHaste: 0.12, rangedCover: 0.15, meleeImmune: true };
   }
   return { zone: 'ground', name: '前院平地', dmgMul: 1.0, rangeBonus: 0, critBonus: 0, reloadHaste: 0, rangedCover: 0, meleeImmune: false };
 }
 
-export const turretBuildCost = (kind: TurretType, cls: ClassId, hasQiang = false) =>
-  Math.ceil(TURRETS[kind].buildCoins * (cls === 'engineer' ? 0.75 : 1) * (hasQiang ? 0.9 : 1));
-export const turretUpgradeCost = (kind: TurretType, level: number, cls: ClassId, hasQiang = false) =>
-  Math.ceil((TURRETS[kind].upgradeCoins[level] ?? 0) * (cls === 'engineer' ? 0.75 : 1) * (hasQiang ? 0.9 : 1));
+export const turretBuildCost = (kind: TurretType, cls: ClassId, hasQiang = false, smithDiscount = false) =>
+  Math.ceil(TURRETS[kind].buildCoins * (cls === 'engineer' ? 0.75 : 1) * (hasQiang ? 0.9 : 1) * (smithDiscount ? 0.85 : 1));
+export const turretUpgradeCost = (kind: TurretType, level: number, cls: ClassId, hasQiang = false, smithDiscount = false) =>
+  Math.ceil((TURRETS[kind].upgradeCoins[level] ?? 0) * (cls === 'engineer' ? 0.75 : 1) * (hasQiang ? 0.9 : 1) * (smithDiscount ? 0.85 : 1));
 export const turretRefundCoins = (kind: TurretType, level: number, cls: ClassId, hasQiang = false) => {
   let spent = turretBuildCost(kind, cls, hasQiang);
   for (let l = 1; l < level; l++) spent += turretUpgradeCost(kind, l, cls, hasQiang);
@@ -116,11 +119,12 @@ export function effectiveRange(run: RunState, id: WeaponId = curWeapon(run).id):
   return Math.round(WEAPONS[id].range * (1 + hb.rangeBonus + perkBonus));
 }
 
-/** 伤害倍率：特餐 × 屋顶/门廊高地 × 战友 × 天赋。 */
+/** 伤害倍率：酒馆战备料理 × 双层传菜架硬件加成 × 屋顶/门廊高地 × 战友 × 天赋。 */
 export function damageMul(run: RunState): number {
   const p = run.player;
   const hb = houseBuff(run);
   let m = (1 + run.buff.dmgMul) * hb.dmgMul;
+  if (hasTavernUpgrade(run, 'wide_pass')) m *= 1.15;
   if (hasAlly(run, 'zhang')) m *= 1.1;
   if (isOnRoof(run) && has(run, 'rooftop')) m *= 1.2;
   if (has(run, 'glasscannon')) m *= 1.65;
@@ -172,27 +176,48 @@ export type CampInteractTarget =
   | { kind: 'drink'; x: number }
   | { kind: 'shop'; x: number }
   | { kind: 'workshop'; x: number }
+  | { kind: 'turretSlot'; slot: number; x: number; y: number }
+  | { kind: 'wallSpot'; x: number; y: number }
+  | { kind: 'fortSpot'; x: number; y: number }
   | { kind: 'doorOut'; x: number }
   | { kind: 'doorIn'; x: number };
 
-/** 营地（室内与室外）走近可交互的对象：石臼磨辣酱、酒桶打酒、传菜台取菜、端盘上菜、收碗、搭话、商店、工坊、进出木门 */
+/** 营地（室内与室外）走近可交互的对象：室外炮台/壁垒/大屋实地建造、酒馆传菜/斟酒/上菜/收碗/搭话、行商、工坊、进出木门 */
 export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
   if (run.phase !== 'camp') return null;
   const p = run.player;
   if (!run.inside) {
-    if (Math.abs(p.x - DOOR_X) <= 32 && p.y > -24) return { kind: 'doorIn', x: DOOR_X };
-    let bestAlly: { score: number; target: CampInteractTarget } | null = null;
+    if (Math.abs(p.x - DOOR_X) <= 30 && p.y > -24) return { kind: 'doorIn', x: DOOR_X };
+    const extCands: { d: number; target: CampInteractTarget }[] = [];
+    // 室外 4 处炮塔基座（屋顶2处 + 庭院2处）支持实地直建/升级
+    for (let i = 0; i < TURRET_SLOTS.length; i++) {
+      const sl = TURRET_SLOTS[i];
+      const onMatchTier = sl.roof ? p.y <= ROOF_Y + 18 : p.y >= -24;
+      const dx = Math.abs(p.x - sl.x);
+      if (onMatchTier && dx <= 30) {
+        extCands.push({ d: dx - 2, target: { kind: 'turretSlot', slot: i, x: sl.x, y: sl.roof ? ROOF_Y : 0 } });
+      }
+    }
+    // 前院防线壁垒实地修补与升级
+    if (p.y >= -24 && Math.abs(p.x - WALL_X) <= 34) {
+      extCands.push({ d: Math.abs(p.x - WALL_X) - 1, target: { kind: 'wallSpot', x: WALL_X, y: 0 } });
+    }
+    // 屋顶大屋核心（加固要塞）
+    if (p.y <= ROOF_Y + 18 && Math.abs(p.x - 166) <= 32) {
+      extCands.push({ d: Math.abs(p.x - 166), target: { kind: 'fortSpot', x: 166, y: ROOF_Y } });
+    }
     for (const allyId of run.story.allies) {
       const pos = ALLY_POS[allyId];
       const ax = run.allies[allyId]?.x ?? pos.extX;
       const ay = run.allies[allyId]?.y ?? pos.extY;
       const dx = Math.abs(p.x - ax);
       const dy = Math.abs(p.y - ay);
-      if (dx <= 28 && dy <= 16 && (!bestAlly || dx < bestAlly.score)) {
-        bestAlly = { score: dx, target: { kind: 'allyTalk', x: ax, ally: allyId } };
+      if (dx <= 28 && dy <= 16) {
+        extCands.push({ d: dx + 4, target: { kind: 'allyTalk', x: ax, ally: allyId } });
       }
     }
-    return bestAlly?.target ?? null;
+    extCands.sort((a, b) => a.d - b.d);
+    return extCands[0]?.target ?? null;
   }
 
   if (run.pourMinigame && Math.abs(p.x - IN_STATIONS.drink) <= 46) {
@@ -392,12 +417,12 @@ export function newRun(
     pourMinigame: null, carryingDrink: null,
     dinerShift: makeIdleShift(0),
     diner: {
-      rep: 0, fans: 0, flame: hFlame, bestTaste: 100,
+      rep: 0, fans: 0, flame: hFlame, bestTaste: 120,
       trendId: DAILY_TRENDS[0].id, trendTag: DAILY_TRENDS[0].tag, trendTitle: DAILY_TRENDS[0].title,
       servedTotal: 0, metVips: [], reviews: [],
       researched: defaultResearchedMeals(),
-      dishLevels: { spicy_skewer: 1, hearty_stew: 1 },
-      menu: ['spicy_skewer', 'hearty_stew'],
+      dishLevels: Object.fromEntries(MEAL_ORDER.map((id) => [id, (heirloom?.mastery?.[id] ?? 1) >= 2 ? 2 : 1])),
+      menu: [...MEAL_ORDER],
       menuStock: {},
       autoSupply: {},
       upgrades: [],
@@ -407,9 +432,14 @@ export function newRun(
       rackLevel: 0,
       lastDispatchLog: '',
       allyRoles: {},
+      feastDishes: [],
+      supportsTriggered: [],
+      smithDiscount: false,
+      extraCrates: 0,
+      allyFuryNext: false,
     },
     story: { allies: [], seenEvents: [] },
-    buff: { dmgMul: 0, haste: 0 }, shop: [],
+    buff: { dmgMul: 0, haste: 0, turretMul: 0, critBonus: 0, frostRounds: false, allyFury: false }, shop: [],
     perks: [], perkChoices: [], targetId: null, priorityId: null,
     pool: [...pool], chain: { n: 0, t: 0 }, vanguardT: 0, cls, skill: { t: 0, cd: 0 },
     endless: false,
@@ -430,22 +460,60 @@ function startDay(run: RunState, ev: GameEvent[]) {
   syncAlliesPos(run, false);
   const diff = run.difficulty ?? 'normal';
   const total = dayZombieCount(run.day, diff);
-  const crateAt = run.day === 1 || rand(run) < 0.45 ? Math.floor(total / 2) : -1;
+  const hasArmsCrate = (run.diner.extraCrates ?? 0) > 0;
+  const crateAt = run.day === 1 || hasArmsCrate || rand(run) < 0.45 ? Math.floor(total / 2) : -1;
   const bossKind = bossForDay(run.day);
   run.spawn = { left: total, timer: 46, total, killed: 0, crateAt, bossKind, bossSpawned: false };
   run.bullets = []; run.fires = []; run.grenades = []; run.enemyProjs = [];
   run.chain = { n: 0, t: 0 }; run.vanguardT = 0; run.skill = { t: 0, cd: 0 };
   rollDailyTrend(run);
+  rollBattleContract(run);
 
-  const mealBoost = (run.cls === 'chef' ? 1.5 : 1) * QUALITY_META[run.mealQuality ?? 'good'].buffMul;
-  if (run.meal) {
-    const m = MEALS[run.meal];
-    run.buff = { dmgMul: m.dmgMul * mealBoost, haste: m.haste * mealBoost };
-    run.player.armor = Math.min(run.player.maxArmor, run.player.armor + Math.round(m.armor * mealBoost));
+  // 结算酒馆晚宴对今日主战场的全部战备增益（支持单道特餐或多道堂食料理叠加）
+  const tb = computeTomorrowBattleBuff(run);
+  if (tb.dishes.length > 0 || tb.allyFury) {
+    run.buff = {
+      dmgMul: tb.dmgMul,
+      haste: tb.haste,
+      turretMul: tb.turretMul,
+      critBonus: tb.critBonus,
+      frostRounds: tb.frostRounds,
+      allyFury: tb.allyFury,
+    };
+    if (tb.armor > 0) {
+      run.player.armor = Math.min(run.player.maxArmor, run.player.armor + tb.armor);
+    }
+    if (tb.bonusGrenades > 0) {
+      run.player.grenades = Math.min(MAX_GRENADES, run.player.grenades + tb.bonusGrenades);
+    }
+    if (tb.allyFury) {
+      run.vanguardT = Math.max(run.vanguardT, 480);
+    }
     run.meal = null;
     run.mealQuality = 'good';
   } else {
-    run.buff = { dmgMul: 0, haste: 0 };
+    run.buff = { dmgMul: 0, haste: 0, turretMul: 0, critBonus: 0, frostRounds: false, allyFury: false };
+  }
+
+  // 军火游商支援：开战直接在前院空投一口武器升星箱
+  if (hasArmsCrate) {
+    const pool: WeaponId[] = ['pistol', ...run.pool];
+    const unowned = pool.filter((id) => !run.player.weapons.some((w) => w.id === id));
+    const weapon = unowned.length > 0
+      ? unowned[Math.floor(rand(run) * unowned.length)]
+      : pool[Math.floor(rand(run) * pool.length)];
+    run.crates.push({ id: run.nextId++, x: Math.min(PLAYER_MAX_X - 40, WALL_X - 36), weapon });
+  }
+  run.diner.feastDishes = [];
+  run.diner.supportsTriggered = [];
+  run.diner.allyFuryNext = false;
+  run.diner.smithDiscount = false;
+  run.diner.extraCrates = 0;
+
+  // 精铜酒栓永久主战场战备：每晚开战自动补给 +35 铁甲与 +1 爆炎弹
+  if (hasTavernUpgrade(run, 'fast_tap')) {
+    run.player.armor = Math.min(run.player.maxArmor, run.player.armor + 35);
+    run.player.grenades = Math.min(MAX_GRENADES, run.player.grenades + 1);
   }
   if (has(run, 'secondwind')) run.player.hp = Math.min(run.player.maxHp, run.player.hp + run.player.maxHp * 0.25);
   if (has(run, 'fortify')) run.player.armor = Math.min(run.player.maxArmor, run.player.armor + 25);
@@ -569,6 +637,10 @@ function damageZombie(
     t: 'kill', id: z.id, x: z.x, y: zy, kind: z.kind, coins: def.coins,
     meat: meatDrop, meatKind, preserved: preserved && meatDrop > 0, dir, crit: opts.crit, boss: def.boss,
   });
+  const cId = run.diner.contract?.id;
+  if (cId === 'rooftop_hunt' && (isOnRoof(run) || isOnPorch(run))) progressBattleContract(run, 1, ev);
+  else if (cId === 'crit_blast' && (opts.crit || opts.burn || heavy)) progressBattleContract(run, 1, ev);
+  else if (cId === 'elite_purge' && (def.boss || z.kind === 'bruiser' || z.kind === 'bat' || z.kind === 'ghoul')) progressBattleContract(run, 1, ev);
   if (def.boss) {
     ev.push({ t: 'bossDead', kind: z.kind, bossIdx: run.day <= 5 ? 0 : run.day <= 10 ? 1 : 2 });
   }
@@ -878,8 +950,9 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
     p.dodgeDir = move !== 0 ? (move > 0 ? 1 : -1) : p.facing;
     ev.push({ t: 'dodge' });
   }
-  if (p.dodgeT > 0) { p.dodgeT--; p.vx = p.dodgeDir * DODGE_SPEED; }
-  else p.vx = move * MOVE_SPEED;
+  const rushSpeedMul = run.inside && run.dinerShift.mode === 'open' ? 1.28 : 1;
+  if (p.dodgeT > 0) { p.dodgeT--; p.vx = p.dodgeDir * DODGE_SPEED * (run.inside ? 1.12 : 1); }
+  else p.vx = move * MOVE_SPEED * rushSpeedMul;
 
   if (run.inside) {
     if (input.jump && p.y === 0) p.vy = JUMP_V * 0.72;
@@ -1094,7 +1167,8 @@ function stepTurrets(run: RunState, ev: GameEvent[]) {
   const eng = run.cls === 'engineer';
   const overclock = has(run, 'overclock') ? 1.2 : 1;
   const engActive = skillActive(run, 'engineer') ? 2 : 1;
-  const haste = (1 + run.buff.haste) * overclock * engActive;
+  const dishTurretMul = 1 + (run.buff.turretMul ?? 0);
+  const haste = (1 + run.buff.haste) * (1 + (run.buff.turretMul ?? 0) * 0.5) * overclock * engActive;
 
   for (let i = 0; i < run.turrets.length; i++) {
     const slot = run.turrets[i];
@@ -1122,7 +1196,7 @@ function stepTurrets(run: RunState, ev: GameEvent[]) {
     const best = inRange[0];
 
     slot.cd = Math.max(2, Math.round(lv.cooldown / haste));
-    const dmg = Math.round(lv.damage * (eng ? 1.2 : 1));
+    const dmg = Math.round(lv.damage * (eng ? 1.2 : 1) * dishTurretMul);
     const dx = best.x - pos.x, dy = zombieBodyY(best) - pos.muzzleY, len = Math.hypot(dx, dy) || 1;
     slot.aim = Math.atan2(dy, dx);
     const ox = pos.x + (dx / len) * 10, oy = pos.muzzleY + (dy / len) * 10;
@@ -1161,18 +1235,19 @@ function stepTurrets(run: RunState, ev: GameEvent[]) {
       }
       if (best) {
         const lv3 = run.fort.level >= 3;
-        run.fort.cd = Math.round((lv3 ? 56 : 92) / (1 + run.buff.haste));
+        run.fort.cd = Math.round((lv3 ? 56 : 92) / ((1 + run.buff.haste) * (1 + (run.buff.turretMul ?? 0) * 0.5)));
         const dx = best.x - FORT_GUN_X, dy = zombieBodyY(best) - FORT_GUN_Y, len = Math.hypot(dx, dy) || 1;
         run.fort.aim = Math.atan2(dy, dx);
         const shots = lv3 ? 2 : 1;
         const ox = FORT_GUN_X + (dx / len) * 10, oy = FORT_GUN_Y + (dy / len) * 10;
+        const fortDmg = Math.round((lv3 ? 54 : 38) * dishTurretMul);
         for (let s = 0; s < shots; s++) {
           const offset = (s - (shots - 1) * 0.5) * 0.06;
           const ca = Math.cos(offset), sa = Math.sin(offset);
           const vx = ((dx / len) * ca - (dy / len) * sa) * 10;
           const vy = ((dx / len) * sa + (dy / len) * ca) * 10;
           run.bullets.push({
-            x: ox, y: oy, vx, vy, dmg: lv3 ? 54 : 38, life: 54,
+            x: ox, y: oy, vx, vy, dmg: fortDmg, life: 54,
             from: 'fort', pierce: false, crit: false, bounces: 0, hit: [], kind: 'normal',
           });
         }
@@ -1348,10 +1423,14 @@ function stepAlliesCamp(run: RunState, ev: GameEvent[]) {
   }
 }
 
-/** 四位驻守战友真实参战：动作帧与出手判定严格同步，冷静站位索敌、零太空步倒走 */
+/** 四位驻守战友真实参战：动作帧与出手判定严格同步，冷静站位索敌、零太空步倒走（受酒馆【猎魔同袍·战友狂飙】与【双层传菜架】加成） */
 function stepAllies(run: RunState, ev: GameEvent[]) {
   if (run.inside || (run.phase !== 'fight' && run.phase !== 'clear')) return;
   const p = run.player;
+  const fury = !!run.buff.allyFury;
+  const allyDmgMul = (fury ? 1.35 : 1) * (hasTavernUpgrade(run, 'wide_pass') ? 1.15 : 1);
+  const cdMul = fury ? 0.75 : 1;
+
   for (const allyId of run.story.allies) {
     const rt = run.allies[allyId];
     if (!rt) continue;
@@ -1365,10 +1444,10 @@ function stepAllies(run: RunState, ev: GameEvent[]) {
 
     if (run.phase === 'fight') {
       if (allyId === 'lin' && run.tick % 240 === 0 && p.hp > 0 && p.hp < p.maxHp) {
-        p.hp = Math.min(p.maxHp, p.hp + 1);
+        p.hp = Math.min(p.maxHp, p.hp + (fury ? 2 : 1));
       }
       if (allyId === 'qiang' && run.tick % 180 === 0 && run.wall.hp > 0 && run.wall.hp < run.wall.maxHp) {
-        run.wall.hp = Math.min(run.wall.maxHp, run.wall.hp + 3);
+        run.wall.hp = Math.min(run.wall.maxHp, run.wall.hp + (fury ? 6 : 3));
       }
     }
 
@@ -1385,7 +1464,7 @@ function stepAllies(run: RunState, ev: GameEvent[]) {
           const targets = run.zombies.filter((z) => z.hp > 0 && (z.y ?? 0) >= -36 && Math.hypot(z.x - rt.x, zombieBodyY(z) - ay) <= 84);
           if (targets.length > 0) {
             rt.facing = targets[0].x >= rt.x ? 1 : -1;
-            const dmg = Math.round(17 + run.day * 1.8);
+            const dmg = Math.round((17 + run.day * 1.8) * allyDmgMul);
             for (const z of targets) {
               damageZombie(run, z, dmg, ev, { byPlayer: false, kb: 4.4, dir: z.x >= rt.x ? 1 : -1, heavy: true });
             }
@@ -1416,19 +1495,19 @@ function stepAllies(run: RunState, ev: GameEvent[]) {
           if (allyId === 'zhang') {
             run.bullets.push({
               x: ox, y: oy, vx: (dx / len) * 13.5, vy: (dy / len) * 13.5,
-              dmg: Math.round(13 + run.day * 1.5), life: 42,
+              dmg: Math.round((13 + run.day * 1.5) * allyDmgMul), life: 42,
               from: 'ally', allyId: 'zhang', pierce: true, pierceLeft: 2, crit: false, bounces: 0, hit: [], kind: 'spear',
             });
           } else if (allyId === 'lin') {
             run.bullets.push({
               x: ox, y: oy, vx: (dx / len) * 9.5, vy: (dy / len) * 9.5,
-              dmg: Math.round(12 + run.day * 1.25), life: 45,
+              dmg: Math.round((12 + run.day * 1.25) * allyDmgMul), life: 45,
               from: 'ally', allyId: 'lin', pierce: false, crit: false, bounces: 0, hit: [], aoe: 44, burn: 105, kind: 'firebolt',
             });
           } else {
             run.bullets.push({
               x: ox, y: oy, vx: (dx / len) * 15, vy: (dy / len) * 15,
-              dmg: Math.round(11 + run.day * 1.35), life: 40,
+              dmg: Math.round((11 + run.day * 1.35) * allyDmgMul), life: 40,
               from: 'ally', allyId: 'zhao', pierce: false, crit: false, bounces: 0, hit: [], kind: 'qi',
             });
           }
@@ -1448,7 +1527,7 @@ function stepAllies(run: RunState, ev: GameEvent[]) {
         continue;
       }
       if (rt.cd === 0) {
-        rt.cd = 72; rt.atkT = 20; rt.vx = 0; rt.state = 'atk';
+        rt.cd = Math.round(72 * cdMul); rt.atkT = 20; rt.vx = 0; rt.state = 'atk';
         rt.facing = best.x >= rt.x ? 1 : -1;
         rt.atkSeq = (rt.atkSeq ?? 0) + 1;
         rt.fireDone = false;
@@ -1468,7 +1547,7 @@ function stepAllies(run: RunState, ev: GameEvent[]) {
         continue;
       }
       if (rt.cd === 0) {
-        rt.cd = 84; rt.atkT = 40; rt.vx = 0; rt.state = 'atk';
+        rt.cd = Math.round(84 * cdMul); rt.atkT = 40; rt.vx = 0; rt.state = 'atk';
         rt.facing = best.x >= rt.x ? 1 : -1;
         rt.atkSeq = (rt.atkSeq ?? 0) + 1;
         rt.fireDone = false;
@@ -1484,7 +1563,7 @@ function stepAllies(run: RunState, ev: GameEvent[]) {
         .sort((a, b) => Math.abs(a.x - rt.x) - Math.abs(b.x - rt.x))[0];
       const inStrikeRange = run.zombies.filter((z) => z.hp > 0 && (z.y ?? 0) >= -36 && Math.hypot(z.x - rt.x, zombieBodyY(z) - ay) <= 84);
       if (inStrikeRange.length > 0 && rt.cd === 0) {
-        rt.cd = 72; rt.atkT = 26; rt.vx = 0; rt.state = 'atk';
+        rt.cd = Math.round(72 * cdMul); rt.atkT = 26; rt.vx = 0; rt.state = 'atk';
         rt.facing = inStrikeRange[0].x >= rt.x ? 1 : -1;
         rt.atkSeq = (rt.atkSeq ?? 0) + 1;
         rt.fireDone = false;
@@ -1510,7 +1589,7 @@ function stepAllies(run: RunState, ev: GameEvent[]) {
         continue;
       }
       if (rt.cd === 0) {
-        rt.cd = 54; rt.atkT = 24; rt.vx = 0; rt.state = 'atk';
+        rt.cd = Math.round(54 * cdMul); rt.atkT = 24; rt.vx = 0; rt.state = 'atk';
         rt.facing = best.x >= rt.x ? 1 : -1;
         rt.atkSeq = (rt.atkSeq ?? 0) + 1;
         rt.fireDone = false;
@@ -1741,6 +1820,9 @@ export function step(run: RunState, input: Input): GameEvent[] {
   }
   if (run.phase === 'fight' && dayRemaining(run) === 0) {
     run.phase = 'clear'; run.phaseT = 0;
+    if (run.diner.contract?.id === 'iron_wall' && !run.diner.contract.done && run.wall.hp >= run.wall.maxHp * 0.5) {
+      progressBattleContract(run, 1, ev);
+    }
     ev.push({ t: 'dayClear', day: run.day });
   } else if (run.phase === 'clear' && run.phaseT >= 110 && (run.crates.length === 0 || run.phaseT >= 220)) {
     while (run.crates.length > 0) {
@@ -1769,7 +1851,7 @@ export function step(run: RunState, input: Input): GameEvent[] {
   return ev;
 }
 
-const qiangWallBonus = (run: RunState) => (hasAlly(run, 'qiang') ? 50 : 0);
+const qiangWallBonus = (run: RunState) => (hasAlly(run, 'qiang') ? 50 : 0) + tavernWallMaxBonus(run);
 
 function enterCampSession(run: RunState, ev: GameEvent[]) {
   run.phase = 'camp';
@@ -1852,17 +1934,26 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       run.player.hp = Math.min(run.player.maxHp, Math.round(run.player.hp + run.player.maxHp * healFrac));
       run.crates = [];
       for (const w of run.player.weapons) w.ammo = magSize(w.id, w.star);
-      const mealBoost = (run.cls === 'chef' ? 1.5 : 1) * QUALITY_META[run.mealQuality ?? 'good'].buffMul;
-      if (run.meal) {
-        const m = MEALS[run.meal];
-        run.buff = { dmgMul: m.dmgMul * mealBoost, haste: m.haste * mealBoost };
-        run.player.armor = Math.min(run.player.maxArmor, run.player.armor + Math.round(m.armor * mealBoost));
+      const tb = computeTomorrowBattleBuff(run);
+      if (tb.dishes.length > 0 || tb.allyFury) {
+        run.buff = {
+          dmgMul: tb.dmgMul,
+          haste: tb.haste,
+          turretMul: tb.turretMul,
+          critBonus: tb.critBonus,
+          frostRounds: tb.frostRounds,
+          allyFury: tb.allyFury,
+        };
+        if (tb.armor > 0) run.player.armor = Math.min(run.player.maxArmor, run.player.armor + tb.armor);
         run.meal = null;
         run.mealQuality = 'good';
       } else {
-        run.buff = { dmgMul: 0, haste: 0 };
+        run.buff = { dmgMul: 0, haste: 0, turretMul: 0, critBonus: 0, frostRounds: false, allyFury: false };
       }
+      run.diner.feastDishes = [];
+      run.diner.supportsTriggered = [];
       rollDailyTrend(run);
+      rollBattleContract(run);
       enterCampSession(run, ev);
       ev.push({ t: 'dayStart', day: run.day });
       return ev;
@@ -2006,20 +2097,24 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
     case 'buildTurret': {
       const slot = run.turrets[cmd.slot];
       if (!slot || slot.type !== null) return null;
-      const cost = turretBuildCost(cmd.kind, run.cls, hasAlly(run, 'qiang'));
+      const cost = turretBuildCost(cmd.kind, run.cls, hasAlly(run, 'qiang'), !!run.diner.smithDiscount);
       if (run.coins < cost) return null;
       run.coins -= cost;
       slot.type = cmd.kind; slot.level = 1; slot.cd = 0; slot.aim = 0; slot.mode = 'near';
+      const meta = TURRET_SLOTS[cmd.slot];
       ev.push({ t: 'build', kind: 'turret' });
+      ev.push({ t: 'fortify', x: meta.x, y: meta.roof ? ROOF_Y - 12 : -18, label: `${TURRETS[cmd.kind].name} 落成!` });
       return ev;
     }
     case 'upgradeTurret': {
       const slot = run.turrets[cmd.slot];
       if (!slot || !slot.type || slot.level >= TURRETS[slot.type].levels.length) return null;
-      const cost = turretUpgradeCost(slot.type, slot.level, run.cls, hasAlly(run, 'qiang'));
+      const cost = turretUpgradeCost(slot.type, slot.level, run.cls, hasAlly(run, 'qiang'), !!run.diner.smithDiscount);
       if (run.coins < cost) return null;
       run.coins -= cost; slot.level++;
+      const meta = TURRET_SLOTS[cmd.slot];
       ev.push({ t: 'build', kind: 'turret' });
+      ev.push({ t: 'fortify', x: meta.x, y: meta.roof ? ROOF_Y - 12 : -18, label: `${TURRETS[slot.type].name} Lv.${slot.level}!` });
       return ev;
     }
     case 'cycleTurretMode': {
@@ -2045,12 +2140,14 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       run.wall.maxHp = Math.round(next.maxHp * (has(run, 'fortify') ? 1.4 : 1)) + qiangWallBonus(run);
       run.wall.hp = run.wall.maxHp;
       ev.push({ t: 'build', kind: 'wall' });
+      ev.push({ t: 'fortify', x: WALL_X, y: -28, label: `${next.name} Lv.${run.wall.level}!` });
       return ev;
     }
     case 'repairWall':
       if (run.wall.hp >= run.wall.maxHp || run.coins < WALL_REPAIR_COST) return null;
       run.coins -= WALL_REPAIR_COST; run.wall.hp = run.wall.maxHp;
       ev.push({ t: 'build', kind: 'wall' });
+      ev.push({ t: 'fortify', x: WALL_X, y: -28, label: '防线已修满!' });
       return ev;
     case 'upgradeFort': {
       if (run.fort.level >= MAX_FORT_LEVEL) return null;
@@ -2062,12 +2159,14 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       run.home.hp = Math.min(newMax, run.home.hp + (newMax - run.home.maxHp) + 40);
       run.home.maxHp = newMax;
       ev.push({ t: 'build', kind: 'fort' });
+      ev.push({ t: 'fortify', x: 166, y: ROOF_Y - 14, label: `${next.name} Lv.${run.fort.level}!` });
       return ev;
     }
     case 'repairFort':
       if (run.home.hp >= run.home.maxHp || run.coins < FORT_REPAIR_COST) return null;
       run.coins -= FORT_REPAIR_COST; run.home.hp = run.home.maxHp;
       ev.push({ t: 'build', kind: 'fort' });
+      ev.push({ t: 'fortify', x: 166, y: ROOF_Y - 14, label: '大屋已修满!' });
       return ev;
     case 'buyWeapon': {
       const def = WEAPONS[cmd.weapon];
@@ -2152,6 +2251,9 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       completeServeGuest(run, g, cmd.quality ?? 'good', ev, false, g.orderKind === 'drink', g.isRye);
       return ev;
     }
+    case 'feastAll': {
+      return feastAllCmd(run, ev);
+    }
     case 'cookSell': {
       return sellMeatKindCmd(run, 'tender', cmd.count, ev);
     }
@@ -2174,9 +2276,10 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       return toggleAutoSupplyCmd(run, cmd.id, ev);
     }
     case 'pickMeal': {
-      if (run.phase !== 'camp' || run.meal !== null) return null;
+      if (run.phase !== 'camp') return null;
       const m = MEALS[cmd.id];
       if (!m || !run.diner.researched.includes(cmd.id)) return null;
+      if ((run.diner.feastDishes ?? []).includes(cmd.id)) return null;
       if ((run.diner.menuStock[cmd.id] ?? 0) > 0) {
         run.diner.menuStock[cmd.id]! -= 1;
       } else if (hasIngredients(run, m.cost)) {
@@ -2185,12 +2288,8 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
         return null;
       }
       const quality: DishQuality = cmd.quality ?? 'good';
-      run.meal = cmd.id;
-      run.mealQuality = quality;
-      if (m.heal > 0) {
-        const heal = Math.round(m.heal * (run.cls === 'chef' ? 1.5 : 1) * QUALITY_META[quality].buffMul);
-        run.player.hp = Math.min(run.player.maxHp, run.player.hp + heal);
-      }
+      activateDishBattleBuff(run, cmd.id, quality, run.meal === null);
+      gainDishXp(run, cmd.id, ev, 1);
       run.diner.fans += 8;
       ev.push({ t: 'meal', id: cmd.id, quality });
       return ev;

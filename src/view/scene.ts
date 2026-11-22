@@ -221,11 +221,15 @@ export class GameScene extends Phaser.Scene {
     const grade = this.cameras.main.postFX?.addColorMatrix();
     if (grade) grade.brightness(1.1).saturate(0.14, true);
 
-    // 点击战斗画面可手动切换优先集火目标
+    // 点击画面：战斗中切换优先集火目标；营地夜晚点击食客/传菜台/酒桶/炮塔位可自动走过去交互
     this.input.on('pointerdown', (ptr: Phaser.Input.Pointer) => {
       const r = game.run;
-      if (game.panel() === null && !r.inside && r.phase === 'fight') {
+      if (game.panel() !== null) return;
+      if (!r.inside && r.phase === 'fight') {
         game.send({ t: 'focusTarget', x: ptr.worldX });
+      } else if (r.phase === 'camp' && !r.pourMinigame) {
+        const wx = Phaser.Math.Clamp(ptr.worldX, r.inside ? 78 : 130, r.inside ? 820 : 620);
+        game.walkTo(wx, true);
       }
     });
 
@@ -843,7 +847,31 @@ export class GameScene extends Phaser.Scene {
           g.fillStyle(C.gold, 0.95).fillTriangle(cx - 4, GROUND_Y - 52 + arrowBob, cx + 4, GROUND_Y - 52 + arrowBob, cx, GROUND_Y - 46 + arrowBob);
         }
       }
-      // 砖灶自动烹制进度条与石臼辛香辣酱存量计
+      // 端菜/端酒时绘制金色方向导引线直指目标食客，再也不用满屋找人
+      if (run.carryingDish || run.carryingDrink) {
+        const dest = run.carryingDish
+          ? (run.guests.find((o) => o.id === run.carryingDish!.guestId && !o.served && o.walkState === 'seated')
+            ?? run.guests.find((o) => o.orderKind === 'dish' && !o.served && o.walkState === 'seated' && !o.isRye && o.dish === run.carryingDish!.dish))
+          : (run.guests.find((o) => o.id === run.carryingDrink!.guestId && !o.served && o.walkState === 'seated')
+            ?? run.guests.find((o) => o.orderKind === 'drink' && !o.served && o.walkState === 'seated' && o.drink === run.carryingDrink!.drink));
+        if (dest) {
+          const dx = dest.x - p.x;
+          const dir = dx >= 0 ? 1 : -1;
+          if (Math.abs(dx) > 22) {
+            const ax = p.x + dir * (22 + Math.sin(now / 110) * 3);
+            const ay = GROUND_Y - 26;
+            g.fillStyle(C.gold, 0.96).fillTriangle(ax + dir * 7, ay, ax - dir * 3, ay - 5, ax - dir * 3, ay + 5);
+            g.lineStyle(1.4, C.gold, 0.52).lineBetween(p.x + dir * 12, GROUND_Y - 2, dest.x - dir * 12, GROUND_Y - 2);
+          }
+          g.lineStyle(1.8, C.gold, 0.85).strokeEllipse(dest.x, GROUND_Y - 1, 26, 7);
+        }
+      }
+      if (game.walkTarget) {
+        const wt = game.walkTarget.x;
+        const pulse = 1 + Math.sin(now / 90) * 0.14;
+        g.lineStyle(1.5, C.gold, 0.78).strokeEllipse(wt, GROUND_Y - 1, 18 * pulse, 5 * pulse);
+      }
+      // 砖灶自动烹制进度条
       if (rushOpen) {
         const s = run.dinerShift;
         const activeOrders = s.kitchenOrders.slice(0, stoveCapacity(run));
@@ -852,24 +880,10 @@ export class GameScene extends Phaser.Scene {
           const tw = 38, th = 6;
           const left = IN_STATIONS.kitchen - tw / 2;
           const prog = Phaser.Math.Clamp(1 - o.ticksLeft / Math.max(1, o.totalTicks), 0, 1);
-          const stalled = !o.isRye && s.sauce <= 0;
           g.fillStyle(C.ink, 0.92).fillRoundedRect(left - 1, ky - 1, tw + 2, th + 2, 2);
-          g.fillStyle(stalled ? C.red : o.isRye ? C.grey : C.ember, 0.95).fillRect(left, ky, Math.max(2, tw * prog), th);
-          g.lineStyle(1, stalled ? C.red : C.gold, 0.9).strokeRoundedRect(left - 1, ky - 1, tw + 2, th + 2, 2);
+          g.fillStyle(o.isRye ? C.grey : C.ember, 0.95).fillRect(left, ky, Math.max(2, tw * prog), th);
+          g.lineStyle(1, C.gold, 0.9).strokeRoundedRect(left - 1, ky - 1, tw + 2, th + 2, 2);
         });
-
-        const mx = IN_STATIONS.mortar;
-        const my = GROUND_Y - 52;
-        const sw = 28, sh = 5;
-        const sRatio = Phaser.Math.Clamp(s.sauce / Math.max(1, s.maxSauce), 0, 1);
-        const lowSauce = s.sauce <= 25 || s.sauceStalled;
-        const sCol = s.sauceStalled ? C.red : sRatio <= 0.3 ? C.ember : C.green;
-        g.fillStyle(C.ink, 0.9).fillRoundedRect(mx - sw / 2 - 1, my - 1, sw + 2, sh + 2, 2);
-        g.fillStyle(sCol, 1).fillRect(mx - sw / 2, my, Math.max(sRatio > 0 ? 2 : 0, sw * sRatio), sh);
-        g.lineStyle(1, lowSauce ? C.red : C.copper, 0.95).strokeRoundedRect(mx - sw / 2 - 1, my - 1, sw + 2, sh + 2, 2);
-        if (lowSauce) {
-          g.fillStyle(C.red, 0.98).fillTriangle(mx - 4, my - 9 + arrowBob, mx + 4, my - 9 + arrowBob, mx, my - 3 + arrowBob);
-        }
       }
       if (run.pourMinigame) {
         const dx = IN_STATIONS.drink;
@@ -1024,9 +1038,20 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(C.lamp, 0.9).fillTriangle(LADDER_X - 5, GROUND_Y + PORCH_Y - 42 + bob, LADDER_X + 5, GROUND_Y + PORCH_Y - 42 + bob, LADDER_X, GROUND_Y + PORCH_Y - 34 + bob);
       const extCt = nearbyCampTarget(run);
       if (extCt) {
-        const ey = extCt.kind === 'allyTalk' ? GROUND_Y + ALLY_POS[extCt.ally].extY : GROUND_Y;
-        g.fillStyle(C.gold, 0.36).fillRoundedRect(extCt.x - 17, ey - 4, 34, 5, 2);
-        g.lineStyle(1.4, C.lamp, 0.9).strokeRoundedRect(extCt.x - 17, ey - 4, 34, 5, 2);
+        const ey = extCt.kind === 'allyTalk' ? GROUND_Y + ALLY_POS[extCt.ally].extY
+          : (extCt.kind === 'turretSlot' || extCt.kind === 'wallSpot' || extCt.kind === 'fortSpot') ? GROUND_Y + extCt.y
+          : GROUND_Y;
+        const bw = extCt.kind === 'wallSpot' || extCt.kind === 'fortSpot' ? 42 : 34;
+        g.fillStyle(C.gold, 0.36).fillRoundedRect(extCt.x - bw / 2, ey - 4, bw, 5, 2);
+        g.lineStyle(1.6, C.lamp, 0.95).strokeRoundedRect(extCt.x - bw / 2, ey - 4, bw, 5, 2);
+        if (extCt.kind === 'turretSlot' || extCt.kind === 'wallSpot' || extCt.kind === 'fortSpot') {
+          g.fillStyle(C.gold, 0.96).fillTriangle(extCt.x - 5, ey - 32 + bob, extCt.x + 5, ey - 32 + bob, extCt.x, ey - 24 + bob);
+        }
+      }
+      if (game.walkTarget) {
+        const wt = game.walkTarget.x;
+        const pulse = 1 + Math.sin(now / 90) * 0.14;
+        g.lineStyle(1.5, C.gold, 0.78).strokeEllipse(wt, GROUND_Y + p.y - 1, 18 * pulse, 5 * pulse);
       }
     }
 
@@ -1345,16 +1370,43 @@ export class GameScene extends Phaser.Scene {
         const guest = game.run.guests.find((o) => o.id === e.guestId);
         const gx = guest ? guest.x : 340;
         this.burst('fx_boom', gx, GROUND_Y - 36, 0.55);
-        const burstN = e.quality === 'legendary' ? 10 : e.quality === 'perfect' ? 6 : 3;
+        const burstN = e.quality === 'legendary' ? 10 : e.quality === 'perfect' ? 6 : 4;
         for (let i = 0; i < burstN; i++) {
           this.spawnSpark(gx, GROUND_Y - 40, Phaser.Math.FloatBetween(-1.4, 1.4), Phaser.Math.FloatBetween(-2.2, -0.6), 0.08, 26, 2.2, e.quality === 'legendary' ? C.gold : C.ember);
         }
-        floaters.add(gx, GROUND_Y - 62, '+' + e.coins + '金', 'coin');
-        if (e.vipRequestClear) {
-          floaters.add(gx, GROUND_Y - 80, '点名委托达成 +2灵感!', 'crit');
-        } else if (e.partyMatch) {
-          floaters.add(gx, GROUND_Y - 80, '派对大卖!', 'crit');
+        floaters.add(gx, GROUND_Y - 58, '+' + e.coins + '金', 'coin');
+        if (e.supportTag) {
+          floaters.add(gx, GROUND_Y - 76, e.supportTag, 'crit');
+        } else if (e.dishBuffTag) {
+          floaters.add(gx, GROUND_Y - 76, `明日 ${e.dishBuffTag}`, 'crit');
         }
+        break;
+      }
+      case 'dishLevelUp': {
+        const fxX = game.run.inside ? game.run.player.x : IN_STATIONS.kitchen;
+        for (let i = 0; i < 12; i++) {
+          this.spawnSpark(fxX, GROUND_Y - 46, Phaser.Math.FloatBetween(-2.2, 2.2), Phaser.Math.FloatBetween(-2.8, -0.6), 0.06, 28, 2.6, C.gold);
+        }
+        this.waves.push({ x: fxX, y: GROUND_Y - 36, r: 8, maxR: 38, col: C.gold, life: 15, max: 15, width: 2.8 });
+        floaters.add(fxX, GROUND_Y - 82, `${MEALS[e.id].name} Lv.${e.level}招牌!`, 'crit');
+        break;
+      }
+      case 'fortify': {
+        const fy = GROUND_Y + e.y;
+        this.waves.push({ x: e.x, y: fy, r: 6, maxR: 34, col: C.gold, life: 14, max: 14, width: 2.6 });
+        for (let i = 0; i < 10; i++) {
+          this.spawnSpark(e.x, fy, Phaser.Math.FloatBetween(-1.9, 1.9), Phaser.Math.FloatBetween(-2.6, -0.4), 0.1, 24, 2.4, i % 2 ? C.gold : C.ember, true);
+        }
+        floaters.add(e.x, fy - 24, e.label, 'crit');
+        break;
+      }
+      case 'contractDone': {
+        const cx = game.run.player.x, cy = GROUND_Y + game.run.player.y - 30;
+        this.waves.push({ x: cx, y: cy, r: 10, maxR: 48, col: C.gold, life: 18, max: 18, width: 3.2 });
+        for (let i = 0; i < 14; i++) {
+          this.spawnSpark(cx, cy, Phaser.Math.FloatBetween(-2.4, 2.4), Phaser.Math.FloatBetween(-3.0, -0.6), 0.07, 28, 2.6, C.gold);
+        }
+        floaters.add(cx, cy - 32, `猎令达成! +${e.coins}金`, 'crit');
         break;
       }
       case 'allyJoin':

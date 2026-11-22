@@ -39,11 +39,19 @@ class Game {
   grenadeAim: { dx: number; dy: number } | null = null;
   /** 这一步刚按下的输入，被规则层读走一次就清掉 */
   private pressed = { fire: false, jump: false, dodge: false, reload: false, swap: false, skill: false, grenade: false, interact: false };
+  /** 营地点地自动寻路目标（手动摇杆随时接管） */
+  walkTarget: { x: number; autoInteract: boolean } | null = null;
   private grenadeAimPayload: { dx: number; dy: number } | null = null;
   private acc = 0;
 
   constructor() {
     this.onEvent((e) => audio.onEvent(e));
+  }
+
+  walkTo(x: number, autoInteract = true) {
+    if (this.panel() !== null || this.run.phase !== 'camp') return;
+    audio.unlock();
+    this.walkTarget = { x, autoInteract };
   }
 
   panel(): Panel {
@@ -231,6 +239,25 @@ class Game {
         case 'kitchen': this.open('kitchen'); return true;
         case 'shop': this.open('shop'); return true;
         case 'workshop': this.open('build'); return true;
+        case 'turretSlot': {
+          const sl = r.turrets[ct.slot];
+          if (sl?.type) {
+            if (this.send({ t: 'upgradeTurret', slot: ct.slot })) return true;
+            return this.send({ t: 'cycleTurretMode', slot: ct.slot });
+          }
+          if (this.send({ t: 'buildTurret', slot: ct.slot, kind: 'mg' })) return true;
+          this.open('build'); return true;
+        }
+        case 'wallSpot': {
+          if (r.wall.hp < r.wall.maxHp && this.send({ t: 'repairWall' })) return true;
+          if (this.send({ t: 'upgradeWall' })) return true;
+          this.open('build'); return true;
+        }
+        case 'fortSpot': {
+          if (r.home.hp < r.home.maxHp && this.send({ t: 'repairFort' })) return true;
+          if (this.send({ t: 'upgradeFort' })) return true;
+          this.open('build'); return true;
+        }
         case 'doorOut': return this.send({ t: 'exitHouse' });
         case 'doorIn': return this.send({ t: 'enterHouse' });
       }
@@ -256,7 +283,7 @@ class Game {
     return false;
   }
 
-  releaseAll() { this.held.move = 0; this.held.down = false; this.held.fire = false; this.grenadeAim = null; this.grenadeAimPayload = null; }
+  releaseAll() { this.held.move = 0; this.held.down = false; this.held.fire = false; this.grenadeAim = null; this.grenadeAimPayload = null; this.walkTarget = null; }
 
   send(cmd: Command): boolean {
     audio.unlock();
@@ -270,16 +297,33 @@ class Game {
 
   /** 画面层每帧调用：按固定步长推进规则层 */
   advance(dtMs: number) {
-    if (this.panel() !== null) { this.acc = 0; return; }
+    if (this.panel() !== null) { this.acc = 0; this.walkTarget = null; return; }
 
     this.acc = Math.min(this.acc + dtMs, 100);
     const beforePhase = this.run.phase, beforeInside = this.run.inside, beforeZone = houseBuff(this.run).zone;
     let urgent = false;
     while (this.acc >= 1000 / 60) {
       this.acc -= 1000 / 60;
+      let autoMove = 0;
+      if (this.held.move !== 0 || this.run.phase !== 'camp' || this.run.pourMinigame) {
+        this.walkTarget = null;
+      } else if (this.walkTarget) {
+        const dx = this.walkTarget.x - this.run.player.x;
+        if (Math.abs(dx) <= 14) {
+          const doAct = this.walkTarget.autoInteract;
+          this.walkTarget = null;
+          if (doAct) {
+            this.handleInteract();
+            urgent = true;
+          }
+        } else {
+          autoMove = Math.sign(dx);
+        }
+      }
       const input: Input = {
         ...NO_INPUT,
         ...this.held,
+        move: this.held.move !== 0 ? this.held.move : autoMove,
         ...this.pressed,
         fire: this.held.fire || this.pressed.fire,
         grenadeAim: this.grenadeAimPayload,
@@ -292,6 +336,7 @@ class Game {
           || e.t === 'pourDone' || e.t === 'tableClean' || e.t === 'guestAngry' || e.t === 'shiftEnd' || e.t === 'shiftOpen' || e.t === 'serve'
           || e.t === 'grindSauce' || e.t === 'sauceEmpty' || e.t === 'kitchenDone' || e.t === 'research' || e.t === 'prepDish'
           || e.t === 'dispatchReturn' || e.t === 'rackHarvest' || e.t === 'partyStart' || e.t === 'endlessEnter'
+          || e.t === 'contractDone' || e.t === 'dishLevelUp' || e.t === 'fortify'
         ) {
           urgent = true;
         }

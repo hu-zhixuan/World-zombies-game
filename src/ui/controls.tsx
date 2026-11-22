@@ -250,8 +250,8 @@ export function CampKeys() {
         break;
       case 'kitchen':
         icon = 'ic_kitchen';
-        label = '食堂总览';
-        tip = '备菜 · 研发 · 菜单';
+        label = '战备酒馆';
+        tip = '犒赏 · 料理 · 工事';
         break;
       case 'pass':
         icon = 'ic_clean_plate';
@@ -273,10 +273,27 @@ export function CampKeys() {
         label = '防线工坊';
         tip = '工坊';
         break;
+      case 'turretSlot': {
+        const sl = run.turrets[ct.slot];
+        icon = 'ic_anvil';
+        label = sl?.type ? '升/切炮塔' : '实地建塔';
+        tip = sl?.type ? `Lv.${sl.level} · 点上方条改建` : '点上方条直建炮塔';
+        break;
+      }
+      case 'wallSpot':
+        icon = 'ic_wall';
+        label = run.wall.hp < run.wall.maxHp ? '现场修墙' : '升级壁垒';
+        tip = `防线 ${run.wall.hp}/${run.wall.maxHp}`;
+        break;
+      case 'fortSpot':
+        icon = 'ic_fort';
+        label = run.home.hp < run.home.maxHp ? '修缮大屋' : '加固要塞';
+        tip = `大屋 ${run.home.hp}/${run.home.maxHp}`;
+        break;
       case 'doorOut':
         icon = 'ic_wall';
-        label = '出门看墙';
-        tip = '出门';
+        label = '出门巡防';
+        tip = '室外可实地建塔修墙';
         break;
       case 'doorIn':
         icon = 'ic_kitchen';
@@ -386,17 +403,18 @@ export function CampBar() {
   const run = game.run;
   const near = run.inside ? nearbyStation(run) : null;
   const unserved = run.guests.filter((g) => !g.served).length;
+  const feastCnt = (run.diner.feastDishes ?? []).length;
   const sub = run.dinerShift.mode === 'open'
     ? '营业中'
-    : run.meal
-      ? '特餐已备'
+    : feastCnt > 0
+      ? `战备${feastCnt}道`
       : unserved > 0
-        ? `${unserved}客`
-        : '总览';
+        ? `${unserved}客待援`
+        : '战备台';
   return (
     <div class="camp-bar" id="camp-bar">
       <button id="btn-kitchen" class={`camp-btn ${near === 'kitchen' ? 'near' : ''}`} onClick={() => game.open('kitchen')}>
-        <Icon k="ic_kitchen" />食堂 · {sub}
+        <Icon k="ic_kitchen" />酒馆 · {sub}
       </button>
       {run.endless ? (
         <>
