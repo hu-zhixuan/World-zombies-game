@@ -211,7 +211,7 @@ export const SHOP_MEDKIT_COST = 30;
 export const SHOP_REROLL_COST = 15;
 export const MAX_GRENADES = 5;
 
-// ── 食材与秘酿香料（3 主料 + 1 通用秘酿香料）──
+// ── 魔物食材（主战场杀敌分级掉落，高地/暴击/控制击杀触发鲜切保鲜×2）──
 export type IngredientId = MeatKind | 'spice';
 export type MeatInventory = Record<MeatKind, number>;
 export interface MeatDef {
@@ -223,16 +223,16 @@ export interface MeatDef {
   hint: string;
 }
 export const MEATS: Record<MeatKind, MeatDef> = {
-  tender:  { id: 'tender',  name: '嫩肉', short: '嫩', icon: 'ic_meat',         sellPrice: 5,  hint: '游荡腐尸 / 黑猫 / 猎犬 / 魔蝠' },
-  thick:   { id: 'thick',   name: '厚肉', short: '厚', icon: 'ic_meat_thick',   sellPrice: 9,  hint: '焦骨巨尸（第 4 日起）' },
-  essence: { id: 'essence', name: '魔髓', short: '髓', icon: 'ic_meat_essence', sellPrice: 18, hint: '首领巨兽 / 提灯怨灵（第 5～6 日起）' },
+  tender:  { id: 'tender',  name: '嫩肉', short: '嫩', icon: 'ic_meat',         sellPrice: 6,  hint: '游荡腐尸 / 黑猫 / 猎犬 / 魔蝠' },
+  thick:   { id: 'thick',   name: '厚肉', short: '厚', icon: 'ic_meat_thick',   sellPrice: 11, hint: '焦骨巨尸 / 悬赏补给' },
+  essence: { id: 'essence', name: '魔髓', short: '髓', icon: 'ic_meat_essence', sellPrice: 20, hint: '首领巨兽 / 提灯怨灵 / 净空悬赏' },
 };
 export const MEAT_ORDER: MeatKind[] = ['tender', 'thick', 'essence'];
 export const SPICE_BUY_COST = 12;
 export const SPICE_SELL_PRICE = 4;
 export const SPICE_META = { id: 'spice' as const, name: '秘酿香料', short: '香', icon: 'ic_spice', buyCost: SPICE_BUY_COST, sellPrice: SPICE_SELL_PRICE };
 
-// ── 深夜食堂：12 道暮夜酒馆精选菜单（炉火灵感研发 + 单份/大锅多份 + 美味度成长）──
+// ── 暮夜战备酒馆：6 道核心魔物战备料理（上菜即享：赚取军费 + 叠加明日主战场全队战备增益）──
 export type MealId =
   | 'spicy_skewer' | 'hearty_stew' | 'garlic_cold_cut' | 'amber_egg_hash'
   | 'smoked_bone_broth' | 'iron_steak' | 'honey_glazed_ribs' | 'melted_cheese_roast'
@@ -243,6 +243,7 @@ export interface MealDef {
   name: string;
   icon: string;
   desc: string;
+  battleTag: string;
   cost: Partial<Record<IngredientId, number>>;
   servings: number;
   basePay: number;
@@ -256,90 +257,101 @@ export interface MealDef {
   armor: number;
   haste: number;
   heal: number;
+  turretMul?: number;
+  critBonus?: number;
+  frostRounds?: boolean;
+  bonusGrenades?: number;
 }
 
 export const MEALS: Record<MealId, MealDef> = {
   spicy_skewer: {
     id: 'spicy_skewer', name: '炭烤香辣肉串', icon: 'ic_dish_skewer',
-    desc: '单份快手明火肉串 · 留作特餐明日武器伤害 +22%',
-    cost: { tender: 1 }, servings: 1, basePay: 22, baseTaste: 85, cookTicks: 90, sauceCost: 8, researchCost: 0, defaultUnlocked: true,
+    desc: '明火快烤嫩肉 · 明日主战场主角与战友火器伤害 +22%',
+    battleTag: '枪伤+22%',
+    cost: { tender: 1 }, servings: 1, basePay: 28, baseTaste: 100, cookTicks: 65, sauceCost: 0, researchCost: 0, defaultUnlocked: true,
     tags: ['辣', '家常'], dmgMul: 0.22, armor: 0, haste: 0, heal: 0,
   },
   hearty_stew: {
     id: 'hearty_stew', name: '守夜暖胃肉汤', icon: 'ic_dish_stew',
-    desc: '一锅出 2 份浓汤 · 留餐回 35 血且明日 +35 护甲',
-    cost: { tender: 2 }, servings: 2, basePay: 26, baseTaste: 100, cookTicks: 115, sauceCost: 10, researchCost: 0, defaultUnlocked: true,
-    tags: ['鲜嫩', '饱腹'], dmgMul: 0, armor: 35, haste: 0, heal: 35,
+    desc: '浓汤热补 · 立即回 35 血，明日主战场开战 +40 铁甲',
+    battleTag: '回35血+40甲',
+    cost: { tender: 2 }, servings: 1, basePay: 38, baseTaste: 120, cookTicks: 75, sauceCost: 0, researchCost: 0, defaultUnlocked: true,
+    tags: ['鲜嫩', '饱腹'], dmgMul: 0, armor: 40, haste: 0, heal: 35,
   },
   garlic_cold_cut: {
-    id: 'garlic_cold_cut', name: '蒜香冷切熏肉', icon: 'ic_dish_coldcut',
-    desc: '秘香腌切 2 份冷盘 · 留餐回 10 血且攻速/伤害小幅提升',
-    cost: { tender: 1, spice: 1 }, servings: 2, basePay: 36, baseTaste: 125, cookTicks: 85, sauceCost: 10, researchCost: 4,
-    tags: ['烟熏', '家常'], dmgMul: 0.14, armor: 10, haste: 0.12, heal: 10,
+    id: 'garlic_cold_cut', name: '蒜香疾风熏肉', icon: 'ic_dish_coldcut',
+    desc: '双肉冷切拼盘 · 明日主战场射击攻速与换弹 +24%、枪伤 +12%',
+    battleTag: '攻速+24%',
+    cost: { tender: 1, thick: 1 }, servings: 1, basePay: 54, baseTaste: 165, cookTicks: 80, sauceCost: 0, researchCost: 0, defaultUnlocked: true,
+    tags: ['烟熏', '家常'], dmgMul: 0.12, armor: 15, haste: 0.24, heal: 15,
   },
+  iron_steak: {
+    id: 'iron_steak', name: '铁板重甲厚排', icon: 'ic_dish_steak',
+    desc: '炙烤巨兽厚排 · 明日主战场所有炮塔与堡垒火炮伤害/射速 +30%',
+    battleTag: '炮塔+30%',
+    cost: { thick: 2 }, servings: 1, basePay: 72, baseTaste: 215, cookTicks: 90, sauceCost: 0, researchCost: 0, defaultUnlocked: true,
+    tags: ['厚肉', '烟熏'], dmgMul: 0.15, armor: 25, haste: 0.15, heal: 0, turretMul: 0.30,
+  },
+  abyss_marrow_pot: {
+    id: 'abyss_marrow_pot', name: '深渊魔髓秘锅', icon: 'ic_dish_hotpot',
+    desc: '魔髓沸煮奇锅 · 明日主战场暴击率 +18% 且子弹附带寒霜减速',
+    battleTag: '暴+18%寒霜',
+    cost: { thick: 1, essence: 1 }, servings: 1, basePay: 98, baseTaste: 290, cookTicks: 95, sauceCost: 0, researchCost: 0, defaultUnlocked: true,
+    tags: ['辣', '奇味'], dmgMul: 0.24, armor: 30, haste: 0.16, heal: 25, critBonus: 0.18, frostRounds: true,
+  },
+  apocalypse_feast: {
+    id: 'apocalypse_feast', name: '长夜堡垒全宴', icon: 'ic_dish_feast',
+    desc: '三材镇店大席 · 明日全伤 +35% · 攻速 +24% · +50甲 · +2爆炎弹',
+    battleTag: '伤+35%+2雷',
+    cost: { tender: 2, thick: 1, essence: 1 }, servings: 1, basePay: 138, baseTaste: 380, cookTicks: 105, sauceCost: 0, researchCost: 0, defaultUnlocked: true,
+    tags: ['鲜嫩', '烟熏', '饱腹', '奇味', '厚肉'], dmgMul: 0.35, armor: 50, haste: 0.24, heal: 45, turretMul: 0.22, critBonus: 0.12, bonusGrenades: 2,
+  },
+  // 兼容旧存档引用的 6 道副菜映射
   amber_egg_hash: {
     id: 'amber_egg_hash', name: '炉火金蛋煎肉', icon: 'ic_dish_egg',
-    desc: '铁锅煎香 3 份盖饭 · 留餐回 15 血且伤害 +18%',
-    cost: { tender: 2, spice: 1 }, servings: 3, basePay: 40, baseTaste: 145, cookTicks: 110, sauceCost: 11, researchCost: 6,
+    desc: '铁锅煎香盖饭 · 明日武器伤害 +18%', battleTag: '枪伤+18%',
+    cost: { tender: 2 }, servings: 1, basePay: 40, baseTaste: 145, cookTicks: 80, sauceCost: 0, researchCost: 0, defaultUnlocked: true,
     tags: ['鲜嫩', '辣'], dmgMul: 0.18, armor: 15, haste: 0.14, heal: 15,
   },
   smoked_bone_broth: {
     id: 'smoked_bone_broth', name: '白萝卜清炖骨汤', icon: 'ic_dish_turnip',
-    desc: '慢火一锅出 4 份热汤 · 留餐回 45 血且 +40 护甲',
-    cost: { tender: 3, spice: 1 }, servings: 4, basePay: 44, baseTaste: 170, cookTicks: 130, sauceCost: 11, researchCost: 8,
+    desc: '慢火热汤 · 回 45 血且 +40 护甲', battleTag: '回45血/+40甲',
+    cost: { tender: 3 }, servings: 1, basePay: 44, baseTaste: 170, cookTicks: 85, sauceCost: 0, researchCost: 0, defaultUnlocked: true,
     tags: ['鲜嫩', '饱腹'], dmgMul: 0.10, armor: 40, haste: 0, heal: 45,
-  },
-  iron_steak: {
-    id: 'iron_steak', name: '铁板滋滋厚排', icon: 'ic_dish_steak',
-    desc: '精品厚肉单盘 · 留餐明日攻速 +22% 且伤害 +18%',
-    cost: { thick: 1 }, servings: 1, basePay: 52, baseTaste: 200, cookTicks: 120, sauceCost: 12, researchCost: 10,
-    tags: ['厚肉', '烟熏'], dmgMul: 0.18, armor: 20, haste: 0.22, heal: 0,
   },
   honey_glazed_ribs: {
     id: 'honey_glazed_ribs', name: '蜜汁甜玉米肋排', icon: 'ic_dish_corn',
-    desc: '炭炉大盘出 3 份 · 留餐回 15 血且伤害 +26%',
-    cost: { tender: 1, thick: 1, spice: 1 }, servings: 3, basePay: 60, baseTaste: 230, cookTicks: 135, sauceCost: 12, researchCost: 13,
+    desc: '炭炉肋排 · 伤害 +26%', battleTag: '枪伤+26%',
+    cost: { tender: 1, thick: 1 }, servings: 1, basePay: 60, baseTaste: 230, cookTicks: 85, sauceCost: 0, researchCost: 0, defaultUnlocked: true,
     tags: ['厚肉', '家常'], dmgMul: 0.26, armor: 18, haste: 0.16, heal: 15,
   },
   melted_cheese_roast: {
     id: 'melted_cheese_roast', name: '熔岩奶酪焗厚肉', icon: 'ic_dish_cheese',
-    desc: '浓香拉丝出 3 份 · 留餐回 25 血且 +35 护甲',
-    cost: { thick: 2, spice: 1 }, servings: 3, basePay: 72, baseTaste: 265, cookTicks: 145, sauceCost: 14, researchCost: 16,
+    desc: '浓香拉丝厚肉 · +35 护甲', battleTag: '护甲+35/伤+24%',
+    cost: { thick: 2 }, servings: 1, basePay: 72, baseTaste: 265, cookTicks: 90, sauceCost: 0, researchCost: 0, defaultUnlocked: true,
     tags: ['厚肉', '饱腹'], dmgMul: 0.24, armor: 35, haste: 0.15, heal: 25,
   },
   crimson_carrot_braise: {
     id: 'crimson_carrot_braise', name: '琥珀蜜汁炖肉腩', icon: 'ic_dish_carrot',
-    desc: '琥珀慢炖一锅 5 份 · 留餐回 30 血且全攻防提升',
-    cost: { tender: 2, thick: 2, spice: 1 }, servings: 5, basePay: 78, baseTaste: 300, cookTicks: 155, sauceCost: 14, researchCost: 19,
+    desc: '琥珀慢炖肉腩 · 全攻防提升', battleTag: '枪伤+30%/+28甲',
+    cost: { tender: 2, thick: 2 }, servings: 1, basePay: 78, baseTaste: 300, cookTicks: 95, sauceCost: 0, researchCost: 0, defaultUnlocked: true,
     tags: ['鲜嫩', '烟熏', '厚肉'], dmgMul: 0.30, armor: 28, haste: 0.18, heal: 30,
   },
   berry_meat_tart: {
     id: 'berry_meat_tart', name: '暮夜野莓烘肉派', icon: 'ic_dish_tart',
-    desc: '魔髓调馅出 4 份 · 留餐回 30 血且伤害 +34%',
-    cost: { thick: 1, essence: 1, spice: 1 }, servings: 4, basePay: 96, baseTaste: 345, cookTicks: 160, sauceCost: 15, researchCost: 23,
+    desc: '魔髓调馅肉派 · 伤害 +34%', battleTag: '枪伤+34%',
+    cost: { thick: 1, essence: 1 }, servings: 1, basePay: 96, baseTaste: 345, cookTicks: 95, sauceCost: 0, researchCost: 0, defaultUnlocked: true,
     tags: ['奇味', '鲜嫩'], dmgMul: 0.34, armor: 25, haste: 0.20, heal: 30,
-  },
-  abyss_marrow_pot: {
-    id: 'abyss_marrow_pot', name: '深渊魔髓秘辣锅', icon: 'ic_dish_hotpot',
-    desc: '秘锅沸煮出 5 份 · 留餐回 35 血且伤害 +40%',
-    cost: { tender: 2, essence: 1, spice: 1 }, servings: 5, basePay: 112, baseTaste: 390, cookTicks: 170, sauceCost: 16, researchCost: 28,
-    tags: ['辣', '奇味'], dmgMul: 0.40, armor: 30, haste: 0.18, heal: 35,
-  },
-  apocalypse_feast: {
-    id: 'apocalypse_feast', name: '长夜堡垒全宴', icon: 'ic_dish_feast',
-    desc: '镇店宗师大席一备 8 份 · 留餐全属性大幅飞跃',
-    cost: { tender: 2, thick: 2, essence: 2, spice: 2 }, servings: 8, basePay: 145, baseTaste: 450, cookTicks: 190, sauceCost: 18, researchCost: 34,
-    tags: ['鲜嫩', '烟熏', '饱腹', '奇味', '厚肉'], dmgMul: 0.48, armor: 50, haste: 0.28, heal: 55,
   },
 };
 
+/** 精选 6 道战备主菜（一屏展示、定位清晰、直连主战场） */
 export const MEAL_ORDER: MealId[] = [
-  'spicy_skewer', 'hearty_stew', 'garlic_cold_cut', 'amber_egg_hash',
-  'smoked_bone_broth', 'iron_steak', 'honey_glazed_ribs', 'melted_cheese_roast',
-  'crimson_carrot_braise', 'berry_meat_tart', 'abyss_marrow_pot', 'apocalypse_feast',
+  'spicy_skewer', 'hearty_stew', 'garlic_cold_cut',
+  'iron_steak', 'abyss_marrow_pot', 'apocalypse_feast',
 ];
 
-export const defaultResearchedMeals = (): MealId[] => MEAL_ORDER.filter((id) => MEALS[id].defaultUnlocked);
+export const defaultResearchedMeals = (): MealId[] => [...MEAL_ORDER];
 export const unlockedMeals = (_day?: number): MealDef[] => MEAL_ORDER.map((id) => MEALS[id]);
 export const MEAT_SELL_PRICE = MEATS.tender.sellPrice;
 
@@ -349,7 +361,7 @@ export const RYE_FALLBACK = {
   pay: 1,
   rep: -1,
   fans: 0,
-  cookTicks: 75,
+  cookTicks: 60,
 } as const;
 
 export type DrinkId = 'beer' | 'tea';
@@ -364,27 +376,17 @@ export interface DrinkDef {
 }
 export const DRINKS: Record<DrinkId, DrinkDef> = {
   beer: {
-    id: 'beer',
-    name: '麦芽黑啤',
-    icon: 'ic_beer',
-    pay: 16,
-    rep: 2,
-    fans: 10,
+    id: 'beer', name: '麦芽黑啤', icon: 'ic_beer', pay: 18, rep: 2, fans: 10,
     orderQuote: '先打一大杯冰镇麦芽黑啤解乏，泡沫留足两指厚！',
   },
   tea: {
-    id: 'tea',
-    name: '守夜热茶',
-    icon: 'ic_tea',
-    pay: 14,
-    rep: 2,
-    fans: 9,
+    id: 'tea', name: '守夜热茶', icon: 'ic_tea', pay: 16, rep: 2, fans: 9,
     orderQuote: '夜风凉透骨头，快沏一盏滚烫暖胃的守夜热茶！',
   },
 };
 
-export const MAX_DISH_LV = 5;
-export const dishUpgradeCost = (id: MealId, lv: number) => Math.round((MEALS[id].basePay * 0.65 + 14) * lv);
+export const MAX_DISH_LV = 3;
+export const dishUpgradeCost = (id: MealId, lv: number) => Math.round((MEALS[id].basePay * 0.65 + 16) * lv);
 export const dishEnhanceMeatCost = (id: MealId, lv: number): MeatInventory => {
   const m = MEALS[id].cost;
   const mul = Math.max(1, lv);
@@ -394,59 +396,120 @@ export const dishEnhanceMeatCost = (id: MealId, lv: number): MeatInventory => {
     essence: (m.essence ?? 0) * mul,
   };
 };
-export const dishLevelPayMul = (lv: number) => 1 + 0.22 * Math.max(0, lv - 1);
+export const dishLevelPayMul = (lv: number) => 1 + 0.25 * Math.max(0, lv - 1);
+export const dishLevelBuffMul = (lv: number) => 1 + 0.22 * Math.max(0, lv - 1);
 export const dishLevelTaste = (id: MealId, lv: number) =>
-  MEALS[id].baseTaste + Math.max(0, lv - 1) * Math.round(MEALS[id].baseTaste * 0.14 + 12);
+  MEALS[id].baseTaste + Math.max(0, lv - 1) * Math.round(MEALS[id].baseTaste * 0.2 + 15);
 export const dishLevelServings = (id: MealId, lv: number) =>
-  MEALS[id].servings + (lv >= 3 ? 1 : 0) + (lv >= 5 ? 1 : 0);
+  MEALS[id].servings + (lv >= 2 ? 1 : 0) + (lv >= 3 ? 1 : 0);
 
+// ── 酒馆硬件装潢升级（室内可见家具 + 主战场永久战力双联动）──
 export type TavernUpgradeId = 'tables_6' | 'tables_8' | 'fast_tap' | 'wide_pass' | 'warm_lantern';
 export interface TavernUpgradeDef {
   id: TavernUpgradeId;
   name: string;
   desc: string;
+  battleTag: string;
   cost: number;
   icon: string;
 }
 export const TAVERN_UPGRADES: Record<TavernUpgradeId, TavernUpgradeDef> = {
-  tables_6:     { id: 'tables_6',     name: '客席·6座',     desc: '大堂扩建摆出第 3 张橡木桌 · 同时接待 6 位食客', cost: 90,  icon: 'ic_chef' },
-  tables_8:     { id: 'tables_8',     name: '客席·8座',     desc: '大堂再添第 4 张橡木桌 · 满厅 8 座迎接狂欢夜', cost: 145, icon: 'ic_chef' },
-  wide_pass:    { id: 'wide_pass',    name: '双层传菜架',   desc: '传菜台扩至 5 格 · 出菜略快且走动更利索',        cost: 95,  icon: 'ic_clean_plate' },
-  fast_tap:     { id: 'fast_tap',     name: '精铜酒栓',     desc: '完美金沫区加宽且酒水赏金 +25%',                cost: 80,  icon: 'ic_beer' },
-  warm_lantern: { id: 'warm_lantern', name: '暖琥珀吊灯',   desc: '食客耐心流失减缓 28% · 营业延长至 55 秒',      cost: 110, icon: 'ic_ledger' },
+  tables_6:     { id: 'tables_6',     name: '6座',     battleTag: '城墙+120',   desc: '大堂增设第3桌(6座) · 主战场防线与大屋耐久上限永久 +120', cost: 90,  icon: 'ic_chef' },
+  tables_8:     { id: 'tables_8',     name: '8座',     battleTag: '城墙+240',   desc: '大堂增设第4桌(8座) · 主战场防线与大屋耐久上限再 +120', cost: 145, icon: 'ic_chef' },
+  wide_pass:    { id: 'wide_pass',    name: '传菜架',   battleTag: '全伤+15%',   desc: '后厨出锅速度翻倍 · 主战场主角与战友火器伤害永久 +15%', cost: 95,  icon: 'ic_clean_plate' },
+  fast_tap:     { id: 'fast_tap',     name: '铜酒栓',   battleTag: '开战甲+雷',  desc: '食客配酒赏金 +25% · 每晚开战自动获 +35铁甲 与 +1爆炎弹', cost: 80,  icon: 'ic_beer' },
+  warm_lantern: { id: 'warm_lantern', name: '琥珀灯',   battleTag: '高地暴+12%', desc: '吸引高赏金豪客 · 屋顶与门廊高地暴击率永久 +12%、射程 +10%', cost: 110, icon: 'ic_ledger' },
 };
 export const TAVERN_UPGRADE_ORDER: TavernUpgradeId[] = ['wide_pass', 'fast_tap', 'warm_lantern'];
 export const SEAT_UPGRADE_ORDER: TavernUpgradeId[] = ['tables_6', 'tables_8'];
 
+// ── 食客主战场支援身份（每位食客吃饱后立刻反哺主战场！）──
+export type GuestSupportKind = 'smith' | 'arms' | 'medic' | 'vanguard';
+export interface GuestSupportDef {
+  id: GuestSupportKind;
+  roleName: string;
+  shortTag: string;
+  desc: string;
+  icon: string;
+}
+export const GUEST_SUPPORTS: Record<GuestSupportKind, GuestSupportDef> = {
+  smith:    { id: 'smith',    roleName: '筑城匠师', shortTag: '修墙+90·造塔85折', desc: '饱餐后立即修复防线与大屋 90 耐久，且工坊造塔/升塔立减 15% 金币', icon: 'ic_anvil' },
+  arms:     { id: 'arms',     roleName: '军火游商', shortTag: '赠爆炎弹·战场空投', desc: '饱餐后立即赠送 1 枚爆炎弹，且明日主战场额外空投 1 个武器升星箱', icon: 'ic_grenade' },
+  medic:    { id: 'medic',    roleName: '战地药师', shortTag: '回血+35·铁甲+35',   desc: '饱餐后立即为主角恢复 35 生命并镀上 +35 镶铁护甲', icon: 'ic_armor' },
+  vanguard: { id: 'vanguard', roleName: '猎魔同袍', shortTag: '明日战友伤害+35%', desc: '饱餐后激发明日【战友狂飙】：全体战友伤害 +35%、攻速 +25%', icon: 'ic_rooftop' },
+};
+export const GUEST_SUPPORT_ORDER: GuestSupportKind[] = ['smith', 'arms', 'medic', 'vanguard'];
+
+// ── 主战场狩猎悬赏（酒馆委托 -> 战场明确目标 -> 达成即奖重金与高阶肉材）──
+export type BattleContractId = 'rooftop_hunt' | 'crit_blast' | 'elite_purge' | 'iron_wall';
+export interface BattleContractDef {
+  id: BattleContractId;
+  title: string;
+  desc: (target: number) => string;
+  baseTarget: number;
+  perDayTarget: number;
+  baseCoins: number;
+  meatReward: MeatInventory;
+  bonusGrenade?: number;
+}
+export const BATTLE_CONTRACTS: Record<BattleContractId, BattleContractDef> = {
+  rooftop_hunt: {
+    id: 'rooftop_hunt', title: '高地狙猎令',
+    desc: (t) => `站在屋顶或门廊高地击杀 ${t} 只魔物`,
+    baseTarget: 4, perDayTarget: 1, baseCoins: 45,
+    meatReward: { tender: 2, thick: 1, essence: 0 },
+  },
+  crit_blast: {
+    id: 'crit_blast', title: '破甲重火令',
+    desc: (t) => `利用暴击或爆炎火器击杀 ${t} 只魔物`,
+    baseTarget: 3, perDayTarget: 1, baseCoins: 55,
+    meatReward: { tender: 1, thick: 2, essence: 0 }, bonusGrenade: 1,
+  },
+  elite_purge: {
+    id: 'elite_purge', title: '猎魔净空令',
+    desc: (t) => `击杀 ${t} 只飞怪或精锐魔物（黑猫/猎犬/巨尸/魔蝠/怨灵/首领）`,
+    baseTarget: 2, perDayTarget: 1, baseCoins: 68,
+    meatReward: { tender: 0, thick: 1, essence: 1 },
+  },
+  iron_wall: {
+    id: 'iron_wall', title: '铁壁守夜令',
+    desc: () => '本夜清场时前院防线耐久保持在 50% 以上',
+    baseTarget: 1, perDayTarget: 0, baseCoins: 62,
+    meatReward: { tender: 1, thick: 1, essence: 1 },
+  },
+};
+export const BATTLE_CONTRACT_ORDER: BattleContractId[] = ['rooftop_hunt', 'crit_blast', 'elite_purge', 'iron_wall'];
+
 export interface DinerGuestDef {
   id: string; name: string; role: string; sprite: string; fps: number;
+  supportKind: GuestSupportKind;
   dish: MealId; dishName: string; basePay: number;
   orderQuote: string; thanksQuote: string;
 }
 export const DINER_GUESTS: DinerGuestDef[] = [
   {
-    id: 'agou', name: '阿狗', role: '镇外拾荒客', sprite: 'npc_hat', fps: 6,
-    dish: 'spicy_skewer', dishName: '炭烤香辣肉串', basePay: 22,
+    id: 'agou', name: '阿狗', role: '猎魔游侠', sprite: 'npc_hat', fps: 6, supportKind: 'vanguard',
+    dish: 'spicy_skewer', dishName: '炭烤香辣肉串', basePay: 28,
     orderQuote: '掌柜，刚从雾里跑回来，来串冒油的辣肉串暖暖身子！',
-    thanksQuote: '嘶哈——焦香麻辣，明天守城我帮你多盯紧东墙！',
+    thanksQuote: '嘶哈——焦香麻辣，明天守城我们大伙火力全开！',
   },
   {
-    id: 'qijie', name: '七姐', role: '夜巡猎手', sprite: 'npc_woman', fps: 7,
-    dish: 'hearty_stew', dishName: '守夜暖胃肉汤', basePay: 28,
-    orderQuote: '夜风太冷了，给我盛碗滚烫的肉汤，撒点黑胡椒。',
-    thanksQuote: '这口热汤下肚，浑身的寒气都散了，多谢掌柜！',
+    id: 'qijie', name: '七姐', role: '战地药师', sprite: 'npc_woman', fps: 7, supportKind: 'medic',
+    dish: 'hearty_stew', dishName: '守夜暖胃肉汤', basePay: 38,
+    orderQuote: '夜风太冷了，给我盛碗滚烫的肉汤，我带了秘药和铁甲片。',
+    thanksQuote: '这口热汤下肚寒气全散，这套护甲片和秘药给你披上！',
   },
   {
-    id: 'laobao', name: '老包', role: '防线夜巡者', sprite: 'npc_bearded', fps: 6,
-    dish: 'iron_steak', dishName: '铁板滋滋厚排', basePay: 52,
-    orderQuote: '连着值完夜班快扛不住了，切块最厚的铁板肉排！',
-    thanksQuote: '够劲！满口肉汁，待会儿我顺手给你把屋顶支架紧一紧！',
+    id: 'laobao', name: '老包', role: '筑城匠师', sprite: 'npc_bearded', fps: 6, supportKind: 'smith',
+    dish: 'iron_steak', dishName: '铁板重甲厚排', basePay: 72,
+    orderQuote: '连着抢修工事快累垮了，切块最厚的铁板肉排！',
+    thanksQuote: '够劲！满口肉汁，前院路障我刚替你加固好，今晚造塔算八五折！',
   },
   {
-    id: 'niqiu', name: '泥鳅', role: '黑市游商', sprite: 'npc_oldman', fps: 7,
-    dish: 'garlic_cold_cut', dishName: '蒜香冷切熏肉', basePay: 36,
-    orderQuote: '掌柜的，把你压箱底的招牌冷切熏肉端上来，赏金少不了你的！',
-    thanksQuote: '绝了！全暮色镇就数你这小酒馆最有人情味，赏金拿好！',
+    id: 'niqiu', name: '泥鳅', role: '军火游商', sprite: 'npc_oldman', fps: 7, supportKind: 'arms',
+    dish: 'garlic_cold_cut', dishName: '蒜香疾风熏肉', basePay: 54,
+    orderQuote: '掌柜的，把你招牌的蒜香熏肉端上来，军火支援少不了你的！',
+    thanksQuote: '绝了！这枚爆炎弹你先拿着，明晚战场上我再给你空投一口神兵箱！',
   },
 ];
 

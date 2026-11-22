@@ -1,4 +1,4 @@
-import type { AdTierId, ClassId, DifficultyId, DrinkId, MealId, MeatInventory, MeatKind, PerkId, StaffRole, TavernUpgradeId, TurretType, WeaponId, ZombieKind } from '../content/data';
+import type { AdTierId, BattleContractId, ClassId, DifficultyId, DrinkId, GuestSupportKind, MealId, MeatInventory, MeatKind, PerkId, StaffRole, TavernUpgradeId, TurretType, WeaponId, ZombieKind } from '../content/data';
 import type { AllyId, DishQuality, VipTierId } from '../content/story';
 
 /** 世界尺寸（逻辑像素）。画面高 310，室外地面线在 222，下面留给石墙地基与手指按键。 */
@@ -120,6 +120,7 @@ export interface DinerGuest {
   vipId: string;
   tier: VipTierId;
   personality: GuestPersonality;
+  supportKind?: GuestSupportKind;
   name: string;
   role: string;
   sprite: string;
@@ -262,6 +263,18 @@ export interface HiredStaffState {
   carrying?: StaffCarriedDish | null;
 }
 
+export interface BattleContractState {
+  id: BattleContractId;
+  title: string;
+  desc: string;
+  progress: number;
+  target: number;
+  coins: number;
+  meatReward: MeatInventory;
+  bonusGrenade?: number;
+  done: boolean;
+}
+
 export interface DinerState {
   rep: number;
   fans: number;
@@ -275,6 +288,8 @@ export interface DinerState {
   reviews: DinerReview[];
   researched: MealId[];
   dishLevels: Partial<Record<MealId, number>>;
+  /** 菜品实战火候熟练度（每做出/端出 1 盘 +1，达 2 盘自动升 Lv.2 熟手招牌，达 5 盘自动升 Lv.3 镇店绝活） */
+  dishXp?: Partial<Record<MealId, number>>;
   menu: MealId[];
   menuStock: Partial<Record<MealId, number>>;
   autoSupply: Partial<Record<MealId, boolean>>;
@@ -285,6 +300,18 @@ export interface DinerState {
   rackLevel: number;
   lastDispatchLog: string;
   allyRoles: Partial<Record<AllyId, StaffRole>>;
+  /** 今夜已犒赏激活的明日主战场料理队列（最多3道叠加） */
+  feastDishes?: MealId[];
+  /** 今夜已触发的食客战场支援身份 */
+  supportsTriggered?: GuestSupportKind[];
+  /** 筑城匠师支援：工坊造塔/升塔享 85 折 */
+  smithDiscount?: boolean;
+  /** 军火游商支援：明日主战场额外空投武器升星箱数 */
+  extraCrates?: number;
+  /** 猎魔同袍支援：明日主战场全体战友伤害+35%、攻速+25% */
+  allyFuryNext?: boolean;
+  /** 当前主战场狩猎悬赏 */
+  contract?: BattleContractState;
 }
 
 export interface StoryProgress {
@@ -327,7 +354,7 @@ export interface RunState {
   dinerShift: DinerShiftState;
   diner: DinerState;
   story: StoryProgress;
-  buff: { dmgMul: number; haste: number };
+  buff: { dmgMul: number; haste: number; turretMul?: number; critBonus?: number; frostRounds?: boolean; allyFury?: boolean };
   shop: WeaponId[];
   perks: PerkId[]; perkChoices: PerkId[];
   /** 这一局能掉落/进货的武器（由局外解锁决定） */
@@ -369,6 +396,7 @@ export type Command =
   | { t: 'rerollShop' }
   | { t: 'salvageWeapon'; index: number }
   | { t: 'serveGuest'; guestId: string; quality?: DishQuality }
+  | { t: 'feastAll' }
   | { t: 'serveCarried' }
   | { t: 'grindMortar' }
   | { t: 'startShift' }
@@ -436,7 +464,10 @@ export type GameEvent =
   | { t: 'guestAngry'; guestId: string; name: string }
   | { t: 'shiftOpen'; duration: number }
   | { t: 'shiftEnd'; served: number; coins: number; tips: number; fans: number; bestCombo: number; rating: number; flameEarned: number }
-  | { t: 'serve'; guestId: string; vipId: string; name: string; dishName: string; quality: DishQuality; coins: number; fans: number; rep: number; quote: string; allServed?: boolean; firstMeet?: boolean; trendMatch?: boolean; partyMatch?: boolean; vipRequestClear?: boolean; rankUp?: string; isRye?: boolean }
+  | { t: 'serve'; guestId: string; vipId: string; name: string; dishName: string; quality: DishQuality; coins: number; fans: number; rep: number; quote: string; allServed?: boolean; firstMeet?: boolean; trendMatch?: boolean; partyMatch?: boolean; vipRequestClear?: boolean; rankUp?: string; isRye?: boolean; supportKind?: GuestSupportKind; supportTag?: string; dishBuffTag?: string }
+  | { t: 'contractDone'; id: BattleContractId; title: string; coins: number; rewardText: string }
+  | { t: 'dishLevelUp'; id: MealId; level: number }
+  | { t: 'fortify'; x: number; y: number; label: string }
   | { t: 'cook'; meat: number; coins: number }
   | { t: 'meal'; id: MealId; quality: DishQuality }
   | { t: 'dinerStory'; eventKey: 'firstOpen' | 'rep10' | 'rep25' | 'rep40' }

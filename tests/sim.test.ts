@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
-  CLASSES, CRIT_MUL, DIFFICULTIES, DINER_GUESTS, DRINKS, FORT_LEVELS, LAST_DAY, MEALS, MEAL_ORDER, PERKS, RACK_LEVELS, RYE_FALLBACK, SEAT_UPGRADE_ORDER,
-  SPICE_BUY_COST, STAFF_POOL, TAVERN_UPGRADES, TURRETS, WALL_LEVELS, WEAPONS,
-  dayZombieCount, dishEnhanceMeatCost, dishUpgradeCost, nextUnlock, partyForDay, sustainedDps, unlockedClasses, unlockedWeapons, zombieHp,
+  CLASSES, CRIT_MUL, DIFFICULTIES, DINER_GUESTS, DRINKS, FORT_LEVELS, LAST_DAY, MEALS, MEAL_ORDER, PERKS, RYE_FALLBACK, SEAT_UPGRADE_ORDER,
+  TAVERN_UPGRADES, TURRETS, WALL_LEVELS, WEAPONS,
+  dayZombieCount, dishEnhanceMeatCost, dishUpgradeCost, nextUnlock, sustainedDps, unlockedClasses, unlockedWeapons, zombieHp,
 } from '../src/content/data';
 import {
   BOSS_INTROS, BOSS_VICTORY, CHAPTER_CARDS, CINEMATIC_INTRO, COMPANION_JOIN_STORIES, DAILY_TRENDS, FANS_RANKS,
@@ -13,8 +13,8 @@ import {
 import { loadMeta, recordRunToMeta, starsEarned } from '../src/app/meta';
 import { runBot } from '../src/sim/bot';
 import {
-  BODY_Y, MAX_CARRY, command, computeGrenadeThrow, damageMul, dinerRank, dishLevel, dishResearchCost, dishServings, dishTaste, effectiveRange,
-  houseBuff, isOnPorch, isOnRoof, maxSeats, maxStaffSlots, meatPrice, nearbyCampTarget, newRun, staffHasSkill, step, tavernUpgradeCost, totalMeat,
+  BODY_Y, MAX_CARRY, command, computeGrenadeThrow, damageMul, dishLevel, dishTaste, effectiveRange,
+  houseBuff, isOnPorch, isOnRoof, maxSeats, meatPrice, nearbyCampTarget, newRun, step, tavernUpgradeCost, totalMeat,
   turretBuildCost, turretRefundCoins, turretUpgradeCost,
 } from '../src/sim/sim';
 import {
@@ -392,13 +392,17 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     expect(r.guests.every((g) => g.served)).toBe(true);
     expect(r.coins).toBeGreaterThan(85);
 
-    // 12 道食谱需靠炉火灵感研发，未研发的长夜全宴不可留餐
-    expect(MEAL_ORDER.length).toBe(12);
-    expect(r.diner.researched.length).toBe(2);
-    expect(command(r, { t: 'pickMeal', id: 'apocalypse_feast' })).toBeNull();
+    // 6 道核心魔物战备料理默认全开放，无需繁琐研发锁，上菜或自享均叠加明日主战场增益
+    expect(MEAL_ORDER.length).toBe(6);
+    expect(r.diner.researched.length).toBe(6);
+    expect((r.diner.feastDishes ?? []).length).toBeGreaterThanOrEqual(1);
 
+    // 清空今日已叠菜，单独验证自享「赤椒炙肉串」转为次日主战场枪械伤害加成
+    r.diner.feastDishes = [];
+    r.meats.tender = 5;
     command(r, { t: 'pickMeal', id: 'spicy_skewer', quality: 'legendary' });
     expect(r.meal).toBe('spicy_skewer');
+    expect(r.diner.feastDishes).toContain('spicy_skewer');
     if (r.meats.tender > 0) command(r, { t: 'sellMeatKind', kind: 'tender', count: r.meats.tender });
     expect(r.meats.tender).toBe(0);
     // 出门与进门
@@ -406,11 +410,11 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     step(r, { ...NO_INPUT, interact: true });
     expect(r.inside).toBe(false);
     expect(r.player.x).toBe(DOOR_X);
-    // 次日特餐（含传说火候加成）转为战斗伤害加成
+    // 次日战备料理转为战斗伤害加成（含火候熟练自动升 Lv.2 倍率）
     command(r, { t: 'nextDay' });
     expect(r.inside).toBe(false);
-    expect(r.buff.dmgMul).toBeCloseTo(MEALS.spicy_skewer.dmgMul * QUALITY_META.legendary.buffMul);
-    expect(damageMul(r)).toBeGreaterThan(1.5); // 房顶居高 + 特餐
+    expect(r.buff.dmgMul).toBeCloseTo(MEALS.spicy_skewer.dmgMul * QUALITY_META.legendary.buffMul * (1 + 0.22 * (dishLevel(r, 'spicy_skewer') - 1)));
+    expect(damageMul(r)).toBeGreaterThan(1.45); // 房顶居高 + 战备料理
   });
 
   test('厨师全部解锁：掉肉更多、卖肉多 +35%、特餐效果 +50%', () => {
@@ -675,20 +679,12 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     expect(totalShots.zhao).toBeGreaterThanOrEqual(2);
   });
 
-  test('暮夜酒馆经营闭环：炉火研发/美味度强化/自动补货/断货黑麦饼 → 饮品斟酒 → 收脏盘 → 日报净利', () => {
+  test('暮夜战备酒馆经营闭环：菜品强化/直接现烹/断货黑麦饼 → 饮品斟酒 → 收脏盘 → 日报战备结算', () => {
     const r = quiet(); r.phase = 'perk'; r.perkChoices = ['rooftop'];
     command(r, { t: 'pickPerk', id: 'rooftop' });
-    r.day = 3; r.coins = 500; r.meats = { tender: 10, thick: 4, essence: 0 };
-    r.diner.flame = 12; r.diner.bestTaste = 100;
+    r.day = 3; r.coins = 500; r.meats = { tender: 10, thick: 4, essence: 2 };
 
-    // 炉火灵感研发新菜「蒜香冷切熏肉」+ 购买香料
-    expect(command(r, { t: 'buySpice', count: 2 })).not.toBeNull();
-    expect(r.coins).toBe(500 - 2 * SPICE_BUY_COST);
-    expect(command(r, { t: 'researchDish', id: 'garlic_cold_cut' })?.some((e) => e.t === 'research')).toBe(true);
-    expect(r.diner.researched).toContain('garlic_cold_cut');
-    expect(r.diner.bestTaste).toBeGreaterThanOrEqual(125);
-
-    // 强化菜品消耗主料+金币，同步提升美味度与多份数
+    // 强化菜品消耗主料+金币，同步提升售价、美味度与明日战场增益倍率
     const baseTaste = dishTaste(r, 'hearty_stew');
     const upCoin = dishUpgradeCost('hearty_stew', 1);
     const upMeat = dishEnhanceMeatCost('hearty_stew', 1);
@@ -697,16 +693,10 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     expect(dishLevel(r, 'hearty_stew')).toBe(2);
     expect(dishTaste(r, 'hearty_stew')).toBeGreaterThan(baseTaste);
     expect(r.meats.tender).toBe(tenderBefore - upMeat.tender);
-    expect(r.coins).toBeLessThan(500 - 2 * SPICE_BUY_COST - upCoin + 1);
-    expect(dishServings(r, 'hearty_stew')).toBeGreaterThanOrEqual(2);
+    expect(r.coins).toBe(500 - upCoin);
 
-    // 上架数量上限保护 & 自动补货开关 & 断货兜底干硬黑麦饼
+    // 默认直接耗生肉现烹；当生肉与库存皆为 0 时，营业入单兜底为干硬黑麦饼
     r.diner.menu = ['spicy_skewer', 'hearty_stew'];
-    expect(command(r, { t: 'toggleAutoSupply', id: 'spicy_skewer' })).not.toBeNull();
-    expect(r.diner.autoSupply.spicy_skewer).toBe(true);
-
-    // 无库存、关闭自动补货且零嫩肉时，营业入单会降级为干硬黑麦饼（1金、0粉、口碑惩罚）
-    r.diner.autoSupply.spicy_skewer = false;
     r.diner.menuStock = {};
     r.meats = { tender: 0, thick: 0, essence: 0 };
     expect(command(r, { t: 'startShift' })).not.toBeNull();
@@ -740,15 +730,12 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     r.player.x = dirty.x;
     expect(command(r, { t: 'cleanTable', plateId: dirty.id })?.some((e) => e.t === 'tableClean')).toBe(true);
 
-    // 测打烊日报：星级、炉火灵感产出、进货支出与净利归帐
-    const flamePre = r.diner.flame;
+    // 测打烊日报：星级评分与净利归帐
     const closeEvs = command(r, { t: 'closeShift' })!;
     expect(closeEvs.some((e) => e.t === 'shiftEnd')).toBe(true);
     expect(r.dinerShift.mode).toBe('summary');
     expect(r.dinerShift.report).not.toBeNull();
-    expect(r.dinerShift.report!.spiceExpense).toBe(2 * SPICE_BUY_COST);
     expect(r.dinerShift.report!.rating).toBeGreaterThanOrEqual(1);
-    expect(r.diner.flame).toBe(flamePre + r.dinerShift.report!.flameEarned);
     expect(command(r, { t: 'finishSummary' })).not.toBeNull();
     expect(r.dinerShift.mode).toBe('prep');
   });
@@ -775,78 +762,85 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     expect(r2.meats.essence).toBeGreaterThanOrEqual(2);
   });
 
-  test('口碑榜 E→S 三重卡口、招工培训自动技、夜间派遣寻香、后院贮肉架与日薪扣除', () => {
+  test('战备酒馆与主战场四大联动：战场狩猎悬赏、4 类食客战场支援、6 道料理叠加增益、4 项工事装潢永久加成', () => {
     const r = quiet(); r.phase = 'perk'; r.perkChoices = ['rooftop'];
     command(r, { t: 'pickPerk', id: 'rooftop' });
+    r.coins = 1200;
+    r.meats = { tender: 15, thick: 12, essence: 8 };
 
-    // 1. 三重卡口校验：仅有粉丝不足 3 菜/115味 无法升 D 级；三项达标后立刻升 D 级且解锁 2 伙计编
-    r.diner.fans = 100;
-    expect(dinerRank(r).cur.grade).toBe('E');
-    r.diner.flame = 10;
-    expect(command(r, { t: 'researchDish', id: 'garlic_cold_cut' })).not.toBeNull();
-    expect(dinerRank(r).cur.grade).toBe('D');
-    expect(maxStaffSlots(r)).toBe(2);
+    // 联动 1：4 项酒馆装潢同步赋予主战场永久战力（扩座加路障/大屋耐久上限、传菜架+15%全伤、酒栓开战护甲手雷、吊灯高地暴击射程）
+    const wallMaxBefore = r.wall.maxHp;
+    const homeMaxBefore = r.home.maxHp;
+    expect(command(r, { t: 'buyTavernUpgrade', id: 'tables_6' })).not.toBeNull();
+    expect(r.wall.maxHp).toBe(wallMaxBefore + 120);
+    expect(r.home.maxHp).toBe(homeMaxBefore + 120);
 
-    // 2. 发招工传单 -> 招募梅姐 -> 培训至 Lv.3 解锁自动收碗 -> 开店时自动清理脏盘赚钱
-    r.coins = 500;
-    expect(command(r, { t: 'postRecruitment', tier: 'flyer' })).not.toBeNull();
-    expect(r.diner.applicants.length).toBeGreaterThanOrEqual(1);
-    const appId = r.diner.applicants.find((a) => a.id === 'staff_meimei')?.id ?? r.diner.applicants[0].id;
-    expect(command(r, { t: 'hireStaff', id: appId })).not.toBeNull();
-    expect(r.diner.hiredStaff.length).toBe(1);
+    const dmgBeforeWide = damageMul(r);
+    expect(command(r, { t: 'buyTavernUpgrade', id: 'wide_pass' })).not.toBeNull();
+    expect(damageMul(r)).toBeCloseTo(dmgBeforeWide * 1.15);
 
-    const hired = r.diner.hiredStaff[0];
-    if (hired.id === 'staff_meimei') {
-      expect(command(r, { t: 'trainStaff', id: 'staff_meimei' })).not.toBeNull();
-      expect(command(r, { t: 'trainStaff', id: 'staff_meimei' })).not.toBeNull();
-      expect(hired.level).toBe(3);
-      expect(staffHasSkill(hired, 'auto_clean')).toBe(true);
+    expect(command(r, { t: 'buyTavernUpgrade', id: 'warm_lantern' })).not.toBeNull();
+    r.inside = false; r.player.x = 180; r.player.y = ROOF_Y;
+    expect(houseBuff(r).critBonus).toBeCloseTo(0.22); // 屋顶 10% + 暖琥珀吊灯 12%
+    r.inside = true;
+
+    // 联动 2：4 类食客战场支援（筑城匠师修墙+造塔85折、军火游商+手雷+明日空投箱、战地药师回血叠甲、猎魔同袍激活战友狂飙）
+    r.wall.hp = r.wall.maxHp - 100;
+    r.guests[0].supportKind = 'smith';
+    r.guests[0].dish = 'iron_steak';
+    r.guests[1].supportKind = 'arms';
+    r.guests[1].dish = 'abyss_marrow_pot';
+    r.guests[2].supportKind = 'vanguard';
+    r.guests[2].dish = 'apocalypse_feast';
+
+    const grenBefore = r.player.grenades;
+    expect(command(r, { t: 'feastAll' })).not.toBeNull();
+    expect(r.guests.every((g) => g.served)).toBe(true);
+    expect(r.wall.hp).toBe(r.wall.maxHp - 10); // 筑城匠师立刻修复 +90
+    expect(r.diner.smithDiscount).toBe(true);
+    expect(turretBuildCost('cannon', r.cls, false, true)).toBeLessThan(turretBuildCost('cannon', r.cls, false, false));
+    expect(r.player.grenades).toBeGreaterThan(grenBefore); // 军火游商 + 破晓长夜全宴赠送爆炎弹
+    expect(r.diner.extraCrates).toBe(1);
+    expect(r.diner.allyFuryNext).toBe(true);
+
+    // 联动 3：招待食客的 3 道菜自动进入明日战备席（炮塔火力+30%、暴击+18%+寒霜弹、全伤+35%+50甲），且做满 2 盘自动晋升 Lv.2 熟手招牌
+    expect(r.diner.feastDishes).toEqual(['iron_steak', 'abyss_marrow_pot', 'apocalypse_feast']);
+    r.guests[0].served = false;
+    const lvlEvs = command(r, { t: 'serveGuest', guestId: r.guests[0].id, quality: 'good' })!;
+    expect(lvlEvs.some((e) => e.t === 'dishLevelUp' && e.id === 'iron_steak' && e.level === 2)).toBe(true);
+    expect(dishLevel(r, 'iron_steak')).toBe(2);
+
+    // 进入明日主战场：验证战备增益、空投武器箱、精铜酒栓开战补给、以及主战场狩猎悬赏达成
+    expect(command(r, { t: 'buyTavernUpgrade', id: 'fast_tap' })).not.toBeNull();
+    const cratesBefore = r.crates.length;
+    command(r, { t: 'nextDay' });
+    expect(r.phase).toBe('fight');
+    expect(r.buff.turretMul).toBeGreaterThanOrEqual(0.30);
+    expect(r.buff.critBonus).toBeGreaterThanOrEqual(0.18);
+    expect(r.buff.frostRounds).toBe(true);
+    expect(r.buff.allyFury).toBe(true);
+    expect(r.crates.length).toBeGreaterThan(cratesBefore); // 军火游商空投箱已落场
+
+    // 联动 4：主战场狩猎悬赏（高地狙猎令/破甲重火令/猎魔净空令）在战斗中达成即发赏金与魔物肉
+    expect(r.diner.contract).toBeDefined();
+    const contract = r.diner.contract!;
+    contract.id = 'rooftop_hunt';
+    contract.target = 1;
+    contract.progress = 0;
+    contract.done = false;
+    r.spawn.left = 0; r.spawn.timer = 1e9;
+    r.player.x = 180; r.player.y = ROOF_Y;
+    const z = zombie(r, 240, 1, 'roamer');
+    const coinsBeforeKill = r.coins;
+    let contractEv = false;
+    for (let i = 0; i < 45 && z.hp > 0; i++) {
+      for (const e of step(r, { ...NO_INPUT, fire: true })) {
+        if (e.t === 'contractDone') contractEv = true;
+      }
     }
-
-    r.meats = { tender: 8, thick: 2, essence: 0 };
-    expect(command(r, { t: 'prepDish', id: 'spicy_skewer', batches: 3 })).not.toBeNull();
-    expect(command(r, { t: 'startShift' })).not.toBeNull();
-    if (hired.id === 'staff_meimei') {
-      r.dinerShift.dirtyTables.push({ id: 999, seatIdx: 2, x: DINER_PLATE_X[2], createdTick: r.tick });
-      for (let i = 0; i < 190 && r.dinerShift.dirtyTables.length > 0; i++) step(r, NO_INPUT);
-      expect(r.dinerShift.dirtyTables.length).toBe(0);
-    }
-
-    // 3. 打烊日报真实扣除在岗伙计日薪与店面维护
-    const coinsBeforeClose = r.coins;
-    command(r, { t: 'closeShift' });
-    const rep = r.dinerShift.report!;
-    expect(rep.staffWages).toBe(STAFF_POOL.find((s) => s.id === hired.id)!.dailyWage);
-    expect(r.coins).toBe(coinsBeforeClose - Math.min(coinsBeforeClose, rep.staffWages + rep.upkeepCost));
-    command(r, { t: 'finishSummary' });
-
-    // 4. 派去外出派遣 + 第 4 日主题狂欢夜预警 + 后院贮肉架产肉 + 战后派遣带回秘酿香料
-    expect(partyForDay(2).upcoming?.id).toBe('stew_fest');
-    expect(partyForDay(4).active?.id).toBe('stew_fest');
-    expect(command(r, { t: 'setStaffRole', id: hired.id, role: 'dispatch' })).not.toBeNull();
-    r.day = 3; // 推进到第 4 天（贮肉架 & 暖锅炖肉祭）
-    expect(command(r, { t: 'upgradeRack' })).toBeNull(); // 第 3 天尚未解锁
-    r.day = 4;
-    expect(command(r, { t: 'upgradeRack' })).not.toBeNull();
-
-    const spiceBefore = r.spice;
-    const tenderBefore = r.meats.tender;
-    r.phase = 'perk'; r.perkChoices = ['rooftop'];
-    const perkEvs = command(r, { t: 'pickPerk', id: 'rooftop' })!;
-    expect(perkEvs.some((e) => e.t === 'dispatchReturn')).toBe(true);
-    expect(perkEvs.some((e) => e.t === 'rackHarvest')).toBe(true);
-    expect(perkEvs.some((e) => e.t === 'partyStart')).toBe(true);
-    expect(r.spice).toBeGreaterThanOrEqual(spiceBefore + 2);
-    expect(r.meats.tender).toBeGreaterThanOrEqual(tenderBefore + RACK_LEVELS[0].tender);
-
-    // 5. VIP 特邀点名委托：在耐心过半前上桌额外奖励 +2 炉火灵感
-    const reqGuest = r.guests[0];
-    reqGuest.isVipRequest = true;
-    reqGuest.requestBonusCoins = 18;
-    const flameBefore = r.diner.flame;
-    const serveEvs = command(r, { t: 'serveGuest', guestId: reqGuest.id, quality: 'good' })!;
-    expect(serveEvs.some((e) => e.t === 'serve' && e.vipRequestClear)).toBe(true);
-    expect(r.diner.flame).toBe(flameBefore + 2);
+    expect(contractEv).toBe(true);
+    expect(r.diner.contract!.done).toBe(true);
+    expect(r.coins).toBeGreaterThanOrEqual(coinsBeforeKill + contract.coins);
   });
 });
 
@@ -1010,9 +1004,8 @@ describe('15 天完整流程与首领', () => {
     command(r1, { t: 'buyTavernUpgrade', id: 'warm_lantern' });
     expect(r1.diner.upgrades).toContain('warm_lantern');
 
-    const testDish = MEAL_ORDER.find((id) => !r1.diner.researched.includes(id))!;
-    r1.diner.researched.push(testDish);
-    r1.diner.dishLevels[testDish] = 5;
+    const testDish = 'iron_steak';
+    r1.diner.dishLevels[testDish] = 3;
 
     const updatedMeta = recordRunToMeta(baseMeta, r1, true);
     expect(updatedMeta.unlockedDecor).toContain('warm_lantern');
@@ -1026,8 +1019,8 @@ describe('15 天完整流程与首领', () => {
     // 已解锁装潢享 8 折重建价
     expect(tavernUpgradeCost(r2, 'warm_lantern')).toBe(Math.round(TAVERN_UPGRADES.warm_lantern.cost * 0.8));
     expect(tavernUpgradeCost(r2, 'warm_lantern')).toBeLessThan(TAVERN_UPGRADES.warm_lantern.cost);
-    // 已精研菜品享研发灵感折扣（最低 1 点）
-    expect(dishResearchCost(r2, testDish)).toBe(Math.max(1, MEALS[testDish].researchCost - 1));
+    // 已精研菜品在新局直接享有起始等级加成
+    expect(dishLevel(r2, testDish)).toBeGreaterThanOrEqual(2);
   });
 
   test('M3 第 15 天通关后可进入破晓无尽酒馆，既可连续佛系营业也可外出迎战', () => {

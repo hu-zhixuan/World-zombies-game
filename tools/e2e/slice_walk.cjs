@@ -224,71 +224,50 @@ const L = require('./lib.cjs');
   // 7a. 打开深夜小食堂检查备战、自动补货、炉火灵感研发、强化、15VIP 与 780/844 适配
   const forbiddenReSrc = '十五波|短波|电台|直升机|运输机|螺旋桨|废土|加特林|磁轨|特斯拉|左轮炮|步枪|霰弹|手雷|防弹|电网|机枪塔|冰霜塔|电弧塔|重炮塔|避难所|米其林|异变|变异|主厨|工程师|枪手|护士|废品改造狂|卖的废铁|卖废铁|热搜|末世|感染者';
   await g.tap('#btn-kitchen');
-  check((await g.state()).panel === 'kitchen', '点食堂按钮可打开深夜小食堂总览');
-  check(await g.page.evaluate((src) => !new RegExp(src).test(document.querySelector('#panel-kitchen').innerText), forbiddenReSrc), '深夜食堂界面无出戏或过时设定文案');
+  check((await g.state()).panel === 'kitchen', '点酒馆按钮可打开暮夜战备酒馆一屏总览');
+  check(await g.page.evaluate((src) => !new RegExp(src).test(document.querySelector('#panel-kitchen').innerText), forbiddenReSrc), '暮夜战备酒馆界面无出戏或过时设定文案');
+  check(await g.page.evaluate(() => !!document.querySelector('#tavern-contract') && !!document.querySelector('#tavern-battle-buffs')), '战备酒馆顶栏清晰展示主战场狩猎悬赏与明日战备增益总览');
+
+  const wallMaxBeforeSeats = await g.page.evaluate(() => window.__game.run.wall.maxHp);
   await g.tap('#btn-tavern-seats');
   await g.tap('#btn-tavern-warm_lantern');
   await g.tap('#btn-tavern-fast_tap');
+  await g.tap('#btn-tavern-wide_pass');
+  check(await g.page.evaluate((prevMax) => {
+    const r = window.__game.run;
+    const upgs = r.diner.upgrades;
+    return upgs.includes('fast_tap') && upgs.includes('tables_6') && upgs.includes('warm_lantern') && upgs.includes('wide_pass') && r.wall.maxHp === prevMax + 120;
+  }, wallMaxBeforeSeats), '酒馆 4 项工事装潢一键添置且扩座同步永久提升主战场防线耐久上限 (+120)');
+
+  await g.tap('#btn-meal-spicy_skewer');
+  check(await g.page.evaluate(() => window.__game.run.meal === 'spicy_skewer' && (window.__game.run.diner.feastDishes ?? []).includes('spicy_skewer') && (window.__game.run.diner.dishXp?.spicy_skewer ?? 0) >= 1), '烹制战备料理立即激活明日主战场火力增益并积累火候熟练度');
+  await g.tap('#btn-serve-0');
+  check(await g.page.evaluate(() => window.__game.run.guests[0].served && /枪伤|攻速|炮塔|暴击|造塔|空投|战友/.test(document.querySelector('#tavern-battle-buffs')?.textContent || '')), '一屏直接招待到访食客同时收获金币、战场支援与明日料理增益');
   check(await g.page.evaluate(() => {
-    const upgs = window.__game.run.diner.upgrades;
-    return upgs.includes('fast_tap') && upgs.includes('tables_6') && upgs.includes('warm_lantern');
-  }), '食堂首页可添置「扩展客席(6座)」「暖琥珀吊灯」「精铜酒栓」设备升级');
-  await g.tap('#btn-prep-spicy_skewer');
-  await g.tap('#btn-auto-spicy_skewer');
-  check(await g.page.evaluate(() => (window.__game.run.diner.menuStock.spicy_skewer ?? 0) >= 1 && !!window.__game.run.diner.autoSupply.spicy_skewer), '可一键备锅且开启「自动补货」开关');
+    const r = window.__game.run;
+    const xp = r.diner.dishXp?.spicy_skewer ?? 0;
+    return xp < 2 || (r.diner.dishLevels.spicy_skewer ?? 1) >= 2;
+  }), '做满 2 盘料理自动练成 Lv.2 熟手招牌（告别工坊式花钱点升级）');
   await g.shot('06-kitchen'); await fits('#panel-kitchen');
 
-  await g.tap('#tab-kitchen-menu');
-  await g.shot('06b-kitchen-menu'); await fits('#panel-kitchen');
-  await g.tap('#btn-dish-research-garlic_cold_cut');
-  check(await g.page.evaluate(() => window.__game.run.diner.researched.includes('garlic_cold_cut')), '食谱页可消耗炉火灵感研发新菜「蒜香冷切熏肉」');
-  await g.tap('#btn-dish-up-spicy_skewer');
-  check(await g.page.evaluate(() => window.__game.run.diner.dishLevels.spicy_skewer === 2), '食谱页可消耗肉料+金币强化菜品至 Lv.2');
-  await g.tap('#btn-meal-spicy_skewer');
-  check(await g.page.evaluate(() => window.__game.run.meal === 'spicy_skewer'), '特餐菜单可直接留作明日战前特餐');
-
-  await g.tap('#tab-kitchen-vip');
-  await g.shot('06c-kitchen-vip'); await fits('#panel-kitchen');
-  check(await g.page.evaluate(() => document.querySelectorAll('.vip-cell').length === 15), 'VIP 页展示 15 位熟客图鉴');
-
-  await g.tap('#tab-kitchen-staff');
-  await g.tap('#btn-ad-flyer');
-  const hireSel = await g.page.evaluate(() => document.querySelector('#panel-kitchen [id^="btn-hire-"]')?.id);
-  check(!!hireSel, '招工传单可刷新应聘伙计列表');
-  if (hireSel) {
-    await g.tap('#' + hireSel);
-    check(await g.page.evaluate(() => window.__game.run.diner.hiredStaff.length === 1), '可花金币成功聘请伙计入店');
-    const trainSel = await g.page.evaluate(() => document.querySelector('#panel-kitchen [id^="btn-staff-train-"]')?.id);
-    if (trainSel) {
-      await g.tap('#' + trainSel);
-      check(await g.page.evaluate(() => window.__game.run.diner.hiredStaff[0].level >= 2), '可培训已雇伙计升至 Lv.2');
-    }
-    const roleKitchenSel = await g.page.evaluate(() => document.querySelector('#panel-kitchen [id^="btn-staff-role-"][id$="-kitchen"]')?.id);
-    if (roleKitchenSel) await g.tap('#' + roleKitchenSel);
-  }
-  await g.shot('06d-kitchen-staff'); await fits('#panel-kitchen');
   await g.page.setViewportSize({ width: 780, height: 360 });
   await wait(120);
   await fits('#panel-kitchen');
   await g.page.setViewportSize({ width: 844, height: 390 });
   await wait(120);
 
+  await g.tap('#tab-kitchen-vip');
+  await g.shot('06c-kitchen-vip'); await fits('#panel-kitchen');
+  check(await g.page.evaluate(() => document.querySelectorAll('.vip-cell').length === 15), '熟客录展示 15 位熟客与战场支援身份');
+
   await g.tap('#tab-kitchen-dine');
   await g.tap('#btn-close');
 
-  // 7b. 开张营业 -> 等后厨自动出锅到传菜台 -> 去石臼磨辣酱 -> 端菜上桌 -> 搭话 -> 酒桶斟酒 -> 日报
+  // 7b. 开张营业 -> 等后厨自动出锅到传菜台 -> 端菜上桌 -> 搭话 -> 酒桶斟酒 -> 战备日报
   await g.tap('#btn-shift-start');
-  check(await g.page.evaluate(() => window.__game.run.dinerShift.mode === 'open' && !!document.querySelector('#shift-hud.open') && !!document.querySelector('#hud-sauce')), '点击开张营业进入倒计时并显示辛香辣酱存量条');
+  check(await g.page.evaluate(() => window.__game.run.dinerShift.mode === 'open' && !!document.querySelector('#shift-hud.open')), '点击开张营业进入堂食实时经营并显示战备统计');
   await wait(2200);
   await g.shot('05c-tavern-rush');
-
-  // 测石臼急磨辣酱
-  await g.page.evaluate(() => { window.__game.run.dinerShift.sauce = 0; window.__game.notify(); });
-  const mortarDir = (await g.state()).x > 152 ? -38 : 38;
-  await walkUntil(mortarDir, 0, (st) => Math.abs(st.x - 152) <= 18, 4000, '走到石臼磨酱台旁');
-  check(await g.page.evaluate(() => /磨辣酱/.test(document.querySelector('#key-act')?.textContent || '')), '辣酱耗尽走近石臼提示「急磨辣酱」');
-  await g.tap('#key-act');
-  check((await g.state()).sauce >= 60, '点击互动键研磨辛香辣酱恢复灶台出菜');
 
   // 等待传菜台有出锅菜品并走近端菜上桌
   const hasPass = await (async () => {
@@ -312,14 +291,14 @@ const L = require('./lib.cjs');
   await walkUntil(destGuestX > s.x ? 38 : -38, 0, (st) => Math.abs(st.x - destGuestX) <= 18, 4000, '端菜走到对应食客桌前');
   await g.tap('#key-act');
   s = await g.state();
-  check(s.carryingDish === null && s.fans > 0 && s.rep > 0, `靠近食客按下互动键直接上菜涨粉涨口碑 (fans=${s.fans}, rep=${s.rep})`);
+  check(s.carryingDish === null && s.fans > 0 && s.rep > 0, `靠近食客按下互动键直接上菜获支援与口碑 (fans=${s.fans}, rep=${s.rep})`);
 
   // 再按一次互动键与食客搭话（测试「好的」按钮不写“进入战局”）
   await g.tap('#key-act');
   check((await g.state()).panel === 'story' && await g.page.evaluate(() => /好的|下一句/.test(document.querySelector('#btn-story-next').innerText)), '靠近食客按互动键进入对话，且结尾按钮为「好的」');
   await g.tap('#btn-story-skip');
 
-  // 原木酒桶斟酒小游戏 + 提前打烊 + 经营日报
+  // 原木酒桶斟酒小游戏 + 提前打烊 + 战备经营日报
   const barDir = (await g.state()).x > 236 ? -38 : 38;
   await walkUntil(barDir, 0, (st) => Math.abs(st.x - 236) <= 18, 4000, '走到原木酒桶旁');
   await g.tap('#key-act');
@@ -328,15 +307,15 @@ const L = require('./lib.cjs');
   await g.tap('#btn-pour-hit');
   check(await g.page.evaluate(() => !window.__game.run.pourMinigame && !!window.__game.run.carryingDrink), '点击止沫停杯成功装杯在手');
   await g.tap('#btn-shift-stop');
-  check(await g.page.evaluate(() => window.__game.run.dinerShift.mode === 'summary' && !!document.querySelector('#panel-shift-summary')), '点击打烊弹出今夜经营日报');
+  check(await g.page.evaluate(() => window.__game.run.dinerShift.mode === 'summary' && !!document.querySelector('#panel-shift-summary')), '点击打烊弹出今夜战备与堂食日报');
   await fits('#panel-shift-summary');
   await g.shot('05d-shift-summary');
   await g.tap('#btn-shift-summary-ok');
-  check(await g.page.evaluate(() => window.__game.run.dinerShift.mode === 'prep'), '点击收工归帐回到筹备态');
+  check(await g.page.evaluate(() => window.__game.run.dinerShift.mode === 'prep'), '点击收工迎战回到筹备态');
 
   await g.tap('#btn-kitchen');
   await g.tap('#btn-cook-all');
-  check((await g.state()).meat === 0 && (await g.state()).coins > 750, '富余三种肉料一键全部变现换金币');
+  check((await g.state()).meat === 0 && (await g.state()).coins > 650, '富余三种肉料一键全部变现换金币');
   await g.tap('#btn-close');
 
   // 走近行商货架 -> #key-act 打开商店 (x=700)
@@ -390,11 +369,13 @@ const L = require('./lib.cjs');
   check(s.turrets >= 2 && s.wallLv === 2 && s.fortLv === 2 && s.turretModes.startsWith('boss,') && s.weapons.split(',').length <= 2, `要塞沙盘可建造炮塔、升级壁垒堡垒并切换索敌重心 (${s.turretModes}, weapons=${s.weapons})`);
   await g.tap('#btn-close');
 
-  // 8. 走到大门用互动键出门查看升级后的哥特石堡与炮塔防线，随后迎战第 2 天
+  // 8. 走到大门用互动键出门查看升级后的哥特石堡与炮塔防线，并验证室外实地直建浮条 #field-build-hud
   await walkUntil(38, 0, (st) => st.x >= 765, 5500, '走到酒馆大门');
   await g.tap('#key-act');
   check((await g.state()).inside === false, '靠近酒馆大门按互动键走出门外巡查防线');
-  await wait(250);
+  await walkUntil(38, 0, (st) => st.x >= 335, 4000, '走到前院炮塔基座旁');
+  check(await g.page.evaluate(() => !!document.querySelector('#field-build-hud')), '室外走近工事基座自动弹出极简实地改造浮条 #field-build-hud（不遮挡画面）');
+  await wait(200);
   await g.shot('08b-outside-upgraded');
   await g.tap('#btn-next');
   s = await g.state();
