@@ -147,6 +147,7 @@ function StoryPanel() {
           <div class="story-body">
             <div class="story-speaker">
               <strong>{cur.line.name}</strong>
+              {cur.line.role && <span class="story-role">{cur.line.role}</span>}
             </div>
             <p class="story-text">{cur.line.text}</p>
           </div>
@@ -162,7 +163,7 @@ function StoryPanel() {
   );
 }
 
-/** 酒馆传闻录：前情 / 章节 / 战友 */
+/** 突围手札：前情 / 章节 / 战友 */
 function LorePanel() {
   const [tab, setTab] = useState<'intro' | 'chapters' | 'allies'>('intro');
   const [sceneIdx, setSceneIdx] = useState(0);
@@ -170,13 +171,13 @@ function LorePanel() {
   const scene = STORY_SCENES[sceneIdx] ?? STORY_SCENES[0];
 
   return (
-    <Panel id="panel-lore" cls="wide" title="酒馆传闻录" head={<Btn id="btn-close" kind="primary" onClick={() => game.close()}>返回</Btn>}>
+    <Panel id="panel-lore" cls="wide" title="突围手札 · 小胡反叛录" head={<Btn id="btn-close" kind="primary" onClick={() => game.close()}>返回</Btn>}>
       <div class="diner-tabs">
         <button id="tab-lore-intro" class={`tab-btn ${tab === 'intro' ? 'on' : ''}`} onClick={() => setTab('intro')}>序章前情</button>
-        <button id="tab-lore-chapters" class={`tab-btn ${tab === 'chapters' ? 'on' : ''}`} onClick={() => setTab('chapters')}>章节脉络</button>
-        <button id="tab-lore-allies" class={`tab-btn ${tab === 'allies' ? 'on' : ''}`} onClick={() => setTab('allies')}>并肩战友 ({run.story.allies.length}/4)</button>
+        <button id="tab-lore-chapters" class={`tab-btn ${tab === 'chapters' ? 'on' : ''}`} onClick={() => setTab('chapters')}>突围脉络</button>
+        <button id="tab-lore-allies" class={`tab-btn ${tab === 'allies' ? 'on' : ''}`} onClick={() => setTab('allies')}>反叛同袍 ({run.story.allies.length}/4)</button>
         {tab === 'intro' && game.started && (
-          <Btn id="btn-replay-intro" kind="small" cls="tab-right" onClick={() => { game.close(); game.enqueueStory('序幕 · 暮夜酒馆', CINEMATIC_INTRO, true); }}>
+          <Btn id="btn-replay-intro" kind="small" cls="tab-right" onClick={() => { game.close(); game.enqueueStory('序幕 · 逆夜突围', CINEMATIC_INTRO, true); }}>
             重温序幕
           </Btn>
         )}
@@ -1098,16 +1099,16 @@ export function App() {
         </Panel>
       )}
       {panel === 'dead' && (
-        <Panel id="panel-dead" title="酒馆失守" sub={`${DIFFICULTIES[run.difficulty ?? 'normal'].name} · 第 ${run.day} 天 · 击杀 ${run.kills}`}>
+        <Panel id="panel-dead" title="死局未改，反骨未折" sub={`${DIFFICULTIES[run.difficulty ?? 'normal'].name} · 逆夜死战至第 ${run.day} 夜 · 击杀 ${run.kills}`}>
           <Progress gain={game.lastGain} />
-          <Btn id="btn-again" kind="primary" onClick={() => game.chooseClass()}>重返防线</Btn>
+          <Btn id="btn-again" kind="primary" onClick={() => game.chooseClass()}>掀桌再战</Btn>
         </Panel>
       )}
       {panel === 'won' && (
-        <Panel id="panel-won" title="守住了暮夜酒馆！" sub={`${DIFFICULTIES[run.difficulty ?? 'normal'].name} · ${LAST_DAY} 天通关 · 击杀 ${run.kills}`}>
+        <Panel id="panel-won" title="撕碎死局，杀出重围！" sub={`${DIFFICULTIES[run.difficulty ?? 'normal'].name} · 杀穿 ${LAST_DAY} 夜重围 · 击杀 ${run.kills}`}>
           <Progress gain={game.lastGain} />
           <div class="row">
-            <Btn id="btn-enter-endless" kind="primary" onClick={() => game.send({ t: 'enterEndless' })}>留在酒馆继续营业</Btn>
+            <Btn id="btn-enter-endless" kind="primary" onClick={() => game.send({ t: 'enterEndless' })}>重返酒馆继续掀夜</Btn>
             <Btn id="btn-again" onClick={() => game.chooseClass()}>再战一局</Btn>
           </div>
         </Panel>

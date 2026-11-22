@@ -147,7 +147,7 @@ class Game {
     this.immediateStory = false;
     this.started = true;
     this.releaseAll();
-    this.enqueueStory('序幕 · 暮夜酒馆', CINEMATIC_INTRO);
+    this.enqueueStory('序幕 · 逆夜突围', CINEMATIC_INTRO);
     this.emit({ t: 'dayStart', day: 1 });
     this.syncBgm();
     this.notify();
@@ -201,12 +201,12 @@ class Game {
               : `「${g.orderQuote}」——点单：${g.dishName}（${costStr}→${g.pay}金${g.trendMatch ? ' · 今夜热门' : ''}）`;
           const hasStockOrIng = (r.diner.menuStock[g.dish] ?? 0) > 0 || hasIngredients(r, MEALS[g.dish].cost);
           const reply = g.served
-            ? '慢用！屋里炉火常亮，明晚还来喝口热汤。'
+            ? '慢用！黑雾不让亮灯，咱偏要把灶火烧得比谁都旺——明晚一起把东门掀了！'
             : isDrink
-              ? '好嘞，马上到旁边的原木酒桶替您现打一扎！'
+              ? '马上来！这就去原木酒桶现打一扎黑啤，喝燥了再出去跟黑雾反着干！'
               : hasStockOrIng
-                ? '好嘞，后厨砖灶已记下这一单，出锅就从传菜台替您端来！'
-                : '记下了！今夜备菜稍紧，先替您现烤干硬黑麦饼垫垫腹。';
+                ? '好嘞记下了！红砖灶火正狂，一翻锅我就亲自从传菜台给你端上桌！'
+                : '肉料见底了，可咱绝不饿着肚子认怂——先烤块滚烫黑麦饼顶上！';
           this.enqueueStory(`${g.name} · ${g.role}`, [
             { npc: g.vipId, name: g.name, initial: g.name[0] ?? '客', role: g.role, avatar: g.sprite, text: quote },
             { npc: 'ming', name: sp.name, initial: sp.initial, role: sp.desc, avatar: sp.avatar, text: reply },
@@ -217,10 +217,18 @@ class Game {
           const a = ALLIES[ct.ally];
           const join = COMPANION_JOIN_STORIES[a.joinDay];
           const campBanter: Record<AllyId, string> = {
-            zhang: r.inside ? '屋外寒雾越压越低，迎战时我就守在屋顶替你挺紧银枪！传菜台快堆满时我来搭手端！' : '屋顶高台视野通透，只要魔物敢露头，我这杆银枪当场贯穿！',
-            lin:   r.inside ? '灶火旁温着绯火药罐，开张后我看紧左灶加快出菜，迎战再替你调息轰散前排！' : '门廊药囊都在手里，待我用绯火轰散前排，顺带替你慢慢续伤！',
-            qiang: r.inside ? '右侧铁砧刚淬过火，久未收拾的脏碗盘我也会顺手擦净，造塔加固一律九折！' : '壁垒前由我顶着！靠过来的腐尸先吃一记重铠斩击，空隙我也会顺手修墙。',
-            zhao:  r.inside ? '驿道上的商旅都在传咱们暮夜酒馆的名头，今夜堂食涨粉快三成，我来照应中间茶座！' : '半空扑来的夜翼魔蝠与提灯怨灵由我苍蓝气劲盯死，胡掌柜只管放手杀敌！',
+            zhang: r.inside
+              ? '镇长早叫我这伤腿老兵缩地窖等死，去他的规矩！小胡，你一个大学生都敢掀桌，屋顶高台归我架银枪，堂里忙不过来我也搭把手！'
+              : '谁给黑雾定的死局？老子偏不认！敢露头的腐尸，先吃我屋顶一记银枪贯穿！',
+            lin: r.inside
+              ? '公会那帮老古董锁门装死，我偏借你这口红砖灶把毒火炼成绯炎药罐！开张我看紧左灶，打起来阎王也别想从我手里抢人！'
+              : '别怕受伤，小胡！绯火药囊全备齐了——前排归我轰穿，你只管放肆开火，你的命我替你从死神手里硬抢回来！',
+            qiang: r.inside
+              ? '铺子塌了算个屁？写生本给我揣牢，杀穿东门后还得把这反叛老酒馆画全！脏碗我顺手擦，造塔加固一律九折，谁也别想给咱们画死线！'
+              : '暴君踩碎我炉子想叫我下跪？做梦！前院由我重铠劈开，敢撞门的烂骨头全当我的磨刀石！',
+            zhao: r.inside
+              ? '清规戒律叫我闭门敲钟等超度，我把木鱼砸了过来陪你闹翻西街！堂里客席我照应，到了破围那夜，咱们一起破戒踏雾杀穿东门！'
+              : '天上装神弄鬼的魔蝠与怨灵归我苍蓝气劲挨个打落！小胡，只管放手掀翻这鬼夜，头顶有我小赵罩着！',
           };
           const lines: StoryLine[] = [
             { npc: ct.ally, name: a.name, initial: a.initial, role: `${a.role} · ${a.buffDesc}`, avatar: a.sprite, text: campBanter[ct.ally] },
