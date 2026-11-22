@@ -250,67 +250,60 @@ export function CampKeys() {
         break;
       case 'kitchen':
         icon = 'ic_kitchen';
-        label = '战备酒馆';
-        tip = '犒赏 · 料理 · 工事';
+        label = '酒馆';
         break;
       case 'pass':
         icon = 'ic_clean_plate';
         label = '传菜台';
-        tip = `传菜台 (${run.dinerShift.counterDishes.length})`;
         break;
       case 'drink':
         icon = 'ic_beer';
-        label = '打酒泡茶';
-        tip = '酒桶：麦芽黑啤';
+        label = '打酒';
         break;
       case 'shop':
         icon = 'ic_shop';
         label = '军械行商';
-        tip = '行商';
         break;
       case 'workshop':
         icon = 'ic_anvil';
         label = '防线工坊';
-        tip = '工坊';
         break;
       case 'turretSlot': {
         const sl = run.turrets[ct.slot];
         icon = 'ic_anvil';
-        label = sl?.type ? '升/切炮塔' : '实地建塔';
-        tip = sl?.type ? `Lv.${sl.level} · 点上方条改建` : '点上方条直建炮塔';
+        label = sl?.type ? '改建炮塔' : '实地建塔';
+        tip = sl?.type ? `Lv.${sl.level}` : '';
         break;
       }
       case 'wallSpot':
         icon = 'ic_wall';
-        label = run.wall.hp < run.wall.maxHp ? '现场修墙' : '升级壁垒';
+        label = run.wall.hp < run.wall.maxHp ? '修墙' : '升级壁垒';
         tip = `防线 ${run.wall.hp}/${run.wall.maxHp}`;
         break;
       case 'fortSpot':
         icon = 'ic_fort';
-        label = run.home.hp < run.home.maxHp ? '修缮大屋' : '加固要塞';
+        label = run.home.hp < run.home.maxHp ? '修大屋' : '加固要塞';
         tip = `大屋 ${run.home.hp}/${run.home.maxHp}`;
         break;
       case 'doorOut':
         icon = 'ic_wall';
         label = '出门巡防';
-        tip = '室外可实地建塔修墙';
         break;
       case 'doorIn':
         icon = 'ic_kitchen';
         label = '回酒馆';
-        tip = '入堂';
         break;
     }
   } else if (run.carryingDish) {
     const dest = run.guests.find((o) => o.id === run.carryingDish!.guestId);
     icon = dishIcon(run.carryingDish.dish, run.carryingDish.isRye);
     label = '端菜中';
-    tip = `送往 ${dest?.name ?? '餐桌'}`;
+    tip = `→ ${dest?.name ?? '餐桌'}`;
   } else if (run.carryingDrink) {
     const dest = run.guests.find((o) => o.id === run.carryingDrink!.guestId);
     icon = DRINKS[run.carryingDrink.drink].icon;
     label = '端饮中';
-    tip = `送往 ${dest?.name ?? '餐桌'}`;
+    tip = `→ ${dest?.name ?? '餐桌'}`;
   }
 
   const dodgeMax = run.inside && run.dinerShift.mode === 'open' ? 26 : 60;
@@ -324,10 +317,12 @@ export function CampKeys() {
         <Icon k={icon} />
         <span>{label}</span>
       </FanKey>
-      <FanKey id="key-jump" cls="fkey-jump fkey-camp-jump" onDown={() => game.press('jump')}>
-        <Icon k="ic_rooftop" />
-        <span>跳跃</span>
-      </FanKey>
+      {!run.inside && (
+        <FanKey id="key-jump" cls="fkey-jump fkey-camp-jump" onDown={() => game.press('jump')}>
+          <Icon k="ic_rooftop" />
+          <span>跳跃</span>
+        </FanKey>
+      )}
       <FanKey id="key-dodge" cls="fkey-dodge fkey-camp-dodge" progress={dodgeProgress} cooling={dodgeCd > 0} onDown={() => game.press('dodge')}>
         <Icon k="ic_secondwind" />
         <span>{dodgeCd > 0 ? `${Math.ceil(dodgeCd / 60)}s` : (run.inside ? '冲刺' : '闪避')}</span>
@@ -398,23 +393,16 @@ export function WeaponChip() {
   );
 }
 
-/** 营地夜晚极简底栏：仅保留「食堂/特餐」总览与「迎战第 N 天」触发键，其余全部走近用右下互动键交互 */
+/** 营地夜晚极简底栏：仅保留「酒馆」与「迎战第 N 天」触发键（营业中自动隐藏，专心上菜） */
 export function CampBar() {
   const run = game.run;
+  if (run.inside && run.dinerShift.mode === 'open') return null;
   const near = run.inside ? nearbyStation(run) : null;
   const unserved = run.guests.filter((g) => !g.served).length;
-  const feastCnt = (run.diner.feastDishes ?? []).length;
-  const sub = run.dinerShift.mode === 'open'
-    ? '营业中'
-    : feastCnt > 0
-      ? `战备${feastCnt}道`
-      : unserved > 0
-        ? `${unserved}客待援`
-        : '战备台';
   return (
     <div class="camp-bar" id="camp-bar">
       <button id="btn-kitchen" class={`camp-btn ${near === 'kitchen' ? 'near' : ''}`} onClick={() => game.open('kitchen')}>
-        <Icon k="ic_kitchen" />酒馆 · {sub}
+        <Icon k="ic_kitchen" />{unserved > 0 ? `酒馆 · ${unserved}客` : '酒馆'}
       </button>
       {run.endless ? (
         <>
