@@ -490,26 +490,26 @@ export const DINER_GUESTS: DinerGuestDef[] = [
   {
     id: 'agou', name: '阿狗', role: '猎魔游侠', sprite: 'npc_hat', fps: 6, supportKind: 'vanguard',
     dish: 'spicy_skewer', dishName: '炭烤香辣肉串', basePay: 28,
-    orderQuote: '掌柜，刚从雾里跑回来，来串冒油的辣肉串暖暖身子！',
-    thanksQuote: '嘶哈——焦香麻辣，明天守城我们大伙火力全开！',
+    orderQuote: '小胡！黑雾立宵禁不许人出门，老子偏刚摸黑踩完点回来——烤串暴辣的，呛醒这鬼夜！',
+    thanksQuote: '嘶哈——够烈够野！你一个大学生都敢跟死城掀桌，明晚我带头冲上去撕开缺口！',
   },
   {
     id: 'qijie', name: '七姐', role: '战地药师', sprite: 'npc_woman', fps: 7, supportKind: 'medic',
     dish: 'hearty_stew', dishName: '守夜暖胃肉汤', basePay: 38,
-    orderQuote: '夜风太冷了，给我盛碗滚烫的肉汤，我带了秘药和铁甲片。',
-    thanksQuote: '这口热汤下肚寒气全散，这套护甲片和秘药给你披上！',
+    orderQuote: '小胡同学，给姐盛碗滚烫肉汤！手腕震肿了还死不低头，这副铁甲和秘药你必须披上！',
+    thanksQuote: '好一口烈汤！黑雾越要咱们闭嘴等死，姐越要保你活蹦乱跳杀穿东门！',
   },
   {
     id: 'laobao', name: '老包', role: '筑城匠师', sprite: 'npc_bearded', fps: 6, supportKind: 'smith',
     dish: 'iron_steak', dishName: '铁板重甲厚排', basePay: 72,
-    orderQuote: '连着抢修工事快累垮了，切块最厚的铁板肉排！',
-    thanksQuote: '够劲！满口肉汁，前院路障我刚替你加固好，今晚造塔算八五折！',
+    orderQuote: '小胡，切块最厚的铁板肉排！怪物想推平老街立规矩，老子偏把铁壁砸成它的断头台！',
+    thanksQuote: '痛快！满口滚油肉汁，前院木垒我刚替你铆成铁板，今晚造塔加固全算八五折！',
   },
   {
     id: 'niqiu', name: '泥鳅', role: '军火游商', sprite: 'npc_oldman', fps: 7, supportKind: 'arms',
     dish: 'garlic_cold_cut', dishName: '蒜香疾风熏肉', basePay: 54,
-    orderQuote: '掌柜的，把你招牌的蒜香熏肉端上来，军火支援少不了你的！',
-    thanksQuote: '绝了！这枚爆炎弹你先拿着，明晚战场上我再给你空投一口神兵箱！',
+    orderQuote: '小胡，上盘招牌蒜香熏肉！满城都押暮色镇必亡，老夫偏反着盘口全押你这身反骨！',
+    thanksQuote: '绝活！这枚爆炎弹揣稳了，明晚战场上老夫冒死给你抛口神兵箱，一起掀翻黑雾！',
   },
 ];
 
