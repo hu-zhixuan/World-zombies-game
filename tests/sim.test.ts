@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
-  CLASSES, CRIT_MUL, DIFFICULTIES, DINER_GUESTS, DRINKS, FORT_LEVELS, LAST_DAY, MEALS, MEAL_ORDER, PERKS, RYE_FALLBACK, SEAT_UPGRADE_ORDER,
-  TAVERN_UPGRADES, TURRETS, WALL_LEVELS, WEAPONS, WEATHERS,
+  CLASSES, CRIT_MUL, DIFFICULTIES, DINER_GUESTS, DRINKS, FORT_LEVELS, LAST_DAY, MEALS, MEAL_ORDER, PERKS, RARITY_ORDER, RYE_FALLBACK, SEAT_UPGRADE_ORDER,
+  TAVERN_UPGRADES, TURRETS, WALL_LEVELS, WEAPON_ORDER, WEAPONS, WEATHERS,
   dayZombieCount, dishEnhanceMeatCost, dishUpgradeCost, nextUnlock, sustainedDps, unlockedClasses, unlockedWeapons, weatherForDay, zombieHp,
 } from '../src/content/data';
 import {
@@ -13,8 +13,8 @@ import {
 import { loadMeta, recordRunToMeta, starsEarned } from '../src/app/meta';
 import { runBot } from '../src/sim/bot';
 import {
-  BODY_Y, MAX_CARRY, command, computeGrenadeThrow, damageMul, dishLevel, dishTaste, effectiveRange,
-  houseBuff, isOnPorch, isOnRoof, maxSeats, meatPrice, nearbyCampTarget, newRun, step, tavernUpgradeCost, totalMeat,
+  BODY_Y, MAX_CARRY, command, computeGrenadeThrow, crateSalvageCoins, damageMul, dishLevel, dishTaste, effectiveRange,
+  houseBuff, isOnPorch, isOnRoof, maxSeats, meatPrice, nearbyCampTarget, nearbyWeaponCrate, newRun, shopReplaceRefund, step, tavernUpgradeCost, totalMeat,
   turretBuildCost, turretRefundCoins, turretUpgradeCost,
 } from '../src/sim/sim';
 import {
@@ -39,15 +39,14 @@ describe('手感曲线与兵器特色', () => {
   test('开局双铳打第 1 天的游荡腐尸不超过 4 击', () => {
     expect(Math.ceil(zombieHp('roamer', 1) / WEAPONS.pistol.damage)).toBeLessThanOrEqual(4);
   });
-  test('不同定位兵器：价格与持续输出阶梯合理，且每把兵器皆有鲜明特色标签与说明', () => {
-    expect(sustainedDps(WEAPONS.pistol)).toBeLessThan(sustainedDps(WEAPONS.revolver));
-    expect(sustainedDps(WEAPONS.revolver)).toBeLessThan(sustainedDps(WEAPONS.smg));
-    expect(sustainedDps(WEAPONS.smg)).toBeLessThan(sustainedDps(WEAPONS.shotgun));
-    expect(sustainedDps(WEAPONS.shotgun)).toBeLessThan(sustainedDps(WEAPONS.assault));
-    expect(sustainedDps(WEAPONS.assault)).toBeLessThan(sustainedDps(WEAPONS.rifle));
-    expect(sustainedDps(WEAPONS.assault)).toBeLessThan(sustainedDps(WEAPONS.rocket));
-    expect(sustainedDps(WEAPONS.rifle)).toBeLessThan(sustainedDps(WEAPONS.rocket));
-    expect(sustainedDps(WEAPONS.tesla)).toBeGreaterThan(sustainedDps(WEAPONS.pistol) * 2.5);
+  test('6 把暮夜神兵严格对应白/绿/蓝/紫/橙/红 6 级品质色且输出与售价阶梯递增', () => {
+    expect(WEAPON_ORDER).toEqual(['pistol', 'smg', 'shotgun', 'tesla', 'rifle', 'rocket']);
+    expect(WEAPON_ORDER.map((id) => WEAPONS[id].rarity)).toEqual(RARITY_ORDER);
+    for (let i = 1; i < WEAPON_ORDER.length; i++) {
+      const prev = WEAPONS[WEAPON_ORDER[i - 1]], cur = WEAPONS[WEAPON_ORDER[i]];
+      expect(prev.price).toBeLessThan(cur.price);
+      expect(sustainedDps(prev)).toBeLessThan(sustainedDps(cur));
+    }
     const turretDps = (t: keyof typeof TURRETS) => (TURRETS[t].levels[0].damage * 60) / TURRETS[t].levels[0].cooldown;
     expect(turretDps('frost')).toBeLessThan(turretDps('mg'));
     expect(turretDps('mg')).toBeLessThan(turretDps('tesla'));
@@ -58,7 +57,7 @@ describe('手感曲线与兵器特色', () => {
       expect(WEAPONS[id].desc.length).toBeGreaterThanOrEqual(10);
     }
   });
-  test('全 8 把兵器差异化机制：双铳二连回膛、左轮穿甲跳弹震慑、连珠火铳蓄热炽弹、龙息铳轰退爆燃、寒霜连铳深冻碎冰、圣铳破甲、法杖元素超载、追踪爆炎炮', () => {
+  test('全 6 把神兵差异化机制：双铳二连回膛、连珠火铳蓄热炽弹、龙息铳轰退爆燃、法杖元素超载、圣铳全穿破甲、追踪爆炎炮火海', () => {
     // 1. 猎手双铳：1 发扳机打出 2 颗弹丸 + 击杀立即回膛 +2 发弹药
     const rPis = quiet(); rPis.player.x = 300; rPis.player.y = 0; rPis.autoFire = false;
     rPis.player.weapons = [{ id: 'pistol', star: 1, ammo: 5 }];
@@ -67,18 +66,7 @@ describe('手感曲线与兵器特色', () => {
     expect(zWeak.hp).toBeLessThanOrEqual(0);
     expect(rPis.player.weapons[0].ammo).toBe(6); // 消耗 1 弹，击杀回膛 +2 => 5 - 1 + 2 = 6
 
-    // 2. 重锤左轮：穿甲 2 名目标 + 弹射追击近邻 1 名并击晕震慑，第 4 名不受伤
-    const rRev = quiet(); rRev.player.x = 300; rRev.player.y = 0; rRev.autoFire = false;
-    rRev.player.weapons = [{ id: 'revolver', star: 1, ammo: 6 }];
-    const z1 = zombie(rRev, 360, 500), z2 = zombie(rRev, 390, 500), z3 = zombie(rRev, 420, 500), z4 = zombie(rRev, 455, 500);
-    for (let i = 0; i < 18; i++) step(rRev, { ...NO_INPUT, fire: i === 0 });
-    expect(z1.hp).toBeLessThan(500);
-    expect(z2.hp).toBeLessThan(500);
-    expect(z3.hp).toBeLessThan(500);
-    expect(z4.hp).toBe(500);
-    expect(z1.stunT).toBeGreaterThan(0);
-
-    // 3. 连珠火铳：持续按住开火蓄热飙射速并射出灼烧穿甲火弹 (hot)
+    // 2. 连珠火铳：持续按住开火蓄热飙射速并射出灼烧穿甲火弹 (hot)
     const rSmg = quiet(); rSmg.player.x = 300; rSmg.player.y = 0; rSmg.autoFire = false;
     rSmg.player.weapons = [{ id: 'smg', star: 1, ammo: 44 }];
     zombie(rSmg, 380, 5000);
@@ -89,7 +77,7 @@ describe('手感曲线与兵器特色', () => {
     expect(rSmg.player.smgHeat).toBeGreaterThanOrEqual(0.65);
     expect(sawHotShot).toBe(true);
 
-    // 4. 双管龙息铳：近距离 1.5x 增伤并点燃目标
+    // 3. 双管龙息铳：近距离 1.5x 增伤并点燃目标
     const rSg = quiet(); rSg.player.x = 300; rSg.player.y = 0; rSg.autoFire = false;
     rSg.player.weapons = [{ id: 'shotgun', star: 1, ammo: 6 }];
     const zClose = zombie(rSg, 360, 500);
@@ -97,29 +85,7 @@ describe('手感曲线与兵器特色', () => {
     expect(500 - zClose.hp).toBeGreaterThanOrEqual(WEAPONS.shotgun.damage * (WEAPONS.shotgun.pellets ?? 6) * 1.4);
     expect(zClose.burnT).toBeGreaterThan(0);
 
-    // 5. 寒霜连铳：命中已减速目标触发深冻定身 + 碎冰范围溅射
-    const rIce = quiet(); rIce.player.x = 300; rIce.player.y = 0; rIce.autoFire = false;
-    rIce.player.weapons = [{ id: 'assault', star: 1, ammo: 32 }];
-    const zSlow = zombie(rIce, 360, 500); zSlow.slowT = 60;
-    const zNear = zombie(rIce, 385, 500);
-    let frostEv = false;
-    for (let i = 0; i < 15; i++) {
-      for (const e of step(rIce, { ...NO_INPUT, fire: i === 0 })) if (e.t === 'frost') frostEv = true;
-    }
-    expect(frostEv).toBe(true);
-    expect(zSlow.freezeT).toBeGreaterThan(0);
-    expect(zNear.hp).toBeLessThan(500);
-
-    // 6. 猩红圣铳：全屏 hitscan 光束，对重甲(bruiser)/Boss 额外 +35% 破甲伤害
-    const rRifle = quiet(); rRifle.player.x = 300; rRifle.player.y = 0; rRifle.autoFire = false;
-    rRifle.player.weapons = [{ id: 'rifle', star: 1, ammo: 6 }];
-    const norm = zombie(rRifle, 420, 5000, 'roamer');
-    const brute = zombie(rRifle, 480, 5000, 'bruiser');
-    const evs = step(rRifle, { ...NO_INPUT, fire: true });
-    expect(evs.some((e) => e.t === 'railbeam')).toBe(true);
-    expect(5000 - brute.hp).toBeGreaterThan(5000 - norm.hp);
-
-    // 7. 秘蓝法杖：多段连锁麻痹 + 命中燃烧目标触发元素超载 (+35%)
+    // 4. 秘蓝法杖：多段连锁麻痹 + 命中燃烧目标触发元素超载 (+35%)
     const rTes = quiet(); rTes.player.x = 300; rTes.player.y = 0; rTes.autoFire = false;
     rTes.player.weapons = [{ id: 'tesla', star: 1, ammo: 16 }];
     const zBurn = zombie(rTes, 360, 1000); zBurn.burnT = 90;
@@ -129,7 +95,16 @@ describe('手感曲线与兵器特色', () => {
     expect(zBurn.stunT).toBeGreaterThan(0);
     expect(zChain.hp).toBeLessThan(1000);
 
-    // 8. 焦土爆炎炮：轻度追踪重弹炸裂并留下地面持续灼烧火海
+    // 5. 猩红圣铳：全屏 hitscan 光束，对重甲(bruiser)/Boss 额外 +35% 破甲伤害
+    const rRifle = quiet(); rRifle.player.x = 300; rRifle.player.y = 0; rRifle.autoFire = false;
+    rRifle.player.weapons = [{ id: 'rifle', star: 1, ammo: 6 }];
+    const norm = zombie(rRifle, 420, 5000, 'roamer');
+    const brute = zombie(rRifle, 480, 5000, 'bruiser');
+    const evs = step(rRifle, { ...NO_INPUT, fire: true });
+    expect(evs.some((e) => e.t === 'railbeam')).toBe(true);
+    expect(5000 - brute.hp).toBeGreaterThan(5000 - norm.hp);
+
+    // 6. 焦土爆炎炮：轻度追踪重弹炸裂并留下地面持续灼烧火海
     const rRoc = quiet(); rRoc.player.x = 300; rRoc.player.y = 0; rRoc.autoFire = false;
     rRoc.player.weapons = [{ id: 'rocket', star: 1, ammo: 4 }];
     zombie(rRoc, 440, 2000);
@@ -301,33 +276,73 @@ describe('2D 小屋实体碰撞、阶梯跳台与元气骑士式手动开火锁�
 });
 
 describe('兵器升星、可控抛物线爆炎弹、铁甲与军械行商', () => {
-  test('仅保留金币货币：捡到新兵器进兵器栏，已有升星，满星直接折算金币', () => {
+  test('仅保留金币货币：走近地面兵器绝不自动覆盖，由玩家点选拾取、融合升星或原地拆金', () => {
     const r = quiet(); r.player.x = 280; r.player.y = 0;
     expect('scrap' in r).toBe(false);
     r.crates.push({ id: 900, x: 280, weapon: 'smg' });
-    expect(step(r, NO_INPUT).some((e) => e.t === 'pickup' && e.isNew)).toBe(true);
+    // 走近地面兵器只识别 nearbyWeaponCrate，不自动顶替或拾走
+    const walkEv = step(r, NO_INPUT);
+    expect(walkEv.some((e) => e.t === 'pickup')).toBe(false);
+    expect(nearbyWeaponCrate(r)?.id).toBe(900);
+    expect(r.player.weapons.map((w) => w.id)).toEqual(['pistol']);
+
+    const pEv = command(r, { t: 'pickupCrate', crateId: 900 })!;
+    expect(pEv.some((e) => e.t === 'pickup' && e.isNew)).toBe(true);
     expect(r.player.weapons.map((w) => w.id)).toEqual(['pistol', 'smg']);
+
     r.crates.push({ id: 901, x: 280, weapon: 'smg' });
-    expect(step(r, NO_INPUT).some((e) => e.t === 'star' && e.star === 2)).toBe(true);
+    expect(command(r, { t: 'pickupCrate', crateId: 901 })!.some((e) => e.t === 'star' && e.star === 2)).toBe(true);
+
     r.player.weapons[0].star = 5;
-    r.crates.push({ id: 902, x: 280, weapon: 'pistol' }); step(r, NO_INPUT);
-    expect(r.coins).toBe(45);
+    r.crates.push({ id: 902, x: 280, weapon: 'pistol' });
+    const fullEv = command(r, { t: 'pickupCrate', crateId: 902 })!;
+    expect(fullEv.some((e) => e.t === 'pickup' && e.recycledCoins === crateSalvageCoins({ weapon: 'pistol', star: 1 }))).toBe(true);
+    expect(r.coins).toBe(crateSalvageCoins({ weapon: 'pistol', star: 1 }));
   });
 
-  test('随身最多 2 把兵器：超出时替换手中兵器', () => {
+  test('元气骑士式双槽管理：点选槽位直接切换，满槽自选替换并将旧枪掉回地面，补给箱直拾不占枪槽', () => {
     const r = quiet(); r.player.x = 280; r.player.y = 0;
-    r.player.weapons.push({ id: 'smg', star: 1, ammo: 10 });
-    r.player.cur = 1;
-    r.crates.push({ id: 900, x: 280, weapon: 'shotgun' }); step(r, NO_INPUT);
-    expect(r.player.weapons.map((w) => w.id)).toEqual(['pistol', 'shotgun']);
-    expect(r.player.weapons.length).toBe(MAX_CARRY);
+    r.player.weapons.push({ id: 'smg', star: 2, ammo: 10 });
     expect(MAX_CARRY).toBe(2);
+    expect(r.player.cur).toBe(0);
+
+    // 点选切换 1 <-> 0 槽位
+    expect(command(r, { t: 'selectWeapon', index: 1 })!.some((e) => e.t === 'swap' && e.weapon === 'smg')).toBe(true);
+    expect(r.player.cur).toBe(1);
+
+    // 地面掉落双管龙息铳 ★2：先尝试不传 replaceIndex 被安全拒绝（需玩家挑选槽位），传入 replaceIndex: 0 精准替换主槽
+    r.crates.push({ id: 900, x: 280, weapon: 'shotgun', star: 2 });
+    expect(command(r, { t: 'pickupCrate', crateId: 900 })).toBeNull();
+    const swapEv = command(r, { t: 'pickupCrate', crateId: 900, replaceIndex: 0 })!;
+    expect(swapEv.some((e) => e.t === 'pickup' && e.weapon === 'shotgun' && e.replaced === 'pistol')).toBe(true);
+    expect(r.player.weapons.map((w) => w.id)).toEqual(['shotgun', 'smg']);
+    expect(r.player.weapons[0].star).toBe(2);
+    // 换下的猎手双铳完整掉回地面，且可随时原地拆金
+    expect(r.crates.length).toBe(1);
+    expect(r.crates[0].weapon).toBe('pistol');
+    const coinsBefore = r.coins;
+    expect(command(r, { t: 'salvageCrate', crateId: r.crates[0].id })).not.toBeNull();
+    expect(r.coins).toBe(coinsBefore + crateSalvageCoins({ weapon: 'pistol', star: 1 }));
+    expect(r.crates.length).toBe(0);
+
+    // 空投补给箱（kind: 'supply'）碰触直接自动领取，不弹替换也不顶掉武器
+    r.crates.push({ id: 905, x: 280, y: 0, kind: 'supply', supplyBonus: true, weapon: 'pistol' });
+    const supEv = step(r, NO_INPUT);
+    expect(supEv.some((e) => e.t === 'supplyPickup')).toBe(true);
+    expect(r.player.weapons.map((w) => w.id)).toEqual(['shotgun', 'smg']);
+    expect(r.player.grenades).toBe(3);
   });
 
-  test('军械行商可购买兵器、补给（爆炎弹/铁甲/秘药）、刷货与拆解', () => {
-    const r = quiet(); r.phase = 'camp'; r.inside = true; r.coins = 500;
-    expect(command(r, { t: 'buyWeapon', weapon: 'revolver' })).not.toBeNull();
-    expect(r.player.weapons.some((w) => w.id === 'revolver')).toBe(true);
+  test('军械行商支持满槽自选替换槽位与折抵金、购买补给、刷货与拆解', () => {
+    const r = quiet(); r.phase = 'camp'; r.inside = true; r.coins = 800;
+    expect(command(r, { t: 'buyWeapon', weapon: 'smg' })).not.toBeNull();
+    expect(r.player.weapons.map((w) => w.id)).toEqual(['pistol', 'smg']);
+    // 2/2 满槽时自选替换 0 号槽（猎手双铳），保留 1 号槽连珠火铳并返还折抵金
+    const expectedRefund = shopReplaceRefund('pistol', 1);
+    const coinsBefore = r.coins;
+    expect(command(r, { t: 'buyWeapon', weapon: 'shotgun', replaceIndex: 0 })).not.toBeNull();
+    expect(r.player.weapons.map((w) => w.id)).toEqual(['shotgun', 'smg']);
+    expect(r.coins).toBe(coinsBefore - WEAPONS.shotgun.price + expectedRefund);
     r.player.hp = 40;
     expect(command(r, { t: 'buySupply', item: 'armor' })).not.toBeNull();
     expect(r.player.armor).toBe(40);
@@ -421,7 +436,7 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     expect(unlockedClasses(4)).toEqual(['gunner', 'engineer', 'chef']);
     expect(CLASSES.chef.comingSoon).toBeUndefined();
     expect(meatPrice('chef')).toBeGreaterThan(meatPrice('gunner'));
-    const c = newRun(9, ['revolver', 'smg'], 'chef');
+    const c = newRun(9, ['smg', 'shotgun'], 'chef');
     c.phase = 'camp'; c.meats.tender = 3;
     command(c, { t: 'pickMeal', id: 'spicy_skewer', quality: 'good' });
     command(c, { t: 'nextDay' });
@@ -846,7 +861,7 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
 
 describe('职业与天赋', () => {
   test('猎手「鹰眼」：全穿透 + 必暴；无贯穿对比', () => {
-    const r = newRun(7, ['revolver', 'smg'], 'gunner');
+    const r = newRun(7, ['smg', 'shotgun'], 'gunner');
     r.spawn.left = 0; r.spawn.timer = 1e9; r.turrets.forEach((t) => { t.type = null; t.level = 0; });
     r.player.x = 300; r.player.y = 0; r.autoFire = false;
     const a = zombie(r, 380), b = zombie(r, 420);
@@ -873,7 +888,7 @@ describe('职业与天赋', () => {
     command(r, { t: 'nextDay' });
     expect(damageMul(r)).toBeCloseTo(1.65 * 1.2); // 出门上屋顶叠乘 +20% 高地伤害
 
-    expect(unlockedWeapons(0)).toEqual(['revolver', 'smg']);
+    expect(unlockedWeapons(0)).toEqual(['smg', 'shotgun']);
     expect(nextUnlock(0)!.id).toBe('engineer');
     expect(nextUnlock(99)).toBeUndefined();
 
@@ -889,7 +904,7 @@ describe('职业与天赋', () => {
 describe('15 天完整流程与首领', () => {
   test('第 5 / 10 / 15 天会刷出首领，机器人 3 个职业均可通关 15 天', () => {
     for (const cls of ['gunner', 'engineer', 'chef'] as const) {
-      const r = newRun(11, ['revolver', 'smg', 'shotgun', 'assault', 'rifle', 'tesla', 'rocket'], cls);
+      const r = newRun(11, ['smg', 'shotgun', 'tesla', 'rifle', 'rocket'], cls);
       const rep = runBot(r);
       expect(rep.won, cls).toBe(true);
       expect(rep.days.length).toBe(LAST_DAY);
@@ -906,7 +921,7 @@ describe('15 天完整流程与首领', () => {
     expect(r.phase).toBe('dead');
 
     for (const ground of [false, true]) {
-      const passive = newRun(2, ['revolver', 'smg'], 'gunner');
+      const passive = newRun(2, ['smg', 'shotgun'], 'gunner');
       for (let i = 0; i < 60 * 60 * 15; i++) {
         if (passive.phase === 'perk') { command(passive, { t: 'pickPerk', id: passive.perkChoices[0] }); continue; }
         if (passive.phase === 'camp') { command(passive, { t: 'nextDay' }); continue; }
@@ -924,8 +939,8 @@ describe('15 天完整流程与首领', () => {
     expect(zombieHp('roamer', 5, 'hard')).toBeGreaterThan(zombieHp('roamer', 5, 'normal'));
     expect(dayZombieCount(5, 'nightmare')).toBeGreaterThan(dayZombieCount(5, 'normal'));
 
-    const nRun = newRun(7, ['revolver', 'smg'], 'gunner', 'normal');
-    const nmRun = newRun(7, ['revolver', 'smg'], 'gunner', 'nightmare');
+    const nRun = newRun(7, ['smg', 'shotgun'], 'gunner', 'normal');
+    const nmRun = newRun(7, ['smg', 'shotgun'], 'gunner', 'nightmare');
     nRun.phase = 'camp'; nRun.player.hp = 60;
     nmRun.phase = 'camp'; nmRun.player.hp = 60;
     command(nRun, { t: 'nextDay' });
@@ -933,18 +948,18 @@ describe('15 天完整流程与首领', () => {
     expect(nRun.player.hp).toBeGreaterThan(60);
     expect(nmRun.player.hp).toBe(60); // 噩梦难度无夜间自动回血
 
-    const scoredNormal = newRun(1, ['revolver'], 'gunner', 'normal');
-    const scoredHard = newRun(1, ['revolver'], 'gunner', 'hard');
-    const scoredNm = newRun(1, ['revolver'], 'gunner', 'nightmare');
+    const scoredNormal = newRun(1, ['smg'], 'gunner', 'normal');
+    const scoredHard = newRun(1, ['smg'], 'gunner', 'hard');
+    const scoredNm = newRun(1, ['smg'], 'gunner', 'nightmare');
     for (const st of [scoredNormal, scoredHard, scoredNm]) { st.day = 6; st.phase = 'won'; }
     expect(starsEarned(scoredHard)).toBeGreaterThan(starsEarned(scoredNormal));
     expect(starsEarned(scoredNm)).toBeGreaterThan(starsEarned(scoredHard));
     expect(DIFFICULTIES.nightmare.starMul).toBe(2);
   });
 
-  test('多个随机种子下基础解锁池（仅重锤左轮+连珠火铳）机器人也能稳定打通 15 天', () => {
+  test('多个随机种子下基础解锁池（连珠火铳+双管龙息铳）机器人也能稳定打通 15 天', () => {
     for (const seed of [1, 2, 3]) {
-      const r = newRun(seed, ['revolver', 'smg']);
+      const r = newRun(seed, ['smg', 'shotgun']);
       const rep = runBot(r);
       expect(rep.won, `种子 ${seed}`).toBe(true);
       expect(rep.days.length).toBe(LAST_DAY);
@@ -998,7 +1013,7 @@ describe('15 天完整流程与首领', () => {
 
   test('M3 跨局传承（手札菜谱+装潢图纸）在新局生效研究减费与硬件八折', () => {
     const baseMeta = loadMeta();
-    const r1 = newRun(17, ['revolver', 'smg']);
+    const r1 = newRun(17, ['smg', 'shotgun']);
     r1.phase = 'camp';
     r1.coins = 5000;
     command(r1, { t: 'buyTavernUpgrade', id: 'warm_lantern' });
@@ -1011,7 +1026,7 @@ describe('15 天完整流程与首领', () => {
     expect(updatedMeta.unlockedDecor).toContain('warm_lantern');
     expect(updatedMeta.recipeMastery[testDish]).toBe(3);
 
-    const r2 = newRun(18, ['revolver', 'smg'], 'gunner', 'normal', {
+    const r2 = newRun(18, ['smg', 'shotgun'], 'gunner', 'normal', {
       metVips: updatedMeta.metVips,
       mastery: updatedMeta.recipeMastery,
       decor: updatedMeta.unlockedDecor,
@@ -1024,7 +1039,7 @@ describe('15 天完整流程与首领', () => {
   });
 
   test('M3 第 15 天通关后可进入破晓无尽酒馆，既可连续佛系营业也可外出迎战', () => {
-    const r = newRun(23, ['revolver', 'smg']);
+    const r = newRun(23, ['smg', 'shotgun']);
     r.day = LAST_DAY;
     r.phase = 'won';
     r.inside = false;
@@ -1082,10 +1097,10 @@ describe('v66 极简克制玩法深化：物理陷阱、读招反制、动态天
     expect(r.fires.length).toBeGreaterThanOrEqual(1);
     expect(zNear.hp).toBeLessThan(500);
 
-    // 2. 可击落空投补给伞：点击锁定/射击打断伞绳 -> 加速砸落地面晕眩并重伤敌群 -> 落地可拾取并获附加补给
+    // 2. 可击落空投补给伞：点击锁定/射击打断伞绳 -> 加速砸落地面晕眩并重伤敌群 -> 落地后由玩家点选拾取并获附加补给
     const r2 = quiet();
     r2.player.x = 300; r2.player.y = 0; r2.autoFire = false; r2.player.grenades = 1;
-    r2.crates = [{ id: 8802, x: 420, y: -120, vy: 0.42, parachute: true, supplyBonus: true, weapon: 'revolver' }];
+    r2.crates = [{ id: 8802, x: 420, y: -120, vy: 0.42, parachute: true, supplyBonus: true, kind: 'weapon', weapon: 'smg' }];
     const zUnder = zombie(r2, 430, 500, 'roamer');
     command(r2, { t: 'focusTarget', x: 420 });
     expect(r2.priorityCrateId).toBe(8802);
@@ -1103,10 +1118,11 @@ describe('v66 极简克制玩法深化：物理陷阱、读招反制、动态天
     expect(zUnder.hp).toBeLessThan(500);
     expect(zUnder.stunT).toBeGreaterThan(0);
 
-    // 走过去拾取落地空投箱：获得兵器 + 额外爆炎弹补给
+    // 走过去不自动顶替旧枪，点选拾取落地空投箱后获得兵器 + 额外爆炎弹补给
     r2.player.x = 420;
-    const pickEvs = step(r2, NO_INPUT);
-    expect(pickEvs.some((e) => e.t === 'pickup' && e.weapon === 'revolver')).toBe(true);
+    expect(step(r2, NO_INPUT).some((e) => e.t === 'pickup')).toBe(false);
+    const pickEvs = command(r2, { t: 'pickupCrate', crateId: 8802 })!;
+    expect(pickEvs.some((e) => e.t === 'pickup' && e.weapon === 'smg')).toBe(true);
     expect(r2.player.grenades).toBe(2);
   });
 
@@ -1114,9 +1130,9 @@ describe('v66 极简克制玩法深化：物理陷阱、读招反制、动态天
     // 1. 提灯怨灵蓄光前摇期间命中 -> 打灯破招 + 额外魔髓 + 反噬周围敌群
     const rG = quiet();
     rG.player.x = 300; rG.player.y = 0; rG.autoFire = false;
-    rG.player.weapons = [{ id: 'revolver', star: 1, ammo: 6 }];
+    rG.player.weapons = [{ id: 'pistol', star: 1, ammo: 6 }];
     const ghoul = zombie(rG, WALL_X + 140, 400, 'ghoul', -74);
-    const bystander = zombie(rG, WALL_X + 160, 400, 'roamer', 0);
+    const bystander = zombie(rG, WALL_X + 160, 400, 'bat', -66);
     ghoul.atkCd = 0;
     step(rG, NO_INPUT); // 进入蓄光前摇
     expect((ghoul.chargeT ?? 0)).toBeGreaterThan(0);
@@ -1135,7 +1151,7 @@ describe('v66 极简克制玩法深化：物理陷阱、读招反制、动态天
     // 2. 焦骨巨尸重砸前摇期间重击命中 -> 重击破防
     const rB = quiet();
     rB.player.x = 300; rB.player.y = 0; rB.autoFire = false;
-    rB.player.weapons = [{ id: 'revolver', star: 1, ammo: 6 }];
+    rB.player.weapons = [{ id: 'shotgun', star: 1, ammo: 6 }];
     const brute = zombie(rB, WALL_X + 8, 800, 'bruiser');
     brute.atkCd = 0;
     step(rB, NO_INPUT);
@@ -1152,7 +1168,7 @@ describe('v66 极简克制玩法深化：物理陷阱、读招反制、动态天
     // 3. 完美闪避「绝境反骨」：敌方火球迫近瞬间按闪避 -> 自动装填 +3 发 & 赐予 3 发必暴反骨弹
     const rD = quiet();
     rD.player.x = 320; rD.player.y = 0; rD.autoFire = false;
-    rD.player.weapons = [{ id: 'revolver', star: 1, ammo: 1 }];
+    rD.player.weapons = [{ id: 'pistol', star: 1, ammo: 1 }];
     rD.enemyProjs.push({ x: 350, y: GROUND_Y - 22, vx: -4, vy: 0, dmg: 20, life: 40 });
     const dodgeEvs = step(rD, { ...NO_INPUT, dodge: true });
     expect(dodgeEvs.some((e) => e.t === 'perfectDodge')).toBe(true);

@@ -1,13 +1,29 @@
-// 内容表。8 把机制迥异的武器（致敬《元气骑士》× 屋顶守夜玩法）、15 天敌群曲线与纯金币防线养成。
+// 内容表。6 把机制与品质分明的暮夜神兵（致敬《元气骑士》白→绿→蓝→紫→橙→红分级）、15 天敌群曲线与纯金币防线养成。
 import legacyPerks from './legacy/perks.json';
 
 const perkText = (id: string) => legacyPerks.PERKS.find((p) => p.id === id);
 
-export type Rarity = 'common' | 'rare' | 'epic' | 'legendary';
-export const RARITY_NAME: Record<Rarity, string> = { common: '普通', rare: '稀有', epic: '史诗', legendary: '传说' };
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+export const RARITY_NAME: Record<Rarity, string> = {
+  common: '普通',
+  uncommon: '精良',
+  rare: '稀有',
+  epic: '史诗',
+  legendary: '传说',
+  mythic: '神兵',
+};
+export const RARITY_TIER_COLOR: Record<Rarity, string> = {
+  common: '白',
+  uncommon: '绿',
+  rare: '蓝',
+  epic: '紫',
+  legendary: '橙',
+  mythic: '红',
+};
+export const RARITY_ORDER: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
 
-// ── 武器（8 把机制完全分化的暮夜兵器：二连回膛 / 穿甲跳弹 / 蓄热连珠 / 龙息轰退 / 深冻碎冰 / 瞬发圣光 / 秘法雷链 / 追踪火海）──
-export type WeaponId = 'pistol' | 'revolver' | 'smg' | 'shotgun' | 'assault' | 'rifle' | 'tesla' | 'rocket';
+// ── 武器（6 把品质色与定位完全分化的暮夜神兵：白/二连回膛 · 绿/蓄热连珠 · 蓝/龙息轰退 · 紫/麻痹雷链 · 橙/瞬发全穿 · 红/追踪火海）──
+export type WeaponId = 'pistol' | 'smg' | 'shotgun' | 'tesla' | 'rifle' | 'rocket';
 export interface WeaponDef {
   id: WeaponId; name: string; rarity: Rarity; icon: string; price: number;
   trait: string; desc: string;
@@ -20,45 +36,35 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
   pistol: {
     id: 'pistol', name: '猎手双铳', rarity: 'common', icon: 'wp_pistol', price: 0,
     trait: '灵动二连', desc: '一扣扳机连发两颗银弹，+20% 暴击且每次击杀立即回膛 2 发弹药',
-    damage: 19, burst: 2, interval: 30, mag: 10, reload: 50, speed: 13, range: 270, spread: 0,
-  },
-  revolver: {
-    id: 'revolver', name: '重锤左轮', rarity: 'common', icon: 'wp_revolver', price: 90,
-    trait: '穿甲跳弹', desc: '重锤银弹击晕并贯穿 2 名敌怪，命中后自动弹射追击近邻腐尸',
-    damage: 64, interval: 24, mag: 6, reload: 46, speed: 15, range: 325, spread: 0, pierceCount: 2, ricochet: 1,
+    damage: 19, burst: 2, interval: 30, mag: 10, reload: 50, speed: 13, range: 280, spread: 0,
   },
   smg: {
-    id: 'smg', name: '连珠火铳', rarity: 'rare', icon: 'wp_smg', price: 135,
+    id: 'smg', name: '连珠火铳', rarity: 'uncommon', icon: 'wp_smg', price: 95,
     trait: '蓄热狂飙', desc: '按住不放铳管升温，射速飙升，高热下每 3 发化作灼烧穿甲火弹',
-    damage: 13, interval: 9, mag: 40, reload: 50, speed: 13, range: 280, spread: 0.045,
+    damage: 14, interval: 9, mag: 40, reload: 48, speed: 13.5, range: 300, spread: 0.04,
   },
   shotgun: {
-    id: 'shotgun', name: '双管龙息铳', rarity: 'rare', icon: 'wp_shotgun', price: 155,
+    id: 'shotgun', name: '双管龙息铳', rarity: 'rare', icon: 'wp_shotgun', price: 150,
     trait: '轰退爆燃', desc: '6 发扇形龙息重弹贯穿 2 名敌军，中近距 1.5 倍轰击击退并点燃尸群',
-    damage: 16, interval: 34, mag: 6, reload: 52, speed: 11.5, range: 270, spread: 0.14, pellets: 6, pierceCount: 2,
-  },
-  assault: {
-    id: 'assault', name: '寒霜连铳', rarity: 'rare', icon: 'wp_assault', price: 195,
-    trait: '深冻碎冰', desc: '极寒符文弹令敌军几近定身，命中已减速目标当场引爆碎冰飞溅',
-    damage: 22, interval: 7, mag: 32, reload: 48, speed: 13.5, range: 350, spread: 0.015, slow: 115,
-  },
-  rifle: {
-    id: 'rifle', name: '猩红圣铳', rarity: 'epic', icon: 'wp_rifle', price: 250,
-    trait: '瞬发全穿', desc: '扣扳机瞬发穿透整列敌军的圣光符文弹，对重甲与首领额外 +35% 破甲伤',
-    damage: 155, interval: 36, mag: 6, reload: 54, speed: 99, range: 520, spread: 0, pierce: true, hitscan: true,
+    damage: 17, interval: 33, mag: 6, reload: 50, speed: 11.5, range: 285, spread: 0.135, pellets: 6, pierceCount: 2,
   },
   tesla: {
-    id: 'tesla', name: '秘蓝法杖', rarity: 'epic', icon: 'wp_tesla', price: 295,
+    id: 'tesla', name: '秘蓝法杖', rarity: 'epic', icon: 'wp_tesla', price: 215,
     trait: '麻痹超载', desc: '秘法雷链跳跃 4～6 名敌军并短暂麻痹，命中燃烧或冰冻目标触发元素超载 +35%',
-    damage: 62, interval: 18, mag: 16, reload: 48, speed: 14, range: 340, spread: 0, chain: 4,
+    damage: 62, interval: 18, mag: 16, reload: 48, speed: 14, range: 350, spread: 0, chain: 4,
+  },
+  rifle: {
+    id: 'rifle', name: '猩红圣铳', rarity: 'legendary', icon: 'wp_rifle', price: 285,
+    trait: '瞬发全穿', desc: '扣扳机瞬发穿透整列敌军的圣光符文弹，对重甲与首领额外 +35% 破甲伤',
+    damage: 160, interval: 35, mag: 6, reload: 52, speed: 99, range: 520, spread: 0, pierce: true, hitscan: true,
   },
   rocket: {
-    id: 'rocket', name: '焦土爆炎炮', rarity: 'legendary', icon: 'wp_rocket', price: 355,
+    id: 'rocket', name: '焦土爆炎炮', rarity: 'mythic', icon: 'wp_rocket', price: 360,
     trait: '追踪火海', desc: '发射轻度自导爆炎重弹，大范围轰炸并留下持续 3.5 秒的灼烧火海',
-    damage: 215, interval: 42, mag: 4, reload: 56, speed: 9.2, range: 430, spread: 0, aoe: 92, homing: true,
+    damage: 225, interval: 41, mag: 4, reload: 54, speed: 9.4, range: 440, spread: 0, aoe: 96, homing: true,
   },
 };
-export const WEAPON_ORDER: WeaponId[] = ['pistol', 'revolver', 'smg', 'shotgun', 'assault', 'rifle', 'tesla', 'rocket'];
+export const WEAPON_ORDER: WeaponId[] = ['pistol', 'smg', 'shotgun', 'tesla', 'rifle', 'rocket'];
 export const MAX_STAR = 5;
 export const starMul = (star: number) => 1 + 0.22 * (star - 1);
 export const magSize = (id: WeaponId, star: number) => Math.round(WEAPONS[id].mag * (star >= 3 ? 1.4 : 1));
@@ -670,7 +676,7 @@ export const PERKS: PerkDef[] = ([
   'pierce', 'chainkill', 'bloodfrenzy', 'glasscannon', 'rooftop', 'shrapnel', 'fortify', 'shock',
 ] as PerkId[]).map(perk);
 export const perkDef = (id: PerkId) => PERKS.find((p) => p.id === id)!;
-export const RARITY_WEIGHT: Record<Rarity, number> = { common: 10, rare: 6, epic: 3, legendary: 1 };
+export const RARITY_WEIGHT: Record<Rarity, number> = { common: 10, uncommon: 8, rare: 6, epic: 3, legendary: 1.5, mythic: 0.7 };
 
 // ── 职业（3 大职业全部可用！厨师随深夜食堂一起开放）──
 export type ClassId = 'gunner' | 'engineer' | 'chef';
@@ -689,19 +695,17 @@ export const CRIT_MUL = 2;
 export const LAST_DAY = 15;
 export const DAY_HEAL = 0.16;
 
-// ── 局外成长（更快解锁各把特色神兵，前期就能爽到不同机制）──
+// ── 局外成长（更快解锁各把特色神兵：0★起手体验白/绿/蓝，2/4/6★逐级解锁紫/橙/红神兵）──
 export type Unlock = { stars: number; kind: 'weapon'; id: WeaponId } | { stars: number; kind: 'class'; id: ClassId };
 export const UNLOCKS: Unlock[] = [
-  { stars: 0, kind: 'weapon', id: 'revolver' },
   { stars: 0, kind: 'weapon', id: 'smg' },
+  { stars: 0, kind: 'weapon', id: 'shotgun' },
   { stars: 0, kind: 'class', id: 'gunner' },
   { stars: 2, kind: 'class', id: 'engineer' },
-  { stars: 2, kind: 'weapon', id: 'shotgun' },
+  { stars: 2, kind: 'weapon', id: 'tesla' },
   { stars: 4, kind: 'class', id: 'chef' },
-  { stars: 4, kind: 'weapon', id: 'assault' },
-  { stars: 6, kind: 'weapon', id: 'rifle' },
-  { stars: 8, kind: 'weapon', id: 'tesla' },
-  { stars: 10, kind: 'weapon', id: 'rocket' },
+  { stars: 4, kind: 'weapon', id: 'rifle' },
+  { stars: 6, kind: 'weapon', id: 'rocket' },
 ];
 export const unlockedWeapons = (stars: number) => UNLOCKS.flatMap((u) => (u.kind === 'weapon' && stars >= u.stars ? [u.id] : []));
 export const unlockedClasses = (stars: number) => UNLOCKS.flatMap((u) => (u.kind === 'class' && stars >= u.stars ? [u.id] : []));

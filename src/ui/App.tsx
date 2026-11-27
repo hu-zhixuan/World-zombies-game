@@ -3,21 +3,21 @@ import { audio } from '../app/audio';
 import { game } from '../app/game';
 import {
   CLASSES, DIFFICULTIES, DIFFICULTY_ORDER, DRINKS, FORT_LEVELS, FORT_REPAIR_COST, GUEST_SUPPORTS, LAST_DAY, MAX_DISH_LV, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
-  MEALS, MEAL_ORDER, MEAT_ORDER, RARITY_NAME, RYE_FALLBACK, SEAT_UPGRADE_ORDER, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST,
+  MEALS, MEAL_ORDER, MEAT_ORDER, RARITY_NAME, RARITY_TIER_COLOR, RYE_FALLBACK, SEAT_UPGRADE_ORDER, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST,
   STAR_COST, STAR_PERKS, TAVERN_UPGRADES, TAVERN_UPGRADE_ORDER, TURRETS, WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, WEATHERS, ZOMBIES,
   classUnlockStars, newZombieOn, nextUnlock, partyForDay, perkDef, sustainedDps, unlockName,
-  type TurretType,
+  type TurretType, type WeaponId,
 } from '../content/data';
 import {
   ALLIES, ALLY_ORDER, CHAPTER_CARDS, CINEMATIC_INTRO, COMPANION_JOIN_STORIES, QUALITY_META, REST_STORY, STORY_SCENES, VIP_CUSTOMERS,
   type RestStoryKey, type StorySceneKey,
 } from '../content/story';
 import {
-  MAX_CARRY, computeTomorrowBattleBuff, dayRemaining, dinerRank, dishLevel, dishPrice, dishXp, dishXpTarget, formatRecipeCost, hasAlly, hasIngredients, hasTavernUpgrade, houseBuff,
-  meatPrice, nearbyCampTarget, pourQuality, tavernUpgradeCost, turretBuildCost, turretRefundCoins, turretUpgradeCost, vipSupportKind,
+  MAX_CARRY, computeTomorrowBattleBuff, crateSalvageCoins, dayRemaining, dinerRank, dishLevel, dishPrice, dishXp, dishXpTarget, formatRecipeCost, hasAlly, hasIngredients, hasTavernUpgrade, houseBuff,
+  meatPrice, nearbyCampTarget, pourQuality, shopReplaceRefund, tavernUpgradeCost, turretBuildCost, turretRefundCoins, turretUpgradeCost, vipSupportKind,
 } from '../sim/sim';
 import { TURRET_SLOTS, type GameEvent, type TurretTargetMode } from '../sim/types';
-import { CampBar, CampKeys, Keys, Pad, WeaponChip } from './controls';
+import { CampBar, CampKeys, GroundLootTags, Keys, Pad, PickupBar, WeaponChip } from './controls';
 import { Bar, Btn, Chip, Icon, NpcPortrait, Panel, Stars } from './parts';
 
 function StorySceneView(p: { scene?: StorySceneKey }) {
@@ -574,12 +574,80 @@ function KitchenPanel() {
   );
 }
 
+/** 拾取地面兵器：满槽时由玩家点选替换哪一槽（元气骑士式），也可原地拆金或放回地上 */
+function WeaponSwapPanel() {
+  const run = game.run, p = run.player;
+  const c = game.pendingSwapCrateId != null
+    ? run.crates.find((o) => o.id === game.pendingSwapCrateId && o.kind !== 'supply')
+    : undefined;
+  if (!c) {
+    return (
+      <Panel id="panel-weapon-swap" title="地上兵器已收起"
+        head={<Btn id="btn-swap-cancel" kind="primary" onClick={() => game.close()}>继续战斗</Btn>}>
+        <div class="swap-empty">这件兵器已被拾取或消失。</div>
+      </Panel>
+    );
+  }
+  const def = WEAPONS[c.weapon];
+  const star = c.star ?? 1;
+  const salvage = crateSalvageCoins(c);
+  return (
+    <Panel id="panel-weapon-swap" title="选择替换兵器槽位" sub="换下的旧兵器会完整掉回地面，可随时捡回或拆金">
+      <div class="swap-panel">
+        <div class="swap-ground" data-rarity={def.rarity}>
+          <Icon k={def.icon} cls="x2" />
+          <div class="swap-ground-info">
+            <span class="swap-ground-head">
+              <em class="rarity-pill" data-rarity={def.rarity}>{RARITY_TIER_COLOR[def.rarity]} · {RARITY_NAME[def.rarity]}</em>
+              <strong>{def.name}{star > 1 ? ` ★${star}` : ''}</strong>
+            </span>
+            <small>{def.trait} · {def.desc}</small>
+          </div>
+        </div>
+
+        <p class="swap-hint">携行已满（{p.weapons.length}/{MAX_CARRY}），点选要替换的武器槽位：</p>
+        <div class="swap-slots">
+          {[0, 1].map((idx) => {
+            const w = p.weapons[idx];
+            if (!w) return null;
+            const wDef = WEAPONS[w.id];
+            return (
+              <button key={idx} type="button" class={`swap-slot ${idx === p.cur ? 'cur' : ''}`} id={`btn-swap-slot-${idx}`} data-rarity={wDef.rarity}
+                onClick={() => { game.send({ t: 'pickupCrate', crateId: c.id, replaceIndex: idx }); game.close(); }}>
+                <span class="swap-slot-idx">槽位 {idx + 1}{idx === p.cur ? ' · 手持' : ''}</span>
+                <Icon k={wDef.icon} />
+                <span class="swap-slot-meta">
+                  <b>{wDef.name} ★{w.star}</b>
+                  <small>{RARITY_TIER_COLOR[wDef.rarity]} · {RARITY_NAME[wDef.rarity]} · 点击替换</small>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div class="row">
+          <Btn id="btn-swap-salvage" kind="ghost" onClick={() => { game.send({ t: 'salvageCrate', crateId: c.id }); game.close(); }}>
+            原地拆金 +{salvage}金
+          </Btn>
+          <Btn id="btn-swap-cancel" kind="primary" onClick={() => game.close()}>
+            暂不拾取（留地上）
+          </Btn>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
 /** 酒馆军械行商 */
 function ShopPanel() {
   const run = game.run, p = run.player;
+  const [swapPick, setSwapPick] = useState<WeaponId | null>(null);
+  const activeSwapPick = swapPick && run.shop.includes(swapPick) && !p.weapons.some((w) => w.id === swapPick) && p.weapons.length >= MAX_CARRY
+    ? swapPick
+    : null;
   return (
     <Panel id="panel-shop" cls="wide" title="军械行商"
-      head={<><Btn kind="small" id="btn-reroll" disabled={run.coins < SHOP_REROLL_COST} onClick={() => game.send({ t: 'rerollShop' })}>换一批 {SHOP_REROLL_COST}金</Btn><Purse /><Btn id="btn-close" kind="primary" onClick={() => game.close()}>关门</Btn></>}>
+      head={<><Btn kind="small" id="btn-reroll" disabled={run.coins < SHOP_REROLL_COST} onClick={() => { setSwapPick(null); game.send({ t: 'rerollShop' }); }}>换一批 {SHOP_REROLL_COST}金</Btn><Purse /><Btn id="btn-close" kind="primary" onClick={() => game.close()}>关门</Btn></>}>
       <div class="row">
         {run.shop.map((id) => {
           const def = WEAPONS[id], owned = p.weapons.find((w) => w.id === id);
@@ -587,18 +655,43 @@ function ShopPanel() {
           const cost = owned ? STAR_COST[owned.star] : def.price;
           const nextStar = owned ? Math.min(MAX_STAR, owned.star + 1) : 1;
           const dps = Math.round(sustainedDps(def, nextStar));
+          const needSlotPick = !owned && !isMax && p.weapons.length >= MAX_CARRY;
           return (
-            <button class="card" key={id} id={`btn-shop-${id}`} data-rarity={def.rarity} disabled={isMax || run.coins < cost} onClick={() => game.send({ t: 'buyWeapon', weapon: id })}>
+            <button class={`card ${activeSwapPick === id ? 'picking' : ''}`} key={id} id={`btn-shop-${id}`} data-rarity={def.rarity} disabled={isMax || run.coins < cost}
+              onClick={() => {
+                if (needSlotPick) setSwapPick(activeSwapPick === id ? null : id);
+                else { setSwapPick(null); game.send({ t: 'buyWeapon', weapon: id }); }
+              }}>
               <Icon k={def.icon} cls="x2" />
               <strong>{def.name}</strong>
-              <em>{RARITY_NAME[def.rarity]} · {def.trait}</em>
+              <em>{RARITY_TIER_COLOR[def.rarity]}·{RARITY_NAME[def.rarity]} · {def.trait}</em>
               <span>{def.desc}</span>
               <small>秒伤 {dps} · 射程 {def.range}</small>
-              <u>{isMax ? '满星' : owned ? `升 ★${owned.star + 1} (${cost}金)` : p.weapons.length >= MAX_CARRY ? `替换 (${cost}金)` : `购入 (${cost}金)`}</u>
+              <u>{isMax ? '满星' : owned ? `升 ★${owned.star + 1} (${cost}金)` : needSlotPick ? `选槽替换 (${cost}金)` : `购入 (${cost}金)`}</u>
             </button>
           );
         })}
       </div>
+
+      {activeSwapPick && (
+        <div class="shop-swap-box" id="shop-swap-box" data-rarity={WEAPONS[activeSwapPick].rarity}>
+          <span class="shop-swap-title">将 <b>{WEAPONS[activeSwapPick].name}</b> 放入哪个槽位？（换下的旧兵器按折抵金退还）</span>
+          <div class="shop-swap-btns">
+            {p.weapons.map((w, idx) => {
+              const oldDef = WEAPONS[w.id];
+              return (
+                <button key={idx} type="button" class="swap-slot mini" id={`btn-shop-replace-${idx}`} data-rarity={oldDef.rarity}
+                  onClick={() => { game.send({ t: 'buyWeapon', weapon: activeSwapPick, replaceIndex: idx }); setSwapPick(null); }}>
+                  <Icon k={oldDef.icon} />
+                  <span>槽{idx + 1} · {oldDef.name} ★{w.star}</span>
+                  <small>替换 (+{shopReplaceRefund(w.id, w.star)}金)</small>
+                </button>
+              );
+            })}
+            <Btn kind="small" id="btn-shop-replace-cancel" onClick={() => setSwapPick(null)}>取消</Btn>
+          </div>
+        </div>
+      )}
 
       <div class="supply-row">
         <Btn kind="small" id="btn-buy-grenade" disabled={p.grenades >= MAX_GRENADES || run.coins < SHOP_GRENADE_COST} onClick={() => game.send({ t: 'buySupply', item: 'grenade' })}>
@@ -616,7 +709,7 @@ function ShopPanel() {
         <div class="salvage-row">
           <small>拆解 ({p.weapons.length}/{MAX_CARRY})：</small>
           {p.weapons.map((w, idx) => (
-            <Btn kind="small" key={w.id} id={`btn-salvage-${w.id}`} onClick={() => game.send({ t: 'salvageWeapon', index: idx })}>
+            <Btn kind="small" key={w.id} id={`btn-salvage-${w.id}`} onClick={() => { setSwapPick(null); game.send({ t: 'salvageWeapon', index: idx }); }}>
               {WEAPONS[w.id].name} (+{45 + w.star * 20}金)
             </Btn>
           ))}
@@ -955,7 +1048,7 @@ function BuildPanel() {
           {run.player.weapons.map((w) => {
             const def = WEAPONS[w.id], max = w.star >= MAX_STAR, cost = STAR_COST[w.star];
             return (
-              <div class="item star-mini" key={w.id}>
+              <div class="item star-mini" key={w.id} data-rarity={def.rarity}>
                 <Icon k={def.icon} cls="gun" />
                 <div class="grow"><b>{def.name}</b><Stars n={w.star} /></div>
                 <Btn kind="small" id={`btn-star-${w.id}`} disabled={max || run.coins < cost} onClick={() => game.send({ t: 'buyStar', weapon: w.id })}>
@@ -987,7 +1080,12 @@ function Toasts(p: { layer?: 'shift' | 'bar' }) {
     else if (e.t === 'bossDead') pushToast(`击溃 ${ZOMBIES[e.kind].name}`, true);
     else if (e.t === 'dayClear') pushToast('本夜清场');
     else if (e.t === 'contractDone') pushToast(`猎令达成「${e.title}」${e.rewardText}`, true);
-    else if (e.t === 'pickup' && e.isNew) pushToast(`获得 ${WEAPONS[e.weapon].name}`, true);
+    else if (e.t === 'pickup') {
+      if (e.recycledCoins) pushToast(`${WEAPONS[e.weapon].name} 折金 +${e.recycledCoins}金`);
+      else if (e.replaced) pushToast(`换装 ${WEAPONS[e.weapon].name}（${WEAPONS[e.replaced].name} 已落回地面）`, true);
+      else if (e.isNew) pushToast(`获得 ${WEAPONS[e.weapon].name}`, true);
+    }
+    else if (e.t === 'supplyPickup') pushToast(`空投补给：${e.label}`);
     else if (e.t === 'star') pushToast(`${WEAPONS[e.weapon].name} ${'★'.repeat(e.star)}${STAR_PERKS[e.star] ? ' · ' + STAR_PERKS[e.star] : ''}`, true);
     else if (e.t === 'skill') pushToast(`${CLASSES[e.cls].skill}`, true);
     else if (e.t === 'allyJoin') pushToast(`${ALLIES[e.ally].name} 入伙`, true);
@@ -1046,6 +1144,7 @@ export function App() {
       {panel === null && !showSummary && (
         <>
           <Pad />
+          {!run.inside && <><GroundLootTags /><PickupBar /></>}
           {isCamp && run.inside && run.pourMinigame && <PourHud />}
           {isCamp && run.inside && !run.pourMinigame && <ShiftHud />}
           {isCamp && !run.inside && <FieldBuildHud />}
@@ -1072,6 +1171,7 @@ export function App() {
       {panel === 'kitchen' && <KitchenPanel />}
       {panel === 'shop' && <ShopPanel />}
       {panel === 'build' && <BuildPanel />}
+      {panel === 'weaponSwap' && <WeaponSwapPanel />}
       {panel === 'pause' && (
         <Panel id="panel-pause" title="暂停">
           <div class="row">

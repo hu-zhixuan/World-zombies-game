@@ -105,9 +105,9 @@ const L = require('./lib.cjs');
   check(swapOrderOk, '战斗右下按键「跳跃在上、闪避在下」位置互换完成');
   await g.shot('01e-wave1-clean');
 
-  check(await g.page.evaluate(() => !!document.querySelector('#key-fire')), '右下角主开火键 #key-fire 已就位');
+  check(await g.page.evaluate(() => !!document.querySelector('#key-fire') && document.querySelector('#weapon-slot-0')?.getAttribute('data-rarity') === 'common' && !!document.querySelector('#weapon-slot-1.empty')), '右下角主开火键就位，并排双武器槽位渲染清晰且首发双铳显示白品普通框');
   const noOverlap = await g.page.evaluate(() => {
-    const ids = ['#key-fire', '#key-jump', '#key-dodge', '#key-grenade', '#key-skill', '#weapon-chip', '#key-reload', '#hud-house'];
+    const ids = ['#pad', '#key-fire', '#key-jump', '#key-dodge', '#key-grenade', '#key-skill', '#weapon-slot-0', '#weapon-slot-1', '#key-reload', '#hud-house'];
     const rects = ids.map((id) => ({ id, r: document.querySelector(id).getBoundingClientRect() }));
     for (let i = 0; i < rects.length; i++) {
       for (let j = i + 1; j < rects.length; j++) {
@@ -119,7 +119,7 @@ const L = require('./lib.cjs');
     }
     return 'ok';
   });
-  check(noOverlap === 'ok', '右下角按钮、武器条与屋顶增益条互不重叠 (' + noOverlap + ')');
+  check(noOverlap === 'ok', '右下角按钮、并排双武器槽与屋顶增益条互不重叠 (' + noOverlap + ')');
 
   // 3. 元气骑士式手感：不按攻击键绝不乱开枪；按住攻击键才自动锁敌射杀 + 可拖拽控抛物线爆炎弹
   check(await until((st) => st.zombies >= 2 && st.target !== null, 30000, '等魔物进射程出现锁定框'), '魔物进入射程出现锁定准星');
@@ -327,10 +327,14 @@ const L = require('./lib.cjs');
   check((await g.state()).panel === 'shop', '走近行商按互动键打开军械行商');
   check(await g.page.evaluate((src) => !new RegExp(src).test(document.querySelector('#panel-shop').innerText), forbiddenReSrc), '军械行商界面无科幻或现代出戏词汇');
   await g.shot('07-shop'); await fits('#panel-shop');
-  await g.tap('#btn-shop-revolver');
+  check(await g.page.evaluate(() => document.querySelector('#btn-shop-smg')?.getAttribute('data-rarity') === 'uncommon' && document.querySelector('#btn-shop-shotgun')?.getAttribute('data-rarity') === 'rare'), '行商武器卡片严格着色绿品精良/蓝品稀有');
+  await g.tap('#btn-shop-smg');
+  await g.tap('#btn-shop-shotgun');
+  check(await g.page.evaluate(() => !!document.querySelector('#shop-swap-box') && window.__game.run.player.weapons.map((w) => w.id).join(',') === 'pistol,smg'), '满槽点选新枪不盲目覆盖旧枪，弹出槽位选择栏 #shop-swap-box');
+  await g.tap('#btn-shop-replace-0');
   await g.tap('#btn-buy-armor');
   s = await g.state();
-  check(s.weapons.includes('revolver') && s.armor >= 40, '军械行商能购入重锤左轮并购买铁甲');
+  check(/^shotgun\d,smg\d$/.test(s.weapons) && s.armor >= 40, `军械行商能购入连珠火铳并自选替换槽位购入龙息铳与铁甲 (${s.weapons})`);
   await g.tap('#btn-close');
 
   // 走近铁匠工坊 -> #key-act 打开空间要塞沙盘工坊（x=736）
@@ -382,6 +386,55 @@ const L = require('./lib.cjs');
   await g.tap('#btn-next');
   s = await g.state();
   check(s.panel === null && s.day === 2 && s.phase === 'fight' && s.y <= -90, '迎战第 2 天正常出发站回房顶');
+
+  // 8b. 元气骑士式双槽点击直切 + 地面兵器光柱飘标 + 不覆盖旧枪主动选择替换 + 原地拆金
+  check(await g.page.evaluate(() => document.querySelector('#weapon-slot-0.cur')?.getAttribute('data-rarity') === 'rare' && document.querySelector('#weapon-slot-1.sub')?.getAttribute('data-rarity') === 'uncommon'), '双武器槽位按蓝品/绿品实时区分点亮主副槽');
+  await g.tap('#weapon-slot-1');
+  check((await g.page.evaluate(() => window.__game.run.player.cur)) === 1, '直接点击底栏副武器槽 #weapon-slot-1 可瞬间切换主手兵器');
+  await g.tap('#weapon-slot-0');
+  check((await g.page.evaluate(() => window.__game.run.player.cur)) === 0, '直接点击底栏主武器槽 #weapon-slot-0 切回龙息铳');
+
+  const savedHero = await g.page.evaluate(() => {
+    const r = window.__game.run, p = r.player;
+    const prev = { x: p.x, y: p.y };
+    p.x = 326; p.y = 0; p.vy = 0;
+    r.crates.push({ id: 9701, x: 326, y: 0, kind: 'weapon', weapon: 'tesla', star: 2 });
+    window.__game.notify();
+    return prev;
+  });
+  await wait(180);
+  const groundLootOk = await g.page.evaluate(() => {
+    const r = window.__game.run;
+    const bar = document.querySelector('#pickup-bar');
+    const chip = document.querySelector('#weapon-chip');
+    const tag = document.querySelector('#ground-loot-tags .loot-tag[data-rarity="epic"]');
+    if (!bar || !chip || !tag) return 'missing-loot-ui';
+    if (r.player.weapons.map((w) => w.id).join(',') !== 'shotgun,smg') return 'overwrote-weapon';
+    const br = bar.getBoundingClientRect(), cr = chip.getBoundingClientRect();
+    if (br.bottom > cr.top - 1) return 'pickup-bar-overlaps-dock';
+    return 'ok';
+  });
+  check(groundLootOk === 'ok', '走近地面史诗兵器不顶掉旧枪且清晰呈现品质名牌 #pickup-bar (' + groundLootOk + ')');
+  await g.shot('v67-ground-loot');
+
+  await g.tap('#btn-pickup-crate');
+  check((await g.state()).panel === 'weaponSwap', '满槽点击拾取弹出元气骑士式选槽替换弹窗 #panel-weapon-swap');
+  await fits('#panel-weapon-swap');
+  await g.shot('v67-weapon-swap');
+  await g.tap('#btn-swap-slot-1');
+  await wait(140);
+  check(await g.page.evaluate(() => {
+    const r = window.__game.run;
+    return r.player.weapons.map((w) => w.id).join(',') === 'shotgun,tesla' && r.crates.some((c) => c.weapon === 'smg');
+  }), '点选槽位 2 完成换枪，原连珠火铳完整掉回地面');
+  await g.tap('#btn-salvage-crate');
+  check(await g.page.evaluate(() => !window.__game.run.crates.some((c) => c.weapon === 'smg')), '地面替换下来的旧枪可一键拆金回收');
+  await g.page.evaluate((prev) => {
+    const p = window.__game.run.player;
+    p.x = prev.x; p.y = prev.y; p.vy = 0;
+    window.__game.notify();
+  }, savedHero);
+
   check(await until((st) => st.kills > s.kills, 30000, '第 2 天自动击杀'), '第 2 天房顶塔防联合击杀正常');
 
   // 验证中途战友（小张/阿强）在场上会实际移动走位、攻击且零太空步倒走
@@ -493,6 +546,9 @@ const L = require('./lib.cjs');
   await g.page.evaluate(() => {
     window.__game.run.day = 3;
     window.__game.run.weather = 'fog';
+    if (window.__game.run.player.weapons.length < 2) {
+      window.__game.run.player.weapons.push({ id: 'rocket', star: 3, ammo: 4 });
+    }
     window.__game.notify();
   });
   await wait(120);
@@ -500,7 +556,7 @@ const L = require('./lib.cjs');
   await g.page.setViewportSize({ width: 780, height: 360 });
   await wait(160);
   const narrowOk = await g.page.evaluate(() => {
-    const ids = ['#hud-day', '#hud-house', '#weapon-chip', '#key-reload', '#key-fire', '#key-jump', '#key-dodge', '#key-grenade', '#key-skill'];
+    const ids = ['#hud-day', '#hud-house', '#pad', '#weapon-slot-0', '#weapon-slot-1', '#key-reload', '#key-fire', '#key-jump', '#key-dodge', '#key-grenade', '#key-skill'];
     const rects = ids.map((id) => ({ id, r: document.querySelector(id)?.getBoundingClientRect() }));
     if (rects.some((x) => !x.r || x.r.right > innerWidth || x.r.bottom > innerHeight || x.r.left < 0 || x.r.top < 0)) return 'out-of-bounds';
     for (let i = 0; i < rects.length; i++) {

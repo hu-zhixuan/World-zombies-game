@@ -101,6 +101,7 @@ export interface EnemyProj {
 }
 export interface Crate {
   id: number; x: number; weapon: WeaponId;
+  kind?: 'weapon' | 'supply'; star?: number;
   y?: number; vy?: number; parachute?: boolean; supplyBonus?: boolean;
 }
 export interface TurretSlotState { type: TurretType | null; level: number; cd: number; aim: number; mode: TurretTargetMode }
@@ -413,7 +414,10 @@ export type Command =
   | { t: 'repairWall' }
   | { t: 'upgradeFort' }
   | { t: 'repairFort' }
-  | { t: 'buyWeapon'; weapon: WeaponId }
+  | { t: 'buyWeapon'; weapon: WeaponId; replaceIndex?: number }
+  | { t: 'selectWeapon'; index: number }
+  | { t: 'pickupCrate'; crateId: number; replaceIndex?: number }
+  | { t: 'salvageCrate'; crateId: number }
   | { t: 'buySupply'; item: 'grenade' | 'armor' | 'medkit' }
   | { t: 'rerollShop' }
   | { t: 'salvageWeapon'; index: number }
@@ -475,7 +479,8 @@ export type GameEvent =
   | { t: 'homeHit' }
   | { t: 'jump'; onRoof: boolean } | { t: 'swap'; weapon: WeaponId }
   | { t: 'dodge' } | { t: 'reload' } | { t: 'empty' }
-  | { t: 'pickup'; weapon: WeaponId; star: number; isNew: boolean }
+  | { t: 'pickup'; weapon: WeaponId; star: number; isNew: boolean; replaced?: WeaponId; recycledCoins?: number }
+  | { t: 'supplyPickup'; x: number; label: string }
   | { t: 'star'; weapon: WeaponId; star: number }
   | { t: 'build'; kind: 'turret' | 'wall' | 'fort' }
   | { t: 'shop'; item: string }
