@@ -3,7 +3,7 @@ import {
   CLASSES, CRIT_CHANCE, CRIT_MUL, DIFFICULTIES, FORT_LEVELS, FORT_REPAIR_COST, LAST_DAY, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
   MEALS, MEAL_ORDER, PERKS, RARITY_WEIGHT, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST, STAR_COST, TURRETS,
   WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES, bossForDay, dayZombieCount, defaultResearchedMeals, extraBullets, magSize, starMul, weatherForDay, zombieHp,
-  type ClassId, type DifficultyId, type DrinkId, type MealId, type PerkId, type TavernUpgradeId, type TurretType, type WeaponId, type ZombieKind,
+  type ClassId, type DifficultyId, type DrinkId, type MealId, type MeatKind, type PerkId, type TavernUpgradeId, type TurretType, type WeaponId, type ZombieKind,
 } from '../content/data';
 import {
   COMPANION_JOIN_STORIES, DAILY_TRENDS,
@@ -15,19 +15,19 @@ import {
   TURRET_SLOTS, WALL_X, type AllyRuntime, type Bullet, type Command, type CounterDish, type Crate, type DinerGuest, type GameEvent, type Input, type OilBarrel, type RunState, type StationId, type TurretTargetMode, type Zombie,
 } from './types';
 import {
-  activateDishBattleBuff, allyRole, applyGuestBattleSupport, buySpiceCmd, buyTavernUpgradeCmd, completeServeGuest, computeTomorrowBattleBuff,
+  GRILL_QUALITY_LABEL, activateDishBattleBuff, allyRole, applyGuestBattleSupport, buySpiceCmd, buyTavernUpgradeCmd, cancelGrillCmd, completeServeGuest, computeTomorrowBattleBuff,
   dinerRank, dishLevel, dishPrice, dishResearchCost, dishServings, dishTaste, dishXp, dishXpTarget, feastAllCmd,
-  finishShiftToSummary, formatRecipeCost, gainDishXp, grindMortarCmd, hasIngredients, hasTavernUpgrade, hireStaffCmd,
+  finishShiftToSummary, formatRecipeCost, gainDishXp, grillCutForRun, grillQuality, grindMortarCmd, hasIngredients, hasTavernUpgrade, hireStaffCmd,
   makeIdleShift, maxMenuSlots, maxSeats, maxStaffSlots, meatPrice, passCounterCapacity, postRecruitmentCmd, pourQuality,
   prepDishCmd, progressBattleContract, researchDishCmd, resolveNightPrepAndDispatch, rollBattleContract, rollDailyTrend, rollDinerGuests, sellMeatKindCmd,
-  setAllyRoleCmd, setStaffRoleCmd, spendIngredients, staffDef, staffHasSkill, startShiftCmd, stepStaffCamp,
-  stepTavernShift, stoveCapacity, tavernUpgradeCost, tavernWallMaxBonus, toggleAutoSupplyCmd, toggleMenuDishCmd, totalMeat, trainStaffCmd,
+  setAllyRoleCmd, setStaffRoleCmd, spendIngredients, staffDef, staffHasSkill, startGrillCmd, startShiftCmd, stepStaffCamp,
+  stepTavernShift, stopGrillCmd, stoveCapacity, tavernUpgradeCost, tavernWallMaxBonus, toggleAutoSupplyCmd, toggleMenuDishCmd, totalMeat, trainStaffCmd,
   upgradeDishCmd, upgradeRackCmd, vipSupportKind,
 } from './diner';
 
 export {
-  activateDishBattleBuff, allyRole, applyGuestBattleSupport, computeTomorrowBattleBuff, dinerRank, dishLevel, dishPrice, dishResearchCost, dishServings, dishTaste,
-  dishXp, dishXpTarget, formatRecipeCost, hasIngredients, hasTavernUpgrade, maxMenuSlots, maxSeats, maxStaffSlots, meatPrice, passCounterCapacity, pourQuality,
+  GRILL_QUALITY_LABEL, activateDishBattleBuff, allyRole, applyGuestBattleSupport, computeTomorrowBattleBuff, dinerRank, dishLevel, dishPrice, dishResearchCost, dishServings, dishTaste,
+  dishXp, dishXpTarget, formatRecipeCost, grillCutForRun, grillQuality, hasIngredients, hasTavernUpgrade, maxMenuSlots, maxSeats, maxStaffSlots, meatPrice, passCounterCapacity, pourQuality,
   rollBattleContract, staffDef, staffHasSkill, stoveCapacity, tavernUpgradeCost, tavernWallMaxBonus, totalMeat, vipSupportKind,
 };
 
@@ -185,6 +185,8 @@ export function nearbyWeaponCrate(run: RunState): Crate | null {
 }
 
 export type CampInteractTarget =
+  | { kind: 'grillFinish'; x: number; meatKind: MeatKind | 'rye'; dishName: string }
+  | { kind: 'grillStart'; x: number; meatKind: MeatKind | 'rye'; dishName: string; guest: DinerGuest | null }
   | { kind: 'pourFinish'; x: number; drink: DrinkId; guestId: string | null }
   | { kind: 'serveDrink'; x: number; guest: DinerGuest }
   | { kind: 'serveCarried'; x: number; guest: DinerGuest }
@@ -205,14 +207,13 @@ export type CampInteractTarget =
   | { kind: 'doorOut'; x: number }
   | { kind: 'doorIn'; x: number };
 
-/** 营地（室内与室外）走近可交互的对象：室外炮台/壁垒/大屋实地建造、酒馆传菜/斟酒/上菜/收碗/搭话、行商、工坊、进出木门 */
+/** 营地（室内与室外）走近可交互的对象：室外炮台/壁垒/大屋实地建造；室内炉灶烤肉、端桌上菜、行商、工坊、进出木门 */
 export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
   if (run.phase !== 'camp') return null;
   const p = run.player;
   if (!run.inside) {
     if (Math.abs(p.x - DOOR_X) <= 30 && p.y > -24) return { kind: 'doorIn', x: DOOR_X };
     const extCands: { d: number; target: CampInteractTarget }[] = [];
-    // 室外 4 处炮塔基座（屋顶2处 + 庭院2处）支持实地直建/升级
     for (let i = 0; i < TURRET_SLOTS.length; i++) {
       const sl = TURRET_SLOTS[i];
       const onMatchTier = sl.roof ? p.y <= ROOF_Y + 18 : p.y >= -24;
@@ -221,11 +222,9 @@ export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
         extCands.push({ d: dx - 2, target: { kind: 'turretSlot', slot: i, x: sl.x, y: sl.roof ? ROOF_Y : 0 } });
       }
     }
-    // 前院防线壁垒实地修补与升级
     if (p.y >= -24 && Math.abs(p.x - WALL_X) <= 34) {
       extCands.push({ d: Math.abs(p.x - WALL_X) - 1, target: { kind: 'wallSpot', x: WALL_X, y: 0 } });
     }
-    // 屋顶大屋核心（加固要塞）
     if (p.y <= ROOF_Y + 18 && Math.abs(p.x - 166) <= 32) {
       extCands.push({ d: Math.abs(p.x - 166), target: { kind: 'fortSpot', x: 166, y: ROOF_Y } });
     }
@@ -243,111 +242,66 @@ export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
     return extCands[0]?.target ?? null;
   }
 
-  if (run.pourMinigame && Math.abs(p.x - IN_STATIONS.drink) <= 46) {
-    return { kind: 'pourFinish', x: IN_STATIONS.drink, drink: run.pourMinigame.drink, guestId: run.pourMinigame.guestId };
+  if (run.grillMinigame) {
+    return {
+      kind: 'grillFinish',
+      x: IN_STATIONS.kitchen,
+      meatKind: run.grillMinigame.meatKind,
+      dishName: run.grillMinigame.dishName,
+    };
   }
 
   const cands: { effD: number; target: CampInteractTarget }[] = [];
   const push = (effD: number, target: CampInteractTarget) => cands.push({ effD, target });
 
-  // 1. 手上端菜 / 端酒优先送到对应餐桌
-  if (run.carryingDrink) {
-    const targetG = run.guests.find((o) => o.id === run.carryingDrink!.guestId && !o.served && o.walkState !== 'leaving')
-      ?? run.guests.find((o) => o.orderKind === 'drink' && !o.served && o.walkState === 'seated' && o.drink === run.carryingDrink!.drink)
-      ?? run.guests.find((o) => o.orderKind === 'drink' && !o.served && o.walkState === 'seated');
-    if (targetG) {
-      const dg = Math.abs(p.x - targetG.x);
-      if (dg <= 36) push(dg - 14, { kind: 'serveDrink', x: targetG.x, guest: targetG });
-    }
-  }
+  // 1. 手上端着热烤肉优先上给对应在座客人
   if (run.carryingDish) {
     const targetG = run.guests.find((o) => o.id === run.carryingDish!.guestId && !o.served && o.walkState !== 'leaving')
-      ?? run.guests.find((o) => o.orderKind === 'dish' && !o.served && o.walkState === 'seated' && !o.isRye && o.dish === run.carryingDish!.dish)
-      ?? run.guests.find((o) => o.orderKind === 'dish' && !o.served && o.walkState === 'seated');
+      ?? run.guests.find((o) => !o.served && o.walkState !== 'leaving' && Math.abs(p.x - o.x) <= 40)
+      ?? run.guests.find((o) => !o.served && o.walkState === 'seated');
     if (targetG) {
       const dg = Math.abs(p.x - targetG.x);
-      if (dg <= 36) push(dg - 14, { kind: 'serveCarried', x: targetG.x, guest: targetG });
+      if (dg <= 40) push(dg - 18, { kind: 'serveCarried', x: targetG.x, guest: targetG });
     }
   }
 
-  // 2. 空手时可收走餐桌上的脏盘子
-  if (!run.carryingDish && !run.carryingDrink) {
-    for (const dp of run.dinerShift.dirtyTables) {
-      const d = Math.abs(p.x - dp.x);
-      if (d <= 28) push(d - 5, { kind: 'cleanTable', x: dp.x, plateId: dp.id, seatIdx: dp.seatIdx });
-    }
-  }
-
-  // 3. 左墙红砖灶台（备菜 / 菜单 / 炉火灵感研发）
+  // 2. 左墙红砖炉灶（走近直接开张烤肉 / 进火候小游戏）
   const dk = Math.abs(p.x - IN_STATIONS.kitchen);
-  if (dk <= 24) {
-    push(dk + (run.dinerShift.mode === 'open' ? 6 : 0), { kind: 'kitchen', x: IN_STATIONS.kitchen });
-  }
-
-  // 4. 石臼磨酱台（营业中磨辛香辣酱，缺酱时高优提示）
-  const dm = Math.abs(p.x - IN_STATIONS.mortar);
-  if (dm <= 22 && run.dinerShift.mode === 'open' && run.dinerShift.sauce < run.dinerShift.maxSauce) {
-    const urg = run.dinerShift.sauce <= 35 ? -8 : 0;
-    push(dm + urg, {
-      kind: 'grindMortar',
-      x: IN_STATIONS.mortar,
-      sauce: Math.round(run.dinerShift.sauce),
-      maxSauce: run.dinerShift.maxSauce,
+  if (dk <= 44 && !run.carryingDish && run.dinerShift.mode !== 'summary') {
+    const cut = grillCutForRun(run);
+    const waitG = run.guests
+      .filter((g) => !g.served && g.walkState !== 'leaving')
+      .sort((a, b) => (a.isVipRequest ? -1 : 0) - (b.isVipRequest ? -1 : 0) || a.patience - b.patience)[0] ?? null;
+    push(dk - 4, {
+      kind: 'grillStart',
+      x: IN_STATIONS.kitchen,
+      meatKind: cut.meatKind,
+      dishName: cut.dishName,
+      guest: waitG,
     });
   }
 
-  // 5. 橡木传菜台 (pass)
-  const dpd = Math.abs(p.x - IN_STATIONS.pass);
-  if (dpd <= 22) {
-    if (!run.carryingDish && !run.carryingDrink && run.dinerShift.counterDishes.length > 0) {
-      const cd = run.dinerShift.counterDishes[0];
-      push(dpd - 4, { kind: 'pickCounter', x: IN_STATIONS.pass, counterDish: cd });
-    } else if (run.dinerShift.mode === 'open') {
-      push(dpd + 4, { kind: 'pass', x: IN_STATIONS.pass });
-    }
-  }
-
-  // 6. 原木啤酒/热茶桶 (drink)
-  const ddr = Math.abs(p.x - IN_STATIONS.drink);
-  if (ddr <= 22) {
-    if (!run.carryingDish && !run.carryingDrink) {
-      const drinkGuest = run.guests
-        .filter((g) => g.orderKind === 'drink' && !g.served && g.walkState === 'seated')
-        .sort((a, b) => a.patience - b.patience)[0] ?? null;
-      if (drinkGuest) {
-        push(ddr - 3, { kind: 'pourStart', x: IN_STATIONS.drink, drink: drinkGuest.drink ?? 'beer', guest: drinkGuest });
-      } else {
-        push(ddr + 4, { kind: 'drink', x: IN_STATIONS.drink });
-      }
-    } else {
-      push(ddr + 6, { kind: 'drink', x: IN_STATIONS.drink });
-    }
-  }
-
   const ds = Math.abs(p.x - IN_STATIONS.shop);
-  if (ds <= 24) push(ds, { kind: 'shop', x: IN_STATIONS.shop });
+  if (ds <= 28) push(ds, { kind: 'shop', x: IN_STATIONS.shop });
 
   const dw = Math.abs(p.x - IN_STATIONS.workshop);
-  if (dw <= 24) push(dw, { kind: 'workshop', x: IN_STATIONS.workshop });
+  if (dw <= 28) push(dw, { kind: 'workshop', x: IN_STATIONS.workshop });
 
   const dd = Math.abs(p.x - IN_STATIONS.door);
-  if (dd <= 26) push(dd, { kind: 'doorOut', x: IN_STATIONS.door });
+  if (dd <= 28) push(dd, { kind: 'doorOut', x: IN_STATIONS.door });
 
-  // 7. 与在座食客搭话
-  for (const g of run.guests) {
-    if (g.walkState === 'leaving') continue;
-    const isCarryMatch = (run.carryingDish && run.carryingDish.guestId === g.id)
-      || (run.carryingDrink && run.carryingDrink.guestId === g.id);
-    if (isCarryMatch) continue;
-    const dg = Math.abs(p.x - g.x);
-    if (dg <= 22) push(dg + 1, { kind: 'guestTalk', x: g.x, guest: g });
-  }
-
-  // 8. 与室内战友交谈
-  for (const allyId of run.story.allies) {
-    const ax = run.allies[allyId]?.x ?? ALLY_POS[allyId].intX;
-    const da = Math.abs(p.x - ax);
-    if (da <= 26) push(da + 2, { kind: 'allyTalk', x: ax, ally: allyId });
+  // 3. 空手时可搭话已就座客人或战友（与端肉上桌保持一致 40px 舒适交互距离）
+  if (!run.carryingDish) {
+    for (const g of run.guests) {
+      if (g.walkState === 'leaving') continue;
+      const dg = Math.abs(p.x - g.x);
+      if (dg <= 40) push(dg + 3, { kind: 'guestTalk', x: g.x, guest: g });
+    }
+    for (const allyId of run.story.allies) {
+      const ax = run.allies[allyId]?.x ?? ALLY_POS[allyId].intX;
+      const da = Math.abs(p.x - ax);
+      if (da <= 26) push(da + 4, { kind: 'allyTalk', x: ax, ally: allyId });
+    }
   }
 
   cands.sort((a, b) => a.effD - b.effD);
@@ -458,6 +412,7 @@ export function newRun(
     kills: 0,
     meal: null, mealQuality: 'good', guests: [],
     carryingDish: null,
+    grillMinigame: null,
     pourMinigame: null, carryingDrink: null,
     dinerShift: makeIdleShift(0),
     diner: {
@@ -505,7 +460,7 @@ function startDay(run: RunState, ev: GameEvent[]) {
   run.player.burstLeft = 0; run.player.burstCd = 0; run.player.smgHeat = 0;
   run.player.perfectDodgeT = 0;
   run.player.rebelCritShots = run.diner.bonusCritRounds ?? 0;
-  run.carryingDish = null; run.pourMinigame = null; run.carryingDrink = null;
+  run.carryingDish = null; run.grillMinigame = null; run.pourMinigame = null; run.carryingDrink = null;
   run.dinerShift = makeIdleShift(0);
   syncAlliesPos(run, false);
   const diff = run.difficulty ?? 'normal';
@@ -2257,6 +2212,7 @@ function enterCampSession(run: RunState, ev: GameEvent[]) {
   run.player.facing = -1;
   syncAlliesPos(run, true);
   run.carryingDish = null;
+  run.grillMinigame = null;
   run.pourMinigame = null;
   run.carryingDrink = null;
   run.dinerShift = makeIdleShift(0);
@@ -2363,7 +2319,7 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
       if (run.phase !== 'camp' || !run.inside) return null;
       run.inside = false; run.player.x = DOOR_X; run.player.y = 0; run.player.vy = 0; run.player.facing = 1;
       syncAlliesPos(run, false);
-      run.carryingDish = null; run.pourMinigame = null; run.carryingDrink = null;
+      run.carryingDish = null; run.grillMinigame = null; run.pourMinigame = null; run.carryingDrink = null;
       if (run.dinerShift.mode !== 'prep') run.dinerShift = makeIdleShift(run.dinerShift.spiceSpentCoins);
       ev.push({ t: 'inside', inside: false });
       return ev;
@@ -2377,11 +2333,21 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
     }
     case 'finishSummary': {
       if (run.dinerShift.mode !== 'summary') return null;
+      run.grillMinigame = null;
       run.dinerShift = makeIdleShift(0);
       run.guests = run.guests
         .filter((g) => !g.served && g.walkState !== 'leaving' && !g.angry)
         .map((g) => ({ ...g, patience: 9999, maxPatience: 9999, eatT: 0 }));
       return ev;
+    }
+    case 'startGrill': {
+      return startGrillCmd(run, ev, cmd.meatKind, cmd.guestId);
+    }
+    case 'stopGrill': {
+      return stopGrillCmd(run, ev);
+    }
+    case 'cancelGrill': {
+      return cancelGrillCmd(run, ev);
     }
     case 'toggleMenuDish': {
       return toggleMenuDishCmd(run, cmd.id, ev);

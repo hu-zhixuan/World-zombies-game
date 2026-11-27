@@ -421,6 +421,7 @@ class SoundEngine {
       case 'prepDish':
         this.play('sfx_cook_sizzle', { gain: 0.76, rate: 1.0 });
         break;
+      case 'grillDone':
       case 'pourDone':
       case 'serve':
         this.cookResult(e.quality);

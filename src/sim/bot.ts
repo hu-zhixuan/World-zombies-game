@@ -1,6 +1,6 @@
 // 自动打的机器人：用来在测试里跑完整 15 天流程，检验难度曲线与各模块经济联动。
-import { MAX_DISH_LV, MEALS, MEAL_ORDER, MEAT_ORDER, WEAPONS, ZOMBIES, dishEnhanceMeatCost, dishUpgradeCost, type TurretType } from '../content/data';
-import { MAX_CARRY, command, hasIngredients, hasTavernUpgrade, isOnPorch, isOnRoof, nearbyWeaponCrate, step, tavernUpgradeCost } from './sim';
+import { MEAT_ORDER, WEAPONS, ZOMBIES, type TurretType } from '../content/data';
+import { MAX_CARRY, command, isOnPorch, isOnRoof, nearbyWeaponCrate, step } from './sim';
 import { NO_INPUT, PORCH_MAX_X, ROOF_MAX_X, WALL_X, type GameEvent, type Input, type RunState } from './types';
 
 export function botInput(run: RunState): Input {
@@ -44,26 +44,22 @@ export function botInput(run: RunState): Input {
 export interface BotReport { won: boolean; ticks: number; days: { day: number; seconds: number; hpLost: number; wallLost: number }[]; events: GameEvent[] }
 
 function manageCamp(run: RunState) {
-  // 1. 暮夜战备酒馆：一键犒赏堂食食客（赚取赏金 + 触发铁匠85折/军火空投/药师回甲/同袍狂飙 + 叠加明日战场料理增益）
-  for (const id of [...MEAL_ORDER].reverse()) {
-    const lv = run.diner.dishLevels[id] ?? 1;
-    if (lv < MAX_DISH_LV && run.coins >= dishUpgradeCost(id, lv) + 120 && hasIngredients(run, dishEnhanceMeatCost(id, lv))) {
-      command(run, { t: 'upgradeDish', id });
-      break;
+  // 1. 直接开张烤肉接待（火候停金区出锅 + 端肉上桌得赏金与明日战备），多余生肉换金
+  if (run.inside && run.guests.some((g) => !g.served)) {
+    command(run, { t: 'startShift' });
+    for (const g of run.guests) {
+      if (g.served || (run.meats.tender + run.meats.thick + run.meats.essence <= 0)) break;
+      if (!command(run, { t: 'startGrill', guestId: g.id })) break;
+      let guard = 0;
+      while (run.grillMinigame && guard++ < 90) {
+        if (Math.abs(run.grillMinigame.fill - 0.79) <= 0.04) break;
+        step(run, NO_INPUT);
+      }
+      command(run, { t: 'stopGrill' });
+      if (run.carryingDish) command(run, { t: 'serveCarried' });
     }
-  }
-  for (const uid of ['fast_tap', 'wide_pass', 'tables_6', 'warm_lantern'] as const) {
-    if (!hasTavernUpgrade(run, uid) && run.coins >= tavernUpgradeCost(run, uid) + 140) {
-      command(run, { t: 'buyTavernUpgrade', id: uid });
-      break;
-    }
-  }
-  command(run, { t: 'feastAll' });
-  if (!run.meal && (run.diner.feastDishes?.length ?? 0) === 0) {
-    const wantId = run.player.hp < run.player.maxHp * 0.7 && hasIngredients(run, MEALS.hearty_stew.cost)
-      ? 'hearty_stew'
-      : [...MEAL_ORDER].reverse().find((id) => hasIngredients(run, MEALS[id].cost));
-    if (wantId) command(run, { t: 'pickMeal', id: wantId, quality: 'perfect' });
+    if (run.dinerShift.mode === 'open') command(run, { t: 'closeShift' });
+    if (run.dinerShift.mode === 'summary') command(run, { t: 'finishSummary' });
   }
   for (const k of MEAT_ORDER) {
     if (run.meats[k] > 0) command(run, { t: 'sellMeatKind', kind: k, count: run.meats[k] });

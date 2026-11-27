@@ -198,6 +198,17 @@ export interface DirtyPlate {
   createdTick: number;
 }
 
+export interface GrillMinigameState {
+  meatKind: MeatKind | 'rye';
+  dish: MealId | 'rye';
+  dishName: string;
+  guestId: string | null;
+  fill: number;
+  dir: 1 | -1;
+  speed: number;
+  startedTick: number;
+}
+
 export interface PourMinigameState {
   drink: DrinkId;
   guestId: string | null;
@@ -370,6 +381,7 @@ export interface RunState {
   mealQuality: DishQuality;
   guests: DinerGuest[];
   carryingDish: CarriedDishState | null;
+  grillMinigame?: GrillMinigameState | null;
   pourMinigame: PourMinigameState | null;
   carryingDrink: CarriedDrinkState | null;
   dinerShift: DinerShiftState;
@@ -442,6 +454,9 @@ export type Command =
   | { t: 'upgradeRack' }
   | { t: 'buySpice'; count?: number }
   | { t: 'sellMeatKind'; kind: MeatKind; count: number }
+  | { t: 'startGrill'; meatKind?: MeatKind; guestId?: string | null }
+  | { t: 'stopGrill' }
+  | { t: 'cancelGrill' }
   | { t: 'startPour'; drink: DrinkId; guestId?: string | null }
   | { t: 'stopPour' }
   | { t: 'cancelPour' }
@@ -489,6 +504,7 @@ export type GameEvent =
   | { t: 'sauceEmpty' }
   | { t: 'research'; id: MealId; flameLeft: number }
   | { t: 'prepDish'; id: MealId; servingsAdded: number }
+  | { t: 'grillDone'; meatKind: MeatKind | 'rye'; dishName: string; quality: DishQuality }
   | { t: 'pourDone'; drink: DrinkId; quality: DishQuality }
   | { t: 'tableClean'; x: number; coins: number; byAlly?: AllyId; byStaff?: string }
   | { t: 'dispatchReturn'; log: string; spice: number; meats: MeatInventory }
