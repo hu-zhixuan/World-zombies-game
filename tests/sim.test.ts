@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
-  CLASSES, CRIT_MUL, DIFFICULTIES, DINER_GUESTS, DRINKS, FORT_LEVELS, LAST_DAY, MEALS, MEAL_ORDER, PERKS, RARITY_ORDER, RYE_FALLBACK, SEAT_UPGRADE_ORDER,
+  CLASSES, CRIT_MUL, DIFFICULTIES, DINER_GUESTS, DRINKS, FORT_LEVELS, LAST_DAY, MEALS, MEAL_ORDER, PERKS, RARITY_ORDER,
   TAVERN_UPGRADES, TURRETS, WALL_LEVELS, WEAPON_ORDER, WEAPONS, WEATHERS,
-  dayZombieCount, dishEnhanceMeatCost, dishUpgradeCost, nextUnlock, sustainedDps, unlockedClasses, unlockedWeapons, weatherForDay, zombieHp,
+  dayZombieCount, nextUnlock, sustainedDps, unlockedClasses, unlockedWeapons, weatherForDay, zombieHp,
 } from '../src/content/data';
 import {
   BOSS_INTROS, BOSS_VICTORY, CHAPTER_CARDS, CINEMATIC_INTRO, COMPANION_JOIN_STORIES, DAILY_TRENDS, FANS_RANKS,
@@ -13,12 +13,12 @@ import {
 import { loadMeta, recordRunToMeta, starsEarned } from '../src/app/meta';
 import { runBot } from '../src/sim/bot';
 import {
-  BODY_Y, MAX_CARRY, command, computeGrenadeThrow, crateSalvageCoins, damageMul, dishLevel, dishTaste, effectiveRange,
-  houseBuff, isOnPorch, isOnRoof, maxSeats, meatPrice, nearbyCampTarget, nearbyWeaponCrate, newRun, shopReplaceRefund, step, tavernUpgradeCost, totalMeat,
+  BODY_Y, MAX_CARRY, command, computeGrenadeThrow, crateSalvageCoins, damageMul, dishLevel, effectiveRange, grillQuality,
+  houseBuff, isOnPorch, isOnRoof, meatPrice, nearbyCampTarget, nearbyWeaponCrate, newRun, shopReplaceRefund, step, tavernUpgradeCost, totalMeat,
   turretBuildCost, turretRefundCoins, turretUpgradeCost,
 } from '../src/sim/sim';
 import {
-  ALLY_POS, DINER_PLATE_X, DINER_SEAT_X, DOOR_X, GROUND_Y, HOUSE_WALL_X, IN_STATIONS, NO_INPUT, PORCH_MAX_X, PORCH_Y, ROOF_Y, WALL_X, type RunState, type Zombie,
+  ALLY_POS, DINER_SEAT_X, DOOR_X, GROUND_Y, HOUSE_WALL_X, IN_STATIONS, NO_INPUT, PORCH_MAX_X, PORCH_Y, ROOF_Y, WALL_X, type RunState, type Zombie,
 } from '../src/sim/types';
 
 const clone = (r: RunState): RunState => JSON.parse(JSON.stringify(r));
@@ -591,55 +591,52 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     expect(frontGround.hp).toBe(500);
   });
 
-  test('深夜食堂屋内核验玩法：自动出菜耗辣酱 → 辣酱归零停摆 → 石臼磨酱恢复 → 传菜台取菜上桌', () => {
+  test('红砖灶台烤肉闭环：直接开张 → 火候指针停金区出锅 → 端肉上桌激活明日战备（零辣酱卡单/零脏盘）', () => {
     const r = quiet(); r.phase = 'perk'; r.perkChoices = ['rooftop'];
     command(r, { t: 'pickPerk', id: 'rooftop' });
-    r.meats = { tender: 8, thick: 2, essence: 0 };
+    r.meats = { tender: 6, thick: 2, essence: 1 };
     r.story.allies = ['zhang'];
 
-    // 备菜并开启营业
-    expect(command(r, { t: 'prepDish', id: 'spicy_skewer', batches: 3 })).not.toBeNull();
-    expect(r.diner.menuStock.spicy_skewer).toBe(3);
-    expect(command(r, { t: 'startShift' })).not.toBeNull();
+    // 走近红砖灶台，直接按下互动即可就地开张并启动烤肉火候条
+    r.player.x = IN_STATIONS.kitchen;
+    expect(nearbyCampTarget(r)?.kind).toBe('grillStart');
+    expect(command(r, { t: 'startGrill' })).not.toBeNull();
     expect(r.dinerShift.mode).toBe('open');
-    expect(r.dinerShift.kitchenOrders.length).toBeGreaterThan(0);
+    expect(r.grillMinigame).not.toBeNull();
+    expect(nearbyCampTarget(r)?.kind).toBe('grillFinish');
 
-    // 若辛香辣酱耗尽，后厨自动卡单停摆，走近石臼研磨后继续出菜
-    r.dinerShift.sauce = 0;
-    const stallEvs = step(r, NO_INPUT);
-    expect(r.dinerShift.sauceStalled).toBe(true);
-    expect(stallEvs.some((e) => e.t === 'sauceEmpty')).toBe(true);
-
-    r.player.x = IN_STATIONS.mortar;
-    expect(nearbyCampTarget(r)?.kind).toBe('grindMortar');
-    const grindEvs = command(r, { t: 'grindMortar' })!;
-    expect(grindEvs.some((e) => e.t === 'grindSauce')).toBe(true);
-    expect(r.dinerShift.sauceStalled).toBe(false);
-    expect(r.dinerShift.sauce).toBeGreaterThanOrEqual(60);
-
-    // 推步等待后厨自动出菜至传菜台
-    for (let i = 0; i < 140 && r.dinerShift.counterDishes.length === 0; i++) step(r, NO_INPUT);
-    expect(r.dinerShift.counterDishes.length).toBeGreaterThan(0);
-
-    // 走近传菜台取菜并送到对应客人桌前
-    r.player.x = IN_STATIONS.pass;
-    expect(nearbyCampTarget(r)?.kind).toBe('pickCounter');
-    expect(command(r, { t: 'pickCounterDish' })).not.toBeNull();
+    // 推进针摆并停在金色区间，消耗生肉 1 份出锅并直接端在手中（无传菜台中间环节）
+    const meatsBefore = totalMeat(r.meats);
+    for (let i = 0; i < 90 && r.grillMinigame && Math.abs(r.grillMinigame.fill - 0.79) > 0.04; i++) {
+      step(r, NO_INPUT);
+    }
+    const grillEvs = command(r, { t: 'stopGrill' })!;
+    expect(grillEvs.some((e) => e.t === 'grillDone' && e.quality === 'legendary')).toBe(true);
+    expect(r.grillMinigame).toBeNull();
+    expect(totalMeat(r.meats)).toBe(meatsBefore - 1);
     expect(r.carryingDish).not.toBeNull();
+    expect(r.carryingDish?.hotUntilTick).toBeDefined();
 
-    const dest = r.guests.find((g) => g.id === r.carryingDish!.guestId) ?? r.guests.find((g) => !g.served && g.orderKind === 'dish')!;
+    // 走到熟客桌前上桌，触发酬金与明日战备加成，且不产生任何脏盘与辣酱卡单
+    const dest = r.guests.find((g) => g.id === r.carryingDish!.guestId) ?? r.guests.find((g) => !g.served)!;
     r.player.x = dest.x;
     expect(nearbyCampTarget(r)?.kind).toBe('serveCarried');
+    const coinsBefore = r.coins;
     const serveEvs = command(r, { t: 'serveCarried' })!;
     expect(serveEvs.some((e) => e.t === 'serve' && e.guestId === dest.id)).toBe(true);
+    expect(r.coins).toBeGreaterThan(coinsBefore);
     expect(r.carryingDish).toBeNull();
+    expect(r.dinerShift.dirtyTables.length).toBe(0);
+    expect(r.dinerShift.sauceStalled).toBe(false);
     expect(nearbyCampTarget(r)?.kind).toBe('guestTalk');
 
-    // 走近屋里战友与商店可触发对应交互
+    // 走近屋里战友、军械货架与防线图纸台均可触发对应交互
     r.player.x = ALLY_POS.zhang.intX;
     expect(nearbyCampTarget(r)?.kind).toBe('allyTalk');
     r.player.x = IN_STATIONS.shop;
     expect(nearbyCampTarget(r)?.kind).toBe('shop');
+    r.player.x = IN_STATIONS.workshop;
+    expect(nearbyCampTarget(r)?.kind).toBe('workshop');
   });
 
   test('战友 AI 零太空步倒走且出招与动画序列号严格同步（idle 停顿 + 单次出手）', () => {
@@ -694,63 +691,51 @@ describe('酒馆室内、深夜食堂全功能、4 炮塔与堡垒路障全金�
     expect(totalShots.zhao).toBeGreaterThanOrEqual(2);
   });
 
-  test('暮夜战备酒馆经营闭环：菜品强化/直接现烹/断货黑麦饼 → 饮品斟酒 → 收脏盘 → 日报战备结算', () => {
+  test('暮夜战备酒馆简化闭环：断肉黑麦兜底（零扣声望）→ 冲刺端肉自动上桌 → 无佣金打烊结算直跳休整', () => {
     const r = quiet(); r.phase = 'perk'; r.perkChoices = ['rooftop'];
     command(r, { t: 'pickPerk', id: 'rooftop' });
-    r.day = 3; r.coins = 500; r.meats = { tender: 10, thick: 4, essence: 2 };
+    r.day = 3; r.coins = 500;
 
-    // 强化菜品消耗主料+金币，同步提升售价、美味度与明日战场增益倍率
-    const baseTaste = dishTaste(r, 'hearty_stew');
-    const upCoin = dishUpgradeCost('hearty_stew', 1);
-    const upMeat = dishEnhanceMeatCost('hearty_stew', 1);
-    const tenderBefore = r.meats.tender;
-    expect(command(r, { t: 'upgradeDish', id: 'hearty_stew' })).not.toBeNull();
-    expect(dishLevel(r, 'hearty_stew')).toBe(2);
-    expect(dishTaste(r, 'hearty_stew')).toBeGreaterThan(baseTaste);
-    expect(r.meats.tender).toBe(tenderBefore - upMeat.tender);
-    expect(r.coins).toBe(500 - upCoin);
-
-    // 默认直接耗生肉现烹；当生肉与库存皆为 0 时，营业入单兜底为干硬黑麦饼
-    r.diner.menu = ['spicy_skewer', 'hearty_stew'];
-    r.diner.menuStock = {};
+    // 当三种鲜肉皆为 0 时，红砖灶台烤出黑麦干肉兜底（付 1 金，零声望扣减）
     r.meats = { tender: 0, thick: 0, essence: 0 };
-    expect(command(r, { t: 'startShift' })).not.toBeNull();
-    expect(r.dinerShift.ryeCount).toBeGreaterThan(0);
-    const ryeGuest = r.guests.find((g) => g.isRye)!;
-    expect(ryeGuest.pay).toBe(RYE_FALLBACK.pay);
+    const repBefore = r.diner.rep;
+    r.player.x = IN_STATIONS.kitchen;
+    expect(command(r, { t: 'startGrill' })).not.toBeNull();
+    expect(r.dinerShift.mode).toBe('open');
+    expect(r.grillMinigame?.meatKind).toBe('rye');
+    expect(command(r, { t: 'stopGrill' })?.some((e) => e.t === 'grillDone')).toBe(true);
+    expect(r.carryingDish?.isRye).toBe(true);
 
-    // 测饮品零耗肉接酒 -> 上饮 -> 吃喝留脏盘 -> 收桌
-    const drinkGuest = r.guests[0];
-    drinkGuest.orderKind = 'drink';
-    drinkGuest.drink = 'beer';
-    drinkGuest.dishName = DRINKS.beer.name;
-    drinkGuest.isRye = false;
-    drinkGuest.served = false;
-    drinkGuest.walkState = 'seated';
-    drinkGuest.x = DINER_SEAT_X[drinkGuest.seatIdx];
-    const meatBeforePour = totalMeat(r.meats);
-    r.player.x = IN_STATIONS.drink;
-    expect(command(r, { t: 'buyTavernUpgrade', id: 'fast_tap' })).not.toBeNull();
-    expect(command(r, { t: 'startPour', drink: 'beer', guestId: drinkGuest.id })).not.toBeNull();
-    while (r.pourMinigame && r.pourMinigame.fill < 0.805) step(r, NO_INPUT);
-    expect(command(r, { t: 'stopPour' })?.some((e) => e.t === 'pourDone' && e.quality === 'legendary')).toBe(true);
-    expect(totalMeat(r.meats)).toBe(meatBeforePour);
+    // 冲刺掠过等餐熟客身边：不按互动键也自动顺手端上桌，且不产生脏盘
+    const g0 = r.guests.find((g) => !g.served)!;
+    g0.walkState = 'seated';
+    g0.x = DINER_SEAT_X[g0.seatIdx];
+    r.player.x = g0.x - 10;
+    const serveEvs = step(r, { ...NO_INPUT, move: 1, dodge: true });
+    expect(serveEvs.some((e) => e.t === 'serve' && e.guestId === g0.id)).toBe(true);
+    expect(r.carryingDish).toBeNull();
+    expect(r.diner.rep).toBeGreaterThanOrEqual(repBefore);
+    expect(r.dinerShift.dirtyTables.length).toBe(0);
 
-    r.player.x = drinkGuest.x;
-    expect(command(r, { t: 'serveDrink', guestId: drinkGuest.id })?.some((e) => e.t === 'serve')).toBe(true);
-    expect(r.dinerShift.drinkCount).toBe(1);
-    for (let i = 0; i < 185; i++) step(r, NO_INPUT);
-    expect(r.dinerShift.dirtyTables.some((d) => d.x === DINER_PLATE_X[drinkGuest.seatIdx])).toBe(true);
-    const dirty = r.dinerShift.dirtyTables[0];
-    r.player.x = dirty.x;
-    expect(command(r, { t: 'cleanTable', plateId: dirty.id })?.some((e) => e.t === 'tableClean')).toBe(true);
+    // 新鲜出锅烤肉（非黑麦）结算后直接进净利，无员工薪水/日常维护杂项扣除
+    r.meats = { tender: 4, thick: 2, essence: 1 };
+    r.player.x = IN_STATIONS.kitchen;
+    expect(command(r, { t: 'startGrill' })).not.toBeNull();
+    for (let i = 0; i < 90 && r.grillMinigame && grillQuality(r.grillMinigame.fill) !== 'legendary'; i++) step(r, NO_INPUT);
+    expect(command(r, { t: 'stopGrill' })).not.toBeNull();
+    const g1 = r.guests.find((g) => !g.served)!;
+    g1.walkState = 'seated';
+    g1.x = DINER_SEAT_X[g1.seatIdx];
+    r.player.x = g1.x;
+    expect(command(r, { t: 'serveCarried' })).not.toBeNull();
 
-    // 测打烊日报：星级评分与净利归帐
     const closeEvs = command(r, { t: 'closeShift' })!;
     expect(closeEvs.some((e) => e.t === 'shiftEnd')).toBe(true);
     expect(r.dinerShift.mode).toBe('summary');
-    expect(r.dinerShift.report).not.toBeNull();
-    expect(r.dinerShift.report!.rating).toBeGreaterThanOrEqual(1);
+    const rep = r.dinerShift.report!;
+    expect(rep.staffWages).toBe(0);
+    expect(rep.upkeepCost).toBe(0);
+    expect(rep.netProfit).toBe(rep.dishCoins + rep.tipsCoins);
     expect(command(r, { t: 'finishSummary' })).not.toBeNull();
     expect(r.dinerShift.mode).toBe('prep');
   });
@@ -966,49 +951,54 @@ describe('15 天完整流程与首领', () => {
     }
   });
 
-  test('M3 堂食扩座（4→6→8座）严格按前置解锁且可同时招待最多 8 位食客', () => {
-    expect(SEAT_UPGRADE_ORDER).toEqual(['tables_6', 'tables_8']);
-    expect(DINER_SEAT_X.length).toBe(8);
-    expect(DINER_PLATE_X.length).toBe(8);
+  test('暮夜酒馆保持从容 3~4 席且红砖灶台按 魔髓→厚肉→嫩肉→黑麦 优先级烤出战备加成', () => {
+    expect(DINER_SEAT_X.length).toBeGreaterThanOrEqual(4);
 
     const r = quiet();
     r.phase = 'perk';
     r.perkChoices = ['rooftop'];
     command(r, { t: 'pickPerk', id: 'rooftop' });
-    r.coins = 5000;
-    expect(maxSeats(r)).toBe(4);
-
-    // 未解锁 6 座前无法直购 8 座
-    command(r, { t: 'buyTavernUpgrade', id: 'tables_8' });
-    expect(r.diner.upgrades).not.toContain('tables_8');
-    expect(maxSeats(r)).toBe(4);
-
-    // 依次扩建到 6 座、8 座
-    command(r, { t: 'buyTavernUpgrade', id: 'tables_6' });
-    expect(r.diner.upgrades).toContain('tables_6');
-    expect(maxSeats(r)).toBe(6);
-
-    command(r, { t: 'buyTavernUpgrade', id: 'tables_8' });
-    expect(r.diner.upgrades).toContain('tables_8');
-    expect(maxSeats(r)).toBe(8);
-
-    // 高口碑 + 备菜开张可同时落座超过 4 席且席位全部在 0..7 合法范围内
-    r.meats = { tender: 16, thick: 8, essence: 4 };
-    command(r, { t: 'prepDish', id: 'spicy_skewer', batches: 6 });
-    r.diner.fans = 320;
+    r.meats = { tender: 1, thick: 1, essence: 1 };
     command(r, { t: 'startShift' });
     expect(r.dinerShift.mode).toBe('open');
 
+    // 从容营业：同时在场食客不超过 4 位，告别 8 桌拥挤混乱
     let peakSeats = 0;
-    const seenSeats = new Set<number>();
-    for (let i = 0; i < 1500 && r.dinerShift.mode === 'open'; i++) {
+    for (let i = 0; i < 600 && r.dinerShift.mode === 'open'; i++) {
       step(r, NO_INPUT);
-      const seated = r.guests.filter((g) => g.seatIdx >= 0 && g.seatIdx < 8 && g.walkState !== 'leaving');
-      peakSeats = Math.max(peakSeats, seated.length);
-      for (const g of seated) seenSeats.add(g.seatIdx);
+      const activeGuests = r.guests.filter((g) => g.walkState !== 'leaving');
+      peakSeats = Math.max(peakSeats, activeGuests.length);
     }
-    expect(peakSeats).toBeGreaterThan(4);
-    expect(seenSeats.size).toBeGreaterThan(4);
+    expect(peakSeats).toBeGreaterThanOrEqual(3);
+    expect(peakSeats).toBeLessThanOrEqual(4);
+
+    // 依次烤制 魔髓 → 厚肉 → 嫩肉 → 黑麦，并上桌转化明日防线/暴击/枪伤增益
+    const order: string[] = [];
+    for (let round = 0; round < 4; round++) {
+      if (r.guests.every((g) => g.served)) {
+        r.guests[0].served = false;
+        r.guests[0].walkState = 'seated';
+        r.guests[0].x = DINER_SEAT_X[r.guests[0].seatIdx];
+      }
+      r.player.x = IN_STATIONS.kitchen;
+      expect(command(r, { t: 'startGrill' })).not.toBeNull();
+      order.push(r.grillMinigame!.meatKind);
+      for (let i = 0; i < 90 && r.grillMinigame && grillQuality(r.grillMinigame.fill) !== 'legendary'; i++) step(r, NO_INPUT);
+      expect(command(r, { t: 'stopGrill' })).not.toBeNull();
+      const dest = r.guests.find((g) => g.id === r.carryingDish!.guestId) ?? r.guests.find((g) => !g.served)!;
+      dest.walkState = 'seated';
+      dest.x = DINER_SEAT_X[dest.seatIdx];
+      r.player.x = dest.x;
+      expect(command(r, { t: 'serveCarried' })).not.toBeNull();
+    }
+    expect(order).toEqual(['essence', 'thick', 'tender', 'rye']);
+
+    command(r, { t: 'closeShift' });
+    command(r, { t: 'finishSummary' });
+    command(r, { t: 'nextDay' });
+    expect(r.buff.dmgMul).toBeGreaterThan(0);
+    expect(r.buff.turretMul).toBeGreaterThan(0);
+    expect(r.buff.critBonus).toBeGreaterThan(0);
   });
 
   test('M3 跨局传承（手札菜谱+装潢图纸）在新局生效研究减费与硬件八折', () => {
@@ -1229,25 +1219,23 @@ describe('v66 极简克制玩法深化：物理陷阱、读招反制、动态天
     expect(galeThrow.vx).toBeGreaterThan(clearThrow.vx);
   });
 
-  test('酒馆堂内轻交互：热菜「趁热暴击」+30%金与战备加成 + 熟客红框「加急战备单」赠明晚火油桶/弹药箱', () => {
+  test('酒馆堂内轻交互：刚出锅热肉「趁热暴击」+30%金与战备加成 + 熟客红框「加急战备单」赠明晚火油桶/弹药箱', () => {
     const r = quiet(); r.phase = 'perk'; r.perkChoices = ['rooftop'];
     command(r, { t: 'pickPerk', id: 'rooftop' });
     r.meats = { tender: 10, thick: 4, essence: 2 };
     r.player.armor = 0;
-    expect(command(r, { t: 'startShift' })).not.toBeNull();
 
-    // 等待第一道菜出锅到传菜台，立刻端起并送达桌前 -> 触发趁热暴击！
-    for (let i = 0; i < 140 && r.dinerShift.counterDishes.length === 0; i++) step(r, NO_INPUT);
-    expect(r.dinerShift.counterDishes.length).toBeGreaterThan(0);
-    expect(r.dinerShift.counterDishes[0].cookedTick).toBeDefined();
-
-    r.player.x = IN_STATIONS.pass;
-    expect(command(r, { t: 'pickCounterDish' })).not.toBeNull();
+    // 走近红砖灶台直接开张并停火出锅，直接端着刚出锅热肉触发「趁热」有效期！
+    r.player.x = IN_STATIONS.kitchen;
+    expect(command(r, { t: 'startGrill' })).not.toBeNull();
+    expect(command(r, { t: 'stopGrill' })).not.toBeNull();
     expect(r.carryingDish?.hotUntilTick).toBeDefined();
     const dest = r.guests.find((g) => g.id === r.carryingDish!.guestId) ?? r.guests.find((g) => !g.served)!;
     // 同时将其设为红框加急战备单（明晚免费火油桶）
     dest.isVipRequest = true;
     dest.warOrderReward = 'barrel';
+    dest.walkState = 'seated';
+    dest.x = DINER_SEAT_X[dest.seatIdx];
     r.player.x = dest.x;
     const serveEvs = command(r, { t: 'serveCarried' })!;
     const sEv = serveEvs.find((e) => e.t === 'serve');

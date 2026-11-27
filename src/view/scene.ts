@@ -4,7 +4,7 @@ import { game } from '../app/game';
 import { ASSETS } from '../assets';
 import { DRINKS, MEALS, MEATS, RYE_FALLBACK, WEAPONS, ZOMBIES, type MealId, type Rarity } from '../content/data';
 import { ALLIES, QUALITY_META } from '../content/story';
-import { BODY_Y, FORT_GUN_X, allyRole, computeGrenadeThrow, curWeapon, hasTavernUpgrade, houseBuff, nearbyCampTarget, staffDef, stoveCapacity, turretWorldPos, zombieBodyY } from '../sim/sim';
+import { BODY_Y, FORT_GUN_X, GRILL_QUALITY_LABEL, allyRole, computeGrenadeThrow, curWeapon, hasTavernUpgrade, houseBuff, nearbyCampTarget, staffDef, turretWorldPos, zombieBodyY } from '../sim/sim';
 import {
   ALLY_POS, DINER_PLATE_X, DOOR_X, GROUND_Y, IN_STATIONS, LADDER_X, PORCH_MAX_X, PORCH_MIN_X, PORCH_Y,
   ROOF_MAX_X, ROOF_MIN_X, ROOF_Y, TURRET_SLOTS, VIEW_H, WALL_X, WORLD_W, type GameEvent,
@@ -241,7 +241,7 @@ export class GameScene extends Phaser.Scene {
           return;
         }
         if (r.phase === 'fight') game.send({ t: 'focusTarget', x: ptr.worldX, y: ptr.worldY });
-      } else if (r.phase === 'camp' && !r.pourMinigame) {
+      } else if (r.phase === 'camp' && !r.pourMinigame && !r.grillMinigame) {
         const wx = Phaser.Math.Clamp(ptr.worldX, r.inside ? 78 : 130, r.inside ? 820 : 620);
         game.walkTo(wx, true);
       }
@@ -826,23 +826,11 @@ export class GameScene extends Phaser.Scene {
       const ct = nearbyCampTarget(run);
       if (ct) {
         const sx = ct.x;
-        const barW = ct.kind === 'kitchen' ? 56
-          : ct.kind === 'grindMortar' ? 34
-          : ct.kind === 'pourStart' || ct.kind === 'pourFinish' || ct.kind === 'drink' ? 42
-          : ct.kind === 'pass' || ct.kind === 'pickCounter' ? 34
-          : ct.kind === 'cleanTable' ? 24
+        const barW = ct.kind === 'grillStart' || ct.kind === 'grillFinish' || ct.kind === 'kitchen' ? 56
           : ct.kind === 'workshop' ? 56 : ct.kind === 'shop' ? 46 : 32;
         g.fillStyle(C.gold, 0.36).fillRoundedRect(sx - barW / 2, GROUND_Y - 4, barW, 5, 2);
         g.lineStyle(1.4, C.lamp, 0.9).strokeRoundedRect(sx - barW / 2, GROUND_Y - 4, barW, 5, 2);
       }
-      // 传菜台刚出锅 5 秒内的热菜托盘金光提示
-      run.dinerShift.counterDishes.slice(0, 5).forEach((cd, idx) => {
-        if (!cd.isRye && cd.cookedTick !== undefined && run.tick - cd.cookedTick <= 300) {
-          const hx = IN_STATIONS.pass - 14 + idx * 7;
-          const pulse = 0.65 + Math.sin(now / 110 + idx) * 0.3;
-          g.lineStyle(1.6, C.gold, pulse).strokeEllipse(hx, GROUND_Y - 31, 14, 5);
-        }
-      });
       const bob = Math.sin(now / 210) * 1.6;
       const arrowBob = Math.sin(now / 120) * 2.5;
       const rushOpen = run.dinerShift.mode === 'open';
@@ -902,22 +890,15 @@ export class GameScene extends Phaser.Scene {
           g.fillStyle(C.green, 0.98).fillRect(st.x - 9, GROUND_Y - 47, Math.max(2, 18 * pct), 1.8);
         }
       }
-      if (rushOpen && !run.carryingDish && !run.carryingDrink) {
-        for (const dp of run.dinerShift.dirtyTables) {
-          g.fillStyle(C.ember, 0.95).fillTriangle(dp.x - 4, GROUND_Y - 52 + arrowBob, dp.x + 4, GROUND_Y - 52 + arrowBob, dp.x, GROUND_Y - 46 + arrowBob);
-        }
-        if (run.dinerShift.counterDishes.length > 0) {
-          const cx = IN_STATIONS.pass;
-          g.fillStyle(C.gold, 0.95).fillTriangle(cx - 4, GROUND_Y - 52 + arrowBob, cx + 4, GROUND_Y - 52 + arrowBob, cx, GROUND_Y - 46 + arrowBob);
-        }
+      // 空手营业时，用金色指引箭头呼唤走近红砖炉烤肉
+      if (rushOpen && !run.carryingDish && !run.grillMinigame && run.guests.some((o) => !o.served && o.walkState !== 'leaving')) {
+        const kx = IN_STATIONS.kitchen;
+        g.fillStyle(C.gold, 0.96).fillTriangle(kx - 5, GROUND_Y - 56 + arrowBob, kx + 5, GROUND_Y - 56 + arrowBob, kx, GROUND_Y - 49 + arrowBob);
       }
-      // 端菜/端酒时绘制金色方向导引线直指目标食客，再也不用满屋找人
-      if (run.carryingDish || run.carryingDrink) {
-        const dest = run.carryingDish
-          ? (run.guests.find((o) => o.id === run.carryingDish!.guestId && !o.served && o.walkState === 'seated')
-            ?? run.guests.find((o) => o.orderKind === 'dish' && !o.served && o.walkState === 'seated' && !o.isRye && o.dish === run.carryingDish!.dish))
-          : (run.guests.find((o) => o.id === run.carryingDrink!.guestId && !o.served && o.walkState === 'seated')
-            ?? run.guests.find((o) => o.orderKind === 'drink' && !o.served && o.walkState === 'seated' && o.drink === run.carryingDrink!.drink));
+      // 端着热烤肉时绘制金色方向导引线直指目标食客
+      if (run.carryingDish) {
+        const dest = run.guests.find((o) => o.id === run.carryingDish!.guestId && !o.served && o.walkState === 'seated')
+          ?? run.guests.find((o) => !o.served && o.walkState === 'seated');
         if (dest) {
           const dx = dest.x - p.x;
           const dir = dx >= 0 ? 1 : -1;
@@ -935,34 +916,20 @@ export class GameScene extends Phaser.Scene {
         const pulse = 1 + Math.sin(now / 90) * 0.14;
         g.lineStyle(1.5, C.gold, 0.78).strokeEllipse(wt, GROUND_Y - 1, 18 * pulse, 5 * pulse);
       }
-      // 砖灶自动烹制进度条
-      if (rushOpen) {
-        const s = run.dinerShift;
-        const activeOrders = s.kitchenOrders.slice(0, stoveCapacity(run));
-        activeOrders.forEach((o, idx) => {
-          const ky = GROUND_Y - 66 - idx * 10;
-          const tw = 38, th = 6;
-          const left = IN_STATIONS.kitchen - tw / 2;
-          const prog = Phaser.Math.Clamp(1 - o.ticksLeft / Math.max(1, o.totalTicks), 0, 1);
-          g.fillStyle(C.ink, 0.92).fillRoundedRect(left - 1, ky - 1, tw + 2, th + 2, 2);
-          g.fillStyle(o.isRye ? C.grey : C.ember, 0.95).fillRect(left, ky, Math.max(2, tw * prog), th);
-          g.lineStyle(1, C.gold, 0.9).strokeRoundedRect(left - 1, ky - 1, tw + 2, th + 2, 2);
-        });
-      }
-      if (run.pourMinigame) {
-        const dx = IN_STATIONS.drink;
-        const dy = GROUND_Y - 72;
-        const tw = 58, th = 9;
-        const left = dx - tw / 2;
-        const fast = run.diner.upgrades.includes('fast_tap');
-        const lo = fast ? 0.70 : 0.74, hi = fast ? 0.92 : 0.90;
-        const f = Phaser.Math.Clamp(run.pourMinigame.fill, 0, 1);
-        g.fillStyle(C.ink, 0.92).fillRoundedRect(left - 2, dy - 2, tw + 4, th + 4, 3);
-        g.fillStyle(C.woodDark, 0.95).fillRoundedRect(left, dy, tw, th, 2);
-        g.fillStyle(C.lamp, 0.45).fillRect(left + lo * tw, dy + 1, (hi - lo) * tw, th - 2);
-        g.fillStyle(C.gold, 0.9).fillRect(left + 0.80 * tw, dy + 1, 0.04 * tw, th - 2);
-        g.fillStyle(f >= lo && f <= hi ? C.gold : C.ember, 0.95).fillRect(left, dy + 1.5, f * tw, th - 3);
-        g.lineStyle(1.4, C.gold, 0.95).strokeRoundedRect(left - 1, dy - 1, tw + 2, th + 2, 2);
+      if (run.grillMinigame) {
+        const gx = IN_STATIONS.kitchen;
+        const gy = GROUND_Y - 68;
+        const tw = 68, th = 10;
+        const left = gx - tw / 2;
+        const f = Phaser.Math.Clamp(run.grillMinigame.fill, 0, 1);
+        g.fillStyle(C.ink, 0.94).fillRoundedRect(left - 2, gy - 2, tw + 4, th + 4, 3);
+        g.fillStyle(C.woodDark, 0.96).fillRoundedRect(left, gy, tw, th, 2);
+        g.fillStyle(C.ember, 0.35).fillRect(left + 0.42 * tw, gy + 1, 0.54 * tw, th - 2);
+        g.fillStyle(C.lamp, 0.6).fillRect(left + 0.65 * tw, gy + 1, 0.25 * tw, th - 2);
+        g.fillStyle(C.gold, 0.95).fillRect(left + 0.745 * tw, gy + 1, 0.09 * tw, th - 2);
+        const px = left + f * tw;
+        g.fillStyle(C.paper, 1).fillRect(px - 1.5, gy - 1, 3, th + 2);
+        g.lineStyle(1.4, C.gold, 0.95).strokeRoundedRect(left - 1, gy - 1, tw + 2, th + 2, 2);
       }
       return;
     }
@@ -1474,6 +1441,16 @@ export class GameScene extends Phaser.Scene {
       case 'sauceEmpty': {
         if (game.run.inside) {
           floaters.add(IN_STATIONS.mortar, GROUND_Y - 62, '辣酱耗尽！去磨酱', 'hurt');
+        }
+        break;
+      }
+      case 'grillDone': {
+        if (game.run.inside) {
+          this.burst('fx_boom', IN_STATIONS.kitchen, GROUND_Y - 34, 0.52);
+          for (let i = 0; i < 8; i++) {
+            this.spawnSpark(IN_STATIONS.kitchen, GROUND_Y - 36, Phaser.Math.FloatBetween(-1.2, 1.2), Phaser.Math.FloatBetween(-2.2, -0.5), 0.07, 22, 2.2, e.quality === 'legendary' ? C.gold : C.ember);
+          }
+          floaters.add(IN_STATIONS.kitchen, GROUND_Y - 62, `${GRILL_QUALITY_LABEL[e.quality]}·${e.dishName}`, e.quality === 'legendary' || e.quality === 'perfect' ? 'crit' : 'coin');
         }
         break;
       }

@@ -7,12 +7,12 @@ import {
   type StaffRole, type StaffSkillId, type TavernUpgradeId,
 } from '../content/data';
 import {
-  DAILY_TRENDS, DINER_REVIEW_POOL, FANS_RANKS, QUALITY_META, VIP_CUSTOMERS, VIP_TIERS, getFansRank, getRepTier,
+  DAILY_TRENDS, DINER_REVIEW_POOL, QUALITY_META, VIP_CUSTOMERS, VIP_TIERS, getFansRank, getRepTier,
   type AllyId, type DishQuality, type VipDef,
 } from '../content/story';
 import {
-  DINER_PLATE_X, DINER_SEAT_X, IN_MAX_X, IN_MIN_X, IN_STATIONS,
-  type BattleContractState, type CounterDish, type DinerGuest, type DinerShiftState, type GameEvent, type GuestPersonality,
+  DINER_SEAT_X, IN_MAX_X, IN_MIN_X, IN_STATIONS,
+  type BattleContractState, type DinerGuest, type DinerShiftState, type GameEvent, type GuestPersonality,
   type HiredStaffState, type RunState,
 } from './types';
 
@@ -349,6 +349,107 @@ export function pourQuality(fill: number, fastTap = false): DishQuality {
   return 'poor';
 }
 
+export const GRILL_QUALITY_LABEL: Record<DishQuality, string> = {
+  poor: '偏生/微焦',
+  good: '香熟可口',
+  perfect: '火候刚好',
+  legendary: '金焦绝佳',
+};
+
+/** 炉火指针评价：金色核心区(0.745..0.835) 金焦绝佳 ×1.7 赏金，金区(0.65..0.90) 火候刚好 ×1.38 */
+export function grillQuality(fill: number): DishQuality {
+  if (Math.abs(fill - 0.79) <= 0.045) return 'legendary';
+  if (fill >= 0.65 && fill <= 0.90) return 'perfect';
+  if (fill >= 0.42 && fill <= 0.96) return 'good';
+  return 'poor';
+}
+
+/** 按手里打到的魔物肉自动挑最好的上炉烤（无肉兜底烤黑麦肉干） */
+export function grillCutForRun(run: RunState, forcedKind?: MeatKind): {
+  meatKind: MeatKind | 'rye';
+  dish: MealId | 'rye';
+  dishName: string;
+} {
+  const pick: MeatKind | 'rye' = forcedKind && (run.meats[forcedKind] ?? 0) > 0
+    ? forcedKind
+    : (run.meats.essence ?? 0) > 0
+      ? 'essence'
+      : (run.meats.thick ?? 0) > 0
+        ? 'thick'
+        : (run.meats.tender ?? 0) > 0
+          ? 'tender'
+          : 'rye';
+  if (pick === 'essence') return { meatKind: 'essence', dish: 'abyss_marrow_pot', dishName: '秘炙魔髓' };
+  if (pick === 'thick') return { meatKind: 'thick', dish: 'iron_steak', dishName: '厚切战排' };
+  if (pick === 'tender') return { meatKind: 'tender', dish: 'spicy_skewer', dishName: '炭烤嫩肉串' };
+  return { meatKind: 'rye', dish: 'rye', dishName: '烤黑麦肉干' };
+}
+
+export function startGrillCmd(run: RunState, ev: GameEvent[], forcedKind?: MeatKind, guestId?: string | null): GameEvent[] | null {
+  if (run.phase !== 'camp' || !run.inside || run.carryingDish || run.grillMinigame) return null;
+  if (run.dinerShift.mode === 'prep') startShiftCmd(run, ev);
+  if (run.dinerShift.mode !== 'open') return null;
+
+  const cut = grillCutForRun(run, forcedKind);
+  const dest = (guestId ? run.guests.find((o) => o.id === guestId && !o.served && o.walkState !== 'leaving') : undefined)
+    ?? run.guests.filter((o) => !o.served && o.walkState !== 'leaving').sort((a, b) => (a.isVipRequest ? -1 : 0) - (b.isVipRequest ? -1 : 0) || a.patience - b.patience)[0]
+    ?? null;
+
+  run.grillMinigame = {
+    meatKind: cut.meatKind,
+    dish: cut.dish,
+    dishName: cut.dishName,
+    guestId: dest?.id ?? null,
+    fill: 0.08,
+    dir: 1,
+    speed: 0.017,
+    startedTick: run.tick,
+  };
+  return ev;
+}
+
+export function stopGrillCmd(run: RunState, ev: GameEvent[]): GameEvent[] | null {
+  const grill = run.grillMinigame;
+  if (run.phase !== 'camp' || !run.inside || !grill) return null;
+  run.grillMinigame = null;
+
+  const quality = grillQuality(grill.fill);
+  let actualIsRye = grill.meatKind === 'rye';
+  if (grill.meatKind !== 'rye' && (run.meats[grill.meatKind] ?? 0) > 0) {
+    run.meats[grill.meatKind] -= 1;
+  } else if (grill.meatKind !== 'rye') {
+    actualIsRye = true;
+  }
+
+  const dest = (grill.guestId ? run.guests.find((o) => o.id === grill.guestId && !o.served && o.walkState !== 'leaving') : undefined)
+    ?? run.guests.filter((o) => !o.served && o.walkState !== 'leaving').sort((a, b) => a.patience - b.patience)[0]
+    ?? null;
+
+  const dishId: MealId | 'rye' = actualIsRye ? 'rye' : grill.dish;
+  const dishName = actualIsRye ? '烤黑麦肉干' : grill.dishName;
+  run.carryingDish = {
+    guestId: dest?.id ?? '',
+    dish: dishId,
+    dishName,
+    quality,
+    isRye: actualIsRye,
+    hotUntilTick: run.tick + 420,
+  };
+  if (dest && !actualIsRye && dishId !== 'rye') {
+    dest.dish = dishId;
+    dest.dishName = dishName;
+    dest.isRye = false;
+  }
+  ev.push({ t: 'grillDone', meatKind: actualIsRye ? 'rye' : grill.meatKind, dishName, quality });
+  return ev;
+}
+
+export function cancelGrillCmd(run: RunState, ev: GameEvent[]): GameEvent[] | null {
+  if (!run.grillMinigame) return null;
+  run.grillMinigame = null;
+  return ev;
+}
+
 export function makeIdleShift(keepSpiceSpent = 0): DinerShiftState {
   return {
     mode: 'prep',
@@ -588,15 +689,10 @@ export function enqueueGuestOrder(run: RunState, g: DinerGuest) {
 }
 
 export function rollDinerGuests(run: RunState) {
-  const guestCount = maxSeats(run) >= 6 ? 4 : 3;
+  const guestCount = 3;
   const chosen = buildVipPool(run, guestCount, new Set<string>());
-  const seatOrder = [0, 1, 3, 4];
-  const cookable = MEAL_ORDER.filter((id) => hasIngredients(run, MEALS[id].cost));
-  const candidateMeals: MealId[] = cookable.length >= 2
-    ? cookable
-    : run.day <= 2
-      ? ['spicy_skewer', 'hearty_stew', 'garlic_cold_cut']
-      : MEAL_ORDER;
+  const seatOrder = [0, 1, 3, 2];
+  const candidateMeals: MealId[] = ['spicy_skewer', 'iron_steak', 'abyss_marrow_pot'];
 
   const guests: DinerGuest[] = chosen.map((vip, idx) => {
     const seatIdx = seatOrder[idx] ?? idx;
@@ -606,13 +702,13 @@ export function rollDinerGuests(run: RunState) {
     const meal = MEALS[dishId];
     const trendMatch = meal.tags.includes(run.diner.trendTag);
     const shortName = vip.name.includes('·') ? vip.name.split('·').pop()! : vip.name;
-    const pay = computeDishPay(run, dishId, vip, trendMatch, personality);
+    const pay = Math.max(26, computeDishPay(run, dishId, vip, trendMatch, personality));
     const isUrgentWar = run.day >= 2 && idx === 1;
     const warOrderReward: 'barrel' | 'ammo' | undefined = isUrgentWar ? (run.day % 2 === 0 ? 'barrel' : 'ammo') : undefined;
     const orderQuote = isUrgentWar
       ? (warOrderReward === 'barrel'
-        ? `暗号「红灯照雾」· 加急战备单！速上【${meal.name}】，明晚前院白送一只火油桶！`
-        : `暗号「掀桌满膛」· 加急战备单！速上【${meal.name}】，当场赠满额战备弹药箱！`)
+        ? '暗号「红灯照雾」· 加急单！端来刚出炉的热烤肉，明晚白送一只火油桶！'
+        : '暗号「掀桌满膛」· 加急单！端来刚出炉的热烤肉，当场赠满额战备弹药箱！')
       : (VIP_ORDER_LINES[vip.id] ?? vip.bg);
     return {
       id: `${vip.id}_${run.day}_${idx}`,
@@ -649,38 +745,25 @@ export function rollDinerGuests(run: RunState) {
 
 export function spawnShiftGuest(run: RunState): DinerGuest | null {
   const occupied = new Set(run.guests.filter((g) => g.walkState !== 'leaving').map((g) => g.seatIdx));
-  const dirty = new Set(run.dinerShift.dirtyTables.map((d) => d.seatIdx));
-  const seats = [0, 1, 3, 2, 4, 5, 6, 7].slice(0, maxSeats(run));
-  const seatIdx = seats.find((i) => !occupied.has(i) && !dirty.has(i));
+  const seats = [0, 1, 3, 2];
+  const seatIdx = seats.find((i) => !occupied.has(i));
   if (seatIdx === undefined) return null;
 
   const activeVips = new Set(run.guests.map((g) => g.vipId));
   const vip = buildVipPool(run, 1, activeVips)[0] ?? VIP_CUSTOMERS[0];
   const personality = rollPersonality(run, vip);
   const supportKind = vipSupportKind(vip.id, seatIdx);
-  const patMul = (personality === 'hurried' ? 0.72 : personality === 'gourmet' ? 1.18 : 1)
-    * (hasTavernUpgrade(run, 'warm_lantern') ? 1.28 : 1);
-  const maxPatience = Math.round((1560 + rand(run) * 280) * patMul);
+  const patMul = personality === 'hurried' ? 0.85 : personality === 'gourmet' ? 1.2 : 1;
+  const maxPatience = Math.round(2100 * patMul);
 
   const hasVipReqAlready = run.guests.some((o) => o.isVipRequest && !o.served);
   const wantVipReq = !hasVipReqAlready && rand(run) < 0.45;
   const shortName = vip.name.includes('·') ? vip.name.split('·').pop()! : vip.name;
-
-  const cookable = MEAL_ORDER.filter((id) => (run.diner.menuStock[id] ?? 0) > 0 || hasIngredients(run, MEALS[id].cost));
-  const pool = cookable.length > 0 ? cookable : (run.diner.menu.length > 0 ? run.diner.menu : MEAL_ORDER);
-  let dishId = pickGuestMeal(run, vip, rand(run) < 0.4, pool);
-  let isVipRequest = false;
-  let requestBonusCoins: number | undefined;
-  let warOrderReward: 'barrel' | 'ammo' | undefined;
-  if (wantVipReq && cookable.length > 0) {
-    dishId = pickGuestMeal(run, vip, false, cookable);
-    isVipRequest = true;
-    requestBonusCoins = Math.round(MEALS[dishId].basePay * 0.45);
-    warOrderReward = (run.day + seatIdx) % 2 === 0 ? 'barrel' : 'ammo';
-  }
+  const dishId = grillCutForRun(run).dish === 'rye' ? 'spicy_skewer' : grillCutForRun(run).dish as MealId;
   const meal = MEALS[dishId];
   const trendMatch = meal.tags.includes(run.diner.trendTag);
-  const pay = computeDishPay(run, dishId, vip, trendMatch, personality);
+  const pay = Math.max(26, computeDishPay(run, dishId, vip, trendMatch, personality));
+  const warOrderReward: 'barrel' | 'ammo' | undefined = wantVipReq ? ((run.day + seatIdx) % 2 === 0 ? 'barrel' : 'ammo') : undefined;
   const g: DinerGuest = {
     id: `${vip.id}_rush_${run.nextId++}`,
     vipId: vip.id,
@@ -700,13 +783,13 @@ export function spawnShiftGuest(run: RunState): DinerGuest | null {
     dishName: meal.name,
     pay,
     trendMatch,
-    isVipRequest,
-    requestBonusCoins,
+    isVipRequest: wantVipReq || undefined,
+    requestBonusCoins: wantVipReq ? Math.round(meal.basePay * 0.45) : undefined,
     warOrderReward,
-    orderQuote: isVipRequest
+    orderQuote: wantVipReq
       ? (warOrderReward === 'barrel'
-        ? `暗号「红灯照雾」· 加急战备单！速上【${meal.name}】，明晚前院白送一只火油桶！`
-        : `暗号「掀桌满膛」· 加急战备单！速上【${meal.name}】，当场赠满额战备弹药箱！`)
+        ? '暗号「红灯照雾」· 加急单！端来刚出炉的热烤肉，明晚白送一只火油桶！'
+        : '暗号「掀桌满膛」· 加急单！端来刚出炉的热烤肉，当场赠满额战备弹药箱！')
       : (VIP_ORDER_LINES[vip.id] ?? vip.bg),
     thanksQuote: vip.reactions.good,
     served: false,
@@ -720,40 +803,34 @@ export function spawnShiftGuest(run: RunState): DinerGuest | null {
 
 export function startShiftCmd(run: RunState, ev: GameEvent[]): GameEvent[] | null {
   if (run.phase !== 'camp' || !run.inside || run.dinerShift.mode === 'open') return null;
-  if (run.diner.menu.length === 0) run.diner.menu = [run.diner.researched[0] ?? 'spicy_skewer'];
-  const duration = (hasTavernUpgrade(run, 'warm_lantern') ? 55 : 45) * 60;
-  const baseMaxP = Math.round(1620 * (hasTavernUpgrade(run, 'warm_lantern') ? 1.28 : 1));
-  const keepSpiceSpent = run.dinerShift.spiceSpentCoins ?? 0;
+  const duration = 45 * 60;
+  const baseMaxP = 2100;
 
   run.carryingDish = null;
+  run.grillMinigame = null;
   run.pourMinigame = null;
   run.carryingDrink = null;
-  run.dinerShift = makeIdleShift(keepSpiceSpent);
+  run.dinerShift = makeIdleShift(0);
   run.dinerShift.mode = 'open';
   run.dinerShift.timer = duration;
   run.dinerShift.duration = duration;
-  run.dinerShift.spawnCd = 95;
-  for (const st of run.diner.hiredStaff) {
-    st.carrying = null;
-    st.targetId = null;
-    st.task = 'idle';
-    st.taskT = 0;
-  }
+  run.dinerShift.spawnCd = 60;
 
   run.guests = run.guests
     .filter((g) => !g.served && g.walkState !== 'leaving')
-    .map((g) => {
-      const mul = g.personality === 'hurried' ? 0.72 : g.personality === 'gourmet' ? 1.18 : 1;
-      const maxP = Math.round(baseMaxP * mul);
-      return { ...g, walkState: 'seated' as const, maxPatience: maxP, patience: maxP, eatT: 0 };
-    });
+    .map((g) => ({
+      ...g,
+      orderKind: 'dish' as const,
+      isRye: false,
+      walkState: 'seated' as const,
+      maxPatience: baseMaxP,
+      patience: baseMaxP,
+      eatT: 0,
+    }));
 
-  for (const g of run.guests) {
-    if (g.orderKind === 'dish' && !g.served && g.walkState === 'seated') {
-      enqueueGuestOrder(run, g);
-    }
+  while (run.guests.length < 3) {
+    if (!spawnShiftGuest(run)) break;
   }
-  if (run.guests.length < 3) spawnShiftGuest(run);
   ev.push({ t: 'shiftOpen', duration });
   return ev;
 }
@@ -763,52 +840,30 @@ export function finishShiftToSummary(run: RunState, ev: GameEvent[]) {
   if (s.mode !== 'open') return;
   s.mode = 'summary';
   s.timer = 0;
+  run.grillMinigame = null;
   run.pourMinigame = null;
   run.carryingDish = null;
   run.carryingDrink = null;
   s.kitchenOrders = [];
-  for (const st of run.diner.hiredStaff) {
-    st.carrying = null;
-    st.targetId = null;
-    st.task = 'idle';
-    st.taskT = 0;
-  }
+  s.counterDishes = [];
+  s.dirtyTables = [];
   run.guests = run.guests.filter((g) => g.walkState === 'seated' && !g.angry);
 
-  const realServed = Math.max(0, s.servedCount - s.ryeCount);
-  const rawRating = 2.4
-    + Math.min(2.1, realServed * 0.34 + s.bestCombo * 0.06)
-    + (run.diner.bestTaste >= 140 ? 0.3 : 0)
-    - s.ryeCount * 0.45
-    - s.lostCount * 0.55
-    - s.dirtyTables.length * 0.12;
-  const rating = Math.round(Math.max(1.0, Math.min(5.0, rawRating)) * 10) / 10;
-  const flameEarned = Math.max(2, Math.round(rating * 1.4) + (realServed >= 4 ? 1 : 0));
-  run.diner.flame += flameEarned;
-
-  const activeWage = run.diner.hiredStaff
-    .filter((st) => st.role !== 'rest')
-    .reduce((sum, st) => sum + (staffDef(st.id)?.dailyWage ?? 14), 0);
-  const rankIdx = Math.max(0, FANS_RANKS.findIndex((r) => r.grade === dinerRank(run).cur.grade));
-  const upkeepCost = run.day >= 2 ? 4 + rankIdx * 3 + run.diner.rackLevel * 2 : 0;
-  const paidExpense = Math.min(run.coins, activeWage + upkeepCost);
-  run.coins -= paidExpense;
-
-  const partyBonusCoins = s.partyBonusCoins ?? 0;
-  const drinkCoins = Math.round(s.drinkCount * 15);
-  const dishCoins = Math.max(0, s.coinsEarned - drinkCoins - partyBonusCoins);
-  const netProfit = s.coinsEarned + s.tipsEarned - s.spiceSpentCoins - activeWage - upkeepCost;
+  const rawRating = 3.0 + Math.min(2.0, s.servedCount * 0.48 + s.bestCombo * 0.12) - s.lostCount * 0.3;
+  const rating = Math.round(Math.max(2.0, Math.min(5.0, rawRating)) * 10) / 10;
+  const flameEarned = Math.max(2, s.servedCount);
+  const netProfit = s.coinsEarned + s.tipsEarned;
   s.report = {
-    dishCoins,
-    drinkCoins,
+    dishCoins: s.coinsEarned,
+    drinkCoins: 0,
     tipsCoins: s.tipsEarned,
-    partyBonusCoins,
-    spiceExpense: s.spiceSpentCoins,
-    staffWages: activeWage,
-    upkeepCost,
+    partyBonusCoins: s.partyBonusCoins ?? 0,
+    spiceExpense: 0,
+    staffWages: 0,
+    upkeepCost: 0,
     ryePenaltyCount: s.ryeCount,
     angryCount: s.lostCount,
-    dirtyLeftCount: s.dirtyTables.length,
+    dirtyLeftCount: 0,
     rating,
     flameEarned,
     netProfit,
@@ -829,6 +884,19 @@ export function finishShiftToSummary(run: RunState, ev: GameEvent[]) {
 export function stepTavernShift(run: RunState, ev: GameEvent[]) {
   if (!run.inside) return;
 
+  // ── 0. 红砖炉轻量火候指针（平滑来回摆动，玩家点一次停在金色区即可） ──
+  if (run.grillMinigame) {
+    const gr = run.grillMinigame;
+    gr.fill += gr.dir * gr.speed;
+    if (gr.fill >= 0.98) {
+      gr.fill = 0.98;
+      gr.dir = -1;
+    } else if (gr.fill <= 0.03) {
+      gr.fill = 0.03;
+      gr.dir = 1;
+    }
+  }
+
   if (run.pourMinigame) {
     run.pourMinigame.fill += run.pourMinigame.speed;
     if (run.pourMinigame.fill >= 1.04) {
@@ -842,114 +910,21 @@ export function stepTavernShift(run: RunState, ev: GameEvent[]) {
   const s = run.dinerShift;
   if (s.mode !== 'open') return;
 
-  // ── 0. 冲刺顺手递菜 / 拂过收盘（跑堂爽感优化）──
-  if (run.player.dodgeT > 0 && !run.pourMinigame) {
-    if (run.carryingDish) {
-      const cd = run.carryingDish;
-      const dest = run.guests.find((o) => o.id === cd.guestId && !o.served && o.walkState === 'seated')
-        ?? run.guests.find((o) => o.orderKind === 'dish' && !o.served && o.walkState === 'seated' && !o.isRye && o.dish === cd.dish);
-      if (dest && Math.abs(run.player.x - dest.x) <= 26) {
-        const hotCrit = !cd.isRye && cd.hotUntilTick !== undefined && run.tick <= cd.hotUntilTick;
-        run.carryingDish = null;
-        completeServeGuest(run, dest, cd.quality, ev, false, false, !!cd.isRye, hotCrit);
-      }
-    } else if (run.carryingDrink) {
-      const ck = run.carryingDrink;
-      const dest = run.guests.find((o) => o.id === ck.guestId && !o.served && o.walkState === 'seated')
-        ?? run.guests.find((o) => o.orderKind === 'drink' && !o.served && o.walkState === 'seated' && o.drink === ck.drink);
-      if (dest && Math.abs(run.player.x - dest.x) <= 26) {
-        run.carryingDrink = null;
-        completeServeGuest(run, dest, ck.quality, ev, false, true);
-      }
-    } else if (s.dirtyTables.length > 0) {
-      const hitIdx = s.dirtyTables.findIndex((dp) => Math.abs(run.player.x - dp.x) <= 22);
-      if (hitIdx >= 0) {
-        const dp = s.dirtyTables.splice(hitIdx, 1)[0];
-        const tip = run.cls === 'chef' ? 4 : 3;
-        run.coins += tip;
-        s.tipsEarned += tip;
-        s.cleanedCount++;
-        ev.push({ t: 'tableClean', x: dp.x, coins: tip });
-      }
+  // ── 1. 冲刺顺手递上刚出锅烤肉（不用停步也能趁热喂给客人！） ──
+  if (run.player.dodgeT > 0 && !run.grillMinigame && run.carryingDish) {
+    const cd = run.carryingDish;
+    const dest = run.guests.find((o) => o.id === cd.guestId && !o.served && o.walkState === 'seated')
+      ?? run.guests.find((o) => !o.served && o.walkState === 'seated');
+    if (dest && Math.abs(run.player.x - dest.x) <= 28) {
+      const hotCrit = !cd.isRye && cd.hotUntilTick !== undefined && run.tick <= cd.hotUntilTick;
+      run.carryingDish = null;
+      completeServeGuest(run, dest, cd.quality, ev, false, false, !!cd.isRye, hotCrit);
     }
   }
 
-  // ── 1. 后厨自动出菜 & 辣酱消耗（辣酱耗尽则非黑麦饼订单卡单，直到玩家/自动磨酱手去石臼磨酱）──
-  const cap = passCounterCapacity(run);
-  const stoveSlots = stoveCapacity(run);
-  const linCook = hasAlly(run, 'lin') && allyRole(run, 'lin') === 'kitchen';
-  const cookStaff = run.diner.hiredStaff.filter((st) => st.role === 'kitchen');
-  const fastCookBonus = cookStaff.reduce((sum, st) => sum + 0.22 + (staffHasSkill(st, 'fast_cook') ? 0.18 : 0), 0);
-  const hasExtraPlate = cookStaff.some((st) => staffHasSkill(st, 'extra_plate'));
-  const speedMul = (linCook ? 1.25 : 1) * (hasTavernUpgrade(run, 'wide_pass') ? 1.5 : 1) * (1 + fastCookBonus) * (run.cls === 'chef' ? 1.15 : 1);
-
-  if (s.kitchenOrders.length > 0 && s.counterDishes.length < cap) {
-    const active = s.kitchenOrders.slice(0, stoveSlots);
-    const doneIds = new Set<number>();
-    for (const order of active) {
-      const needsSauce = !order.isRye && (order.sauceCost > 0 || s.sauce <= 0);
-      if (needsSauce && s.sauce <= 0) {
-        if (!s.sauceStalled) {
-          s.sauceStalled = true;
-          ev.push({ t: 'sauceEmpty' });
-        }
-        continue;
-      }
-      if (!order.isRye && order.sauceCost > 0) {
-        const drain = (order.sauceCost / Math.max(1, order.totalTicks)) * speedMul;
-        s.sauce = Math.max(0, s.sauce - drain);
-        if (s.sauce <= 0 && !s.sauceStalled) {
-          s.sauceStalled = true;
-          ev.push({ t: 'sauceEmpty' });
-        }
-      }
-      order.ticksLeft -= speedMul;
-      if (order.ticksLeft <= 0 && s.counterDishes.length < cap) {
-        const quality: DishQuality = order.isRye ? 'poor' : linCook || cookStaff.length > 0 || run.cls === 'chef' ? 'perfect' : 'good';
-        const cDish: CounterDish = {
-          id: run.nextId++,
-          guestId: order.guestId,
-          dish: order.dish,
-          dishName: order.dishName,
-          quality,
-          isRye: order.isRye,
-          cookedTick: run.tick,
-        };
-        s.counterDishes.push(cDish);
-        doneIds.add(order.id);
-        ev.push({ t: 'kitchenDone', dish: order.dish, dishName: order.dishName, isRye: order.isRye });
-
-        if (!order.isRye && hasExtraPlate && s.counterDishes.length < cap && rand(run) < 0.28) {
-          const otherWaiting = run.guests.find(
-            (og) => og.orderKind === 'dish' && !og.served && og.walkState === 'seated'
-              && og.id !== order.guestId
-              && !s.counterDishes.some((c) => c.guestId === og.id)
-              && run.carryingDish?.guestId !== og.id
-              && !run.diner.hiredStaff.some((st) => st.carrying?.guestId === og.id),
-          );
-          if (otherWaiting) {
-            s.counterDishes.push({
-              id: run.nextId++,
-              guestId: otherWaiting.id,
-              dish: order.dish,
-              dishName: order.dishName,
-              quality: 'perfect',
-              cookedTick: run.tick,
-            });
-            ev.push({ t: 'kitchenDone', dish: order.dish, dishName: order.dishName, extraPlate: true });
-          }
-        }
-      }
-    }
-    if (doneIds.size > 0) {
-      s.kitchenOrders = s.kitchenOrders.filter((o) => !doneIds.has(o.id));
-    }
-  }
-
-  // ── 2. 客人进店、点单、耐心计时与用餐离席 ──
-  const walkSpeed = hasTavernUpgrade(run, 'wide_pass') ? 1.15 : 0.92;
-  const zhaoFloor = hasAlly(run, 'zhao') && allyRole(run, 'zhao') === 'floor';
-  const drainMul = (hasTavernUpgrade(run, 'warm_lantern') ? 0.72 : 1) * (zhaoFloor ? 0.85 : 1) * (s.sauceStalled ? 1.25 : 1);
+  // ── 2. 客人进店、享肉离席（零脏碗零卡单，清爽循环） ──
+  const walkSpeed = 1.15;
+  const drainMul = run.grillMinigame ? 0.35 : 0.72;
   const nextGuests: DinerGuest[] = [];
 
   for (const g of run.guests) {
@@ -959,7 +934,6 @@ export function stepTavernShift(run: RunState, ev: GameEvent[]) {
         g.x = g.targetX;
         g.walkState = 'seated';
         g.facing = g.seatIdx % 2 === 0 ? 1 : -1;
-        if (g.orderKind === 'dish') enqueueGuestOrder(run, g);
       } else {
         const vx = Math.sign(d) * Math.min(walkSpeed, Math.abs(d));
         g.x += vx;
@@ -972,7 +946,7 @@ export function stepTavernShift(run: RunState, ev: GameEvent[]) {
     if (g.walkState === 'leaving') {
       const d = g.targetX - g.x;
       if (Math.abs(d) <= 4) continue;
-      const vx = Math.sign(d) * Math.min(1.2, Math.abs(d));
+      const vx = Math.sign(d) * Math.min(1.25, Math.abs(d));
       g.x += vx;
       g.facing = vx >= 0 ? 1 : -1;
       nextGuests.push(g);
@@ -987,16 +961,9 @@ export function stepTavernShift(run: RunState, ev: GameEvent[]) {
         g.walkState = 'leaving';
         g.targetX = IN_STATIONS.door;
         g.facing = 1;
-        s.kitchenOrders = s.kitchenOrders.filter((o) => o.guestId !== g.id);
-        s.counterDishes = s.counterDishes.filter((c) => c.guestId !== g.id);
-        if (run.carryingDish?.guestId === g.id) run.carryingDish = null;
-        if (run.carryingDrink?.guestId === g.id) run.carryingDrink.guestId = null;
-        for (const st of run.diner.hiredStaff) {
-          if (st.carrying?.guestId === g.id) { st.carrying = null; st.targetId = null; }
-        }
+        if (run.carryingDish?.guestId === g.id) run.carryingDish.guestId = '';
         s.lostCount++;
         s.combo = 0;
-        run.diner.rep = Math.max(0, run.diner.rep - (g.personality === 'gourmet' ? 2 : 1));
         ev.push({ t: 'guestAngry', guestId: g.id, name: g.name });
       }
       nextGuests.push(g);
@@ -1006,12 +973,6 @@ export function stepTavernShift(run: RunState, ev: GameEvent[]) {
     if (g.eatT > 0) {
       g.eatT--;
       if (g.eatT <= 0) {
-        s.dirtyTables.push({
-          id: run.nextId++,
-          seatIdx: g.seatIdx,
-          x: DINER_PLATE_X[g.seatIdx] ?? g.x,
-          createdTick: run.tick,
-        });
         g.walkState = 'leaving';
         g.targetX = IN_STATIONS.door;
         g.facing = 1;
@@ -1022,16 +983,17 @@ export function stepTavernShift(run: RunState, ev: GameEvent[]) {
   run.guests = nextGuests;
 
   const activeCount = run.guests.filter((g) => g.walkState !== 'leaving').length;
-  const seatCap = maxSeats(run);
-  if (s.timer > 180 && activeCount + s.dirtyTables.length < seatCap) {
+  const unservedCount = run.guests.filter((g) => !g.served && g.walkState !== 'leaving').length;
+  if (s.timer > 120 && activeCount < 4) {
+    if (unservedCount === 0) s.spawnCd = Math.min(s.spawnCd, 40);
     if (s.spawnCd > 0) s.spawnCd--;
     if (s.spawnCd <= 0) {
       spawnShiftGuest(run);
-      s.spawnCd = (seatCap >= 6 ? 128 : 165) + Math.floor(rand(run) * 65);
+      s.spawnCd = 110 + Math.floor(rand(run) * 45);
     }
   }
 
-  if (--s.timer <= 0) {
+  if (!run.grillMinigame && --s.timer <= 0) {
     finishShiftToSummary(run, ev);
   }
 }
@@ -1094,7 +1056,8 @@ export function completeServeGuest(
   const beforeRank = dinerRank(run).cur.grade;
   const party = activeParty(run);
   const partyMatch = !isRye && !isDrink && isPartyDish(run, g.dish);
-  const baseCoins = isRye ? RYE_FALLBACK.pay : Math.round(g.pay * qMeta.payMul);
+  const cutPay = isRye ? 14 : Math.max(g.pay, Math.round((MEALS[g.dish].basePay * 0.92 + run.day * 2) * (run.cls === 'chef' ? 1.35 : 1)));
+  const baseCoins = Math.round(cutPay * qMeta.payMul);
   const effectiveHot = hotCrit && !isRye && !isDrink;
   if (effectiveHot) {
     comboTip += Math.max(4, Math.round(baseCoins * 0.3));
@@ -1111,12 +1074,12 @@ export function completeServeGuest(
   const drinkDef = isDrink && g.drink ? DRINKS[g.drink] : null;
   const gourmetFans = !isRye && g.personality === 'gourmet' ? 5 : 0;
   const fansGain = isRye
-    ? 0
+    ? 2
     : drinkDef
       ? Math.round(drinkDef.fans * qMeta.payMul * zhaoMul * chefFans * tierFans)
       : Math.round(qMeta.fans * trendFans * partyFansMul * zhaoMul * chefFans * tierFans) + gourmetFans;
   const repDelta = isRye
-    ? (g.personality === 'gourmet' ? -2 : RYE_FALLBACK.rep)
+    ? 0
     : drinkDef
       ? drinkDef.rep + (quality === 'legendary' ? 1 : 0)
       : qMeta.rep + (g.trendMatch ? 1 : 0) + (vipRequestClear ? 1 : 0);

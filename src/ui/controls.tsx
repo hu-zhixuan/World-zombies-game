@@ -2,9 +2,9 @@
 import { useRef } from 'preact/hooks';
 import { audio } from '../app/audio';
 import { game } from '../app/game';
-import { CLASSES, DRINKS, MAX_STAR, MEALS, RARITY_NAME, RYE_FALLBACK, WEAPONS, magSize, type MealId } from '../content/data';
-import { ALLIES, QUALITY_META } from '../content/story';
-import { MAX_CARRY, crateSalvageCoins, curWeapon, formatRecipeCost, nearbyCampTarget, nearbyStation, nearbyWeaponCrate, pourQuality } from '../sim/sim';
+import { CLASSES, MAX_STAR, MEALS, RARITY_NAME, RYE_FALLBACK, WEAPONS, magSize, type MealId } from '../content/data';
+import { ALLIES } from '../content/story';
+import { GRILL_QUALITY_LABEL, MAX_CARRY, crateSalvageCoins, curWeapon, grillQuality, nearbyCampTarget, nearbyWeaponCrate } from '../sim/sim';
 import { GROUND_Y } from '../sim/types';
 import { getScene } from '../view/scene';
 import { Bar, Icon } from './parts';
@@ -203,47 +203,29 @@ export function CampKeys() {
 
   if (ct) {
     switch (ct.kind) {
-      case 'grindMortar':
-        icon = 'ic_mortar';
-        label = ct.sauce <= 0 ? '急磨辣酱' : '磨辣酱';
-        tip = `辛香辣酱 ${ct.sauce}/${ct.maxSauce}`;
-        break;
-      case 'pourFinish': {
-        const q = pourQuality(run.pourMinigame!.fill, run.diner.upgrades.includes('fast_tap'));
-        icon = DRINKS[ct.drink].icon;
-        label = '止沫停杯';
-        tip = `${DRINKS[ct.drink].name} · ${QUALITY_META[q].label}`;
+      case 'grillFinish': {
+        const q = grillQuality(run.grillMinigame?.fill ?? 0.5);
+        icon = dishIcon(run.grillMinigame?.dish ?? 'spicy_skewer', ct.meatKind === 'rye');
+        label = '停火出锅';
+        tip = `${ct.dishName} · ${GRILL_QUALITY_LABEL[q]}`;
         break;
       }
-      case 'pourStart':
-        icon = DRINKS[ct.drink].icon;
-        label = `打${ct.drink === 'beer' ? '黑啤' : '热茶'}`;
-        tip = ct.guest ? `${ct.guest.name} · ${DRINKS[ct.drink].name}` : DRINKS[ct.drink].name;
+      case 'grillStart': {
+        icon = ct.meatKind === 'rye' ? RYE_FALLBACK.icon : ct.meatKind === 'essence' ? 'ic_dish_marrow' : ct.meatKind === 'thick' ? 'ic_dish_steak' : 'ic_dish_skewer';
+        const shortCut = ct.meatKind === 'essence' ? '魔髓' : ct.meatKind === 'thick' ? '厚排' : ct.meatKind === 'tender' ? '嫩肉' : '黑麦';
+        label = run.dinerShift.mode === 'open' ? `烤·${shortCut}` : '开张烤肉';
+        tip = ct.guest ? `${ct.dishName} → ${ct.guest.name}` : ct.dishName;
         break;
-      case 'serveDrink':
-        icon = DRINKS[run.carryingDrink!.drink].icon;
-        label = `递酒·${ct.guest.name}`;
-        tip = `${QUALITY_META[run.carryingDrink!.quality].label}·${ct.guest.dishName}`;
-        break;
+      }
       case 'serveCarried':
         icon = dishIcon(run.carryingDish!.dish, run.carryingDish!.isRye);
-        label = `上菜·${ct.guest.name}`;
-        tip = `${QUALITY_META[run.carryingDish!.quality].label}·${ct.guest.dishName}`;
-        break;
-      case 'cleanTable':
-        icon = 'ic_dirty_plate';
-        label = '收拾桌面';
-        tip = `清理空盘 (+${run.cls === 'chef' ? 4 : 3}金)`;
-        break;
-      case 'pickCounter':
-        icon = dishIcon(ct.counterDish.dish, ct.counterDish.isRye);
-        label = '端走热菜';
-        tip = `传菜台 · ${ct.counterDish.dishName}`;
+        label = `上肉·${ct.guest.name}`;
+        tip = `${GRILL_QUALITY_LABEL[run.carryingDish!.quality]} · ${run.carryingDish!.dishName}`;
         break;
       case 'guestTalk':
-        icon = ct.guest.orderKind === 'drink' && ct.guest.drink ? DRINKS[ct.guest.drink].icon : dishIcon(ct.guest.dish, ct.guest.isRye);
+        icon = dishIcon(ct.guest.dish, ct.guest.isRye);
         label = '搭话';
-        tip = ct.guest.served ? `${ct.guest.name}` : `${ct.guest.name} · ${ct.guest.dishName} (${ct.guest.isRye ? '应急' : formatRecipeCost(MEALS[ct.guest.dish].cost)})`;
+        tip = ct.guest.served ? `${ct.guest.name} · 已用膳` : `${ct.guest.name} · 等候烤肉`;
         break;
       case 'allyTalk':
         icon = 'ic_star';
@@ -251,24 +233,24 @@ export function CampKeys() {
         tip = `${ALLIES[ct.ally].name}`;
         break;
       case 'kitchen':
-        icon = 'ic_kitchen';
-        label = '酒馆';
-        break;
       case 'pass':
-        icon = 'ic_clean_plate';
-        label = '传菜台';
-        break;
       case 'drink':
-        icon = 'ic_beer';
-        label = '打酒';
+      case 'grindMortar':
+      case 'pourStart':
+      case 'pourFinish':
+      case 'cleanTable':
+      case 'pickCounter':
+      case 'serveDrink':
+        icon = 'ic_kitchen';
+        label = '烤肉';
         break;
       case 'shop':
         icon = 'ic_shop';
-        label = '军械行商';
+        label = '军械商店';
         break;
       case 'workshop':
         icon = 'ic_anvil';
-        label = '防线工坊';
+        label = '防线升级';
         break;
       case 'turretSlot': {
         const sl = run.turrets[ct.slot];
@@ -299,12 +281,7 @@ export function CampKeys() {
   } else if (run.carryingDish) {
     const dest = run.guests.find((o) => o.id === run.carryingDish!.guestId);
     icon = dishIcon(run.carryingDish.dish, run.carryingDish.isRye);
-    label = '端菜中';
-    tip = `→ ${dest?.name ?? '餐桌'}`;
-  } else if (run.carryingDrink) {
-    const dest = run.guests.find((o) => o.id === run.carryingDrink!.guestId);
-    icon = DRINKS[run.carryingDrink.drink].icon;
-    label = '端饮中';
+    label = '端肉中';
     tip = `→ ${dest?.name ?? '餐桌'}`;
   }
 
@@ -501,16 +478,18 @@ export function WeaponChip() {
   );
 }
 
-/** 营地夜晚极简底栏：仅保留「酒馆」与「迎战第 N 天」触发键（营业中自动隐藏，专心上菜） */
+/** 营地极简底栏：直接跳【防线升级】【军械商店】【迎战第 N 天】（烤肉/营业/结算中自动隐藏） */
 export function CampBar() {
   const run = game.run;
-  if (run.inside && run.dinerShift.mode === 'open') return null;
-  const near = run.inside ? nearbyStation(run) : null;
-  const unserved = run.guests.filter((g) => !g.served).length;
+  if (run.inside && (run.grillMinigame || run.dinerShift.mode === 'open' || run.dinerShift.mode === 'summary')) return null;
+  const ct = run.inside ? nearbyCampTarget(run) : null;
   return (
     <div class="camp-bar" id="camp-bar">
-      <button id="btn-kitchen" class={`camp-btn ${near === 'kitchen' ? 'near' : ''}`} onClick={() => game.open('kitchen')}>
-        <Icon k="ic_kitchen" />{unserved > 0 ? `酒馆 · ${unserved}客` : '酒馆'}
+      <button id="btn-camp-build" class={`camp-btn ${ct?.kind === 'workshop' ? 'near' : ''}`} onClick={() => game.open('build')}>
+        <Icon k="ic_anvil" />防线升级
+      </button>
+      <button id="btn-camp-shop" class={`camp-btn ${ct?.kind === 'shop' ? 'near' : ''}`} onClick={() => game.open('shop')}>
+        <Icon k="ic_shop" />军械商店
       </button>
       {run.endless ? (
         <>
@@ -556,7 +535,7 @@ export function bindKeyboard() {
       else if (k === 'f' || k === 'enter') game.press('interact');
       else if (k === 'escape') {
         if (curPanel === null) game.open('pause');
-        else if (curPanel === 'pause' || curPanel === 'shop' || curPanel === 'build' || curPanel === 'kitchen' || curPanel === 'lore' || curPanel === 'weaponSwap') game.close();
+        else if (curPanel === 'pause' || curPanel === 'shop' || curPanel === 'build' || curPanel === 'lore' || curPanel === 'weaponSwap') game.close();
       }
     }
   };
