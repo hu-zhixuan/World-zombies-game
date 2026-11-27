@@ -4,13 +4,13 @@ import {
   ALLIES, BOSS_VICTORY, CINEMATIC_INTRO, COMPANION_JOIN_STORIES,
   REST_STORY, SPEAKERS, type AllyId, type StoryLine,
 } from '../content/story';
-import { command, formatRecipeCost, hasIngredients, houseBuff, nearbyCampTarget, nearbyExterior, nearbyStation, newRun, step } from '../sim/sim';
+import { MAX_CARRY, command, formatRecipeCost, hasIngredients, houseBuff, nearbyCampTarget, nearbyExterior, nearbyStation, nearbyWeaponCrate, newRun, step } from '../sim/sim';
 import { NO_INPUT, type Command, type GameEvent, type Input, type RunState } from '../sim/types';
 import { audio } from './audio';
 import { loadMeta, recordRunToMeta, saveMeta, starsEarned, type MetaState } from './meta';
 
 /** 玩家主动打开的弹窗。三选一与结算直接由 run.phase 驱动；营地夜晚可自由走动并按需开店/下厨/修防线。 */
-export type UserPanel = 'shop' | 'build' | 'kitchen' | 'pause' | 'lore';
+export type UserPanel = 'shop' | 'build' | 'kitchen' | 'pause' | 'lore' | 'weaponSwap';
 export type Panel = UserPanel | 'title' | 'class' | 'perk' | 'dead' | 'won' | 'story' | null;
 
 export interface QueuedStory { title: string; line: StoryLine }
@@ -28,6 +28,7 @@ class Game {
   });
   started = false;
   choosing = false;
+  pendingSwapCrateId: number | null = null;
   private stack: UserPanel[] = [];
   storyQueue: QueuedStory[] = [];
   private immediateStory = false;
@@ -78,9 +79,23 @@ class Game {
     }
   }
 
+  openWeaponSwap(crateId: number) {
+    const c = this.run.crates.find((o) => o.id === crateId && o.kind !== 'supply' && (o.y ?? 0) >= -8);
+    if (!c) return false;
+    const p = this.run.player;
+    const owned = p.weapons.some((w) => w.id === c.weapon);
+    if (owned || p.weapons.length < MAX_CARRY) {
+      return this.send({ t: 'pickupCrate', crateId: c.id });
+    }
+    this.pendingSwapCrateId = c.id;
+    this.open('weaponSwap');
+    return true;
+  }
+
   close() {
     audio.uiClick();
-    this.stack.pop();
+    const popped = this.stack.pop();
+    if (popped === 'weaponSwap') this.pendingSwapCrateId = null;
     this.syncBgm();
     this.notify();
   }
@@ -122,6 +137,7 @@ class Game {
     audio.unlock();
     audio.uiClick();
     this.choosing = true;
+    this.pendingSwapCrateId = null;
     this.stack = [];
     this.releaseAll();
     this.syncBgm();
@@ -139,6 +155,7 @@ class Game {
     audio.unlock();
     audio.uiClick();
     this.choosing = false;
+    this.pendingSwapCrateId = null;
     this.run = newRun(Date.now() % 100000, unlockedWeapons(this.meta.stars), cls, difficulty, {
       metVips: this.meta.metVips, mastery: this.meta.recipeMastery, decor: this.meta.unlockedDecor,
     });
@@ -288,6 +305,8 @@ class Game {
     }
     const ext = nearbyExterior(r);
     if (ext === 'door' && r.phase === 'camp') return this.send({ t: 'enterHouse' });
+    const nearWc = nearbyWeaponCrate(r);
+    if (nearWc) return this.openWeaponSwap(nearWc.id);
     return false;
   }
 
@@ -340,7 +359,7 @@ class Game {
       this.grenadeAimPayload = null;
       for (const e of step(this.run, input)) {
         if (
-          e.t === 'bossAppear' || e.t === 'pickup' || e.t === 'star' || e.t === 'kill' || e.t === 'hurt' || e.t === 'swap'
+          e.t === 'bossAppear' || e.t === 'pickup' || e.t === 'supplyPickup' || e.t === 'star' || e.t === 'kill' || e.t === 'hurt' || e.t === 'swap'
           || e.t === 'pourDone' || e.t === 'tableClean' || e.t === 'guestAngry' || e.t === 'shiftEnd' || e.t === 'shiftOpen' || e.t === 'serve'
           || e.t === 'grindSauce' || e.t === 'sauceEmpty' || e.t === 'kitchenDone' || e.t === 'research' || e.t === 'prepDish'
           || e.t === 'dispatchReturn' || e.t === 'rackHarvest' || e.t === 'partyStart' || e.t === 'endlessEnter'

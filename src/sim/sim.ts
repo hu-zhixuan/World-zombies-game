@@ -163,6 +163,27 @@ export function nearbyExterior(run: RunState): 'door' | 'ladder' | null {
   return null;
 }
 
+/** 地上掉落兵器拆解换金金额 & 商店换枪折抵金 */
+export const crateSalvageCoins = (c: Pick<Crate, 'weapon' | 'star'>) =>
+  38 + (c.star ?? 1) * 15 + Math.floor(WEAPONS[c.weapon].price * 0.12);
+
+export const shopReplaceRefund = (weapon: WeaponId, star: number) =>
+  Math.min(40 + star * 15, Math.max(35, Math.floor(WEAPONS[weapon].price * 0.5)));
+
+/** 走近地面落定兵器时返回该掉落项（不自动顶掉手上兵器，由玩家点选拾取/替换/拆金） */
+export function nearbyWeaponCrate(run: RunState): Crate | null {
+  if (run.inside || (run.phase !== 'fight' && run.phase !== 'clear' && run.phase !== 'camp')) return null;
+  const p = run.player;
+  if (p.y < -26) return null;
+  let best: Crate | null = null, bd = 32;
+  for (const c of run.crates) {
+    if (c.kind === 'supply' || (c.y ?? 0) < -8) continue;
+    const d = Math.abs(c.x - p.x);
+    if (d <= bd) { bd = d; best = c; }
+  }
+  return best;
+}
+
 export type CampInteractTarget =
   | { kind: 'pourFinish'; x: number; drink: DrinkId; guestId: string | null }
   | { kind: 'serveDrink'; x: number; guest: DinerGuest }
@@ -334,7 +355,7 @@ export function nearbyCampTarget(run: RunState): CampInteractTarget | null {
 }
 
 function rollShopOffers(run: RunState) {
-  const all = Array.from(new Set<WeaponId>(['revolver', 'smg', ...run.pool, 'pistol']));
+  const all = Array.from(new Set<WeaponId>(['smg', 'shotgun', ...run.pool, 'pistol']));
   const unowned = all.filter((id) => !run.player.weapons.some((w) => w.id === id));
   const picks: WeaponId[] = [];
   const source = [...unowned];
@@ -348,6 +369,26 @@ function rollShopOffers(run: RunState) {
     picks.push(rest.splice(idx, 1)[0]);
   }
   run.shop = picks;
+}
+
+/** 从本局已解锁兵器池抽一把适合当前夜数的掉落枪械（减少低阶白枪重复堆叠） */
+function rollDropWeapon(run: RunState, favorUnowned = 0.6): WeaponId {
+  const unlocked = Array.from(new Set<WeaponId>(run.pool.length ? run.pool : ['smg', 'shotgun']));
+  const pool: WeaponId[] = run.day <= 2 ? ['pistol', ...unlocked] : unlocked;
+  const unowned = pool.filter((id) => !run.player.weapons.some((w) => w.id === id));
+  const candidates = unowned.length > 0 && (run.day === 1 || rand(run) < favorUnowned) ? unowned : pool;
+  if (run.day === 1 && candidates.includes('smg')) return 'smg';
+  const weighted = candidates.map((id) => {
+    const price = WEAPONS[id].price;
+    const w = run.day <= 3 ? Math.max(1, 320 - price) : run.day >= 7 ? Math.max(1, price + 40) : 120;
+    return { id, w };
+  });
+  let roll = rand(run) * weighted.reduce((s, o) => s + o.w, 0);
+  for (const o of weighted) {
+    roll -= o.w;
+    if (roll < 0) return o.id;
+  }
+  return weighted[0].id;
 }
 
 const makeAllyRuntime = (k: AllyId, inside: boolean): AllyRuntime => {
@@ -381,7 +422,7 @@ function syncAlliesPos(run: RunState, inside: boolean) {
 /** 开一局。pool 是这一局能掉落/进货的武器（局外解锁的那些），heirloom 为跨局轻度酒馆传承。 */
 export function newRun(
   seed = 1,
-  pool: WeaponId[] = ['revolver', 'smg'],
+  pool: WeaponId[] = ['smg', 'shotgun'],
   cls: ClassId = 'gunner',
   difficulty: DifficultyId = 'normal',
   heirloom?: { metVips?: string[]; mastery?: Partial<Record<MealId, number>>; decor?: TavernUpgradeId[] },
@@ -470,8 +511,10 @@ function startDay(run: RunState, ev: GameEvent[]) {
   const diff = run.difficulty ?? 'normal';
   const total = dayZombieCount(run.day, diff);
   const hasArmsCrate = (run.diner.extraCrates ?? 0) > 0;
-  const crateAt = run.day === 1 || hasArmsCrate || rand(run) < 0.45 ? Math.floor(total / 2) : -1;
   const bossKind = bossForDay(run.day);
+  // 控制战场上神兵箱掉落节奏：首夜给 1 箱副手新枪，之后每 3 夜或首领夜才掉枪箱，避免满地枪械泛滥
+  const dropWeaponTonight = run.day === 1 || (!hasArmsCrate && (run.day % 3 === 0 || !!bossKind));
+  const crateAt = dropWeaponTonight ? Math.floor(total / 2) : -1;
   run.spawn = { left: total, timer: 46, total, killed: 0, crateAt, bossKind, bossSpawned: false };
   run.airdropDone = false;
   run.priorityBarrelId = null;
@@ -521,11 +564,7 @@ function startDay(run: RunState, ev: GameEvent[]) {
 
   // 军火游商支援：开战降落伞空投一口神兵补给箱（打断伞绳可提前砸落）
   if (hasArmsCrate) {
-    const pool: WeaponId[] = ['pistol', ...run.pool];
-    const unowned = pool.filter((id) => !run.player.weapons.some((w) => w.id === id));
-    const weapon = unowned.length > 0
-      ? unowned[Math.floor(rand(run) * unowned.length)]
-      : pool[Math.floor(rand(run) * pool.length)];
+    const weapon = rollDropWeapon(run, 0.8);
     run.crates.push({
       id: run.nextId++,
       x: Math.min(PLAYER_MAX_X - 40, WALL_X - 36),
@@ -533,6 +572,8 @@ function startDay(run: RunState, ev: GameEvent[]) {
       vy: 0.42,
       parachute: true,
       supplyBonus: true,
+      kind: 'weapon',
+      star: 1,
       weapon,
     });
   }
@@ -626,7 +667,7 @@ function damageZombie(
   const before = z.hp;
   const zy = zombieBodyY(z);
   const dir: 1 | -1 = opts.dir ?? (z.x >= run.player.x ? 1 : -1);
-  const heavy = opts.heavy || (opts.kb ?? 0) >= 2.5 || opts.weaponId === 'revolver' || opts.weaponId === 'shotgun' || opts.weaponId === 'rifle' || opts.weaponId === 'rocket';
+  const heavy = opts.heavy || (opts.kb ?? 0) >= 2.5 || opts.weaponId === 'shotgun' || opts.weaponId === 'rifle' || opts.weaponId === 'rocket';
   const bloodrainFrost = run.weather === 'bloodrain' ? 1.5 : 1;
 
   // 提灯怨灵「打灯破招」：蓄光抛鬼火前摇期间被主角命中，立刻打碎鬼灯反噬爆裂并掉额外魔髓
@@ -717,12 +758,14 @@ function damageZombie(
   }
 
   if (z.carriesCrate) {
-    const pool: WeaponId[] = ['pistol', ...run.pool];
-    const unowned = pool.filter((id) => !run.player.weapons.some((w) => w.id === id));
-    const weapon = unowned.length && (run.day === 1 || rand(run) < 0.45)
-      ? unowned[Math.floor(rand(run) * unowned.length)]
-      : pool[Math.floor(rand(run) * pool.length)];
-    run.crates.push({ id: run.nextId++, x: Math.min(Math.max(z.x, HOME_X + 20), PLAYER_MAX_X - 20), weapon });
+    const weapon = rollDropWeapon(run, 0.72);
+    run.crates.push({
+      id: run.nextId++,
+      x: Math.min(Math.max(z.x, HOME_X + 20), PLAYER_MAX_X - 20),
+      kind: 'weapon',
+      star: 1,
+      weapon,
+    });
   }
   if (opts.byPlayer && has(run, 'overkill') && z.hp < 0) {
     const boom = -z.hp * 1.15, r = 42 * (has(run, 'shrapnel') ? 1.28 : 1);
@@ -731,27 +774,92 @@ function damageZombie(
   }
 }
 
-function collectCrate(run: RunState, weapon: WeaponId, ev: GameEvent[], supplyBonus = false) {
+function grantCrateSupplyBonus(run: RunState, ev: GameEvent[], x: number) {
   const p = run.player;
-  if (supplyBonus) {
-    if (p.grenades < MAX_GRENADES) p.grenades++;
-    else p.armor = Math.min(p.maxArmor, p.armor + 20);
-  }
-  const owned = p.weapons.find((w) => w.id === weapon);
-  if (!owned) {
-    const fresh = { id: weapon, star: 1, ammo: magSize(weapon, 1) };
-    if (p.weapons.length >= MAX_CARRY) { p.weapons[p.cur] = fresh; run.coins += 40; }
-    else { p.weapons.push(fresh); p.cur = p.weapons.length - 1; }
-    p.reloadT = 0; p.burstLeft = 0; p.smgHeat = 0;
-    ev.push({ t: 'pickup', weapon, star: 1, isNew: true });
-  } else if (owned.star < MAX_STAR) {
-    owned.star++; owned.ammo = magSize(owned.id, owned.star);
-    ev.push({ t: 'pickup', weapon, star: owned.star, isNew: false });
-    ev.push({ t: 'star', weapon, star: owned.star });
+  if (p.grenades < MAX_GRENADES) {
+    p.grenades++;
+    ev.push({ t: 'supplyPickup', x, label: '+1 爆炎弹' });
   } else {
-    run.coins += 45;
-    ev.push({ t: 'pickup', weapon, star: owned.star, isNew: false });
+    p.armor = Math.min(p.maxArmor, p.armor + 25);
+    ev.push({ t: 'supplyPickup', x, label: '+25 护甲' });
   }
+}
+
+function collectSupplyCrate(run: RunState, c: Crate, ev: GameEvent[]) {
+  const p = run.player;
+  const coinsGain = 22 + run.day * 2;
+  run.coins += coinsGain;
+  if (p.hp < p.maxHp * 0.78) {
+    const heal = Math.min(p.maxHp - p.hp, 18);
+    p.hp += heal;
+    ev.push({ t: 'supplyPickup', x: c.x, label: `+${coinsGain}金 +${Math.round(heal)}血` });
+  } else if (p.grenades < MAX_GRENADES) {
+    p.grenades++;
+    ev.push({ t: 'supplyPickup', x: c.x, label: `+${coinsGain}金 +1爆炎弹` });
+  } else {
+    p.armor = Math.min(p.maxArmor, p.armor + 25);
+    ev.push({ t: 'supplyPickup', x: c.x, label: `+${coinsGain}金 +25甲` });
+  }
+  ev.push({ t: 'pickup', weapon: c.weapon, star: 1, isNew: false });
+}
+
+/** 玩家点选拾取地面兵器：同款升星、有空槽直接装入、满槽时必须由玩家指定 replaceIndex 并把换下的旧枪落回地面 */
+function applyWeaponCrate(run: RunState, c: Crate, ev: GameEvent[], replaceIndex?: number): boolean {
+  const p = run.player;
+  if (c.supplyBonus) {
+    c.supplyBonus = false;
+    grantCrateSupplyBonus(run, ev, c.x);
+  }
+  const dropStar = Math.max(1, Math.min(MAX_STAR, c.star ?? 1));
+  const owned = p.weapons.find((w) => w.id === c.weapon);
+  if (owned) {
+    run.crates = run.crates.filter((o) => o.id !== c.id);
+    if (owned.star < MAX_STAR) {
+      owned.star = Math.min(MAX_STAR, Math.max(owned.star + 1, dropStar));
+      owned.ammo = magSize(owned.id, owned.star);
+      p.reloadT = 0;
+      ev.push({ t: 'pickup', weapon: c.weapon, star: owned.star, isNew: false });
+      ev.push({ t: 'star', weapon: c.weapon, star: owned.star });
+    } else {
+      const gold = crateSalvageCoins(c);
+      run.coins += gold;
+      ev.push({ t: 'pickup', weapon: c.weapon, star: owned.star, isNew: false, recycledCoins: gold });
+    }
+    return true;
+  }
+  if (p.weapons.length < MAX_CARRY) {
+    run.crates = run.crates.filter((o) => o.id !== c.id);
+    p.weapons.push({ id: c.weapon, star: dropStar, ammo: magSize(c.weapon, dropStar) });
+    p.cur = p.weapons.length - 1;
+    p.reloadT = 0; p.burstLeft = 0; p.burstCd = 0; p.smgHeat = 0;
+    ev.push({ t: 'pickup', weapon: c.weapon, star: dropStar, isNew: true });
+    return true;
+  }
+  if (replaceIndex === undefined || replaceIndex < 0 || replaceIndex >= p.weapons.length) {
+    return false;
+  }
+  const prev = p.weapons[replaceIndex];
+  p.weapons[replaceIndex] = { id: c.weapon, star: dropStar, ammo: magSize(c.weapon, dropStar) };
+  p.cur = replaceIndex;
+  p.reloadT = 0; p.burstLeft = 0; p.burstCd = 0; p.smgHeat = 0;
+  // 元气骑士手感：被替换下来的旧武器保留星级掉回地面，随时可换回或拆金
+  c.kind = 'weapon';
+  c.weapon = prev.id;
+  c.star = prev.star;
+  c.y = 0; c.vy = 0; c.parachute = false; c.supplyBonus = false;
+  ev.push({ t: 'pickup', weapon: p.weapons[replaceIndex].id, star: dropStar, isNew: true, replaced: prev.id });
+  return true;
+}
+
+function salvageWeaponCrate(run: RunState, c: Crate, ev: GameEvent[]) {
+  if (c.supplyBonus) {
+    c.supplyBonus = false;
+    grantCrateSupplyBonus(run, ev, c.x);
+  }
+  run.crates = run.crates.filter((o) => o.id !== c.id);
+  const gold = crateSalvageCoins(c);
+  run.coins += gold;
+  ev.push({ t: 'pickup', weapon: c.weapon, star: c.star ?? 1, isNew: false, recycledCoins: gold });
 }
 
 function fireLightning(
@@ -955,7 +1063,7 @@ function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[],
     return;
   }
 
-  // 3. 实体弹丸组（猎手双铳 / 重锤左轮 / 连珠火铳 / 双管龙息铳 / 寒霜连铳 / 焦土爆炎炮）
+  // 3. 实体弹丸组（猎手双铳 / 连珠火铳 / 双管龙息铳 / 焦土爆炎炮）
   const bonusAt5 = def.burst ? 0 : extraBullets(ow.id, ow.star);
   const count = (def.pellets ?? 1) + bonusAt5;
   const rocketSplitScale = def.aoe && count > 1 ? 0.56 : 1;
@@ -966,7 +1074,7 @@ function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[],
     const c = Math.cos(spreadRad), s = Math.sin(spreadRad);
     const finalDmg = (hotSmg ? dmg * 1.5 : dmg) * rocketSplitScale;
     const pierceCnt = fullPierce ? 99 : hotSmg ? Math.max(2, def.pierceCount ?? 1) : (def.pierceCount ?? 1);
-    const ricochetLeft = (def.ricochet ?? 0) + (ow.id === 'revolver' && ow.star >= 5 ? 1 : 0);
+    const ricochetLeft = def.ricochet ?? 0;
     run.bullets.push({
       x: mx, y: my,
       vx: (dx * c - dy * s) * def.speed,
@@ -982,7 +1090,6 @@ function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[],
       hit: [],
       aoe: def.aoe,
       slow: def.slow,
-      stun: ow.id === 'revolver' ? 18 : undefined,
       burn: hotSmg ? 105 : undefined,
       homing: def.homing,
       kind: def.aoe ? 'rocket' : hotSmg ? 'firebolt' : 'normal',
@@ -990,7 +1097,6 @@ function launchWeaponShot(run: RunState, target: Zombie | null, ev: GameEvent[],
       startX: mx,
       startY: my,
       closeBoost: ow.id === 'shotgun',
-      shatter: ow.id === 'assault',
     });
   }
   ev.push({ t: 'shot', x: mx, y: my, from: 'player', weapon: ow.id, ang, hot: hotSmg });
@@ -1196,6 +1302,18 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
     return;
   }
 
+  for (let i = run.crates.length - 1; i >= 0; i--) {
+    const c = run.crates[i];
+    if (c.kind !== 'supply' || (c.y ?? 0) < -10) continue;
+    if (Math.abs(c.x - p.x) > 24 || p.y < -24) continue;
+    run.crates.splice(i, 1);
+    collectSupplyCrate(run, c, ev);
+  }
+  if (input.interact) {
+    const nearWc = nearbyWeaponCrate(run);
+    if (nearWc) applyWeaponCrate(run, nearWc, ev);
+  }
+
   if (input.swap && p.weapons.length > 1) {
     p.cur = (p.cur + 1) % p.weapons.length;
     p.reloadT = 0; p.fireCd = 8; p.burstLeft = 0; p.burstCd = 0; p.smgHeat = 0;
@@ -1224,14 +1342,6 @@ function stepPlayer(run: RunState, input: Input, ev: GameEvent[]) {
     }
   } else if (wantFire && (target || input.fire || hasPriProp) && run.phase !== 'camp' && p.fireCd === 0 && p.reloadT === 0 && p.dodgeT === 0) {
     fire(run, target, ev);
-  }
-
-  for (let i = run.crates.length - 1; i >= 0; i--) {
-    const c = run.crates[i];
-    if ((c.y ?? 0) < -10) continue;
-    if (Math.abs(c.x - p.x) > 22 || p.y < -22) continue;
-    run.crates.splice(i, 1);
-    collectCrate(run, c.weapon, ev, !!c.supplyBonus);
   }
 }
 
@@ -1915,32 +2025,20 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
           break;
         }
 
-        const wasSlowed = z.slowT > 0 || z.freezeT > 0;
         const closeHit = b.closeBoost && b.startX !== undefined && Math.hypot(z.x - b.startX, zcy - (b.startY ?? zcy)) <= 205;
         const hitDmg = b.dmg * (closeHit ? 1.5 : 1);
-        const kb = closeHit ? 5.6 : b.weaponId === 'revolver' ? 4.6 : byPlayer ? 1.6 : 0.6;
+        const kb = closeHit ? 5.6 : byPlayer ? 1.6 : 0.6;
         const dir: 1 | -1 = b.vx >= 0 ? 1 : -1;
         damageZombie(run, z, hitDmg, ev, {
           byPlayer, kb, crit: b.crit || closeHit, slow: b.slow,
-          freeze: byPlayer && b.shatter && wasSlowed ? 65 : undefined,
           stun: b.stun, burn: !!(b.burn || closeHit), weaponId: b.weaponId, dir,
-          heavy: !!closeHit || b.weaponId === 'revolver' || b.weaponId === 'rifle' || b.kind === 'firebolt',
+          heavy: !!closeHit || b.weaponId === 'rifle' || b.kind === 'firebolt',
         });
 
         if (b.burn || closeHit) {
           if (z.hp > 0) z.burnT = Math.max(z.burnT, b.burn ?? 120);
         }
 
-        // 寒霜连铳特色：命中已减速目标深冻定身并引爆碎冰溅射
-        if (byPlayer && b.shatter && wasSlowed) {
-          const shatterR = curWeapon(run).id === 'assault' && curWeapon(run).star >= 5 ? 58 : 48;
-          ev.push({ t: 'frost', x: z.x, y: zcy, r: shatterR });
-          for (const o of run.zombies) {
-            if (o.id !== z.id && o.hp > 0 && Math.hypot(o.x - z.x, zombieBodyY(o) - zcy) <= shatterR) {
-              damageZombie(run, o, b.dmg * 0.55, ev, { byPlayer: true, slow: 115, freeze: 36, weaponId: b.weaponId });
-            }
-          }
-        }
         if (byPlayer && has(run, 'incendiary') && z.hp > 0 && rand(run) < 0.25) z.burnT = 180;
         if (byPlayer && (has(run, 'frostbite') || run.buff.frostRounds)) z.slowT = Math.max(z.slowT, Math.round(135 * (run.weather === 'bloodrain' ? 1.5 : 1)));
         if (byPlayer && has(run, 'shock') && z.hp > 0 && rand(run) < 0.25) {
@@ -1948,7 +2046,7 @@ function stepBullets(run: RunState, ev: GameEvent[]) {
           if (next) fireLightning(run, z.x, zcy, next, b.dmg * 0.55, 2, ev, { byPlayer: true, color: 'shock' });
         }
 
-        // 重锤左轮先天跳弹追击 + 弹射天赋叠加
+        // 弹射天赋
         if (byPlayer && ((b.ricochetLeft ?? 0) > 0 || (has(run, 'ricochet') && b.bounces < 3 && rand(run) < 0.55))) {
           const next = run.zombies.filter((o) => o.hp > 0 && !b.hit.includes(o.id) && Math.hypot(o.x - z.x, zombieBodyY(o) - zcy) <= 165)
             .sort((a, c) => Math.hypot(a.x - z.x, zombieBodyY(a) - zcy) - Math.hypot(c.x - z.x, zombieBodyY(c) - zcy))[0];
@@ -2064,14 +2162,12 @@ export function step(run: RunState, input: Input): GameEvent[] {
           ? 40 + Math.floor(rand(run) * 14)
           : Math.round(Math.max(10, 25 - run.day * 0.9) * (0.52 + group * 0.42)) + Math.floor(rand(run) * 8);
     }
-    // 战局中段：破晓车队抛下可击落空投补给伞（打断伞绳砸晕敌群 + 立即掉落补给）
+    // 战局中段：破晓车队抛下可击落空投伞（常态为战备补给伞：金币/铁甲/爆炎弹，首领夜或极少数波次才空投神兵）
     if (!run.airdropDone && run.spawn.total >= 6 && run.spawn.killed >= Math.floor(run.spawn.total * 0.45)) {
       run.airdropDone = true;
-      const pool: WeaponId[] = ['pistol', ...run.pool];
-      const unowned = pool.filter((id) => !run.player.weapons.some((w) => w.id === id));
-      const weapon = unowned.length > 0 && rand(run) < 0.55
-        ? unowned[Math.floor(rand(run) * unowned.length)]
-        : pool[Math.floor(rand(run) * pool.length)];
+      const hasWeaponCrate = run.spawn.crateAt >= 0 || run.crates.some((c) => c.kind !== 'supply');
+      const isWeaponDrop = !!bossForDay(run.day) || (!hasWeaponCrate && run.day >= 2 && rand(run) < 0.25);
+      const weapon = isWeaponDrop ? rollDropWeapon(run, 0.7) : 'pistol';
       const frontZ = run.zombies.filter((z) => z.hp > 0 && z.x > WALL_X + 35).sort((a, b) => a.x - b.x)[0];
       const dropX = frontZ ? Math.min(WALL_X + 260, Math.max(WALL_X + 65, Math.round(frontZ.x))) : WALL_X + 125;
       run.crates.push({
@@ -2080,7 +2176,9 @@ export function step(run: RunState, input: Input): GameEvent[] {
         y: -185,
         vy: 0.42,
         parachute: true,
-        supplyBonus: true,
+        supplyBonus: isWeaponDrop,
+        kind: isWeaponDrop ? 'weapon' : 'supply',
+        star: 1,
         weapon,
       });
     }
@@ -2103,16 +2201,28 @@ export function step(run: RunState, input: Input): GameEvent[] {
     ev.push({ t: 'dead' });
     return ev;
   }
+  const hasGroundWeapon = run.crates.some((c) => c.kind !== 'supply');
+  const playerCheckingYard = hasGroundWeapon && (Math.abs(run.player.y) < 12 || Math.abs(run.player.vx) > 0.1);
+  const clearLimit = playerCheckingYard ? 420 : 220;
   if (run.phase === 'fight' && dayRemaining(run) === 0) {
     run.phase = 'clear'; run.phaseT = 0;
     if (run.diner.contract?.id === 'iron_wall' && !run.diner.contract.done && run.wall.hp >= run.wall.maxHp * 0.5) {
       progressBattleContract(run, 1, ev);
     }
     ev.push({ t: 'dayClear', day: run.day });
-  } else if (run.phase === 'clear' && run.phaseT >= 110 && (run.crates.length === 0 || run.phaseT >= 220)) {
+  } else if (run.phase === 'clear' && run.phaseT >= 110 && (run.crates.length === 0 || run.phaseT >= clearLimit)) {
     while (run.crates.length > 0) {
       const c = run.crates.shift()!;
-      collectCrate(run, c.weapon, ev, !!c.supplyBonus);
+      if (c.kind === 'supply') {
+        collectSupplyCrate(run, c, ev);
+      } else {
+        const owned = run.player.weapons.find((w) => w.id === c.weapon);
+        if (owned || run.player.weapons.length < MAX_CARRY) {
+          applyWeaponCrate(run, c, ev);
+        } else {
+          salvageWeaponCrate(run, c, ev);
+        }
+      }
     }
     if (run.day >= LAST_DAY && !run.endless) {
       run.phase = 'won';
@@ -2497,12 +2607,53 @@ export function command(run: RunState, cmd: Command): GameEvent[] | null {
         return ev;
       }
       if (run.coins < def.price) return null;
-      run.coins -= def.price;
       const fresh = { id: cmd.weapon, star: 1, ammo: magSize(cmd.weapon, 1) };
-      if (run.player.weapons.length >= MAX_CARRY) { run.player.weapons[run.player.cur] = fresh; run.coins += 40; }
-      else { run.player.weapons.push(fresh); run.player.cur = run.player.weapons.length - 1; }
+      if (run.player.weapons.length >= MAX_CARRY) {
+        const idx = cmd.replaceIndex !== undefined ? cmd.replaceIndex : run.player.cur;
+        if (idx < 0 || idx >= run.player.weapons.length) return null;
+        const old = run.player.weapons[idx];
+        run.coins -= def.price;
+        run.player.weapons[idx] = fresh;
+        run.player.cur = idx;
+        run.coins += shopReplaceRefund(old.id, old.star);
+      } else {
+        run.coins -= def.price;
+        run.player.weapons.push(fresh);
+        run.player.cur = run.player.weapons.length - 1;
+      }
       run.player.reloadT = 0; run.player.burstLeft = 0; run.player.smgHeat = 0;
       ev.push({ t: 'shop', item: def.name });
+      return ev;
+    }
+    case 'selectWeapon': {
+      const p = run.player;
+      if (cmd.index < 0 || cmd.index >= p.weapons.length) return null;
+      if (p.cur === cmd.index) return ev;
+      p.cur = cmd.index;
+      p.reloadT = 0; p.fireCd = Math.min(p.fireCd, 6); p.burstLeft = 0; p.burstCd = 0; p.smgHeat = 0;
+      ev.push({ t: 'swap', weapon: curWeapon(run).id });
+      return ev;
+    }
+    case 'pickupCrate': {
+      const c = run.crates.find((o) => o.id === cmd.crateId);
+      if (!c || (c.y ?? 0) < -8) return null;
+      if (c.kind === 'supply') {
+        run.crates = run.crates.filter((o) => o.id !== c.id);
+        collectSupplyCrate(run, c, ev);
+        return ev;
+      }
+      if (!applyWeaponCrate(run, c, ev, cmd.replaceIndex)) return null;
+      return ev;
+    }
+    case 'salvageCrate': {
+      const c = run.crates.find((o) => o.id === cmd.crateId);
+      if (!c || (c.y ?? 0) < -8) return null;
+      if (c.kind === 'supply') {
+        run.crates = run.crates.filter((o) => o.id !== c.id);
+        collectSupplyCrate(run, c, ev);
+        return ev;
+      }
+      salvageWeaponCrate(run, c, ev);
       return ev;
     }
     case 'buySupply': {

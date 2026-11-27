@@ -21,6 +21,12 @@
   --armor: #7eb8f7;      /* 护甲蓝 */
   --leather: #3a261e;    /* 暗革底色 */
   --copper: #c98650;     /* 黄铜高光 */
+  --rarity-common: #f4f1ea;     /* 白：普通 */
+  --rarity-uncommon: #59e36d;   /* 绿：精良 */
+  --rarity-rare: #4da6ff;       /* 蓝：稀有 */
+  --rarity-epic: #b76eff;       /* 紫：史诗 */
+  --rarity-legendary: #ff9c38;  /* 橙：传说 */
+  --rarity-mythic: #ff4757;     /* 红：神兵 */
 
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
   --f1: 12px; --f2: 14px; --f3: 18px; --f4: 24px;

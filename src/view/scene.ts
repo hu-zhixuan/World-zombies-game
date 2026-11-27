@@ -2,7 +2,7 @@
 import Phaser from 'phaser';
 import { game } from '../app/game';
 import { ASSETS } from '../assets';
-import { DRINKS, MEALS, MEATS, RYE_FALLBACK, WEAPONS, ZOMBIES, type MealId } from '../content/data';
+import { DRINKS, MEALS, MEATS, RYE_FALLBACK, WEAPONS, ZOMBIES, type MealId, type Rarity } from '../content/data';
 import { ALLIES, QUALITY_META } from '../content/story';
 import { BODY_Y, FORT_GUN_X, allyRole, computeGrenadeThrow, curWeapon, hasTavernUpgrade, houseBuff, nearbyCampTarget, staffDef, stoveCapacity, turretWorldPos, zombieBodyY } from '../sim/sim';
 import {
@@ -16,14 +16,20 @@ export { VIEW_H };
 
 const D = { sky: 0, town: 1, back: 2, ground: 3, prop: 4, actor: 5, fx: 6, mark: 7 };
 const dishIconKey = (id: MealId | 'rye', isRye?: boolean) => (isRye || id === 'rye' ? RYE_FALLBACK.icon : MEALS[id].icon);
+const RARITY_PALETTE: Record<Rarity, number> = {
+  common: C.rarityCommon,
+  uncommon: C.rarityUncommon,
+  rare: C.rarityRare,
+  epic: C.rarityEpic,
+  legendary: C.rarityLegendary,
+  mythic: C.rarityMythic,
+};
 
 /** 每把枪精确的握把锚点、前臂伸展距离与枪口前伸量（对齐 15x8 hero_arm 拳头中心与紧裁武器轮廓） */
 const WEAPON_GRIP: Record<string, { ox: number; oy: number; reach: number; gyOff: number; muzzle: number; scale: number; kick: number; recoil: number; shake: number }> = {
   pistol:   { ox: 0.25, oy: 0.55, reach: 11.0, gyOff: 1.5,  muzzle: 14, scale: 0.90, kick: 0.2,  recoil: 4.5, shake: 0 },
-  revolver: { ox: 0.28, oy: 0.42, reach: 11.0, gyOff: -0.2, muzzle: 15, scale: 0.86, kick: 0.34, recoil: 6.2, shake: 0.0022 },
   smg:      { ox: 0.24, oy: 0.56, reach: 11.5, gyOff: 1.2,  muzzle: 16, scale: 0.94, kick: 0.14, recoil: 3.4, shake: 0 },
   shotgun:  { ox: 0.28, oy: 0.58, reach: 11.5, gyOff: 1.2,  muzzle: 18, scale: 0.88, kick: 0.42, recoil: 7.4, shake: 0.0038 },
-  assault:  { ox: 0.24, oy: 0.56, reach: 11.5, gyOff: 1.2,  muzzle: 16, scale: 0.90, kick: 0.18, recoil: 4.2, shake: 0.0012 },
   rifle:    { ox: 0.24, oy: 0.54, reach: 11.5, gyOff: 1.0,  muzzle: 18, scale: 0.94, kick: 0.46, recoil: 8.0, shake: 0.0044 },
   tesla:    { ox: 0.20, oy: 0.52, reach: 11.0, gyOff: 1.0,  muzzle: 21, scale: 0.82, kick: 0.2,  recoil: 4.4, shake: 0.0016 },
   rocket:   { ox: 0.28, oy: 0.62, reach: 11.5, gyOff: 1.0,  muzzle: 20, scale: 0.92, kick: 0.5,  recoil: 8.4, shake: 0.0052 },
@@ -224,12 +230,17 @@ export class GameScene extends Phaser.Scene {
     const grade = this.cameras.main.postFX?.addColorMatrix();
     if (grade) grade.brightness(1.1).saturate(0.14, true);
 
-    // 点击画面：战斗中切换优先集火目标；营地夜晚点击食客/传菜台/酒桶/炮塔位可自动走过去交互
+    // 点击画面：战斗中点击近身掉落兵器可直接弹拾取/替换，否则切换优先集火目标；营地夜晚点地自动走过去交互
     this.input.on('pointerdown', (ptr: Phaser.Input.Pointer) => {
       const r = game.run;
       if (game.panel() !== null) return;
-      if (!r.inside && r.phase === 'fight') {
-        game.send({ t: 'focusTarget', x: ptr.worldX, y: ptr.worldY });
+      if (!r.inside && (r.phase === 'fight' || r.phase === 'clear')) {
+        const hitLoot = r.crates.find((c) => c.kind !== 'supply' && (c.y ?? 0) >= -8 && Math.abs(c.x - ptr.worldX) <= 28 && ptr.worldY >= GROUND_Y - 58);
+        if (hitLoot && Math.abs(hitLoot.x - r.player.x) <= 44 && r.player.y >= -28) {
+          game.openWeaponSwap(hitLoot.id);
+          return;
+        }
+        if (r.phase === 'fight') game.send({ t: 'focusTarget', x: ptr.worldX, y: ptr.worldY });
       } else if (r.phase === 'camp' && !r.pourMinigame) {
         const wx = Phaser.Math.Clamp(ptr.worldX, r.inside ? 78 : 130, r.inside ? 820 : 620);
         game.walkTo(wx, true);
@@ -732,12 +743,18 @@ export class GameScene extends Phaser.Scene {
       for (const c of run.crates) {
         seenCrates.add(c.id);
         let im = this.crates.get(c.id);
-        if (!im) { im = this.add.image(c.x, GROUND_Y, 'ic_crate').setOrigin(0.5, 1).setDepth(D.actor); this.crates.set(c.id, im); }
+        if (!im) { im = this.add.image(c.x, GROUND_Y, 'ic_crate').setOrigin(0.5, 1).setDepth(D.actor + 0.1); this.crates.set(c.id, im); }
         const cy = c.y ?? 0;
         const airborne = cy < -2;
+        const isWeaponDrop = c.kind !== 'supply';
+        const wantTex = !airborne && isWeaponDrop ? WEAPONS[c.weapon].icon : 'ic_crate';
+        if (im.texture.key !== wantTex) im.setTexture(wantTex);
         const sway = c.parachute && airborne ? Math.sin(now / 260 + c.id) * 5 : 0;
-        const bob = airborne ? 0 : Math.abs(Math.sin(now / 260)) * 5;
-        im.setVisible(true).setPosition(c.x + sway, GROUND_Y + cy - 2 - bob);
+        const bob = airborne ? 0 : isWeaponDrop ? 8 + Math.sin(now / 220 + c.id) * 3.5 : Math.abs(Math.sin(now / 260)) * 5;
+        im.setOrigin(0.5, isWeaponDrop && !airborne ? 0.5 : 1)
+          .setScale(isWeaponDrop && !airborne ? 1.12 : 1)
+          .setVisible(true)
+          .setPosition(c.x + sway, GROUND_Y + cy - 2 - bob);
       }
     }
     for (const [id, im] of this.crates) if (!seenCrates.has(id)) { im.destroy(); this.crates.delete(id); }
@@ -753,12 +770,11 @@ export class GameScene extends Phaser.Scene {
         if (b.kind === 'firebolt') s.setScale(1.36).setTint(C.ember);
         else if (b.kind === 'spear') s.setScale(1.45, 0.72).setTint(C.paper);
         else if (b.kind === 'qi') s.setScale(1.22).setTint(C.electric);
-        else if (b.kind === 'frost' || b.weaponId === 'assault') s.setScale(1.18).setTint(C.frost);
+        else if (b.kind === 'frost') s.setScale(1.18).setTint(C.frost);
         else if (b.kind === 'rocket') {
           s.setScale(1.55).setTint(C.red);
           if (run.tick % 2 === 0) this.spawnSpark(b.x - b.vx * 0.4, b.y - b.vy * 0.4, -b.vx * 0.14, Phaser.Math.FloatBetween(-0.4, 0.2), 0.02, 12, 2.2, C.ember);
         } else if (b.kind === 'cannon') s.setScale(1.45).setTint(C.copper);
-        else if (b.weaponId === 'revolver') s.setScale(1.34).setTint(C.gold);
         else if (b.weaponId === 'shotgun') s.setScale(0.92).setTint(C.ember);
         else if (b.weaponId === 'smg') s.setScale(0.88).setTint(C.lamp);
         else if (b.weaponId === 'pistol') s.setScale(1.06).setTint(C.paper);
@@ -1045,10 +1061,26 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // ── 空投补给伞穹顶与绳索（可击落砸晕敌群）──
+    // ── 空投补给伞 & 地面掉落兵器品质光柱（白/绿/蓝/紫/橙/红，清晰区分站地即可点选替换） ──
     for (const c of run.crates) {
       const cy = c.y ?? 0;
-      if (cy >= -4) continue;
+      const isWeaponDrop = c.kind !== 'supply';
+      const rCol = isWeaponDrop ? RARITY_PALETTE[WEAPONS[c.weapon].rarity] : C.gold;
+      if (cy >= -4) {
+        const pulse = 0.72 + Math.sin(now / 150 + c.id) * 0.24;
+        if (isWeaponDrop) {
+          g.fillStyle(rCol, 0.16 * pulse).fillRect(c.x - 9, GROUND_Y - 68, 18, 66);
+          g.fillStyle(rCol, 0.34 * pulse).fillRect(c.x - 3, GROUND_Y - 58, 6, 56);
+          g.fillStyle(C.ink, 0.85).fillRoundedRect(c.x - 9, GROUND_Y - 6, 18, 5, 2);
+          g.lineStyle(1.8, rCol, 0.94).strokeEllipse(c.x, GROUND_Y - 1, 28, 8);
+          if (run.tick % 14 === c.id % 14) {
+            this.spawnSpark(c.x + Phaser.Math.FloatBetween(-8, 8), GROUND_Y - 6, Phaser.Math.FloatBetween(-0.15, 0.15), -0.85, -0.01, 22, 2.2, rCol);
+          }
+        } else {
+          g.lineStyle(1.6, C.gold, 0.88 * pulse).strokeEllipse(c.x, GROUND_Y - 1, 24, 7);
+        }
+        continue;
+      }
       const sway = c.parachute ? Math.sin(now / 260 + c.id) * 5 : 0;
       const cx = c.x + sway;
       const boxTopY = GROUND_Y + cy - 18;
@@ -1059,7 +1091,7 @@ export class GameScene extends Phaser.Scene {
           .lineBetween(cx + 14, domeY + 2, cx + 5, boxTopY)
           .lineBetween(cx, domeY + 1, cx, boxTopY);
         g.fillStyle(C.paper, 0.92).fillEllipse(cx, domeY, 34, 14);
-        g.fillStyle(C.red, 0.85).fillEllipse(cx, domeY - 2, 14, 11);
+        g.fillStyle(isWeaponDrop ? rCol : C.gold, 0.92).fillEllipse(cx, domeY - 2, 14, 11);
         g.lineStyle(1.4, C.woodDark, 0.9).strokeEllipse(cx, domeY, 34, 14);
         if (run.priorityCrateId === c.id) {
           g.lineStyle(1.8, C.gold, 0.95).strokeCircle(cx, domeY + 6, 18);
@@ -1097,7 +1129,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // 特色子弹拖尾（左轮金痕 / 连珠火铳炽焰弹 / 寒霜冰晶痕 / 战友银枪与苍蓝气劲）
+    // 特色子弹拖尾（连珠火铳炽焰弹 / 战友银枪与苍蓝气劲）
     for (const b of run.bullets) {
       if (b.kind === 'firebolt') {
         g.lineStyle(2.4, C.ember, 0.82).lineBetween(b.x - b.vx * 1.3, b.y - b.vy * 1.3, b.x, b.y);
@@ -1105,10 +1137,6 @@ export class GameScene extends Phaser.Scene {
         g.lineStyle(2.2, C.paper, 0.86).lineBetween(b.x - b.vx * 1.5, b.y - b.vy * 1.5, b.x, b.y);
       } else if (b.kind === 'qi') {
         g.lineStyle(2.2, C.electric, 0.84).lineBetween(b.x - b.vx * 1.3, b.y - b.vy * 1.3, b.x, b.y);
-      } else if (b.weaponId === 'revolver') {
-        g.lineStyle(2.0, C.gold, 0.75).lineBetween(b.x - b.vx * 1.4, b.y - b.vy * 1.4, b.x, b.y);
-      } else if (b.weaponId === 'assault') {
-        g.lineStyle(1.6, C.frost, 0.65).lineBetween(b.x - b.vx * 1.1, b.y - b.vy * 1.1, b.x, b.y);
       }
     }
 
@@ -1292,7 +1320,7 @@ export class GameScene extends Phaser.Scene {
           const tip = this.heroMuzzlePos(now, ang);
           this.burst('shot_hit', tip.x, tip.y, wId === 'smg' ? (e.hot ? 1.25 : 0.9) : 1.15);
           // 枪口爆焰斜线 + 后坐力 + 退壳 + 方向性机位推拉
-          const flashCol = wId === 'tesla' ? C.electric : wId === 'assault' ? C.frost : wId === 'rifle' ? C.red : e.hot || wId === 'shotgun' ? C.ember : C.gold;
+          const flashCol = wId === 'tesla' ? C.electric : wId === 'rifle' ? C.red : e.hot || wId === 'shotgun' ? C.ember : C.gold;
           this.slashes.push({ x: tip.x, y: tip.y, ang, len: wId === 'shotgun' || wId === 'rifle' ? 15 : e.hot ? 12 : 9, col: flashCol, until: now + 75 });
           this.slashes.push({ x: tip.x, y: tip.y, ang: ang + (wId === 'shotgun' ? 0.5 : 0.35), len: wId === 'shotgun' ? 9 : 6, col: wId === 'shotgun' ? C.ember : C.lamp, until: now + 60, core: false });
           this.slashes.push({ x: tip.x, y: tip.y, ang: ang - (wId === 'shotgun' ? 0.5 : 0.35), len: wId === 'shotgun' ? 9 : 6, col: wId === 'shotgun' ? C.ember : C.lamp, until: now + 60, core: false });
@@ -1601,6 +1629,13 @@ export class GameScene extends Phaser.Scene {
         this.waves.push({ x: e.x, y: GROUND_Y - 8, r: 8, maxR: 82, col: C.gold, life: 16, max: 16, width: 3.2 });
         this.cameras.main.shake(130, 0.005);
         floaters.add(e.x, GROUND_Y - 40, e.stunned > 0 ? `空投砸晕 ×${e.stunned}!` : '空投砸落!', 'crit');
+        break;
+      }
+      case 'supplyPickup': {
+        for (let i = 0; i < 6; i++) {
+          this.spawnSpark(e.x, GROUND_Y - 14, Phaser.Math.FloatBetween(-1.2, 1.2), Phaser.Math.FloatBetween(-2.2, -0.4), 0.08, 20, 2.2, C.gold);
+        }
+        floaters.add(e.x, GROUND_Y - 40, e.label, 'coin');
         break;
       }
       case 'lanternBreak': {

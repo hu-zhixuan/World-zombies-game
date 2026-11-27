@@ -324,8 +324,6 @@ class SoundEngine {
         else if (w === 'shotgun') this.play('sfx_wp_shotgun', { gain: 1.08, rate: 0.98, jitter: 0.04 });
         else if (w === 'rifle') this.play('sfx_wp_rifle', { gain: 1.04, jitter: 0.03 });
         else if (w === 'smg') this.play('sfx_wp_smg', { gain: e.hot ? 0.86 : 0.76, rate: e.hot ? 1.12 : 1.0, jitter: 0.06 });
-        else if (w === 'assault') this.play('sfx_wp_assault', { gain: 0.82, rate: 1.08, jitter: 0.05 });
-        else if (w === 'revolver') this.play('sfx_wp_revolver', { gain: 0.98, rate: 0.96, jitter: 0.04 });
         else this.play('sfx_wp_pistol', { gain: 0.9, jitter: 0.05 });
         break;
       }
@@ -448,6 +446,9 @@ class SoundEngine {
       case 'dispatchReturn':
       case 'rackHarvest':
         this.play('sfx_good', { gain: 0.85, rate: 1.06 });
+        break;
+      case 'supplyPickup':
+        this.play('sfx_good', { gain: 0.85, rate: 1.08 });
         break;
       case 'pickup':
       case 'star':

@@ -2,10 +2,12 @@
 import { useRef } from 'preact/hooks';
 import { audio } from '../app/audio';
 import { game } from '../app/game';
-import { CLASSES, DRINKS, MEALS, RYE_FALLBACK, WEAPONS, magSize, type MealId } from '../content/data';
+import { CLASSES, DRINKS, MAX_STAR, MEALS, RARITY_NAME, RYE_FALLBACK, WEAPONS, magSize, type MealId } from '../content/data';
 import { ALLIES, QUALITY_META } from '../content/story';
-import { curWeapon, formatRecipeCost, nearbyCampTarget, nearbyStation, pourQuality } from '../sim/sim';
-import { Bar, Icon, Stars } from './parts';
+import { MAX_CARRY, crateSalvageCoins, curWeapon, formatRecipeCost, nearbyCampTarget, nearbyStation, nearbyWeaponCrate, pourQuality } from '../sim/sim';
+import { GROUND_Y } from '../sim/types';
+import { getScene } from '../view/scene';
+import { Bar, Icon } from './parts';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -370,25 +372,131 @@ export function Keys() {
   );
 }
 
-/** 底部中间：当前武器、星级、弹药/连珠火铳蓄热 + 独立换弹键 */
+/** 地面未拾取武器名称飘标（白/绿/蓝/紫/橙/红按品质着色，随镜头精确贴合兵器上方且不拦截瞄准点击） */
+export function GroundLootTags() {
+  const run = game.run;
+  if (run.inside) return null;
+  const scene = getScene();
+  if (!scene) return null;
+  const drops = run.crates.filter((c) => c.kind !== 'supply' && (c.y ?? 0) >= -8);
+  if (drops.length === 0) return null;
+
+  return (
+    <div class="loot-tags" id="ground-loot-tags">
+      {drops.map((c) => {
+        const def = WEAPONS[c.weapon];
+        const pt = scene.worldToScreen(c.x, GROUND_Y - 38);
+        const star = c.star ?? 1;
+        return (
+          <div key={c.id} class="loot-tag" data-rarity={def.rarity}
+            ref={(el) => {
+              if (!el) return;
+              el.style.setProperty('--x', String(Math.round(pt.x)));
+              el.style.setProperty('--y', String(Math.round(pt.y)));
+            }}>
+            <span class="rarity-dot" />
+            <b>{def.name}</b>
+            {star > 1 && <em>★{star}</em>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 走近地面掉落兵器时的底部轻交互拾取条（绝不自动顶掉旧枪，点选「拾取 / 选择替换 / 拆金」） */
+export function PickupBar() {
+  const run = game.run, p = run.player;
+  const wc = nearbyWeaponCrate(run);
+  if (!wc) return null;
+  const def = WEAPONS[wc.weapon];
+  const owned = p.weapons.find((w) => w.id === wc.weapon);
+  const fullBag = !owned && p.weapons.length >= MAX_CARRY;
+  const canStarUp = !!owned && owned.star < MAX_STAR;
+  const salvage = crateSalvageCoins(wc);
+  const actLabel = owned
+    ? (canStarUp ? `融合 ★${owned.star + 1}` : `满星折 ${salvage}金`)
+    : fullBag
+      ? '选择替换'
+      : '拾取装备';
+
+  return (
+    <div class="pickup-bar" id="pickup-bar" data-rarity={def.rarity}>
+      <Icon k={def.icon} />
+      <div class="pickup-meta">
+        <span class="pickup-top">
+          <em class="rarity-pill" data-rarity={def.rarity}>{RARITY_NAME[def.rarity]}</em>
+          <b>{def.name}{(wc.star ?? 1) > 1 ? ` ★${wc.star}` : ''}</b>
+        </span>
+        <small>{def.trait}</small>
+      </div>
+      <button id="btn-pickup-crate" class="btn small primary"
+        onPointerDown={(e) => { e.stopPropagation(); game.openWeaponSwap(wc.id); }}>
+        {actLabel}
+      </button>
+      <button id="btn-salvage-crate" class="btn small ghost"
+        onPointerDown={(e) => { e.stopPropagation(); game.send({ t: 'salvageCrate', crateId: wc.id }); }}>
+        拆 +{salvage}金
+      </button>
+    </div>
+  );
+}
+
+/** 底部中间：元气骑士式并排双武器槽位（直接点选切换，品质光框发光着色 + 连珠火铳蓄热 + 独立换弹键） */
 export function WeaponChip() {
-  const run = game.run, p = run.player, w = curWeapon(run), def = WEAPONS[w.id];
-  const reloading = p.reloadT > 0, mag = magSize(w.id, w.star);
-  const isSmg = w.id === 'smg', hot = isSmg && p.smgHeat >= 0.65;
+  const run = game.run, p = run.player, curW = curWeapon(run);
+  const reloading = p.reloadT > 0;
   return (
     <div class="weapon-wrap">
-      <button class={`weapon ${reloading ? 'reloading' : ''}`} data-hot={hot ? '1' : '0'} id="weapon-chip" onPointerDown={() => game.press('swap')}>
-        <Icon k={def.icon} />
-        <span class="col">
-          <Stars n={w.star} />
-          <Bar cls="ammo" v={reloading ? 1 - p.reloadT / def.reload : w.ammo / mag} />
-          {isSmg && (
-            <span class="bar heat" id="hud-smg-heat" ref={(el) => { el?.style.setProperty('--v', Math.max(0, Math.min(1, p.smgHeat)).toFixed(2)); }}><b /></span>
-          )}
-        </span>
-        <small>{reloading ? '换弹中' : `${w.ammo}/${mag}`}{hot ? ' · 高热' : p.weapons.length > 1 ? ` · 切(${p.cur + 1}/${p.weapons.length})` : ` · ${def.trait}`}</small>
-      </button>
-      <button id="key-reload" class={`btn-reload ${reloading ? 'cooling' : ''}`} onPointerDown={() => game.press('reload')}>换弹</button>
+      <div class="weapon-dock" id="weapon-chip">
+        {[0, 1].map((idx) => {
+          const slot = p.weapons[idx];
+          if (!slot) {
+            return (
+              <div key={idx} class="wslot empty" id={`weapon-slot-${idx}`}>
+                <span class="wslot-num">{idx + 1}</span>
+                <small class="wslot-empty-lbl">空副槽</small>
+              </div>
+            );
+          }
+          const def = WEAPONS[slot.id];
+          const isCur = idx === p.cur;
+          const mag = magSize(slot.id, slot.star);
+          const slotReload = isCur && reloading;
+          const isSmg = slot.id === 'smg';
+          const hot = isCur && isSmg && p.smgHeat >= 0.65;
+          return (
+            <button
+              key={idx}
+              id={`weapon-slot-${idx}`}
+              class={`wslot ${isCur ? 'cur' : 'sub'} ${slotReload ? 'reloading' : ''}`}
+              data-rarity={def.rarity}
+              data-hot={hot ? '1' : '0'}
+              onPointerDown={() => {
+                if (isCur && p.weapons.length > 1) return;
+                game.send({ t: 'selectWeapon', index: idx });
+              }}
+            >
+              <span class="wslot-top">
+                <span class="wslot-num">{idx + 1}</span>
+                <b class="wslot-name">{def.name}</b>
+                <em class="wslot-star">{'★'.repeat(slot.star)}</em>
+              </span>
+              <span class="wslot-bot">
+                <Icon k={def.icon} />
+                <span class="wslot-info">
+                  <Bar cls="ammo" v={slotReload ? 1 - p.reloadT / def.reload : slot.ammo / mag} />
+                  {isCur && isSmg && (
+                    <span class="bar heat" id="hud-smg-heat" ref={(el) => { el?.style.setProperty('--v', Math.max(0, Math.min(1, p.smgHeat)).toFixed(2)); }}><b /></span>
+                  )}
+                  <small>{slotReload ? '换弹' : `${slot.ammo}/${mag}`}{hot ? '·热' : ''}</small>
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <button id="key-reload" class={`btn-reload ${reloading ? 'cooling' : ''}`} data-rarity={WEAPONS[curW.id].rarity} onPointerDown={() => game.press('reload')}>换弹</button>
     </div>
   );
 }
@@ -441,12 +549,14 @@ export function bindKeyboard() {
       else if (k === 'k' || k === 'shift') game.press('dodge');
       else if (k === 'r') game.press('reload');
       else if (k === 'q') game.press('swap');
+      else if (k === '1') game.send({ t: 'selectWeapon', index: 0 });
+      else if (k === '2') game.send({ t: 'selectWeapon', index: 1 });
       else if (k === 'e') game.press('grenade');
       else if (k === 'u') game.press('skill');
       else if (k === 'f' || k === 'enter') game.press('interact');
       else if (k === 'escape') {
         if (curPanel === null) game.open('pause');
-        else if (curPanel === 'pause' || curPanel === 'shop' || curPanel === 'build' || curPanel === 'kitchen' || curPanel === 'lore') game.close();
+        else if (curPanel === 'pause' || curPanel === 'shop' || curPanel === 'build' || curPanel === 'kitchen' || curPanel === 'lore' || curPanel === 'weaponSwap') game.close();
       }
     }
   };

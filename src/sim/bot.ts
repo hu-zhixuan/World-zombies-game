@@ -1,6 +1,6 @@
 // 自动打的机器人：用来在测试里跑完整 15 天流程，检验难度曲线与各模块经济联动。
 import { MAX_DISH_LV, MEALS, MEAL_ORDER, MEAT_ORDER, WEAPONS, ZOMBIES, dishEnhanceMeatCost, dishUpgradeCost, type TurretType } from '../content/data';
-import { MAX_CARRY, command, hasIngredients, hasTavernUpgrade, isOnPorch, isOnRoof, step, tavernUpgradeCost } from './sim';
+import { MAX_CARRY, command, hasIngredients, hasTavernUpgrade, isOnPorch, isOnRoof, nearbyWeaponCrate, step, tavernUpgradeCost } from './sim';
 import { NO_INPUT, PORCH_MAX_X, ROOF_MAX_X, WALL_X, type GameEvent, type Input, type RunState } from './types';
 
 export function botInput(run: RunState): Input {
@@ -20,6 +20,11 @@ export function botInput(run: RunState): Input {
     const spot = ROOF_MAX_X - 68; // 留出后撤闪避空间，不从屋檐冲掉下楼
     move = Math.abs(spot - p.x) < 4 ? 0 : Math.sign(spot - p.x);
   }
+  const nearWc = nearbyWeaponCrate(run);
+  const canQuickPick = !!nearWc && (
+    p.weapons.length < MAX_CARRY
+    || p.weapons.some((w) => w.id === nearWc.weapon)
+  );
   const incomingFireball = run.enemyProjs.some((ep) => Math.abs(ep.x - p.x) < 32 && Math.abs(ep.y - (222 + p.y - 20)) < 26);
   const wantDodge = incomingFireball && p.dodgeCd === 0;
   if (wantDodge && isOnRoof(run)) move = p.x > 140 ? -1 : 1;
@@ -30,6 +35,7 @@ export function botInput(run: RunState): Input {
     jump,
     fire: run.targetId !== null,
     dodge: wantDodge,
+    interact: canQuickPick,
     skill: run.zombies.length >= 4 && run.skill.cd === 0,
     grenade: crowdNearWall && p.grenades > 0 && run.zombies.length >= 4,
   };
@@ -78,15 +84,16 @@ function manageCamp(run: RunState) {
     if (run.player.weapons.some((w) => w.id === id) || WEAPONS[id].price > run.coins) continue;
     const minScore = Math.min(...run.player.weapons.map((w) => WEAPONS[w.id].price * (1 + 0.35 * (w.star - 1))));
     if (run.player.weapons.length < MAX_CARRY || WEAPONS[id].price > minScore + 20) {
+      let replaceIndex: number | undefined;
       if (run.player.weapons.length >= MAX_CARRY) {
         let worstIdx = 0, worstS = Infinity;
         run.player.weapons.forEach((w, idx) => {
           const sc = WEAPONS[w.id].price * (1 + 0.35 * (w.star - 1));
           if (sc < worstS) { worstS = sc; worstIdx = idx; }
         });
-        run.player.cur = worstIdx;
+        replaceIndex = worstIdx;
       }
-      command(run, { t: 'buyWeapon', weapon: id });
+      command(run, { t: 'buyWeapon', weapon: id, replaceIndex });
     }
   }
   const order: [number, TurretType][] = [[0, 'frost'], [2, 'tesla'], [3, 'cannon'], [1, 'mg']];
@@ -131,6 +138,18 @@ export function runBot(run: RunState, maxTicks = 60 * 60 * 25): BotReport {
       const s = (WEAPONS[w.id].price + 40) * (1 + 0.35 * (w.star - 1));
       if (s > bestScore) { bestScore = s; bestIdx = idx; }
     });
+    const nearWc = nearbyWeaponCrate(run);
+    if (nearWc && run.player.weapons.length >= MAX_CARRY && !run.player.weapons.some((w) => w.id === nearWc.weapon)) {
+      let worstIdx = 0, worstS = Infinity;
+      run.player.weapons.forEach((w, idx) => {
+        const sc = WEAPONS[w.id].price * (1 + 0.35 * (w.star - 1));
+        if (sc < worstS) { worstS = sc; worstIdx = idx; }
+      });
+      const minOwnedScore = worstS;
+      if (WEAPONS[nearWc.weapon].price > minOwnedScore + 15) {
+        command(run, { t: 'pickupCrate', crateId: nearWc.id, replaceIndex: worstIdx });
+      }
+    }
     const input = botInput(run);
     if (run.player.cur !== bestIdx) input.swap = true;
     const ev = step(run, input);
