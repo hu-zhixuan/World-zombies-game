@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
   CLASSES, CRIT_MUL, DIFFICULTIES, DINER_GUESTS, DRINKS, FORT_LEVELS, LAST_DAY, MEALS, MEAL_ORDER, PERKS, RYE_FALLBACK, SEAT_UPGRADE_ORDER,
-  TAVERN_UPGRADES, TURRETS, WALL_LEVELS, WEAPONS,
-  dayZombieCount, dishEnhanceMeatCost, dishUpgradeCost, nextUnlock, sustainedDps, unlockedClasses, unlockedWeapons, zombieHp,
+  TAVERN_UPGRADES, TURRETS, WALL_LEVELS, WEAPONS, WEATHERS,
+  dayZombieCount, dishEnhanceMeatCost, dishUpgradeCost, nextUnlock, sustainedDps, unlockedClasses, unlockedWeapons, weatherForDay, zombieHp,
 } from '../src/content/data';
 import {
   BOSS_INTROS, BOSS_VICTORY, CHAPTER_CARDS, CINEMATIC_INTRO, COMPANION_JOIN_STORIES, DAILY_TRENDS, FANS_RANKS,
@@ -18,13 +18,13 @@ import {
   turretBuildCost, turretRefundCoins, turretUpgradeCost,
 } from '../src/sim/sim';
 import {
-  ALLY_POS, DINER_PLATE_X, DINER_SEAT_X, DOOR_X, GROUND_Y, HOUSE_WALL_X, IN_STATIONS, NO_INPUT, PORCH_MAX_X, PORCH_Y, ROOF_Y, WALL_X, type RunState,
+  ALLY_POS, DINER_PLATE_X, DINER_SEAT_X, DOOR_X, GROUND_Y, HOUSE_WALL_X, IN_STATIONS, NO_INPUT, PORCH_MAX_X, PORCH_Y, ROOF_Y, WALL_X, type RunState, type Zombie,
 } from '../src/sim/types';
 
 const clone = (r: RunState): RunState => JSON.parse(JSON.stringify(r));
-const zombie = (r: RunState, x: number, hp = 100000, kind: 'roamer' | 'bruiser' | 'bat' | 'ghoul' | 'boss_beast' = 'roamer', y?: number) => {
+const zombie = (r: RunState, x: number, hp = 100000, kind: 'roamer' | 'bruiser' | 'bat' | 'ghoul' | 'boss_beast' = 'roamer', y?: number): Zombie => {
   const zy = y ?? (kind === 'bat' ? -84 : kind === 'ghoul' ? -72 : 0);
-  const z = { id: r.nextId++, kind, x, y: zy, hp, maxHp: hp, atkCd: 999, kb: 0, burnT: 0, slowT: 0, stunT: 0, freezeT: 0, carriesCrate: false };
+  const z: Zombie = { id: r.nextId++, kind, x, y: zy, hp, maxHp: hp, atkCd: 999, kb: 0, burnT: 0, slowT: 0, stunT: 0, freezeT: 0, carriesCrate: false };
   r.zombies.push(z); return z;
 };
 /** 一个没有刷怪的安静场地，默认关闭屋顶 1 号初始火铳塔以便测纯主角规则 */
@@ -1063,3 +1063,189 @@ describe('15 天完整流程与首领', () => {
     expect(r.endless).toBe(true);
   });
 });
+
+describe('v66 极简克制玩法深化：物理陷阱、读招反制、动态天象与堂内轻交互', () => {
+  test('战斗场地物理交互：前院火油桶引爆留火海 + 可击落空投补给伞砸晕敌群', () => {
+    // 1. 前院火油桶：当敌人接近桶旁时开火即可引爆并铺出灼烧火海
+    const r = quiet();
+    r.player.x = 300; r.player.y = 0; r.autoFire = false;
+    r.barrels = [{ id: 8801, x: 420, hp: 20, maxHp: 20 }];
+    const zNear = zombie(r, 445, 500, 'roamer');
+    let sawBarrelBoom = false;
+    for (let i = 0; i < 20; i++) {
+      for (const e of step(r, { ...NO_INPUT, fire: i === 0 })) {
+        if (e.t === 'barrelBoom') sawBarrelBoom = true;
+      }
+    }
+    expect(sawBarrelBoom).toBe(true);
+    expect(r.barrels.length).toBe(0);
+    expect(r.fires.length).toBeGreaterThanOrEqual(1);
+    expect(zNear.hp).toBeLessThan(500);
+
+    // 2. 可击落空投补给伞：点击锁定/射击打断伞绳 -> 加速砸落地面晕眩并重伤敌群 -> 落地可拾取并获附加补给
+    const r2 = quiet();
+    r2.player.x = 300; r2.player.y = 0; r2.autoFire = false; r2.player.grenades = 1;
+    r2.crates = [{ id: 8802, x: 420, y: -120, vy: 0.42, parachute: true, supplyBonus: true, weapon: 'revolver' }];
+    const zUnder = zombie(r2, 430, 500, 'roamer');
+    command(r2, { t: 'focusTarget', x: 420 });
+    expect(r2.priorityCrateId).toBe(8802);
+
+    let sawDrop = false, sawSlam = false;
+    for (let i = 0; i < 60; i++) {
+      for (const e of step(r2, { ...NO_INPUT, fire: i === 0 })) {
+        if (e.t === 'airdropDrop') sawDrop = true;
+        if (e.t === 'airdropSlam') sawSlam = true;
+      }
+    }
+    expect(sawDrop).toBe(true);
+    expect(sawSlam).toBe(true);
+    expect(r2.crates[0].y).toBe(0);
+    expect(zUnder.hp).toBeLessThan(500);
+    expect(zUnder.stunT).toBeGreaterThan(0);
+
+    // 走过去拾取落地空投箱：获得兵器 + 额外爆炎弹补给
+    r2.player.x = 420;
+    const pickEvs = step(r2, NO_INPUT);
+    expect(pickEvs.some((e) => e.t === 'pickup' && e.weapon === 'revolver')).toBe(true);
+    expect(r2.player.grenades).toBe(2);
+  });
+
+  test('敌人反制与读招：提灯怨灵「打灯破招」掉魔髓、焦骨巨尸「重击破防」与完美闪避「绝境反骨」3发必暴', () => {
+    // 1. 提灯怨灵蓄光前摇期间命中 -> 打灯破招 + 额外魔髓 + 反噬周围敌群
+    const rG = quiet();
+    rG.player.x = 300; rG.player.y = 0; rG.autoFire = false;
+    rG.player.weapons = [{ id: 'revolver', star: 1, ammo: 6 }];
+    const ghoul = zombie(rG, WALL_X + 140, 400, 'ghoul', -74);
+    const bystander = zombie(rG, WALL_X + 160, 400, 'roamer', 0);
+    ghoul.atkCd = 0;
+    step(rG, NO_INPUT); // 进入蓄光前摇
+    expect((ghoul.chargeT ?? 0)).toBeGreaterThan(0);
+    const essenceBefore = rG.meats.essence;
+    let sawLanternBreak = false;
+    for (let i = 0; i < 20; i++) {
+      for (const e of step(rG, { ...NO_INPUT, fire: i === 0 })) {
+        if (e.t === 'lanternBreak') sawLanternBreak = true;
+      }
+    }
+    expect(sawLanternBreak).toBe(true);
+    expect(rG.meats.essence).toBeGreaterThanOrEqual(essenceBefore + 1);
+    expect(ghoul.stunT).toBeGreaterThan(0);
+    expect(bystander.hp).toBeLessThan(400);
+
+    // 2. 焦骨巨尸重砸前摇期间重击命中 -> 重击破防
+    const rB = quiet();
+    rB.player.x = 300; rB.player.y = 0; rB.autoFire = false;
+    rB.player.weapons = [{ id: 'revolver', star: 1, ammo: 6 }];
+    const brute = zombie(rB, WALL_X + 8, 800, 'bruiser');
+    brute.atkCd = 0;
+    step(rB, NO_INPUT);
+    expect((brute.chargeT ?? 0)).toBeGreaterThan(0);
+    let sawGuardBreak = false;
+    for (let i = 0; i < 18; i++) {
+      for (const e of step(rB, { ...NO_INPUT, fire: i === 0 })) {
+        if (e.t === 'guardBreak') sawGuardBreak = true;
+      }
+    }
+    expect(sawGuardBreak).toBe(true);
+    expect(brute.stunT).toBeGreaterThan(0);
+
+    // 3. 完美闪避「绝境反骨」：敌方火球迫近瞬间按闪避 -> 自动装填 +3 发 & 赐予 3 发必暴反骨弹
+    const rD = quiet();
+    rD.player.x = 320; rD.player.y = 0; rD.autoFire = false;
+    rD.player.weapons = [{ id: 'revolver', star: 1, ammo: 1 }];
+    rD.enemyProjs.push({ x: 350, y: GROUND_Y - 22, vx: -4, vy: 0, dmg: 20, life: 40 });
+    const dodgeEvs = step(rD, { ...NO_INPUT, dodge: true });
+    expect(dodgeEvs.some((e) => e.t === 'perfectDodge')).toBe(true);
+    expect(rD.player.weapons[0].ammo).toBe(4);
+    expect(rD.player.rebelCritShots).toBe(3);
+    expect(rD.player.dodgeCd).toBeLessThan(60);
+
+    // 消耗 3 发必暴反骨弹验证全额暴击
+    rD.player.dodgeT = 0;
+    const dummy = zombie(rD, 400, 2000, 'roamer');
+    let crits = 0;
+    for (let shot = 0; shot < 3; shot++) {
+      rD.player.fireCd = 0;
+      for (let t = 0; t < 10; t++) {
+        for (const e of step(rD, { ...NO_INPUT, fire: t === 0 })) {
+          if (e.t === 'hit' && e.id === dummy.id && e.crit) crits++;
+        }
+      }
+    }
+    expect(crits).toBeGreaterThanOrEqual(3);
+    expect(rD.player.rebelCritShots).toBe(0);
+  });
+
+  test('动态黑夜天象：浓雾/血雨/狂风周期轮换与真实战局变奏', () => {
+    expect(weatherForDay(1)).toBe('clear');
+    expect(weatherForDay(3)).toBe('fog');
+    expect(weatherForDay(4)).toBe('bloodrain');
+    expect(weatherForDay(6)).toBe('gale');
+    expect(WEATHERS.fog.short.length).toBe(2);
+    expect(WEATHERS.bloodrain.short.length).toBe(2);
+    expect(WEATHERS.gale.short.length).toBe(2);
+
+    // 浓雾夜：屋顶煤油灯光圈暴击大幅提升，地面平地射程略收 -10%
+    const rFog = quiet();
+    const clearRoofCrit = houseBuff(rFog).critBonus;
+    rFog.player.x = 300; rFog.player.y = 0;
+    const clearGroundRange = effectiveRange(rFog, 'pistol');
+    rFog.weather = 'fog';
+    expect(effectiveRange(rFog, 'pistol')).toBeLessThan(clearGroundRange);
+    rFog.player.x = 180; rFog.player.y = ROOF_Y;
+    expect(houseBuff(rFog).critBonus).toBeCloseTo(clearRoofCrit + 0.18);
+
+    // 血雨夜：雷链跳跃次数 +2 且伤害更高，寒霜减速更长
+    const rRain = quiet();
+    rRain.weather = 'bloodrain';
+    rRain.player.x = 300; rRain.player.y = 0; rRain.autoFire = false;
+    rRain.player.weapons = [{ id: 'tesla', star: 1, ammo: 16 }];
+    const targets = [360, 410, 460, 510, 560, 610].map((x) => zombie(rRain, x, 1000, 'roamer'));
+    step(rRain, { ...NO_INPUT, fire: true });
+    // 基础法杖跳 4 人，血雨夜跳 6 人全部命中！
+    expect(targets.every((z) => z.hp < 1000)).toBe(true);
+
+    // 狂风夜：顺风向右抛爆炎弹落点更远
+    const rWind = quiet();
+    const clearThrow = computeGrenadeThrow(rWind, { dx: 0.5, dy: -0.2 });
+    rWind.weather = 'gale';
+    const galeThrow = computeGrenadeThrow(rWind, { dx: 0.5, dy: -0.2 });
+    expect(galeThrow.vx).toBeGreaterThan(clearThrow.vx);
+  });
+
+  test('酒馆堂内轻交互：热菜「趁热暴击」+30%金与战备加成 + 熟客红框「加急战备单」赠明晚火油桶/弹药箱', () => {
+    const r = quiet(); r.phase = 'perk'; r.perkChoices = ['rooftop'];
+    command(r, { t: 'pickPerk', id: 'rooftop' });
+    r.meats = { tender: 10, thick: 4, essence: 2 };
+    r.player.armor = 0;
+    expect(command(r, { t: 'startShift' })).not.toBeNull();
+
+    // 等待第一道菜出锅到传菜台，立刻端起并送达桌前 -> 触发趁热暴击！
+    for (let i = 0; i < 140 && r.dinerShift.counterDishes.length === 0; i++) step(r, NO_INPUT);
+    expect(r.dinerShift.counterDishes.length).toBeGreaterThan(0);
+    expect(r.dinerShift.counterDishes[0].cookedTick).toBeDefined();
+
+    r.player.x = IN_STATIONS.pass;
+    expect(command(r, { t: 'pickCounterDish' })).not.toBeNull();
+    expect(r.carryingDish?.hotUntilTick).toBeDefined();
+    const dest = r.guests.find((g) => g.id === r.carryingDish!.guestId) ?? r.guests.find((g) => !g.served)!;
+    // 同时将其设为红框加急战备单（明晚免费火油桶）
+    dest.isVipRequest = true;
+    dest.warOrderReward = 'barrel';
+    r.player.x = dest.x;
+    const serveEvs = command(r, { t: 'serveCarried' })!;
+    const sEv = serveEvs.find((e) => e.t === 'serve');
+    expect(sEv && sEv.t === 'serve' ? sEv.hotCrit : false).toBe(true);
+    expect(sEv && sEv.t === 'serve' ? sEv.warReward : undefined).toBe('barrel');
+    expect(r.player.armor).toBeGreaterThanOrEqual(10);
+    expect(r.diner.hotServeBonus).toBeGreaterThan(0);
+    expect(r.diner.bonusBarrels).toBe(1);
+
+    // 进入明晚战斗：额外火油桶生效（至少 2 只起）
+    command(r, { t: 'closeShift' });
+    command(r, { t: 'finishSummary' });
+    command(r, { t: 'nextDay' });
+    expect(r.barrels.length).toBeGreaterThanOrEqual(2);
+  });
+});
+

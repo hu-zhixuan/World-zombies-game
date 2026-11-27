@@ -345,6 +345,7 @@ class Game {
           || e.t === 'grindSauce' || e.t === 'sauceEmpty' || e.t === 'kitchenDone' || e.t === 'research' || e.t === 'prepDish'
           || e.t === 'dispatchReturn' || e.t === 'rackHarvest' || e.t === 'partyStart' || e.t === 'endlessEnter'
           || e.t === 'contractDone' || e.t === 'dishLevelUp' || e.t === 'fortify'
+          || e.t === 'barrelBoom' || e.t === 'airdropDrop' || e.t === 'airdropSlam' || e.t === 'lanternBreak' || e.t === 'guardBreak' || e.t === 'perfectDodge'
         ) {
           urgent = true;
         }

@@ -708,3 +708,21 @@ export const unlockedClasses = (stars: number) => UNLOCKS.flatMap((u) => (u.kind
 export const classUnlockStars = (id: ClassId) => UNLOCKS.find((u) => u.kind === 'class' && u.id === id)?.stars;
 export const nextUnlock = (stars: number) => UNLOCKS.find((u) => stars < u.stars);
 export const unlockName = (u: Unlock) => (u.kind === 'weapon' ? WEAPONS[u.id].name : `职业「${CLASSES[u.id].name}」`);
+
+// ── 动态黑夜天象（纯画面氛围 + 玩法变奏，顶栏仅 2 字标识）──
+export type WeatherDef = { id: 'clear' | 'fog' | 'bloodrain' | 'gale'; short: string; name: string; desc: string };
+export const WEATHERS: Record<'clear' | 'fog' | 'bloodrain' | 'gale', WeatherDef> = {
+  clear:     { id: 'clear',     short: '',     name: '寒星夜', desc: '夜空澄澈，战局无额外天象变奏' },
+  fog:       { id: 'fog',       short: '浓雾', name: '浓雾夜', desc: '地面视野微收，高地煤油灯光圈内暴击率大幅提升' },
+  bloodrain: { id: 'bloodrain', short: '血雨', name: '血雨夜', desc: '爆炎火海范围收敛，雷鸣连弧与寒霜冻结连锁翻倍' },
+  gale:      { id: 'gale',      short: '狂风', name: '狂风夜', desc: '顺风爆炎弹飞得更远，空中飞魔俯冲更加迅急' },
+};
+export function weatherForDay(day: number): 'clear' | 'fog' | 'bloodrain' | 'gale' {
+  if (day < 3) return 'clear';
+  const m = day % 4;
+  if (m === 3) return 'fog';
+  if (m === 0) return 'bloodrain';
+  if (m === 2 && day >= 6) return 'gale';
+  return 'clear';
+}
+

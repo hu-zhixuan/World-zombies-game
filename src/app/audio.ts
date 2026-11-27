@@ -344,6 +344,29 @@ class SoundEngine {
       case 'boom':
         this.play('sfx_boom', { gain: 0.98, jitter: 0.05 });
         break;
+      case 'barrelBoom':
+        this.play('sfx_boom', { gain: 1.04, rate: 0.88, jitter: 0.04 });
+        this.play('sfx_cook_sizzle', { gain: 0.85, rate: 0.95, delay: 0.06 });
+        break;
+      case 'airdropDrop':
+        this.play('sfx_swap', { gain: 0.86, rate: 1.25 });
+        break;
+      case 'airdropSlam':
+        this.play('sfx_boom', { gain: 0.96, rate: 0.84 });
+        this.play('sfx_wall_hit', { gain: 0.88, rate: 0.9, delay: 0.03 });
+        break;
+      case 'lanternBreak':
+        this.play('sfx_crit', { gain: 0.96, rate: 1.15 });
+        this.play('sfx_boom', { gain: 0.88, rate: 1.12, delay: 0.04 });
+        break;
+      case 'guardBreak':
+        this.play('sfx_crit', { gain: 0.94, rate: 0.95 });
+        this.play('sfx_wall_hit', { gain: 0.92, rate: 0.82, delay: 0.03 });
+        break;
+      case 'perfectDodge':
+        this.play('sfx_crit', { gain: 1.0, rate: 1.28 });
+        this.play('sfx_reload', { gain: 0.92, rate: 1.16, delay: 0.06 });
+        break;
       case 'lightning':
         this.play('sfx_lightning', { gain: 0.8, jitter: 0.08 });
         break;

@@ -4,7 +4,7 @@ import { game } from '../app/game';
 import {
   CLASSES, DIFFICULTIES, DIFFICULTY_ORDER, DRINKS, FORT_LEVELS, FORT_REPAIR_COST, GUEST_SUPPORTS, LAST_DAY, MAX_DISH_LV, MAX_FORT_LEVEL, MAX_GRENADES, MAX_STAR, MAX_WALL_LEVEL,
   MEALS, MEAL_ORDER, MEAT_ORDER, RARITY_NAME, RYE_FALLBACK, SEAT_UPGRADE_ORDER, SHOP_ARMOR_COST, SHOP_GRENADE_COST, SHOP_MEDKIT_COST, SHOP_REROLL_COST,
-  STAR_COST, STAR_PERKS, TAVERN_UPGRADES, TAVERN_UPGRADE_ORDER, TURRETS, WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, ZOMBIES,
+  STAR_COST, STAR_PERKS, TAVERN_UPGRADES, TAVERN_UPGRADE_ORDER, TURRETS, WALL_LEVELS, WALL_REPAIR_COST, WEAPONS, WEATHERS, ZOMBIES,
   classUnlockStars, newZombieOn, nextUnlock, partyForDay, perkDef, sustainedDps, unlockName,
   type TurretType,
 } from '../content/data';
@@ -43,6 +43,9 @@ function Hud() {
   const defRatio = wallUp ? run.wall.hp / run.wall.maxHp : run.home.hp / run.home.maxHp;
   const defLabel = wallUp ? `防线 ${run.wall.hp}` : `大屋 ${run.home.hp}`;
   const diffName = DIFFICULTIES[run.difficulty ?? 'normal'].name;
+  const weatherTag = !run.inside && run.phase !== 'camp' && run.weather && run.weather !== 'clear'
+    ? ` · ${WEATHERS[run.weather].short}`
+    : '';
 
   return (
     <header class="hud">
@@ -59,8 +62,8 @@ function Hud() {
       <div class="hud-mid">
         <Chip id="hud-day">
           {run.endless
-            ? `无尽·第${run.day}夜·${run.inside ? '酒馆' : '猎场'}`
-            : `${diffName}·${run.phase === 'camp' ? `第${run.day}夜·${run.inside ? '酒馆' : '外院'}` : `第${run.day}/${LAST_DAY}天`}`}
+            ? `无尽·第${run.day}夜·${run.inside ? '酒馆' : '猎场'}${weatherTag}`
+            : `${diffName}·${run.phase === 'camp' ? `第${run.day}夜·${run.inside ? '酒馆' : '外院'}` : `第${run.day}/${LAST_DAY}天${weatherTag}`}`}
         </Chip>
         {boss ? (
           <Chip cls="boss" id="hud-left">
@@ -976,7 +979,10 @@ function Toasts(p: { layer?: 'shift' | 'bar' }) {
       setItems((list) => [...list.slice(-2), { id, text, big }]);
       setTimeout(() => setItems((list) => list.filter((t) => t.id !== id)), 2400);
     };
-    if (e.t === 'dayStart') pushToast(`第 ${e.day} 夜`, true);
+    if (e.t === 'dayStart') {
+      const wShort = game.run.weather && game.run.weather !== 'clear' ? ` · ${WEATHERS[game.run.weather].short}` : '';
+      pushToast(`第 ${e.day} 夜${wShort}`, true);
+    }
     else if (e.t === 'bossAppear') pushToast(`首领 ${ZOMBIES[e.kind].name} 现身`, true);
     else if (e.t === 'bossDead') pushToast(`击溃 ${ZOMBIES[e.kind].name}`, true);
     else if (e.t === 'dayClear') pushToast('本夜清场');
@@ -1004,8 +1010,10 @@ function Toasts(p: { layer?: 'shift' | 'bar' }) {
     else if (e.t === 'serve') {
       if (e.isRye) pushToast(`${e.name} +1金`, false);
       else {
-        const supTxt = e.supportTag ? ` · ${e.supportTag}` : '';
-        pushToast(`${e.name} +${e.coins}金${supTxt}`, true);
+        const hotTxt = e.hotCrit ? ' · 趁热+30%' : '';
+        const warTxt = e.warReward ? (e.warReward === 'barrel' ? ' · 赠明晚火油桶' : ' · 赠弹药箱') : '';
+        const supTxt = !warTxt && e.supportTag ? ` · ${e.supportTag}` : '';
+        pushToast(`${e.name} +${e.coins}金${hotTxt}${warTxt}${supTxt}`, true);
       }
       if (e.rankUp) pushToast(`酒馆晋升 ${e.rankUp} (+25金)`, true);
     }

@@ -155,7 +155,7 @@ const L = require('./lib.cjs');
   await g.touch('touchStart', pad.x, pad.y);
   await wait(30);
   await g.touch('touchMove', pad.x, pad.y + 40);
-  await wait(110);
+  await wait(50);
   await g.touch('touchEnd');
   check(await until((st) => st.y === -48, 2500, '摇杆轻下拉穿屋顶落门廊'), '摇杆下拉轻按可穿过屋顶落到中层门廊');
   check(await g.page.evaluate(() => document.querySelector('#hud-house')?.getAttribute('data-zone') === 'porch'), '跳/落到门廊时增益徽章切换为门廊状态 (porch)');
@@ -488,11 +488,19 @@ const L = require('./lib.cjs');
   s = await g.state();
   check(s.panel === null && s.day === 1 && s.hp === 100 && s.kills === 0, '重开是全新的一局');
 
-  // 11. 窄横屏 780x360 适配检查（#hud-house、#weapon-chip、.keys-fan、#pad 互不重叠或溢出）
+  // 11. v66 前院火油桶 + 2 字动态天象顶栏校验 + 窄横屏 780x360 适配检查（#hud-day 含天象、#hud-house、#weapon-chip、.keys-fan、#pad 互不重叠或溢出）
+  check(await g.page.evaluate(() => window.__game.run.barrels.length >= 1), 'v66 每夜开战前院自动刷出可引爆火油桶');
+  await g.page.evaluate(() => {
+    window.__game.run.day = 3;
+    window.__game.run.weather = 'fog';
+    window.__game.notify();
+  });
+  await wait(120);
+  check(await g.page.evaluate(() => /· 浓雾$/.test(document.querySelector('#hud-day')?.textContent || '')), 'v66 浓雾夜顶栏仅展示 2 字天象标识且无新增 HUD 栏');
   await g.page.setViewportSize({ width: 780, height: 360 });
   await wait(160);
   const narrowOk = await g.page.evaluate(() => {
-    const ids = ['#hud-house', '#weapon-chip', '#key-reload', '#key-fire', '#key-jump', '#key-dodge', '#key-grenade', '#key-skill'];
+    const ids = ['#hud-day', '#hud-house', '#weapon-chip', '#key-reload', '#key-fire', '#key-jump', '#key-dodge', '#key-grenade', '#key-skill'];
     const rects = ids.map((id) => ({ id, r: document.querySelector(id)?.getBoundingClientRect() }));
     if (rects.some((x) => !x.r || x.r.right > innerWidth || x.r.bottom > innerHeight || x.r.left < 0 || x.r.top < 0)) return 'out-of-bounds';
     for (let i = 0; i < rects.length; i++) {
@@ -505,7 +513,7 @@ const L = require('./lib.cjs');
     }
     return 'ok';
   });
-  check(narrowOk === 'ok', '780x360 窄横屏布局无溢出无遮挡 (' + narrowOk + ')');
+  check(narrowOk === 'ok', '780x360 窄横屏含天象标识布局无溢出无遮挡 (' + narrowOk + ')');
 
   const text = await g.page.evaluate(() => document.body.innerText);
   check(!/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(text.replace(/★/g, '')), '界面里没有 emoji');
