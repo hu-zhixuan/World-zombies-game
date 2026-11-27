@@ -63,6 +63,7 @@ export const ALLY_POS: Record<AllyId, { extX: number; extY: number; intX: number
 
 export type Phase = 'fight' | 'clear' | 'perk' | 'camp' | 'dead' | 'won';
 export type TurretTargetMode = 'near' | 'boss' | 'air';
+export type WeatherId = 'clear' | 'fog' | 'bloodrain' | 'gale';
 
 export interface OwnedWeapon { id: WeaponId; star: number; ammo: number }
 export interface Player {
@@ -70,6 +71,7 @@ export interface Player {
   dropIgnoreT: number;
   hp: number; maxHp: number; armor: number; maxArmor: number; hurtT: number; healCarry: number;
   dodgeT: number; dodgeCd: number; dodgeDir: 1 | -1;
+  perfectDodgeT?: number; rebelCritShots?: number;
   fireCd: number; reloadT: number; shootT: number;
   burstLeft: number; burstCd: number; smgHeat: number; smgShots: number;
   grenades: number;
@@ -78,6 +80,10 @@ export interface Player {
 export interface Zombie {
   id: number; kind: ZombieKind; x: number; y: number; hp: number; maxHp: number;
   atkCd: number; kb: number; burnT: number; slowT: number; stunT: number; freezeT: number; carriesCrate: boolean;
+  chargeT?: number; chargeMax?: number;
+}
+export interface OilBarrel {
+  id: number; x: number; hp: number; maxHp: number;
 }
 export interface Bullet {
   x: number; y: number; vx: number; vy: number; dmg: number; life: number;
@@ -93,7 +99,10 @@ export interface GrenadeProj {
 export interface EnemyProj {
   x: number; y: number; vx: number; vy: number; dmg: number; life: number;
 }
-export interface Crate { id: number; x: number; weapon: WeaponId }
+export interface Crate {
+  id: number; x: number; weapon: WeaponId;
+  y?: number; vy?: number; parachute?: boolean; supplyBonus?: boolean;
+}
 export interface TurretSlotState { type: TurretType | null; level: number; cd: number; aim: number; mode: TurretTargetMode }
 export interface AllyRuntime {
   cd: number;
@@ -138,6 +147,7 @@ export interface DinerGuest {
   isRye?: boolean;
   isVipRequest?: boolean;
   requestBonusCoins?: number;
+  warOrderReward?: 'barrel' | 'ammo';
   orderQuote: string;
   thanksQuote: string;
   served: boolean;
@@ -166,6 +176,7 @@ export interface CounterDish {
   dishName: string;
   quality: DishQuality;
   isRye?: boolean;
+  cookedTick?: number;
 }
 
 export interface KitchenOrder {
@@ -310,6 +321,12 @@ export interface DinerState {
   extraCrates?: number;
   /** 猎魔同袍支援：明日主战场全体战友伤害+35%、攻速+25% */
   allyFuryNext?: boolean;
+  /** 熟客加急战备单（叛逆暗号）：明晚前院额外火油桶数 */
+  bonusBarrels?: number;
+  /** 熟客加急战备单（叛逆暗号）：明晚开战首轮必暴反骨弹数 */
+  bonusCritRounds?: number;
+  /** 今夜「趁热暴击」累计的明日战备伤害加成（每盘+4%，上限+12%） */
+  hotServeBonus?: number;
   /** 当前主战场狩猎悬赏 */
   contract?: BattleContractState;
 }
@@ -325,6 +342,7 @@ export interface CarriedDishState {
   dishName: string;
   quality: DishQuality;
   isRye?: boolean;
+  hotUntilTick?: number;
 }
 
 /** 一局的全部状态。能直接 JSON 序列化：存档就是存它。 */
@@ -334,13 +352,15 @@ export interface RunState {
   inside: boolean;
   autoFire: boolean;
   difficulty: DifficultyId;
-  player: Player; zombies: Zombie[]; bullets: Bullet[]; fires: GroundFire[]; grenades: GrenadeProj[]; enemyProjs: EnemyProj[]; crates: Crate[];
+  weather: WeatherId;
+  player: Player; zombies: Zombie[]; barrels: OilBarrel[]; bullets: Bullet[]; fires: GroundFire[]; grenades: GrenadeProj[]; enemyProjs: EnemyProj[]; crates: Crate[];
   turrets: TurretSlotState[];
   allies: Record<AllyId, AllyRuntime>;
   wall: { level: number; hp: number; maxHp: number };
   home: { hp: number; maxHp: number };
   fort: { level: number; cd: number; aim: number };
   spawn: { left: number; timer: number; total: number; killed: number; crateAt: number; bossKind: ZombieKind | null; bossSpawned: boolean };
+  airdropDone?: boolean;
   coins: number;
   meats: MeatInventory;
   spice: number;
@@ -363,6 +383,8 @@ export interface RunState {
   chain: { n: number; t: number }; vanguardT: number;
   targetId: number | null;
   priorityId: number | null;
+  priorityBarrelId?: number | null;
+  priorityCrateId?: number | null;
   /** 职业，和主动技能的剩余时间 / 冷却 */
   cls: ClassId; skill: { t: number; cd: number };
   /** 破晓无尽酒馆模式与跨局轻度传承 */
@@ -424,7 +446,7 @@ export type Command =
   | { t: 'pickCounterDish'; id?: number }
   | { t: 'cookSell'; count: number }
   | { t: 'pickMeal'; id: MealId; quality?: DishQuality }
-  | { t: 'focusTarget'; x: number }
+  | { t: 'focusTarget'; x: number; y?: number }
   | { t: 'enterHouse' }
   | { t: 'exitHouse' }
   | { t: 'nextDay' }
@@ -442,6 +464,12 @@ export type GameEvent =
   | { t: 'skill'; cls: ClassId }
   | { t: 'kill'; id: number; x: number; y?: number; kind: ZombieKind; coins: number; meat: number; meatKind?: MeatKind; preserved?: boolean; dir?: 1 | -1; crit?: boolean; boss?: boolean }
   | { t: 'boom'; x: number; y: number; r: number }
+  | { t: 'barrelBoom'; x: number; y: number }
+  | { t: 'airdropDrop'; id: number; x: number }
+  | { t: 'airdropSlam'; x: number; stunned: number }
+  | { t: 'lanternBreak'; id: number; x: number; y: number }
+  | { t: 'guardBreak'; id: number; x: number; y: number }
+  | { t: 'perfectDodge'; x: number; y: number; reloaded: number }
   | { t: 'hurt'; dmg: number; blocked?: number; cover?: number }
   | { t: 'wallHit'; reflect?: boolean }
   | { t: 'homeHit' }
@@ -464,7 +492,7 @@ export type GameEvent =
   | { t: 'guestAngry'; guestId: string; name: string }
   | { t: 'shiftOpen'; duration: number }
   | { t: 'shiftEnd'; served: number; coins: number; tips: number; fans: number; bestCombo: number; rating: number; flameEarned: number }
-  | { t: 'serve'; guestId: string; vipId: string; name: string; dishName: string; quality: DishQuality; coins: number; fans: number; rep: number; quote: string; allServed?: boolean; firstMeet?: boolean; trendMatch?: boolean; partyMatch?: boolean; vipRequestClear?: boolean; rankUp?: string; isRye?: boolean; supportKind?: GuestSupportKind; supportTag?: string; dishBuffTag?: string }
+  | { t: 'serve'; guestId: string; vipId: string; name: string; dishName: string; quality: DishQuality; coins: number; fans: number; rep: number; quote: string; allServed?: boolean; firstMeet?: boolean; trendMatch?: boolean; partyMatch?: boolean; vipRequestClear?: boolean; rankUp?: string; isRye?: boolean; supportKind?: GuestSupportKind; supportTag?: string; dishBuffTag?: string; hotCrit?: boolean; warReward?: 'barrel' | 'ammo' }
   | { t: 'contractDone'; id: BattleContractId; title: string; coins: number; rewardText: string }
   | { t: 'dishLevelUp'; id: MealId; level: number }
   | { t: 'fortify'; x: number; y: number; label: string }
@@ -478,4 +506,5 @@ export type GameEvent =
   | { t: 'bossDead'; kind: ZombieKind; bossIdx: 0 | 1 | 2 }
   | { t: 'endlessEnter' }
   | { t: 'dayStart'; day: number } | { t: 'dayClear'; day: number } | { t: 'dead' } | { t: 'won' };
+
 

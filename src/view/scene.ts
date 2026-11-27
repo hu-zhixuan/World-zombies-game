@@ -66,6 +66,7 @@ export class GameScene extends Phaser.Scene {
   private staffDishSprites = new Map<string, Phaser.GameObjects.Image>();
   private dirtyPlateSprites = new Map<number, Phaser.GameObjects.Image>();
   private counterDishSprites: Phaser.GameObjects.Image[] = [];
+  private barrelSprites = new Map<number, Phaser.GameObjects.Image>();
   private crates = new Map<number, Phaser.GameObjects.Image>();
   private bullets: Phaser.GameObjects.Sprite[] = [];
   private grenadeSprites: Phaser.GameObjects.Image[] = [];
@@ -81,6 +82,8 @@ export class GameScene extends Phaser.Scene {
   private hitStopUntil = new Map<number, number>();
   private hitJitterUntil = new Map<number, number>();
   private hitTilt = new Map<number, number>();
+  private slowMoUntil = 0;
+  private heroFlashUntil = 0;
   private camX = 0;
   private camKickX = 0;
   private camZoom = 1;
@@ -226,7 +229,7 @@ export class GameScene extends Phaser.Scene {
       const r = game.run;
       if (game.panel() !== null) return;
       if (!r.inside && r.phase === 'fight') {
-        game.send({ t: 'focusTarget', x: ptr.worldX });
+        game.send({ t: 'focusTarget', x: ptr.worldX, y: ptr.worldY });
       } else if (r.phase === 'camp' && !r.pourMinigame) {
         const wx = Phaser.Math.Clamp(ptr.worldX, r.inside ? 78 : 130, r.inside ? 820 : 620);
         game.walkTo(wx, true);
@@ -516,8 +519,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   update(_t: number, dt: number) {
-    game.advance(dt);
-    const run = game.run, p = run.player, now = this.time.now, inside = run.inside;
+    const now = this.time.now;
+    game.advance(now < this.slowMoUntil ? dt * 0.22 : dt);
+    const run = game.run, p = run.player, inside = run.inside;
 
     // 快速切换室内 / 室外图层与 4 大件硬体装修实景显隐
     for (const o of this.extObjs) o.setVisible(!inside);
@@ -558,7 +562,7 @@ export class GameScene extends Phaser.Scene {
     this.sky.tilePositionX = cam.scrollX * 0.08;
     this.town.tilePositionX = cam.scrollX * 0.25;
 
-    // ── 主角 + 分层独立手臂 + 手持枪械贴图 + 闪避残影 ──
+    // ── 主角 + 分层独立手臂 + 手持枪械贴图 + 闪避残影 / 绝境反骨白闪 ──
     const want = p.dodgeT > 0 ? 'hero_crouch' : p.hurtT > 10 ? 'hero_hurt' : p.vy < -0.2 ? 'hero_jump' : p.vy > 0.4 ? 'hero_fall'
       : p.shootT > 0 && Math.abs(p.vx) < 0.1 ? 'hero_shoot' : Math.abs(p.vx) > 0.1 ? 'hero_run' : 'hero_idle';
     if (this.hero.anims.currentAnim?.key !== want) this.hero.play(want);
@@ -567,10 +571,12 @@ export class GameScene extends Phaser.Scene {
     const hsx = 1 - this.heroSquash * 0.55;
     this.hero.setPosition(p.x, GROUND_Y + p.y).setFlipX(p.facing < 0).setScale(hsx, hsy);
     this.hero.setAlpha(p.dodgeT > 0 ? 0.65 : p.hurtT > 0 && Math.floor(now / 60) % 2 ? 0.5 : 1);
+    if (now < this.heroFlashUntil) this.hero.setTintFill(C.paper);
+    else this.hero.clearTint();
 
     if (p.dodgeT > 0 && run.tick !== this.afterimageTick && run.tick % 2 === 0) {
       this.afterimageTick = run.tick;
-      const ghost = this.add.sprite(p.x, GROUND_Y + p.y, want).setOrigin(0.5, 1).setFlipX(p.facing < 0).setDepth(D.actor - 0.1).setTint(C.frost).setAlpha(0.52);
+      const ghost = this.add.sprite(p.x, GROUND_Y + p.y, want).setOrigin(0.5, 1).setFlipX(p.facing < 0).setDepth(D.actor - 0.1).setTint((p.perfectDodgeT ?? 0) > 0 ? C.gold : C.frost).setAlpha(0.58);
       this.tweens.add({ targets: ghost, alpha: 0, duration: 170, onComplete: () => ghost.destroy() });
     }
 
@@ -706,14 +712,32 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // ── 武器箱 ──
+    // ── 前院火油桶（可引爆物理陷阱）与空投补给伞/武器箱 ──
+    const seenBarrels = new Set<number>();
+    if (!inside) {
+      for (const b of run.barrels) {
+        seenBarrels.add(b.id);
+        let im = this.barrelSprites.get(b.id);
+        if (!im) {
+          im = this.add.image(b.x, GROUND_Y, 'barrel').setOrigin(0.5, 1).setDepth(D.prop + 0.16).setTint(C.ember);
+          this.barrelSprites.set(b.id, im);
+        }
+        im.setVisible(true).setPosition(b.x, GROUND_Y);
+      }
+    }
+    for (const [id, im] of this.barrelSprites) if (!seenBarrels.has(id)) { im.destroy(); this.barrelSprites.delete(id); }
+
     const seenCrates = new Set<number>();
     if (!inside) {
       for (const c of run.crates) {
         seenCrates.add(c.id);
         let im = this.crates.get(c.id);
         if (!im) { im = this.add.image(c.x, GROUND_Y, 'ic_crate').setOrigin(0.5, 1).setDepth(D.actor); this.crates.set(c.id, im); }
-        im.setVisible(true).y = GROUND_Y - 2 - Math.abs(Math.sin(now / 260)) * 5;
+        const cy = c.y ?? 0;
+        const airborne = cy < -2;
+        const sway = c.parachute && airborne ? Math.sin(now / 260 + c.id) * 5 : 0;
+        const bob = airborne ? 0 : Math.abs(Math.sin(now / 260)) * 5;
+        im.setVisible(true).setPosition(c.x + sway, GROUND_Y + cy - 2 - bob);
       }
     }
     for (const [id, im] of this.crates) if (!seenCrates.has(id)) { im.destroy(); this.crates.delete(id); }
@@ -759,7 +783,7 @@ export class GameScene extends Phaser.Scene {
     // ── 叠加高亮层（冲击波、暴击斩痕、枪口火焰、像素粒子、抛物线、四角准星、血条） ──
     const g = this.overlay; g.clear();
 
-    // 室内炉口温柔火星与餐桌微热气
+    // 室内炉口温柔火星、餐桌微热气、传菜台/手里刚出锅热菜的「趁热金气」
     if (inside && now > this.hearthTick + 170) {
       this.hearthTick = now;
       this.spawnSpark(118 + Phaser.Math.Between(-10, 10), GROUND_Y - 14, Phaser.Math.FloatBetween(-0.18, 0.18), Phaser.Math.FloatBetween(-0.85, -0.4), -0.008, 32, 2, C.ember);
@@ -767,6 +791,15 @@ export class GameScene extends Phaser.Scene {
         if (guest.served && guest.walkState === 'seated' && Math.random() < 0.4) {
           this.spawnSpark((DINER_PLATE_X[guest.seatIdx] ?? guest.x) + Phaser.Math.Between(-6, 6), GROUND_Y - 34, 0, -0.4, -0.004, 24, 1.6, C.paper);
         }
+      }
+      // 传菜台刚出锅 5 秒内热菜冒金热气
+      run.dinerShift.counterDishes.slice(0, 5).forEach((cd, idx) => {
+        if (!cd.isRye && cd.cookedTick !== undefined && run.tick - cd.cookedTick <= 300) {
+          this.spawnSpark(IN_STATIONS.pass - 14 + idx * 7 + Phaser.Math.FloatBetween(-2, 2), GROUND_Y - 40, Phaser.Math.FloatBetween(-0.12, 0.12), -0.68, -0.006, 24, 2.0, C.gold);
+        }
+      });
+      if (run.carryingDish && !run.carryingDish.isRye && run.carryingDish.hotUntilTick !== undefined && run.tick <= run.carryingDish.hotUntilTick) {
+        this.spawnSpark(p.x + p.facing * 14, GROUND_Y + p.y - 30, Phaser.Math.FloatBetween(-0.15, 0.15), -0.75, -0.006, 20, 2.0, C.gold);
       }
     }
     this.stepAndDrawSparks(g);
@@ -786,6 +819,14 @@ export class GameScene extends Phaser.Scene {
         g.fillStyle(C.gold, 0.36).fillRoundedRect(sx - barW / 2, GROUND_Y - 4, barW, 5, 2);
         g.lineStyle(1.4, C.lamp, 0.9).strokeRoundedRect(sx - barW / 2, GROUND_Y - 4, barW, 5, 2);
       }
+      // 传菜台刚出锅 5 秒内的热菜托盘金光提示
+      run.dinerShift.counterDishes.slice(0, 5).forEach((cd, idx) => {
+        if (!cd.isRye && cd.cookedTick !== undefined && run.tick - cd.cookedTick <= 300) {
+          const hx = IN_STATIONS.pass - 14 + idx * 7;
+          const pulse = 0.65 + Math.sin(now / 110 + idx) * 0.3;
+          g.lineStyle(1.6, C.gold, pulse).strokeEllipse(hx, GROUND_Y - 31, 14, 5);
+        }
+      });
       const bob = Math.sin(now / 210) * 1.6;
       const arrowBob = Math.sin(now / 120) * 2.5;
       const rushOpen = run.dinerShift.mode === 'open';
@@ -801,17 +842,24 @@ export class GameScene extends Phaser.Scene {
         const isTarget = isDishTarget || isDrinkTarget;
         const ratio = Math.max(0, Math.min(1, guest.patience / Math.max(1, guest.maxPatience)));
         const isUrgent = rushOpen && ratio < 0.25;
+        const isWarOrder = !!guest.isVipRequest;
         const gx = guest.x;
         const gy = GROUND_Y - 62 + bob;
-        const bw = isTarget ? 24 : 21;
-        const bh = isTarget ? 20 : 18;
-        const borderCol = isTarget ? C.gold : isUrgent ? C.red : guest.isVipRequest ? C.gold : guest.isRye ? C.grey : guest.trendMatch ? C.ember : C.copper;
+        const bw = isTarget ? 24 : isWarOrder ? 23 : 21;
+        const bh = isTarget ? 20 : isWarOrder ? 19 : 18;
+        // 熟客加急战备单（叛逆暗号）亮起醒目朱红边框，零新弹窗一眼可辨
+        const borderCol = isTarget ? C.gold : (isUrgent || isWarOrder) ? C.red : guest.isRye ? C.grey : guest.trendMatch ? C.ember : C.copper;
         g.fillStyle(C.leather, 0.94).fillRoundedRect(gx - bw / 2, gy - bh / 2, bw, bh, 5);
-        g.lineStyle(isTarget || isUrgent || guest.isVipRequest ? 2 : 1.4, borderCol, 0.98).strokeRoundedRect(gx - bw / 2, gy - bh / 2, bw, bh, 5);
+        g.lineStyle(isTarget || isUrgent || isWarOrder ? 2.2 : 1.4, borderCol, 0.98).strokeRoundedRect(gx - bw / 2, gy - bh / 2, bw, bh, 5);
+        if (isWarOrder) {
+          const wp = 0.55 + Math.sin(now / 130) * 0.35;
+          g.lineStyle(1.3, C.ember, wp).strokeRoundedRect(gx - bw / 2 - 2.5, gy - bh / 2 - 2.5, bw + 5, bh + 5, 6);
+        }
         g.fillStyle(C.leather, 0.94).fillTriangle(gx - 3, gy + bh / 2 - 1, gx + 3, gy + bh / 2 - 1, gx, gy + bh / 2 + 4);
-        // 特邀点名金钻标 + 性格角标色点（急客红、老饕金、酒客琥珀）
-        if (guest.isVipRequest) {
-          g.fillStyle(C.gold, 1).fillCircle(gx - bw / 2 + 2, gy - bh / 2 + 2, 2.5);
+        // 加急战备单红钻角标 + 性格角标色点（急客红、老饕金、酒客琥珀）
+        if (isWarOrder) {
+          g.fillStyle(C.red, 1).fillCircle(gx - bw / 2 + 2, gy - bh / 2 + 2, 2.8);
+          g.fillStyle(C.gold, 1).fillCircle(gx - bw / 2 + 2, gy - bh / 2 + 2, 1.1);
         }
         if (guest.personality !== 'regular') {
           const pAccent = guest.personality === 'hurried' ? C.red : guest.personality === 'gourmet' ? C.gold : C.lamp;
@@ -946,7 +994,86 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // 屋顶 / 门廊高地防守增益光环与矮墙护线
+    // ── 动态黑夜天象（浓雾 / 血雨 / 狂风）纯画面氛围层 ──
+    if (run.weather === 'fog') {
+      const drift = (now * 0.018) % 240;
+      for (let i = 0; i < 4; i++) {
+        const fx = 340 + ((i * 195 + drift) % 680) - 40;
+        const fy = GROUND_Y - 14 - (i % 2) * 32;
+        g.fillStyle(C.haze, 0.14).fillEllipse(fx, fy, 230, 52);
+      }
+      g.fillStyle(C.night, 0.14).fillRect(360, 0, WORLD_W - 360, GROUND_Y + 6);
+      // 屋顶与门廊煤油灯光圈更亮，提示高地暴击大幅提升
+      g.fillStyle(C.lamp, 0.13).fillCircle(166, GROUND_Y + ROOF_Y - 12, 92);
+      g.fillStyle(C.gold, 0.09).fillCircle(266, GROUND_Y + PORCH_Y - 10, 52);
+    } else if (run.weather === 'bloodrain') {
+      const camL = Math.max(0, this.camX - 30);
+      const camR = camL + this.scale.gameSize.width + 60;
+      g.lineStyle(1.2, C.red, 0.42);
+      for (let i = 0; i < 34; i++) {
+        const rx = camL + ((i * 53 + Math.floor(now * 0.22) * 3) % Math.max(120, camR - camL));
+        const ry = ((i * 37 + Math.floor(now * 0.36)) % (GROUND_Y + 6)) - 6;
+        g.lineBetween(rx, ry, rx - 5, ry + 13);
+        if (ry > GROUND_Y - 14) {
+          g.lineStyle(1, C.rose, 0.35).lineBetween(rx - 7, GROUND_Y - 1, rx - 2, GROUND_Y - 3);
+          g.lineStyle(1.2, C.red, 0.42);
+        }
+      }
+    } else if (run.weather === 'gale') {
+      const camL = Math.max(0, this.camX - 40);
+      const span = this.scale.gameSize.width + 80;
+      for (let i = 0; i < 16; i++) {
+        const wx = camL + ((i * 89 + Math.floor(now * 0.42)) % Math.max(160, span));
+        const wy = 24 + (i * 19) % (GROUND_Y - 34);
+        const len = 28 + (i % 3) * 14;
+        g.lineStyle(1.2, i % 3 === 0 ? C.paper : C.haze, 0.28).lineBetween(wx, wy, wx + len, wy + 2);
+      }
+    }
+
+    // ── 前院火油桶视觉提示（红漆危险环 + 敌怪靠近或点击锁定时脉动引爆提示）──
+    for (const b of run.barrels) {
+      const enemyNear = run.zombies.some((z) => z.hp > 0 && Math.abs(z.x - b.x) <= 96);
+      const isPri = run.priorityBarrelId === b.id;
+      const pulse = 0.65 + Math.sin(now / 110 + b.id) * 0.3;
+      g.fillStyle(C.red, 0.85).fillRect(b.x - 8, GROUND_Y - 17, 16, 4);
+      if (enemyNear || isPri) {
+        g.lineStyle(1.8, isPri ? C.gold : C.ember, pulse).strokeEllipse(b.x, GROUND_Y - 2, 34, 9);
+        g.lineStyle(1.6, isPri ? C.gold : C.red, 0.92).strokeCircle(b.x, GROUND_Y - 14, 12 + Math.sin(now / 90) * 1.6);
+        if (run.tick % 6 === 0) {
+          this.spawnSpark(b.x + Phaser.Math.FloatBetween(-6, 6), GROUND_Y - 22, Phaser.Math.FloatBetween(-0.2, 0.2), -0.9, -0.01, 14, 2, C.gold);
+        }
+      }
+    }
+
+    // ── 空投补给伞穹顶与绳索（可击落砸晕敌群）──
+    for (const c of run.crates) {
+      const cy = c.y ?? 0;
+      if (cy >= -4) continue;
+      const sway = c.parachute ? Math.sin(now / 260 + c.id) * 5 : 0;
+      const cx = c.x + sway;
+      const boxTopY = GROUND_Y + cy - 18;
+      if (c.parachute) {
+        const domeY = boxTopY - 20;
+        g.lineStyle(1.2, C.paper, 0.82)
+          .lineBetween(cx - 14, domeY + 2, cx - 5, boxTopY)
+          .lineBetween(cx + 14, domeY + 2, cx + 5, boxTopY)
+          .lineBetween(cx, domeY + 1, cx, boxTopY);
+        g.fillStyle(C.paper, 0.92).fillEllipse(cx, domeY, 34, 14);
+        g.fillStyle(C.red, 0.85).fillEllipse(cx, domeY - 2, 14, 11);
+        g.lineStyle(1.4, C.woodDark, 0.9).strokeEllipse(cx, domeY, 34, 14);
+        if (run.priorityCrateId === c.id) {
+          g.lineStyle(1.8, C.gold, 0.95).strokeCircle(cx, domeY + 6, 18);
+        }
+      } else {
+        // 伞绳已断高速砸落风痕
+        g.lineStyle(1.8, C.paper, 0.72)
+          .lineBetween(cx - 7, boxTopY - 16, cx - 7, boxTopY - 2)
+          .lineBetween(cx + 7, boxTopY - 14, cx + 7, boxTopY - 2);
+        g.lineStyle(1.5, C.gold, 0.85).strokeEllipse(c.x, GROUND_Y - 1, 36, 9);
+      }
+    }
+
+    // 屋顶 / 门廊高地防守增益光环与矮墙护线 + 绝境反骨暴击弹金色光环
     const hb = houseBuff(run);
     if (run.phase !== 'dead' && hb.zone !== 'ground') {
       const col = hb.zone === 'roof' ? C.gold : C.copper;
@@ -960,6 +1087,14 @@ export class GameScene extends Phaser.Scene {
       }
       g.fillStyle(col, 0.18).fillEllipse(p.x, py - 1, 28, 7);
       g.lineStyle(1.4, col, 0.78).strokeEllipse(p.x, py - 1, 28, 7);
+    }
+    if (run.phase === 'fight' && (p.rebelCritShots ?? 0) > 0) {
+      const py = GROUND_Y + p.y;
+      const pulse = 0.7 + Math.sin(now / 80) * 0.25;
+      g.lineStyle(2.0, C.gold, pulse).strokeEllipse(p.x, py - 2, 32, 9);
+      for (let i = 0; i < Math.min(3, p.rebelCritShots ?? 0); i++) {
+        g.fillStyle(C.gold, 0.96).fillCircle(p.x - 6 + i * 6, py - 48, 2.2);
+      }
     }
 
     // 特色子弹拖尾（左轮金痕 / 连珠火铳炽焰弹 / 寒霜冰晶痕 / 战友银枪与苍蓝气劲）
@@ -977,7 +1112,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // 僵尸与空中魔物深冻冰壳 & 麻痹电弧
+    // 僵尸与空中魔物深冻冰壳、麻痹电弧、提灯怨灵蓄光前摇与焦骨巨尸重击蓄力预警
     for (const z of run.zombies) {
       const zy = GROUND_Y + (z.y ?? 0);
       const zh = z.kind === 'bat' ? 26 : 38;
@@ -989,6 +1124,19 @@ export class GameScene extends Phaser.Scene {
         g.lineStyle(1.4, C.electric, 0.9)
           .lineBetween(z.x - 10, zy - zh * 0.85, z.x + 2, zy - zh * 0.55)
           .lineBetween(z.x + 2, zy - zh * 0.55, z.x - 6, zy - zh * 0.25);
+      }
+      if ((z.chargeT ?? 0) > 0) {
+        const frac = Math.max(0, Math.min(1, (z.chargeT ?? 0) / Math.max(1, z.chargeMax ?? 36)));
+        if (z.kind === 'ghoul') {
+          // 提灯怨灵蓄光前摇：收缩翠金光圈，命中即打灯破招
+          const lx = z.x - 9, ly = zy - 24;
+          g.lineStyle(2.2, C.infected, 0.95).strokeCircle(lx, ly, 6 + frac * 14);
+          g.fillStyle(C.gold, 0.75).fillCircle(lx, ly, 4 + (1 - frac) * 3);
+        } else if (z.kind === 'bruiser') {
+          // 焦骨巨尸重砸前摇：猩红脉冲警告环，重击/暴击可破防或完美闪避
+          g.lineStyle(2.4, C.red, 0.92).strokeCircle(z.x, zy - 28, 12 + frac * 12);
+          g.lineStyle(1.4, C.ember, 0.85).strokeEllipse(z.x, zy - 2, 34, 9);
+        }
       }
     }
 
@@ -1370,12 +1518,16 @@ export class GameScene extends Phaser.Scene {
         const guest = game.run.guests.find((o) => o.id === e.guestId);
         const gx = guest ? guest.x : 340;
         this.burst('fx_boom', gx, GROUND_Y - 36, 0.55);
-        const burstN = e.quality === 'legendary' ? 10 : e.quality === 'perfect' ? 6 : 4;
+        const burstN = e.hotCrit || e.warReward ? 10 : e.quality === 'legendary' ? 10 : e.quality === 'perfect' ? 6 : 4;
         for (let i = 0; i < burstN; i++) {
-          this.spawnSpark(gx, GROUND_Y - 40, Phaser.Math.FloatBetween(-1.4, 1.4), Phaser.Math.FloatBetween(-2.2, -0.6), 0.08, 26, 2.2, e.quality === 'legendary' ? C.gold : C.ember);
+          this.spawnSpark(gx, GROUND_Y - 40, Phaser.Math.FloatBetween(-1.4, 1.4), Phaser.Math.FloatBetween(-2.2, -0.6), 0.08, 26, 2.2, e.hotCrit || e.quality === 'legendary' ? C.gold : C.ember);
         }
         floaters.add(gx, GROUND_Y - 58, '+' + e.coins + '金', 'coin');
-        if (e.supportTag) {
+        if (e.hotCrit) {
+          floaters.add(gx, GROUND_Y - 76, '趁热暴击 +30%!', 'crit');
+        } else if (e.warReward) {
+          floaters.add(gx, GROUND_Y - 76, e.warReward === 'barrel' ? '暗号:明晚火油桶!' : '暗号:满额弹药箱!', 'crit');
+        } else if (e.supportTag) {
           floaters.add(gx, GROUND_Y - 76, e.supportTag, 'crit');
         } else if (e.dishBuffTag) {
           floaters.add(gx, GROUND_Y - 76, `明日 ${e.dishBuffTag}`, 'crit');
@@ -1433,6 +1585,54 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.shake(155, 0.0058);
         break;
       }
+      case 'barrelBoom': {
+        this.waves.push({ x: e.x, y: e.y, r: 10, maxR: 86, col: C.ember, life: 18, max: 18, width: 3.6 });
+        floaters.add(e.x, e.y - 36, '火油桶引爆!', 'burn');
+        break;
+      }
+      case 'airdropDrop': {
+        for (let i = 0; i < 6; i++) {
+          this.spawnSpark(e.x, GROUND_Y - 80, Phaser.Math.FloatBetween(-1.6, 1.6), Phaser.Math.FloatBetween(-1.2, 0.8), 0.06, 18, 2.2, C.paper);
+        }
+        floaters.add(e.x, GROUND_Y - 96, '伞绳已断!', 'crit');
+        break;
+      }
+      case 'airdropSlam': {
+        this.waves.push({ x: e.x, y: GROUND_Y - 8, r: 8, maxR: 82, col: C.gold, life: 16, max: 16, width: 3.2 });
+        this.cameras.main.shake(130, 0.005);
+        floaters.add(e.x, GROUND_Y - 40, e.stunned > 0 ? `空投砸晕 ×${e.stunned}!` : '空投砸落!', 'crit');
+        break;
+      }
+      case 'lanternBreak': {
+        this.waves.push({ x: e.x, y: e.y, r: 6, maxR: 54, col: C.infected, life: 16, max: 16, width: 3.2 });
+        this.waves.push({ x: e.x, y: e.y, r: 4, maxR: 34, col: C.gold, life: 12, max: 12, width: 2.2 });
+        for (let i = 0; i < 12; i++) {
+          this.spawnSpark(e.x, e.y, Phaser.Math.FloatBetween(-2.6, 2.6), Phaser.Math.FloatBetween(-2.8, 0.8), 0.1, 24, 2.5, i % 2 ? C.infected : C.gold);
+        }
+        this.camZoom = Math.max(this.camZoom, 1.03);
+        floaters.add(e.x, e.y - 38, '打灯破招! +1魔髓', 'crit');
+        break;
+      }
+      case 'guardBreak': {
+        this.waves.push({ x: e.x, y: e.y, r: 6, maxR: 46, col: C.gold, life: 15, max: 15, width: 3.2 });
+        this.slashes.push({ x: e.x, y: e.y, ang: -0.7, len: 22, col: C.gold, until: now + 130 });
+        this.slashes.push({ x: e.x, y: e.y, ang: 0.7, len: 22, col: C.red, until: now + 130 });
+        this.cameras.main.shake(110, 0.0042);
+        floaters.add(e.x, e.y - 42, '重击破防!', 'crit');
+        break;
+      }
+      case 'perfectDodge': {
+        this.slowMoUntil = now + 180;
+        this.heroFlashUntil = now + 200;
+        this.waves.push({ x: e.x, y: e.y, r: 6, maxR: 48, col: C.paper, life: 16, max: 16, width: 3.2 });
+        this.waves.push({ x: e.x, y: e.y, r: 4, maxR: 30, col: C.gold, life: 12, max: 12, width: 2.4 });
+        for (let i = 0; i < 10; i++) {
+          this.spawnSpark(e.x, e.y, Phaser.Math.FloatBetween(-2.4, 2.4), Phaser.Math.FloatBetween(-2.6, 0.6), 0.06, 22, 2.4, i % 2 ? C.paper : C.gold);
+        }
+        this.camZoom = Math.max(this.camZoom, 1.032);
+        floaters.add(e.x, e.y - 34, '绝境反骨! 暴击×3', 'crit');
+        break;
+      }
       case 'hurt':
         this.cameras.main.shake(e.cover ? 105 : 150, e.cover ? 0.004 : 0.006);
         if (e.cover && e.cover > 0) {
@@ -1449,6 +1649,8 @@ export class GameScene extends Phaser.Scene {
         this.camX = this.targetCamX();
         this.camKickX = 0;
         this.camZoom = 1;
+        this.slowMoUntil = 0;
+        this.heroFlashUntil = 0;
         this.sparks = [];
         this.waves = [];
         this.slashes = [];

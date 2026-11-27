@@ -256,9 +256,10 @@ export function computeTomorrowBattleBuff(run: RunState) {
     bonusGrenades += m.bonusGrenades ?? 0;
   }
 
+  const hotDmg = run.diner.hotServeBonus ?? 0;
   return {
     dishes: allDishes,
-    dmgMul: Math.min(1.2, dmgMul),
+    dmgMul: Math.min(1.2, dmgMul + hotDmg),
     haste: Math.min(0.85, haste),
     armor,
     turretMul: Math.min(0.95, turretMul),
@@ -606,6 +607,13 @@ export function rollDinerGuests(run: RunState) {
     const trendMatch = meal.tags.includes(run.diner.trendTag);
     const shortName = vip.name.includes('·') ? vip.name.split('·').pop()! : vip.name;
     const pay = computeDishPay(run, dishId, vip, trendMatch, personality);
+    const isUrgentWar = run.day >= 2 && idx === 1;
+    const warOrderReward: 'barrel' | 'ammo' | undefined = isUrgentWar ? (run.day % 2 === 0 ? 'barrel' : 'ammo') : undefined;
+    const orderQuote = isUrgentWar
+      ? (warOrderReward === 'barrel'
+        ? `暗号「红灯照雾」· 加急战备单！速上【${meal.name}】，明晚前院白送一只火油桶！`
+        : `暗号「掀桌满膛」· 加急战备单！速上【${meal.name}】，当场赠满额战备弹药箱！`)
+      : (VIP_ORDER_LINES[vip.id] ?? vip.bg);
     return {
       id: `${vip.id}_${run.day}_${idx}`,
       vipId: vip.id,
@@ -625,7 +633,10 @@ export function rollDinerGuests(run: RunState) {
       dishName: meal.name,
       pay,
       trendMatch,
-      orderQuote: VIP_ORDER_LINES[vip.id] ?? vip.bg,
+      isVipRequest: isUrgentWar || undefined,
+      requestBonusCoins: isUrgentWar ? Math.round(meal.basePay * 0.4) : undefined,
+      warOrderReward,
+      orderQuote,
       thanksQuote: vip.reactions.good,
       served: false,
       patience: 9999,
@@ -651,8 +662,8 @@ export function spawnShiftGuest(run: RunState): DinerGuest | null {
     * (hasTavernUpgrade(run, 'warm_lantern') ? 1.28 : 1);
   const maxPatience = Math.round((1560 + rand(run) * 280) * patMul);
 
-  const hasVipReqAlready = run.guests.some((o) => o.isVipRequest);
-  const wantVipReq = run.day >= 2 && !hasVipReqAlready && rand(run) < 0.45;
+  const hasVipReqAlready = run.guests.some((o) => o.isVipRequest && !o.served);
+  const wantVipReq = !hasVipReqAlready && rand(run) < 0.45;
   const shortName = vip.name.includes('·') ? vip.name.split('·').pop()! : vip.name;
 
   const cookable = MEAL_ORDER.filter((id) => (run.diner.menuStock[id] ?? 0) > 0 || hasIngredients(run, MEALS[id].cost));
@@ -660,10 +671,12 @@ export function spawnShiftGuest(run: RunState): DinerGuest | null {
   let dishId = pickGuestMeal(run, vip, rand(run) < 0.4, pool);
   let isVipRequest = false;
   let requestBonusCoins: number | undefined;
+  let warOrderReward: 'barrel' | 'ammo' | undefined;
   if (wantVipReq && cookable.length > 0) {
     dishId = pickGuestMeal(run, vip, false, cookable);
     isVipRequest = true;
     requestBonusCoins = Math.round(MEALS[dishId].basePay * 0.45);
+    warOrderReward = (run.day + seatIdx) % 2 === 0 ? 'barrel' : 'ammo';
   }
   const meal = MEALS[dishId];
   const trendMatch = meal.tags.includes(run.diner.trendTag);
@@ -689,8 +702,11 @@ export function spawnShiftGuest(run: RunState): DinerGuest | null {
     trendMatch,
     isVipRequest,
     requestBonusCoins,
+    warOrderReward,
     orderQuote: isVipRequest
-      ? `特邀军需：急需【${meal.name}】，赶在耐心过半前送达必有重金与战备回馈！`
+      ? (warOrderReward === 'barrel'
+        ? `暗号「红灯照雾」· 加急战备单！速上【${meal.name}】，明晚前院白送一只火油桶！`
+        : `暗号「掀桌满膛」· 加急战备单！速上【${meal.name}】，当场赠满额战备弹药箱！`)
       : (VIP_ORDER_LINES[vip.id] ?? vip.bg),
     thanksQuote: vip.reactions.good,
     served: false,
@@ -833,8 +849,9 @@ export function stepTavernShift(run: RunState, ev: GameEvent[]) {
       const dest = run.guests.find((o) => o.id === cd.guestId && !o.served && o.walkState === 'seated')
         ?? run.guests.find((o) => o.orderKind === 'dish' && !o.served && o.walkState === 'seated' && !o.isRye && o.dish === cd.dish);
       if (dest && Math.abs(run.player.x - dest.x) <= 26) {
+        const hotCrit = !cd.isRye && cd.hotUntilTick !== undefined && run.tick <= cd.hotUntilTick;
         run.carryingDish = null;
-        completeServeGuest(run, dest, cd.quality, ev, false, false, !!cd.isRye);
+        completeServeGuest(run, dest, cd.quality, ev, false, false, !!cd.isRye, hotCrit);
       }
     } else if (run.carryingDrink) {
       const ck = run.carryingDrink;
@@ -896,6 +913,7 @@ export function stepTavernShift(run: RunState, ev: GameEvent[]) {
           dishName: order.dishName,
           quality,
           isRye: order.isRye,
+          cookedTick: run.tick,
         };
         s.counterDishes.push(cDish);
         doneIds.add(order.id);
@@ -916,6 +934,7 @@ export function stepTavernShift(run: RunState, ev: GameEvent[]) {
               dish: order.dish,
               dishName: order.dishName,
               quality: 'perfect',
+              cookedTick: run.tick,
             });
             ev.push({ t: 'kitchenDone', dish: order.dish, dishName: order.dishName, extraPlate: true });
           }
@@ -1025,6 +1044,7 @@ export function completeServeGuest(
   spendFallbackMeat: boolean,
   isDrink = false,
   isRyeOverride?: boolean,
+  hotCrit = false,
 ) {
   const isRye = !!(isRyeOverride ?? g.isRye);
   const qMeta = QUALITY_META[quality];
@@ -1075,6 +1095,12 @@ export function completeServeGuest(
   const party = activeParty(run);
   const partyMatch = !isRye && !isDrink && isPartyDish(run, g.dish);
   const baseCoins = isRye ? RYE_FALLBACK.pay : Math.round(g.pay * qMeta.payMul);
+  const effectiveHot = hotCrit && !isRye && !isDrink;
+  if (effectiveHot) {
+    comboTip += Math.max(4, Math.round(baseCoins * 0.3));
+    run.player.armor = Math.min(run.player.maxArmor, run.player.armor + 10);
+    run.diner.hotServeBonus = Math.min(0.12, (run.diner.hotServeBonus ?? 0) + 0.04);
+  }
   const partyBonusPart = partyMatch && party ? Math.round(baseCoins * (1 - 1 / party.payMul)) : 0;
   const finalCoins = baseCoins + comboTip;
   const zhaoMul = hasAlly(run, 'zhao') && allyRole(run, 'zhao') === 'floor' ? 1.3 : 1;
@@ -1115,7 +1141,7 @@ export function completeServeGuest(
   const revText = isRye
     ? '今夜酒馆菜单卖断了，只啃到干硬黑麦饼……掌柜明日快多备热菜啊！'
     : vipRequestClear
-      ? `点名的【${g.dishName}】趁热送到了！掌柜实在靠谱，额外奉上炉火心得！`
+      ? `加急战备单【${g.dishName}】按暗号准时上桌！酒馆硬核到底，明晚战场见！`
       : pool[Math.floor(rand(run) * pool.length)] ?? g.reactionQuote;
   run.diner.reviews.unshift({
     id: run.nextId++,
@@ -1146,6 +1172,18 @@ export function completeServeGuest(
     run.spice += 2;
   }
 
+  let warReward: 'barrel' | 'ammo' | undefined;
+  if (vipRequestClear && !isRye) {
+    warReward = g.warOrderReward ?? ((run.day + g.seatIdx) % 2 === 0 ? 'barrel' : 'ammo');
+    if (warReward === 'barrel') {
+      run.diner.bonusBarrels = Math.min(2, (run.diner.bonusBarrels ?? 0) + 1);
+    } else {
+      run.player.grenades = Math.min(MAX_GRENADES, run.player.grenades + 1);
+      run.player.armor = Math.min(run.player.maxArmor, run.player.armor + 25);
+      run.diner.bonusCritRounds = Math.min(6, (run.diner.bonusCritRounds ?? 0) + 3);
+    }
+  }
+
   let supportKind: GuestSupportKind | undefined;
   let supportTag: string | undefined;
   let dishBuffTag: string | undefined;
@@ -1162,7 +1200,7 @@ export function completeServeGuest(
     t: 'serve', guestId: g.id, vipId: g.vipId, name: g.name, dishName: isRye ? RYE_FALLBACK.name : g.dishName,
     quality, coins: totalCoins, fans: fansGain + (allServed ? 8 : 0), rep: repDelta + (allServed ? 1 : 0),
     quote: g.reactionQuote, allServed, firstMeet, trendMatch: g.trendMatch, partyMatch, vipRequestClear, rankUp, isRye,
-    supportKind, supportTag, dishBuffTag,
+    supportKind, supportTag, dishBuffTag, hotCrit: effectiveHot || undefined, warReward,
   });
 
   if (run.diner.rep >= 10 && !run.story.seenEvents.includes('rep10')) {
